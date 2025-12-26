@@ -1,0 +1,486 @@
+import type { TabNode, TreeState, IStorageService } from '@/types';
+import { STORAGE_KEYS } from '@/storage/StorageService';
+
+/**
+ * TreeStateManager
+ *
+ * タブツリー状態の集中管理と永続化を担当するサービス
+ * Requirements: 2.1, 2.2, 2.3
+ */
+export class TreeStateManager {
+  private nodes: Map<string, TabNode> = new Map();
+  private tabToNode: Map<number, string> = new Map();
+  private views: Map<string, string[]> = new Map(); // viewId -> nodeIds[]
+  private expandedNodes: Set<string> = new Set();
+
+  constructor(private storageService: IStorageService) {}
+
+  /**
+   * 指定されたviewIdのタブツリーを取得
+   * @param viewId - ビューID
+   * @returns ルートノードの配列
+   */
+  getTree(viewId: string): TabNode[] {
+    const nodeIds = this.views.get(viewId) || [];
+    const rootNodes = nodeIds
+      .map((id) => this.nodes.get(id))
+      .filter((node): node is TabNode => node !== undefined && node.parentId === null);
+
+    return rootNodes;
+  }
+
+  /**
+   * tabIdからTabNodeを取得
+   * @param tabId - タブID
+   * @returns TabNodeまたはnull
+   */
+  getNodeByTabId(tabId: number): TabNode | null {
+    const nodeId = this.tabToNode.get(tabId);
+    if (!nodeId) return null;
+    return this.nodes.get(nodeId) || null;
+  }
+
+  /**
+   * 新しいタブを追加
+   * @param tab - Chrome タブオブジェクト
+   * @param parentId - 親ノードID（nullの場合はルートノード）
+   * @param viewId - ビューID
+   */
+  async addTab(
+    tab: chrome.tabs.Tab,
+    parentId: string | null,
+    viewId: string,
+  ): Promise<void> {
+    if (!tab.id) {
+      throw new Error('Tab ID is required');
+    }
+
+    // 新しいノードを作成
+    const nodeId = `node-${tab.id}`;
+    const depth = parentId ? (this.nodes.get(parentId)?.depth || 0) + 1 : 0;
+
+    const newNode: TabNode = {
+      id: nodeId,
+      tabId: tab.id,
+      parentId,
+      children: [],
+      isExpanded: true,
+      depth,
+      viewId,
+    };
+
+    // マッピングに追加
+    this.nodes.set(nodeId, newNode);
+    this.tabToNode.set(tab.id, nodeId);
+    this.expandedNodes.add(nodeId);
+
+    // ビューに追加
+    const viewNodes = this.views.get(viewId) || [];
+    viewNodes.push(nodeId);
+    this.views.set(viewId, viewNodes);
+
+    // 親ノードに子として追加
+    if (parentId) {
+      const parentNode = this.nodes.get(parentId);
+      if (parentNode) {
+        parentNode.children.push(newNode);
+      }
+    }
+
+    // ストレージに永続化
+    await this.persistState();
+  }
+
+  /**
+   * タブを削除
+   * @param tabId - タブID
+   * @param childTabBehavior - 子タブの処理方法 ('promote' | 'close_all')
+   * @returns 閉じられたタブIDの配列（close_allの場合）
+   */
+  async removeTab(
+    tabId: number,
+    childTabBehavior: 'promote' | 'close_all' = 'promote',
+  ): Promise<number[]> {
+    const nodeId = this.tabToNode.get(tabId);
+    if (!nodeId) return [];
+
+    const node = this.nodes.get(nodeId);
+    if (!node) return [];
+
+    const closedTabIds: number[] = [tabId];
+
+    // 子タブの処理
+    if (childTabBehavior === 'promote') {
+      // 子タブを昇格させる
+      this.promoteChildren(node);
+    } else if (childTabBehavior === 'close_all') {
+      // 子タブを再帰的に削除
+      const childTabIds = this.removeChildrenRecursively(node);
+      closedTabIds.push(...childTabIds);
+    }
+
+    // 親ノードから削除
+    if (node.parentId) {
+      const parentNode = this.nodes.get(node.parentId);
+      if (parentNode) {
+        parentNode.children = parentNode.children.filter((child) => child.id !== nodeId);
+      }
+    }
+
+    // ビューから削除
+    const viewNodes = this.views.get(node.viewId) || [];
+    this.views.set(
+      node.viewId,
+      viewNodes.filter((id) => id !== nodeId),
+    );
+
+    // マッピングから削除
+    this.nodes.delete(nodeId);
+    this.tabToNode.delete(tabId);
+    this.expandedNodes.delete(nodeId);
+
+    // ストレージに永続化
+    await this.persistState();
+
+    return closedTabIds;
+  }
+
+  /**
+   * ノードを移動
+   * @param nodeId - ノードID
+   * @param newParentId - 新しい親ノードID（nullの場合はルート）
+   * @param index - 挿入位置
+   */
+  async moveNode(
+    nodeId: string,
+    newParentId: string | null,
+    index: number,
+  ): Promise<void> {
+    const node = this.nodes.get(nodeId);
+    if (!node) {
+      console.warn(`TreeStateManager.moveNode: Node ${nodeId} not found`);
+      return;
+    }
+
+    // 循環参照のチェック
+    if (newParentId && this.isDescendant(newParentId, nodeId)) {
+      console.error(`TreeStateManager.moveNode: Circular reference detected`);
+      return;
+    }
+
+    // 古い親から削除
+    if (node.parentId) {
+      const oldParent = this.nodes.get(node.parentId);
+      if (oldParent) {
+        oldParent.children = oldParent.children.filter((child) => child.id !== nodeId);
+      }
+    }
+
+    // 新しい親に追加
+    node.parentId = newParentId;
+    node.depth = newParentId ? (this.nodes.get(newParentId)?.depth || 0) + 1 : 0;
+
+    // 子ノードの深さを再帰的に更新
+    this.updateChildrenDepth(node);
+
+    if (newParentId) {
+      const newParent = this.nodes.get(newParentId);
+      if (newParent) {
+        newParent.children.splice(index, 0, node);
+      }
+    }
+
+    // ストレージに永続化
+    await this.persistState();
+  }
+
+  /**
+   * ノードの展開状態を切り替え
+   * @param nodeId - ノードID
+   */
+  async toggleExpand(nodeId: string): Promise<void> {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+
+    node.isExpanded = !node.isExpanded;
+
+    if (node.isExpanded) {
+      this.expandedNodes.add(nodeId);
+    } else {
+      this.expandedNodes.delete(nodeId);
+    }
+
+    // ストレージに永続化
+    await this.persistState();
+  }
+
+  /**
+   * chrome.tabs APIと同期
+   */
+  async syncWithChromeTabs(): Promise<void> {
+    try {
+      const tabs = await chrome.tabs.query({});
+
+      // 現在のビューIDを取得（デフォルトビューを使用）
+      const defaultViewId = 'default-view';
+
+      for (const tab of tabs) {
+        if (!tab.id) continue;
+
+        // 既存のノードがない場合のみ追加
+        const existingNode = this.getNodeByTabId(tab.id);
+        if (!existingNode) {
+          // openerTabIdから親を特定
+          const parentNode = tab.openerTabId
+            ? this.getNodeByTabId(tab.openerTabId)
+            : null;
+
+          await this.addTab(tab, parentNode?.id || null, defaultViewId);
+        }
+      }
+
+      // ストレージに永続化
+      await this.persistState();
+    } catch (error) {
+      console.error('TreeStateManager.syncWithChromeTabs error:', error);
+    }
+  }
+
+  /**
+   * 指定されたタブとそのすべての子孫タブを取得 (Task 7.3: サブツリー全体の移動)
+   * Requirement 4.3: 親タブとそのサブツリー全体を移動
+   *
+   * @param tabId - ルートタブのID
+   * @returns サブツリー全体のノード配列（ルートを含む）
+   */
+  getSubtree(tabId: number): TabNode[] {
+    const rootNode = this.getNodeByTabId(tabId);
+    if (!rootNode) {
+      return [];
+    }
+
+    const subtree: TabNode[] = [];
+    this.collectSubtreeNodes(rootNode, subtree);
+    return subtree;
+  }
+
+  /**
+   * サブツリー全体を別のビューに移動 (Task 7.3: サブツリー全体の移動)
+   * Requirement 4.4: クロスウィンドウ移動時にタブのツリー構造を維持
+   *
+   * @param tabId - ルートタブのID
+   * @param newViewId - 移動先のビューID
+   */
+  async moveSubtreeToView(tabId: number, newViewId: string): Promise<void> {
+    const subtree = this.getSubtree(tabId);
+    if (subtree.length === 0) {
+      return;
+    }
+
+    // サブツリー内のすべてのノードのviewIdを更新
+    for (const node of subtree) {
+      // 古いビューから削除
+      const oldViewNodes = this.views.get(node.viewId) || [];
+      this.views.set(
+        node.viewId,
+        oldViewNodes.filter((id) => id !== node.id),
+      );
+
+      // 新しいビューに追加
+      node.viewId = newViewId;
+      const newViewNodes = this.views.get(newViewId) || [];
+      if (!newViewNodes.includes(node.id)) {
+        newViewNodes.push(node.id);
+        this.views.set(newViewId, newViewNodes);
+      }
+    }
+
+    // ストレージに永続化
+    await this.persistState();
+  }
+
+  /**
+   * ノードとその子孫を再帰的に収集
+   * @param node - 収集開始ノード
+   * @param result - 結果配列
+   */
+  private collectSubtreeNodes(node: TabNode, result: TabNode[]): void {
+    result.push(node);
+
+    // 子ノードを再帰的に収集
+    for (const child of node.children) {
+      this.collectSubtreeNodes(child, result);
+    }
+  }
+
+  /**
+   * ストレージに状態を永続化
+   */
+  private async persistState(): Promise<void> {
+    const nodesRecord: Record<string, TabNode> = {};
+    this.nodes.forEach((node, id) => {
+      nodesRecord[id] = node;
+    });
+
+    const tabToNodeRecord: Record<number, string> = {};
+    this.tabToNode.forEach((nodeId, tabId) => {
+      tabToNodeRecord[tabId] = nodeId;
+    });
+
+    const treeState: TreeState = {
+      views: [], // ビュー管理は別モジュールで実装予定
+      currentViewId: 'default-view',
+      nodes: nodesRecord,
+      tabToNode: tabToNodeRecord,
+    };
+
+    await this.storageService.set(STORAGE_KEYS.TREE_STATE, treeState);
+  }
+
+  /**
+   * ストレージから状態を復元
+   */
+  async loadState(): Promise<void> {
+    try {
+      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+      if (!state) return;
+
+      // ノードの復元
+      this.nodes.clear();
+      this.tabToNode.clear();
+      this.views.clear();
+
+      Object.entries(state.nodes).forEach(([id, node]) => {
+        this.nodes.set(id, node);
+        this.tabToNode.set(node.tabId, id);
+
+        // ビューにノードを追加
+        const viewNodes = this.views.get(node.viewId) || [];
+        viewNodes.push(id);
+        this.views.set(node.viewId, viewNodes);
+
+        if (node.isExpanded) {
+          this.expandedNodes.add(id);
+        }
+      });
+    } catch (error) {
+      console.error('TreeStateManager.loadState error:', error);
+    }
+  }
+
+  /**
+   * ノードが別のノードの子孫かどうかをチェック
+   * @param ancestorId - 祖先ノードID
+   * @param descendantId - 子孫ノードID
+   * @returns true if descendantId is a descendant of ancestorId
+   */
+  private isDescendant(ancestorId: string, descendantId: string): boolean {
+    const ancestor = this.nodes.get(ancestorId);
+    if (!ancestor) return false;
+
+    // 再帰的に子ノードをチェック
+    for (const child of ancestor.children) {
+      if (child.id === descendantId) return true;
+      if (this.isDescendant(child.id, descendantId)) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * ノードの子ノードの深さを再帰的に更新
+   * @param node - 更新するノード
+   */
+  private updateChildrenDepth(node: TabNode): void {
+    for (const child of node.children) {
+      child.depth = node.depth + 1;
+      this.updateChildrenDepth(child);
+    }
+  }
+
+  /**
+   * 子タブを親のレベルに昇格させる (Requirement 2.3: promote)
+   *
+   * 親タブが削除された時、その子タブを親のレベルに昇格させます:
+   * - 親がルートノードの場合: 子タブもルートノードになる
+   * - 親が子ノードの場合: 子タブは親の兄弟ノードになる
+   *
+   * @param parentNode - 削除される親ノード
+   */
+  private promoteChildren(parentNode: TabNode): void {
+    const children = [...parentNode.children];
+
+    for (const child of children) {
+      // 子ノードの親IDを親ノードの親IDに設定
+      // (親がルートの場合はnullになり、子もルートノードになる)
+      child.parentId = parentNode.parentId;
+
+      // 深さを1レベル上げる
+      child.depth = parentNode.depth;
+
+      // 子ノードの子孫の深さも再帰的に更新
+      this.updateChildrenDepth(child);
+
+      // 親ノードに親がいる場合、その親の子として追加
+      if (parentNode.parentId) {
+        const grandparentNode = this.nodes.get(parentNode.parentId);
+        if (grandparentNode) {
+          // 親ノードの直後に子を挿入して順序を保つ
+          const parentIndex = grandparentNode.children.findIndex(
+            (c) => c.id === parentNode.id,
+          );
+          if (parentIndex !== -1) {
+            grandparentNode.children.splice(parentIndex + 1, 0, child);
+          } else {
+            grandparentNode.children.push(child);
+          }
+        }
+      }
+      // 親がルートノードの場合は何もしない
+      // (child.parentId = nullで既にルートノードとして扱われる)
+    }
+
+    // 親ノードの子配列をクリア
+    parentNode.children = [];
+  }
+
+  /**
+   * 子タブを再帰的に削除 (Requirement 2.3: close_all)
+   *
+   * 親タブが削除された時、その子タブとすべての子孫タブを再帰的に削除します。
+   * 深さ優先探索で子孫から順に削除していきます。
+   *
+   * @param parentNode - 削除される親ノード
+   * @returns 削除された子タブのIDリスト(親ノード自身は含まない)
+   */
+  private removeChildrenRecursively(parentNode: TabNode): number[] {
+    const closedTabIds: number[] = [];
+
+    // 配列のコピーを作成してイテレート（削除中に配列が変更されるのを防ぐ）
+    for (const child of [...parentNode.children]) {
+      // 孫タブを再帰的に削除（深さ優先）
+      const grandchildTabIds = this.removeChildrenRecursively(child);
+      closedTabIds.push(...grandchildTabIds);
+
+      // 子タブのIDを記録
+      closedTabIds.push(child.tabId);
+
+      // ビューから削除
+      const viewNodes = this.views.get(child.viewId) || [];
+      this.views.set(
+        child.viewId,
+        viewNodes.filter((id) => id !== child.id),
+      );
+
+      // マッピングから削除
+      this.nodes.delete(child.id);
+      this.tabToNode.delete(child.tabId);
+      this.expandedNodes.delete(child.id);
+    }
+
+    // 親ノードの子配列をクリア
+    parentNode.children = [];
+
+    return closedTabIds;
+  }
+}

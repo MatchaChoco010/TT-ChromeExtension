@@ -1,0 +1,513 @@
+// Service Worker event handlers
+import type { MessageType, MessageResponse } from '@/types';
+import { TreeStateManager } from '@/services/TreeStateManager';
+import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
+
+// Global instances
+const storageService = new StorageService();
+const treeStateManager = new TreeStateManager(storageService);
+
+// Export for testing
+export { storageService as testStorageService, treeStateManager as testTreeStateManager };
+
+// Global drag state for cross-window drag & drop
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let dragState: { tabId: number; treeData: any; sourceWindowId: number } | null =
+  null;
+
+// Default view ID
+const DEFAULT_VIEW_ID = 'default-view';
+
+/**
+ * Register all Chrome tabs event listeners
+ */
+export function registerTabEventListeners(): void {
+  chrome.tabs.onCreated.addListener(handleTabCreated);
+  chrome.tabs.onRemoved.addListener(handleTabRemoved);
+  chrome.tabs.onMoved.addListener(handleTabMoved);
+  chrome.tabs.onUpdated.addListener(handleTabUpdated);
+  chrome.tabs.onActivated.addListener(handleTabActivated);
+}
+
+/**
+ * Register all Chrome windows event listeners
+ */
+export function registerWindowEventListeners(): void {
+  chrome.windows.onCreated.addListener(handleWindowCreated);
+  chrome.windows.onRemoved.addListener(handleWindowRemoved);
+}
+
+/**
+ * Register Chrome runtime message listener
+ */
+export function registerMessageListener(): void {
+  chrome.runtime.onMessage.addListener(handleMessage);
+}
+
+// Tab event handlers
+export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
+  console.log('Tab created:', tab.id);
+
+  if (!tab.id) return;
+
+  try {
+    // Get user settings to determine new tab position
+    const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
+
+    // Task 12.2 (Requirements 9.2, 9.3, 9.4): タブ開き方別の位置ルール適用
+    // タブがどのように開かれたかを判定し、適切な位置ルールを選択
+    let newTabPosition: 'child' | 'sibling' | 'end';
+
+    if (tab.openerTabId) {
+      // Requirement 9.2: リンククリックから開かれたタブ
+      // newTabPositionFromLink が設定されていればそれを使用、なければ既存のnewTabPositionを使用(後方互換性)
+      newTabPosition =
+        settings?.newTabPositionFromLink !== undefined
+          ? settings.newTabPositionFromLink
+          : settings?.newTabPosition || 'child';
+    } else {
+      // Requirement 9.3: 手動で開かれたタブ(アドレスバー、新規タブボタンなど)
+      // newTabPositionManual が設定されていればそれを使用、なければ既存のnewTabPositionを使用(後方互換性)
+      newTabPosition =
+        settings?.newTabPositionManual !== undefined
+          ? settings.newTabPositionManual
+          : settings?.newTabPosition || 'child';
+    }
+
+    // Determine parent node
+    let parentId: string | null = null;
+
+    if (tab.openerTabId && newTabPosition === 'child') {
+      // Find parent node by openerTabId
+      const parentNode = treeStateManager.getNodeByTabId(tab.openerTabId);
+      if (parentNode) {
+        parentId = parentNode.id;
+      }
+    }
+
+    // Add tab to tree
+    await treeStateManager.addTab(tab, parentId, DEFAULT_VIEW_ID);
+
+    // Notify UI about state update
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
+      // Ignore errors when no listeners are available
+      if (
+        !error.message?.includes('Receiving end does not exist') &&
+        !error.message?.includes('message port closed')
+      ) {
+        console.error('Error sending STATE_UPDATED message:', error);
+      }
+    });
+  } catch (error) {
+    console.error('Error in handleTabCreated:', error);
+  }
+}
+
+export async function handleTabRemoved(
+  tabId: number,
+  removeInfo: chrome.tabs.TabRemoveInfo,
+): Promise<void> {
+  console.log('Tab removed:', tabId, removeInfo);
+
+  try {
+    // Get user settings for child tab behavior
+    const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
+    const childTabBehavior = settings?.childTabBehavior || 'promote';
+
+    // Remove tab from tree state
+    await treeStateManager.removeTab(tabId, childTabBehavior);
+
+    // Notify UI about state update
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
+      // Ignore errors when no listeners are available
+      if (
+        !error.message?.includes('Receiving end does not exist') &&
+        !error.message?.includes('message port closed')
+      ) {
+        console.error('Error sending STATE_UPDATED message:', error);
+      }
+    });
+  } catch (error) {
+    console.error('Error in handleTabRemoved:', error);
+  }
+}
+
+export async function handleTabMoved(
+  tabId: number,
+  moveInfo: chrome.tabs.TabMoveInfo,
+): Promise<void> {
+  console.log('Tab moved:', tabId, moveInfo);
+
+  try {
+    // Tab moved event doesn't affect tree structure (parent-child relationships)
+    // Only notify UI to re-render with updated tab order
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
+      // Ignore errors when no listeners are available
+      if (
+        !error.message?.includes('Receiving end does not exist') &&
+        !error.message?.includes('message port closed')
+      ) {
+        console.error('Error sending STATE_UPDATED message:', error);
+      }
+    });
+  } catch (error) {
+    console.error('Error in handleTabMoved:', error);
+  }
+}
+
+export async function handleTabUpdated(
+  tabId: number,
+  changeInfo: chrome.tabs.TabChangeInfo,
+  tab: chrome.tabs.Tab,
+): Promise<void> {
+  console.log('Tab updated:', tabId, changeInfo, tab);
+
+  try {
+    // Only notify UI for meaningful changes (title, url, status, favIconUrl)
+    if (
+      changeInfo.title !== undefined ||
+      changeInfo.url !== undefined ||
+      changeInfo.status !== undefined ||
+      changeInfo.favIconUrl !== undefined
+    ) {
+      // Notify UI about state update
+      chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
+        // Ignore errors when no listeners are available
+        if (
+          !error.message?.includes('Receiving end does not exist') &&
+          !error.message?.includes('message port closed')
+        ) {
+          console.error('Error sending STATE_UPDATED message:', error);
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error in handleTabUpdated:', error);
+  }
+}
+
+function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): void {
+  console.log('Tab activated:', activeInfo);
+  // TODO: Implement unread state update logic
+}
+
+// Window event handlers
+function handleWindowCreated(window: chrome.windows.Window): void {
+  console.log('Window created:', window.id);
+  // TODO: Implement window state update logic
+}
+
+function handleWindowRemoved(windowId: number): void {
+  console.log('Window removed:', windowId);
+  // TODO: Implement window state update logic
+}
+
+// Message handler
+function handleMessage(
+  message: MessageType,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): boolean {
+  try {
+    switch (message.type) {
+      case 'GET_STATE':
+        handleGetState(sendResponse);
+        break;
+
+      case 'UPDATE_TREE':
+        handleUpdateTree(message.payload, sendResponse);
+        break;
+
+      case 'ACTIVATE_TAB':
+        handleActivateTab(message.payload.tabId, sendResponse);
+        break;
+
+      case 'CLOSE_TAB':
+        handleCloseTab(message.payload.tabId, sendResponse);
+        break;
+
+      case 'MOVE_TAB_TO_WINDOW':
+        handleMoveTabToWindow(
+          message.payload.tabId,
+          message.payload.windowId,
+          sendResponse,
+        );
+        break;
+
+      case 'CREATE_WINDOW_WITH_TAB':
+        handleCreateWindowWithTab(message.payload.tabId, sendResponse);
+        break;
+
+      case 'CREATE_WINDOW_WITH_SUBTREE':
+        handleCreateWindowWithSubtree(message.payload.tabId, sendResponse);
+        break;
+
+      case 'MOVE_SUBTREE_TO_WINDOW':
+        handleMoveSubtreeToWindow(
+          message.payload.tabId,
+          message.payload.windowId,
+          sendResponse,
+        );
+        break;
+
+      case 'SET_DRAG_STATE':
+        handleSetDragState(message.payload, sendResponse);
+        break;
+
+      case 'GET_DRAG_STATE':
+        handleGetDragState(sendResponse);
+        break;
+
+      case 'CLEAR_DRAG_STATE':
+        handleClearDragState(sendResponse);
+        break;
+
+      default:
+        sendResponse({
+          success: false,
+          error: 'Unknown message type',
+        });
+    }
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+
+  // Return true to indicate async response
+  return true;
+}
+
+// Message handler implementations
+function handleGetState(
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  // TODO: Get actual tree state from storage
+  sendResponse({ success: true, data: null });
+}
+
+function handleUpdateTree(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _payload: { nodeId: string; newParentId: string | null; index: number },
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  // TODO: Implement tree update logic
+  sendResponse({ success: true, data: null });
+}
+
+function handleActivateTab(
+  tabId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  chrome.tabs.update(tabId, { active: true }, () => {
+    if (chrome.runtime.lastError) {
+      sendResponse({
+        success: false,
+        error: chrome.runtime.lastError.message || 'Unknown error',
+      });
+    } else {
+      sendResponse({ success: true, data: null });
+    }
+  });
+}
+
+function handleCloseTab(
+  tabId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  chrome.tabs.remove(tabId, () => {
+    if (chrome.runtime.lastError) {
+      sendResponse({
+        success: false,
+        error: chrome.runtime.lastError.message || 'Unknown error',
+      });
+    } else {
+      sendResponse({ success: true, data: null });
+    }
+  });
+}
+
+function handleMoveTabToWindow(
+  tabId: number,
+  windowId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  chrome.tabs.move(tabId, { windowId, index: -1 }, () => {
+    if (chrome.runtime.lastError) {
+      sendResponse({
+        success: false,
+        error: chrome.runtime.lastError.message || 'Unknown error',
+      });
+    } else {
+      sendResponse({ success: true, data: null });
+    }
+  });
+}
+
+function handleCreateWindowWithTab(
+  tabId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  chrome.windows.create({ tabId }, () => {
+    if (chrome.runtime.lastError) {
+      sendResponse({
+        success: false,
+        error: chrome.runtime.lastError.message || 'Unknown error',
+      });
+    } else {
+      sendResponse({ success: true, data: null });
+    }
+  });
+}
+
+/**
+ * Task 7.3: サブツリー全体で新しいウィンドウを作成
+ * Requirement 4.2, 4.3: パネル外へのドロップで新しいウィンドウを作成し、サブツリー全体を移動
+ */
+async function handleCreateWindowWithSubtree(
+  tabId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    // サブツリー全体を取得
+    const subtree = treeStateManager.getSubtree(tabId);
+    if (subtree.length === 0) {
+      sendResponse({
+        success: false,
+        error: 'Tab not found',
+      });
+      return;
+    }
+
+    // すべてのタブIDを取得
+    const tabIds = subtree.map((node) => node.tabId);
+
+    // 新しいウィンドウを作成し、最初のタブを移動
+    chrome.windows.create({ tabId }, async (window) => {
+      if (chrome.runtime.lastError || !window || !window.id) {
+        sendResponse({
+          success: false,
+          error: chrome.runtime.lastError?.message || 'Failed to create window',
+        });
+        return;
+      }
+
+      // 残りのタブを新しいウィンドウに移動
+      if (tabIds.length > 1) {
+        const remainingTabIds = tabIds.slice(1);
+
+        // タブを順番に移動
+        for (const tid of remainingTabIds) {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              chrome.tabs.move(tid, { windowId: window.id!, index: -1 }, () => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve();
+                }
+              });
+            });
+          } catch (error) {
+            console.error(`Failed to move tab ${tid}:`, error);
+          }
+        }
+      }
+
+      sendResponse({ success: true, data: null });
+    });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Task 7.3: サブツリー全体を別のウィンドウに移動
+ * Requirement 4.1, 4.3, 4.4: タブを別ウィンドウに移動し、ツリー構造を維持
+ */
+async function handleMoveSubtreeToWindow(
+  tabId: number,
+  windowId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    // サブツリー全体を取得
+    const subtree = treeStateManager.getSubtree(tabId);
+    if (subtree.length === 0) {
+      sendResponse({
+        success: false,
+        error: 'Tab not found',
+      });
+      return;
+    }
+
+    // すべてのタブIDを取得
+    const tabIds = subtree.map((node) => node.tabId);
+
+    // タブを順番に移動
+    for (const tid of tabIds) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          chrome.tabs.move(tid, { windowId, index: -1 }, () => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message || 'Unknown error'));
+            } else {
+              resolve();
+            }
+          });
+        });
+      } catch (error) {
+        console.error(`Failed to move tab ${tid}:`, error);
+      }
+    }
+
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+function handleSetDragState(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload: { tabId: number; treeData: any; sourceWindowId: number },
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  dragState = payload;
+  sendResponse({ success: true, data: null });
+}
+
+function handleGetDragState(
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  sendResponse({ success: true, data: dragState });
+}
+
+function handleClearDragState(
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  dragState = null;
+  sendResponse({ success: true, data: null });
+}
+
+// Export drag state getter for testing
+export function getDragState():
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { tabId: number; treeData: any; sourceWindowId: number } | null {
+  return dragState;
+}
+
+// Export drag state setter for testing
+export function setDragState(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  state: { tabId: number; treeData: any; sourceWindowId: number } | null,
+): void {
+  dragState = state;
+}

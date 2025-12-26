@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Vivaldi-TT",
+  "version": "1.0.0",
+  "description": "Tree-style tab manager for Vivaldi browser",
+  "permissions": [
+    "sidePanel",
+    "tabs",
+    "storage",
+    "unlimitedStorage",
+    "alarms"
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Toggle Tree Tabs"
+  }
+}

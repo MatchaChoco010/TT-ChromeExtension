@@ -1,0 +1,69 @@
+# Project Structure
+
+## Organization Philosophy
+
+機能ドメイン別の階層構造を採用。拡張機能の実行コンテキスト（Background / UI）と責務（Services / Storage / Types）を明確に分離しています。
+
+## Directory Patterns
+
+### Background Logic (`/src/background/`)
+**Purpose**: Service Worker実行環境のコード（タブイベント処理、ツリー同期）
+**Example**: `service-worker.ts`, `event-handlers.ts`, `tree-sync.test.ts`
+
+### Side Panel UI (`/src/sidepanel/`)
+**Purpose**: Reactベースのユーザーインターフェース
+**Subdirectories**:
+- `components/`: UIコンポーネント（TreeNode, TabTreeView, SettingsPanel等）
+- `providers/`: Reactコンテキストプロバイダー（TreeStateProvider, ThemeProvider）
+- `hooks/`: カスタムフック（useMenuActions等）
+
+**Example**: `components/TreeNode.tsx`, `providers/TreeStateProvider.tsx`
+
+### Services (`/src/services/`)
+**Purpose**: ビジネスロジック層（スナップショット管理等）
+**Example**: `SnapshotManager.ts`
+
+### Storage (`/src/storage/`)
+**Purpose**: データ永続化の抽象化層（IndexedDB操作）
+**Example**: `IndexedDBService.ts`, `StorageService.ts`
+
+### Types (`/src/types/`)
+**Purpose**: 型定義の集約（プロジェクト全体で共有）
+**Example**: `index.ts` (TabNode, TabInfo, UserSettings等)
+
+### Testing (`/src/test/`)
+**Purpose**: クロスカッティングな統合テスト（パフォーマンス、互換性）
+**Example**: `performance.test.tsx`, `vivaldi-compatibility.test.tsx`
+
+## Naming Conventions
+
+- **Components**: PascalCase（`TreeNode.tsx`, `SettingsPanel.tsx`）
+- **Tests**: `*.test.ts(x)` (unit), `*.integration.test.tsx` (integration), `*.e2e.test.tsx` (e2e)
+- **Services/Utilities**: PascalCase for classes, camelCase for functions
+- **Types**: PascalCase interfaces/types（`TabNode`, `UserSettings`）
+
+## Import Organization
+
+```typescript
+// 外部ライブラリ
+import React from 'react';
+import type { DragEndEvent } from '@dnd-kit/core';
+
+// 内部モジュール（@/ alias使用）
+import type { TabNode, TabInfo } from '@/types';
+import { TreeStateProvider } from '@/sidepanel/providers/TreeStateProvider';
+import UnreadBadge from './UnreadBadge'; // 同階層コンポーネントは相対パス
+```
+
+**Path Aliases**:
+- `@/`: `./src/` へのマッピング（tsconfig.json + vite.config.ts）
+
+## Code Organization Principles
+
+- **Context分離**: Background（Service Worker）とSidepanel（React UI）は独立して動作
+- **Type-first**: 共通型は`@/types`に集約、import時はtype-only importを活用
+- **Colocation**: コンポーネントとテストは同ディレクトリに配置（関連性を明示）
+- **Provider Pattern**: グローバル状態はReact Contextで管理（TreeState, DragDrop, Theme）
+
+---
+_Document patterns, not file trees. New files following patterns shouldn't require updates_
