@@ -1,5 +1,5 @@
 ---
-description: Execute all pending spec tasks sequentially with clean context per task
+description: Execute all pending spec tasks sequentially with clean context per task (project)
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Task
 argument-hint: <feature-name>
 ---
@@ -60,36 +60,36 @@ Extract: "docs/specs"
 - Example completed task: `- [x] 1.1 (P) プロジェクト初期化` → skip
 - Example completed optional: `- [x]* 3.2 テストカバレッジ` → skip
 
-**If no pending tasks found**:
-- Report "✅ All tasks completed!" and exit successfully
+**未完了タスクが見つからない場合**:
+- 「✅ すべてのタスクが完了しています！」と報告して正常終了
 
 ### Step 3: Display Initial Status
 
-**Show execution plan**:
-- Count total pending tasks
-- List all task numbers that will be executed
-- Display initial status message (see Output Description format)
+**実行計画を表示**:
+- 未完了タスクの総数をカウント
+- 実行予定のすべてのタスク番号をリスト
+- 初期ステータスメッセージを表示（Output Description形式を参照）
 
 ### Step 4: Execute Tasks Sequentially
 
 **For each pending task number**:
 
-1. **Display Task Info**:
-   - Extract task description from `$SPECS_DIR/$1/tasks.md` line matching task number
-   - Output is rendered as Markdown, so use proper Markdown line breaks
-   - Output the following with **two spaces at the end of each line** or **blank lines between paragraphs**:
+1. **タスク情報を表示**:
+   - `$SPECS_DIR/$1/tasks.md` からタスク番号に一致する行のタスク説明を抽出
+   - 出力はMarkdownとしてレンダリングされるため、適切なMarkdown改行を使用
+   - 以下を**各行末に2スペース**または**段落間に空行**で出力:
 
      ```
-     (blank line for paragraph break)
+     (段落区切りの空行)
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-     📌 Task {task-number}/{total}: {task-description}
+     📌 タスク {task-number}/{total}: {task-description}
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-     🔄 Launching clean subagent...
-     (blank line for paragraph break)
+     🔄 クリーンなサブエージェントを起動中...
+     (段落区切りの空行)
      ```
 
-   - CRITICAL: Add two trailing spaces (  ) at the end of each line for Markdown line breaks
-   - OR: Separate each line with blank lines to create distinct paragraphs
+   - 重要: 各行末に2つの末尾スペース（  ）を追加してMarkdown改行
+   - または: 各行を空行で区切って別々の段落を作成
 
 2. **Launch Clean Subagent**:
    - Use Task tool with subagent_type="general-purpose"
@@ -113,142 +113,149 @@ Extract: "docs/specs"
 3. **Collect and Display Output**:
    - Wait for subagent to complete (Task tool is blocking)
    - Capture the subagent's output (test results + summary)
-   - Output with proper Markdown formatting:
+   - **タスクサマリーを日本語で生成**:
+     - サブエージェントの出力からタスクの成果を要約
+     - **10行以内**で簡潔にまとめる（短くできるならより短く）
+     - 以下の形式で表示:
 
      ```
      (blank line)
-     {captured output from subagent}
+     📝 タスクサマリー:
+     {日本語で簡潔なサマリー - 10行以内}
      (blank line)
-     ✅ Task {task-number} completed
+     ✅ タスク {task-number} 完了
      ```
 
    - CRITICAL: Use blank lines to separate sections (Markdown paragraph breaks)
    - Ensure proper spacing for readability in Markdown rendering
 
-4. **Verify Task Completion**:
-   - Re-read `$SPECS_DIR/$1/tasks.md` to verify task is marked as `[x]`
-   - If task still shows `[ ]`, log warning but continue
-   - This verification helps catch any issues early
+4. **タスク完了を確認**:
+   - `$SPECS_DIR/$1/tasks.md` を再読み込みしてタスクが `[x]` になっているか確認
+   - タスクがまだ `[ ]` の場合は警告をログして続行
+   - この確認により問題を早期に発見
 
-5. **Continue to Next Task**:
-   - Move to next pending task
-   - Repeat process with NEW subagent (clean context)
-   - Each iteration is completely independent
+5. **次のタスクへ進む**:
+   - 次の未完了タスクに移動
+   - 新しいサブエージェント（クリーンコンテキスト）でプロセスを繰り返す
+   - 各イテレーションは完全に独立
 
 ### Step 5: Final Report
 
-**After all tasks completed**:
-- Display completion summary with visual separator (see Output Description format)
-- List all task numbers that were executed
-- Show total count
-- Suggest next steps:
-  - `/kiro:validate-impl $1` - Validate the implementation
-  - `/kiro:spec-status $1` - Check overall project status
+**すべてのタスク完了後**:
+- 視覚的な区切りで完了サマリーを表示（Output Description形式を参照）
+- 実行したすべてのタスク番号をリスト
+- 合計数を表示
+- 次のステップを提案:
+  - `/kiro:validate-impl $1` - 実装を検証
+  - `/kiro:spec-status $1` - プロジェクト全体のステータスを確認
 
-## Critical Constraints
+## 重要な制約事項
 
-- **Clean Context**: Each task MUST run in new subagent (no resume)
-- **Sequential Only**: One task at a time, in order
-- **No Skipping**: All pending tasks must be attempted, including optional tasks marked with `*`
-- **Concise Output**: Display only test results and summary from subagents, not full execution log
-- **Proper Formatting**: Use blank lines to separate sections for readability
-- **Error Handling**: If a task fails, report it and stop (don't continue to next)
+- **クリーンコンテキスト**: 各タスクは新しいサブエージェントで実行（resumeなし）
+- **順次実行のみ**: 一度に1タスクずつ、順番に
+- **スキップ禁止**: `*` マークされたオプションタスクを含むすべての未完了タスクを実行
+- **簡潔な出力**: サブエージェントからはテスト結果とサマリーのみ表示（完全な実行ログは不要）
+- **適切なフォーマット**: 可読性のためにセクションを空行で区切る
+- **エラー処理**: タスクが失敗した場合は報告して停止（次に進まない）
+- **日本語での応答**: すべての出力・サマリーは日本語で行う
 
-## Tool Guidance
+## ツールガイダンス
 
-- **Read**: Load CLAUDE.md first, then spec.json and tasks.md from discovered paths
-- **Grep**: Extract Specs path from CLAUDE.md, find pending tasks in tasks.md
-- **Task**: Launch fresh subagent for each task (general-purpose type)
-- **Never resume**: Each Task call must create new agent
+- **Read**: まずCLAUDE.mdを読み込み、次に発見したパスからspec.jsonとtasks.mdを読み込む
+- **Grep**: CLAUDE.mdからSpecsパスを抽出、tasks.mdから未完了タスクを検索
+- **Task**: 各タスクに新しいサブエージェントを起動（general-purposeタイプ）
+- **resumeしない**: 各Task呼び出しは新しいエージェントを作成
 
 ## Output Description
 
-Provide updates in the language specified in spec.json:
+**すべての出力は日本語で行う**
 
-**Initial status** (at start):
+**初期ステータス** (開始時):
 ```
-📋 Found {count} pending tasks for feature '{feature-name}'
-Tasks to execute: {task-numbers}
+📋 フィーチャー '{feature-name}' の未完了タスクが {count} 件見つかりました
+実行予定タスク: {task-numbers}
 
-Starting sequential execution with clean context per task...
-```
-
-**During execution** (per task):
-- **CRITICAL**: Output is rendered as Markdown - use proper line breaks
-- **Method 1**: Add two trailing spaces at end of each line for hard line break
-- **Method 2**: Separate sections with blank lines (paragraph breaks)
-- Example output format:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📌 Task 13.1/15: SettingsPanel コンポーネントの実装
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔄 Launching clean subagent...
-
-{test execution results}
-
-{summary section}
-
-✅ Task 13.1 completed
+クリーンなコンテキストで順次実行を開始します...
 ```
 
-Note: Each line ending with `  ` (two spaces) creates a hard line break in Markdown.
-Blank lines create paragraph breaks.
+**実行中** (タスクごと):
+- **重要**: 出力はMarkdownとしてレンダリングされます - 適切な改行を使用
+- **方法1**: 各行末に2つのスペースを追加してハード改行
+- **方法2**: 空行でセクションを区切る（段落区切り）
+- 出力形式の例:
 
-**Final summary**:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎉 All tasks completed successfully!
+📌 タスク 13.1/15: SettingsPanel コンポーネントの実装
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 クリーンなサブエージェントを起動中...
 
-Executed tasks: {task-numbers}
-Total: {count} tasks
+📝 タスクサマリー:
+• 実装した内容の簡潔な説明
+• テスト結果（成功/失敗）
+• 主要な変更点
+（10行以内で簡潔に）
 
-✨ Next steps:
-• Run /kiro:validate-impl {feature-name} to validate implementation
-• Run /kiro:spec-status {feature-name} to check overall progress
+✅ タスク 13.1 完了
 ```
 
-**Format**:
-- Clear progress updates with visual separators
-- Use Markdown line breaks: two trailing spaces (  ) or blank lines for paragraph breaks
-- Test results + concise summaries only (no step-by-step logs)
-- All output is rendered as Markdown in VSCode
+注: 各行末の `  `（スペース2つ）でMarkdownのハード改行になります。
+空行は段落区切りを作成します。
+
+**最終サマリー**:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 すべてのタスクが正常に完了しました！
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+実行したタスク: {task-numbers}
+合計: {count} タスク
+
+✨ 次のステップ:
+• /kiro:validate-impl {feature-name} を実行して実装を検証
+• /kiro:spec-status {feature-name} を実行して全体の進捗を確認
+```
+
+**フォーマット**:
+- 視覚的な区切りで明確な進捗更新
+- Markdown改行を使用: 行末2スペース、または段落区切りの空行
+- テスト結果＋簡潔なサマリーのみ（ステップバイステップのログは不要）
+- **サマリーは必ず日本語で、10行以内に収める**
 
 ## Safety & Fallback
 
-### Error Scenarios
+### エラーシナリオ
 
-**CLAUDE.md Not Found**:
-- **Fallback**: Use default path `.kiro/specs`
-- **Warning**: "CLAUDE.md not found, using default specs path: .kiro/specs"
+**CLAUDE.mdが見つからない場合**:
+- **フォールバック**: デフォルトパス `.kiro/specs` を使用
+- **警告**: 「CLAUDE.mdが見つかりません。デフォルトのspecsパスを使用: .kiro/specs」
 
-**Spec Not Found**:
-- **Stop Execution**: Spec must exist
-- **Message**: "Feature '$1' not found in {specs-path}/"
-- **Action**: "Check feature name or run `/kiro:spec-init` first"
+**Specが見つからない場合**:
+- **実行停止**: Specが存在する必要があります
+- **メッセージ**: 「フィーチャー '$1' が {specs-path}/ に見つかりません」
+- **アクション**: 「フィーチャー名を確認するか、`/kiro:spec-init` を先に実行してください」
 
-**Tasks Not Approved**:
-- **Stop Execution**: Tasks must be approved
-- **Message**: "Tasks not approved for feature '$1'"
-- **Action**: "Run `/kiro:spec-tasks $1` and approve tasks first"
+**タスクが承認されていない場合**:
+- **実行停止**: タスクは承認されている必要があります
+- **メッセージ**: 「フィーチャー '$1' のタスクが承認されていません」
+- **アクション**: 「`/kiro:spec-tasks $1` を実行し、タスクを承認してください」
 
-**Task Execution Failure**:
-- **Stop Execution**: Don't continue if task fails
-- **Message**: "Task {task-number} failed with error: {error}"
-- **Action**: "Review error, fix issue, then re-run `/impl-tasks $1`"
+**タスク実行失敗**:
+- **実行停止**: タスクが失敗した場合は続行しない
+- **メッセージ**: 「タスク {task-number} がエラーで失敗: {error}」
+- **アクション**: 「エラーを確認し、問題を修正してから `/impl-tasks $1` を再実行してください」
 
-**No Pending Tasks**:
-- **Normal Exit**: All tasks already completed
-- **Message**: "✅ All tasks are already completed for feature '$1'"
+**未完了タスクがない場合**:
+- **正常終了**: すべてのタスクが完了済み
+- **メッセージ**: 「✅ フィーチャー '$1' のすべてのタスクは完了済みです」
 
-### Usage Examples
+### 使用例
 
-**Execute all pending tasks**:
+**すべての未完了タスクを実行**:
 - `/impl-tasks my-feature`
 
-**After completion**:
-- `/kiro:validate-impl my-feature` - Validate implementation
-- `/kiro:spec-status my-feature` - Check overall status
+**完了後**:
+- `/kiro:validate-impl my-feature` - 実装を検証
+- `/kiro:spec-status my-feature` - 全体のステータスを確認
 
 think

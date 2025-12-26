@@ -443,6 +443,7 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
+        childTabBehavior: 'promote',
       };
 
       global.chrome = {
@@ -492,6 +493,7 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
+        childTabBehavior: 'promote',
       };
 
       global.chrome = {
@@ -540,6 +542,7 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
+        childTabBehavior: 'promote',
       };
 
       const mockGet = vi.fn().mockResolvedValue({ user_settings: initialSettings });
@@ -566,7 +569,7 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         },
       } as any;
 
-      const { rerender } = render(
+      render(
         <ThemeProvider>
           <div>Test Content</div>
         </ThemeProvider>,

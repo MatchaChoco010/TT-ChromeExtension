@@ -45,6 +45,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           closeWarningThreshold: 3,
           showUnreadIndicator: true,
           autoSnapshotInterval: 0,
+          childTabBehavior: 'promote',
         };
         setSettings(defaultSettings);
         await chrome.storage.local.set({ user_settings: defaultSettings });

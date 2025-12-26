@@ -36,6 +36,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   currentViewId,
   onViewSwitch,
   onViewCreate,
+  onViewDelete,
   onViewUpdate,
 }) => {
   // Task 8.3: 編集中のビューIDを管理
@@ -159,7 +160,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
           </div>
         </div>
 
-        {/* 保存・キャンセルボタン */}
+        {/* 保存・キャンセル・削除ボタン */}
         <div className="flex gap-2">
           <button
             onClick={handleSave}
@@ -176,6 +177,19 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
             Cancel
           </button>
         </div>
+        {/* Task 4.8: 削除ボタン（デフォルトビュー以外） */}
+        {editingViewId !== 'default' && (
+          <button
+            onClick={() => {
+              onViewDelete(editingViewId);
+              setEditingViewId(null);
+            }}
+            className="w-full px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 rounded transition-colors"
+            aria-label="Delete view"
+          >
+            Delete View
+          </button>
+        )}
       </div>
     );
   }

@@ -58,3 +58,6 @@ coverage/
 
 # Optional REPL history
 .node_repl_history
+
+# Claude Token Monitor data
+.claude-monitor/

@@ -57,7 +57,8 @@ export class TreeStateManager {
 
     // 新しいノードを作成
     const nodeId = `node-${tab.id}`;
-    const depth = parentId ? (this.nodes.get(parentId)?.depth || 0) + 1 : 0;
+    const parentNode = parentId ? this.nodes.get(parentId) : null;
+    const depth = parentNode ? parentNode.depth + 1 : 0;
 
     const newNode: TabNode = {
       id: nodeId,
@@ -224,7 +225,33 @@ export class TreeStateManager {
       // 現在のビューIDを取得（デフォルトビューを使用）
       const defaultViewId = 'default-view';
 
+      // タブをopenerTabIdの依存関係順にソート（親が先、子が後）
+      // これにより、親タブが必ず子タブより先にTreeに追加される
+      const tabsMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
+      const processedTabs = new Set<number>();
+      const orderedTabs: chrome.tabs.Tab[] = [];
+
+      const addTabAndChildren = (tab: chrome.tabs.Tab) => {
+        if (!tab.id || processedTabs.has(tab.id)) return;
+
+        // 親がいる場合は、親を先に処理
+        if (tab.openerTabId && tabsMap.has(tab.openerTabId)) {
+          addTabAndChildren(tabsMap.get(tab.openerTabId)!);
+        }
+
+        processedTabs.add(tab.id);
+        orderedTabs.push(tab);
+      };
+
+      // すべてのタブを依存関係順に処理
       for (const tab of tabs) {
+        if (tab.id) {
+          addTabAndChildren(tab);
+        }
+      }
+
+      // 依存関係順に追加
+      for (const tab of orderedTabs) {
         if (!tab.id) continue;
 
         // 既存のノードがない場合のみ追加
@@ -319,7 +346,11 @@ export class TreeStateManager {
   private async persistState(): Promise<void> {
     const nodesRecord: Record<string, TabNode> = {};
     this.nodes.forEach((node, id) => {
-      nodesRecord[id] = node;
+      // children配列は保存せず、parentIdから再構築する
+      nodesRecord[id] = {
+        ...node,
+        children: [], // 空配列で保存し、loadStateで再構築
+      };
     });
 
     const tabToNodeRecord: Record<number, string> = {};
@@ -350,8 +381,9 @@ export class TreeStateManager {
       this.tabToNode.clear();
       this.views.clear();
 
+      // 最初にすべてのノードを空の children 配列でロード
       Object.entries(state.nodes).forEach(([id, node]) => {
-        this.nodes.set(id, node);
+        this.nodes.set(id, { ...node, children: [] });
         this.tabToNode.set(node.tabId, id);
 
         // ビューにノードを追加
@@ -361,6 +393,33 @@ export class TreeStateManager {
 
         if (node.isExpanded) {
           this.expandedNodes.add(id);
+        }
+      });
+
+      // parentId に基づいて children 参照を再構築
+      Object.entries(state.nodes).forEach(([id, node]) => {
+        if (node.parentId) {
+          const parent = this.nodes.get(node.parentId);
+          const child = this.nodes.get(id);
+          if (parent && child) {
+            parent.children.push(child);
+          }
+        }
+      });
+
+      // すべてのノードの depth を再計算（ルートノードから開始して再帰的に）
+      // これにより、ストレージの破損やマイグレーション後でも正しい深さが保証される
+      const recalculateDepth = (node: TabNode, depth: number): void => {
+        node.depth = depth;
+        for (const child of node.children) {
+          recalculateDepth(child, depth + 1);
+        }
+      };
+
+      // ルートノード（parentId が null）から開始
+      this.nodes.forEach((node) => {
+        if (!node.parentId) {
+          recalculateDepth(node, 0);
         }
       });
     } catch (error) {

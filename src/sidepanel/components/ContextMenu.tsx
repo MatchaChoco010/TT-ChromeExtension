@@ -1,24 +1,8 @@
 import React, { useEffect, useRef } from 'react';
+import type { MenuAction, ContextMenuProps } from '@/types';
 
-export type MenuAction =
-  | 'close'
-  | 'closeOthers'
-  | 'duplicate'
-  | 'pin'
-  | 'unpin'
-  | 'newWindow'
-  | 'group'
-  | 'ungroup'
-  | 'reload';
-
-export interface ContextMenuProps {
-  targetTabIds: number[];
-  position: { x: number; y: number };
-  onAction: (action: MenuAction) => void;
-  onClose: () => void;
-  isPinned?: boolean;
-  isGrouped?: boolean;
-}
+// Re-export MenuAction for backward compatibility
+export type { MenuAction };
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
   targetTabIds,
@@ -27,6 +11,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
   isPinned = false,
   isGrouped = false,
+  hasChildren = false,
+  tabUrl,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const isMultipleSelection = targetTabIds.length > 1;
@@ -115,6 +101,17 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           : 'タブを閉じる'}
       </button>
 
+      {/* サブツリーを閉じる（子タブがある場合のみ） */}
+      {hasChildren && (
+        <button
+          role="menuitem"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          onClick={() => handleMenuItemClick('closeSubtree')}
+        >
+          サブツリーを閉じる
+        </button>
+      )}
+
       {/* 他のタブを閉じる (複数選択時のみ) */}
       {isMultipleSelection && (
         <button
@@ -197,6 +194,20 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         >
           {isMultipleSelection ? 'タブをグループ化' : 'グループに追加'}
         </button>
+      )}
+
+      {/* URLをコピー（単一選択時のみ） */}
+      {!isMultipleSelection && tabUrl && (
+        <>
+          <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+          <button
+            role="menuitem"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+            onClick={() => handleMenuItemClick('copyUrl')}
+          >
+            URLをコピー
+          </button>
+        </>
       )}
     </div>
   );

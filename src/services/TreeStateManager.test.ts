@@ -215,6 +215,42 @@ describe('TreeStateManager', () => {
 
       expect(mockStorageService.set).toHaveBeenCalled();
     });
+
+    it('子孫を持つノードを移動すると、子孫のdepthも更新される', async () => {
+      const viewId = 'view-1';
+      const tab1 = { id: 1, url: 'https://example.com/1', title: 'Root1' } as chrome.tabs.Tab;
+      const tab2 = { id: 2, url: 'https://example.com/2', title: 'Child' } as chrome.tabs.Tab;
+      const tab3 = { id: 3, url: 'https://example.com/3', title: 'Grandchild' } as chrome.tabs.Tab;
+      const tab4 = { id: 4, url: 'https://example.com/4', title: 'Root2' } as chrome.tabs.Tab;
+
+      // Create structure: root1 -> child -> grandchild
+      await manager.addTab(tab1, null, viewId);
+      const root1 = manager.getNodeByTabId(tab1.id!);
+
+      await manager.addTab(tab2, root1!.id, viewId);
+      const child = manager.getNodeByTabId(tab2.id!);
+
+      await manager.addTab(tab3, child!.id, viewId);
+      const grandchild = manager.getNodeByTabId(tab3.id!);
+
+      // Create root2
+      await manager.addTab(tab4, null, viewId);
+      const root2 = manager.getNodeByTabId(tab4.id!);
+
+      // Verify initial depths
+      expect(child!.depth).toBe(1);
+      expect(grandchild!.depth).toBe(2);
+
+      // Move child (with grandchild) to root2
+      await manager.moveNode(child!.id, root2!.id, 0);
+
+      // Verify updated depths
+      const updatedChild = manager.getNodeByTabId(tab2.id!);
+      const updatedGrandchild = manager.getNodeByTabId(tab3.id!);
+
+      expect(updatedChild!.depth).toBe(1);  // child is now child of root2 (depth 0)
+      expect(updatedGrandchild!.depth).toBe(2);  // grandchild should be depth 2
+    });
   });
 
   describe('toggleExpand', () => {

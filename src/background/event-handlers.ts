@@ -1,14 +1,21 @@
 // Service Worker event handlers
 import type { MessageType, MessageResponse } from '@/types';
 import { TreeStateManager } from '@/services/TreeStateManager';
+import { UnreadTracker } from '@/services/UnreadTracker';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
 
 // Global instances
 const storageService = new StorageService();
 const treeStateManager = new TreeStateManager(storageService);
+const unreadTracker = new UnreadTracker(storageService);
+
+// Initialize unread tracker from storage
+unreadTracker.loadFromStorage().catch((error) => {
+  console.error('Failed to load unread tracker:', error);
+});
 
 // Export for testing
-export { storageService as testStorageService, treeStateManager as testTreeStateManager };
+export { storageService as testStorageService, treeStateManager as testTreeStateManager, unreadTracker as testUnreadTracker };
 
 // Global drag state for cross-window drag & drop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,6 +24,18 @@ let dragState: { tabId: number; treeData: any; sourceWindowId: number } | null =
 
 // Default view ID
 const DEFAULT_VIEW_ID = 'default-view';
+
+// Track pending parent relationships for tabs being created
+// Map<tabId, openerTabId>
+// This is needed because Chrome doesn't reliably include openerTabId in the onCreated event
+const pendingTabParents = new Map<number, number>();
+
+// Export to globalThis for access from service worker evaluation contexts (e.g., E2E tests)
+declare global {
+  // eslint-disable-next-line no-var
+  var pendingTabParents: Map<number, number>;
+}
+globalThis.pendingTabParents = pendingTabParents;
 
 /**
  * Register all Chrome tabs event listeners
@@ -77,16 +96,31 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     // Determine parent node
     let parentId: string | null = null;
 
-    if (tab.openerTabId && newTabPosition === 'child') {
+    // Check if we have a pending parent relationship for this tab
+    const pendingOpenerTabId = pendingTabParents.get(tab.id);
+    const effectiveOpenerTabId = pendingOpenerTabId || tab.openerTabId;
+
+    if (effectiveOpenerTabId && newTabPosition === 'child') {
       // Find parent node by openerTabId
-      const parentNode = treeStateManager.getNodeByTabId(tab.openerTabId);
+      const parentNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (parentNode) {
         parentId = parentNode.id;
       }
     }
 
+    // Clean up pending parent mapping
+    if (pendingOpenerTabId) {
+      pendingTabParents.delete(tab.id);
+    }
+
     // Add tab to tree
     await treeStateManager.addTab(tab, parentId, DEFAULT_VIEW_ID);
+
+    // Task 4.13: Requirement 3.13.1 - バックグラウンドで作成されたタブを未読としてマーク
+    // タブがアクティブでない場合（バックグラウンドで読み込まれた場合）、未読としてマーク
+    if (!tab.active && tab.id) {
+      await unreadTracker.markAsUnread(tab.id);
+    }
 
     // Notify UI about state update
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
@@ -116,6 +150,11 @@ export async function handleTabRemoved(
 
     // Remove tab from tree state
     await treeStateManager.removeTab(tabId, childTabBehavior);
+
+    // Task 4.13: タブが削除された場合、未読状態もクリーンアップ
+    if (unreadTracker.isUnread(tabId)) {
+      await unreadTracker.markAsRead(tabId);
+    }
 
     // Notify UI about state update
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
@@ -186,9 +225,29 @@ export async function handleTabUpdated(
   }
 }
 
-function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): void {
+async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promise<void> {
   console.log('Tab activated:', activeInfo);
-  // TODO: Implement unread state update logic
+
+  // Task 4.13: Requirement 3.13.2 - 未読タブをアクティブにした場合、未読バッジを消す
+  try {
+    // タブが未読だった場合、既読としてマーク
+    if (unreadTracker.isUnread(activeInfo.tabId)) {
+      await unreadTracker.markAsRead(activeInfo.tabId);
+
+      // Notify UI about state update
+      chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
+        // Ignore errors when no listeners are available
+        if (
+          !error.message?.includes('Receiving end does not exist') &&
+          !error.message?.includes('message port closed')
+        ) {
+          console.error('Error sending STATE_UPDATED message:', error);
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error in handleTabActivated:', error);
+  }
 }
 
 // Window event handlers
@@ -227,6 +286,10 @@ function handleMessage(
         handleCloseTab(message.payload.tabId, sendResponse);
         break;
 
+      case 'CLOSE_SUBTREE':
+        handleCloseSubtree(message.payload.tabId, sendResponse);
+        break;
+
       case 'MOVE_TAB_TO_WINDOW':
         handleMoveTabToWindow(
           message.payload.tabId,
@@ -263,6 +326,10 @@ function handleMessage(
         handleClearDragState(sendResponse);
         break;
 
+      case 'SYNC_TABS':
+        handleSyncTabs(sendResponse);
+        break;
+
       default:
         sendResponse({
           success: false,
@@ -288,13 +355,34 @@ function handleGetState(
   sendResponse({ success: true, data: null });
 }
 
-function handleUpdateTree(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _payload: { nodeId: string; newParentId: string | null; index: number },
+async function handleUpdateTree(
+  payload: { nodeId: string; newParentId: string | null; index: number },
   sendResponse: (response: MessageResponse<unknown>) => void,
-): void {
-  // TODO: Implement tree update logic
-  sendResponse({ success: true, data: null });
+): Promise<void> {
+  try {
+    const { nodeId, newParentId, index } = payload;
+
+    // TreeStateManagerでノードを移動
+    await treeStateManager.moveNode(nodeId, newParentId, index);
+
+    // 更新通知を送信
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((error) => {
+      // Ignore errors when no listeners are available
+      if (
+        !error.message?.includes('Receiving end does not exist') &&
+        !error.message?.includes('message port closed')
+      ) {
+        console.error('Error sending STATE_UPDATED message:', error);
+      }
+    });
+
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }
 
 function handleActivateTab(
@@ -327,6 +415,40 @@ function handleCloseTab(
       sendResponse({ success: true, data: null });
     }
   });
+}
+
+/**
+ * Requirement 3.11: サブツリーを閉じる
+ * 対象タブとその全ての子孫タブを閉じる
+ */
+async function handleCloseSubtree(
+  tabId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    // サブツリー全体を取得
+    const subtree = treeStateManager.getSubtree(tabId);
+    if (subtree.length === 0) {
+      sendResponse({
+        success: false,
+        error: 'Tab not found',
+      });
+      return;
+    }
+
+    // すべてのタブIDを取得
+    const tabIds = subtree.map((node) => node.tabId);
+
+    // タブを一括で閉じる
+    await chrome.tabs.remove(tabIds);
+
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }
 
 function handleMoveTabToWindow(
@@ -510,4 +632,21 @@ export function setDragState(
   state: { tabId: number; treeData: any; sourceWindowId: number } | null,
 ): void {
   dragState = state;
+}
+
+/**
+ * Handle SYNC_TABS message - sync TreeStateManager with Chrome tabs
+ */
+async function handleSyncTabs(
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    await treeStateManager.syncWithChromeTabs();
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }

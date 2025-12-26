@@ -1,8 +1,11 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { DndContext, closestCenter, DragOverEvent } from '@dnd-kit/core';
-import type { TabNode, TabTreeViewProps } from '@/types';
+import type { TabNode, TabTreeViewProps, MenuAction } from '@/types';
+import { ContextMenu } from './ContextMenu';
+import { useMenuActions } from '../hooks/useMenuActions';
+import UnreadBadge from './UnreadBadge';
 
 // Task 6.4: ドラッグホバー時のブランチ自動展開の閾値（ミリ秒）
 // Requirement 3.4: ホバー時間が1秒を超えたら展開
@@ -13,18 +16,33 @@ interface TreeNodeItemProps {
   onNodeClick: (tabId: number) => void;
   onToggleExpand: (nodeId: string) => void;
   isDraggable: boolean;
+  // Task 4.13: 未読状態を確認する関数
+  isTabUnread?: (tabId: number) => boolean;
+  // Task 4.13: 子孫の未読数を取得する関数
+  getUnreadChildCount?: (nodeId: string) => number;
 }
 
 /**
  * ドラッグ可能なツリーノード項目コンポーネント
+ * Task 4.11: コンテキストメニュー機能を追加
+ * Task 4.13: 未読バッジ表示を追加
  */
 const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   node,
   onNodeClick,
   onToggleExpand,
   isDraggable,
+  isTabUnread,
+  getUnreadChildCount,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const { executeAction } = useMenuActions();
+
+  // Task 4.13: 未読状態とカウントを計算
+  const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
+  const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
 
   const {
     attributes,
@@ -44,26 +62,45 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Task 4.11: 右クリック時のコンテキストメニュー表示
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    setContextMenuOpen(true);
+  };
+
+  // Task 4.11: コンテキストメニューのアクション実行
+  const handleContextMenuAction = (action: MenuAction) => {
+    executeAction(action, [node.tabId], { url: `about:blank` });
+  };
+
   return (
     <div ref={setNodeRef} style={style}>
       {/* ノードの内容 */}
       <div
-        data-testid={`tree-node-${node.id}`}
+        data-testid={`tree-node-${node.tabId}`}
+        data-node-id={node.id}
         data-sortable-item={`sortable-item-${node.id}`}
+        data-expanded={node.isExpanded ? 'true' : 'false'}
+        data-depth={node.depth}
         className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${isDragging ? 'bg-blue-100 border-2 border-blue-500' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={() => onNodeClick(node.tabId)}
+        onContextMenu={handleContextMenu}
         {...attributes}
         {...listeners}
       >
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
           <button
-            data-testid={`toggle-expand-${node.id}`}
+            data-testid="expand-button"
             onClick={(e) => {
               e.stopPropagation();
               onToggleExpand(node.id);
             }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             className="mr-2 w-4 h-4 flex items-center justify-center"
             aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
           >
@@ -74,8 +111,33 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         {/* タブの内容 */}
         <div className="flex-1 flex items-center">
           <span className="text-sm">Tab {node.tabId}</span>
+          {/* Task 4.13: 未読バッジ */}
+          <UnreadBadge isUnread={isUnread} showIndicator={true} />
+          {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
+          {hasChildren && unreadChildCount > 0 && (
+            <div
+              data-testid="unread-child-indicator"
+              className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
+            >
+              <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
+                {unreadChildCount > 99 ? '99+' : unreadChildCount}
+              </span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Task 4.11: コンテキストメニュー */}
+      {contextMenuOpen && (
+        <ContextMenu
+          targetTabIds={[node.tabId]}
+          position={contextMenuPosition}
+          onAction={handleContextMenuAction}
+          onClose={() => setContextMenuOpen(false)}
+          hasChildren={hasChildren}
+          tabUrl="about:blank"
+        />
+      )}
 
       {/* 子ノードの再帰的レンダリング */}
       {hasChildren && node.isExpanded && (
@@ -87,6 +149,8 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               onNodeClick={onNodeClick}
               onToggleExpand={onToggleExpand}
               isDraggable={isDraggable}
+              isTabUnread={isTabUnread}
+              getUnreadChildCount={getUnreadChildCount}
             />
           ))}
         </div>
@@ -97,31 +161,61 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
 /**
  * 非ドラッグ可能なツリーノード項目コンポーネント
+ * Task 4.11: コンテキストメニュー機能を追加
+ * Task 4.13: 未読バッジ表示を追加
  */
 const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   node,
   onNodeClick,
   onToggleExpand,
+  isTabUnread,
+  getUnreadChildCount,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const { executeAction } = useMenuActions();
+
+  // Task 4.13: 未読状態とカウントを計算
+  const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
+  const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
+
+  // Task 4.11: 右クリック時のコンテキストメニュー表示
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    setContextMenuOpen(true);
+  };
+
+  // Task 4.11: コンテキストメニューのアクション実行
+  const handleContextMenuAction = (action: MenuAction) => {
+    executeAction(action, [node.tabId], { url: `about:blank` });
+  };
 
   return (
     <div>
       {/* ノードの内容 */}
       <div
-        data-testid={`tree-node-${node.id}`}
+        data-testid={`tree-node-${node.tabId}`}
+        data-node-id={node.id}
+        data-expanded={node.isExpanded ? 'true' : 'false'}
+        data-depth={node.depth}
         className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={() => onNodeClick(node.tabId)}
+        onContextMenu={handleContextMenu}
       >
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
           <button
-            data-testid={`toggle-expand-${node.id}`}
+            data-testid="expand-button"
             onClick={(e) => {
               e.stopPropagation();
               onToggleExpand(node.id);
             }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             className="mr-2 w-4 h-4 flex items-center justify-center"
             aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
           >
@@ -132,8 +226,33 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         {/* タブの内容 */}
         <div className="flex-1 flex items-center">
           <span className="text-sm">Tab {node.tabId}</span>
+          {/* Task 4.13: 未読バッジ */}
+          <UnreadBadge isUnread={isUnread} showIndicator={true} />
+          {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
+          {hasChildren && unreadChildCount > 0 && (
+            <div
+              data-testid="unread-child-indicator"
+              className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
+            >
+              <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
+                {unreadChildCount > 99 ? '99+' : unreadChildCount}
+              </span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Task 4.11: コンテキストメニュー */}
+      {contextMenuOpen && (
+        <ContextMenu
+          targetTabIds={[node.tabId]}
+          position={contextMenuPosition}
+          onAction={handleContextMenuAction}
+          onClose={() => setContextMenuOpen(false)}
+          hasChildren={hasChildren}
+          tabUrl="about:blank"
+        />
+      )}
 
       {/* 子ノードの再帰的レンダリング */}
       {hasChildren && node.isExpanded && (
@@ -145,6 +264,8 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               onNodeClick={onNodeClick}
               onToggleExpand={onToggleExpand}
               isDraggable={false}
+              isTabUnread={isTabUnread}
+              getUnreadChildCount={getUnreadChildCount}
             />
           ))}
         </div>
@@ -172,6 +293,7 @@ const collectAllNodeIds = (nodes: TabNode[]): string[] => {
  * タブツリービューコンポーネント
  * タブのツリー構造を表示し、現在のビューに基づいてフィルタリングする
  * onDragEndが提供されている場合、ドラッグ&ドロップ機能を有効化
+ * Task 4.13: 未読状態表示機能を追加
  */
 const TabTreeView: React.FC<TabTreeViewProps> = ({
   nodes,
@@ -180,6 +302,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onToggleExpand,
   onDragEnd,
   onDragOver,
+  isTabUnread,
+  getUnreadChildCount,
 }) => {
   // currentViewIdでフィルタリング
   const filteredNodes = useMemo(
@@ -291,6 +415,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
             onNodeClick={onNodeClick}
             onToggleExpand={onToggleExpand}
             isDraggable={isDraggable}
+            isTabUnread={isTabUnread}
+            getUnreadChildCount={getUnreadChildCount}
           />
         ) : (
           <TreeNodeItem
@@ -299,6 +425,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
             onNodeClick={onNodeClick}
             onToggleExpand={onToggleExpand}
             isDraggable={false}
+            isTabUnread={isTabUnread}
+            getUnreadChildCount={getUnreadChildCount}
           />
         )
       )}

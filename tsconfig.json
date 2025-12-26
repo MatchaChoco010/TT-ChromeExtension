@@ -26,9 +26,10 @@
       "@/*": ["./src/*"]
     },
 
-    /* Chrome types */
-    "types": ["chrome"]
+    /* Chrome and Node types */
+    "types": ["chrome", "node"]
   },
   "include": ["src"],
+  "exclude": ["node_modules", "dist", "playwright-report", "test-results", "e2e"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

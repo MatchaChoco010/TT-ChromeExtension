@@ -8,6 +8,8 @@ export interface TabNode {
   isExpanded: boolean;
   depth: number;
   viewId: string;
+  // Task 4.9: グループ機能
+  groupId?: string;
 }
 
 export interface TabInfo {
@@ -138,6 +140,7 @@ export type MessageType =
       payload: { tabId: number; windowId: number };
     }
   | { type: 'CLOSE_TAB'; payload: { tabId: number } }
+  | { type: 'CLOSE_SUBTREE'; payload: { tabId: number } }
   | { type: 'ACTIVATE_TAB'; payload: { tabId: number } }
   | {
       type: 'SET_DRAG_STATE';
@@ -146,6 +149,7 @@ export type MessageType =
     }
   | { type: 'GET_DRAG_STATE' }
   | { type: 'CLEAR_DRAG_STATE' }
+  | { type: 'SYNC_TABS' }
   | { type: 'STATE_UPDATED' };
 
 export type MessageResponse<T> =
@@ -180,19 +184,24 @@ export interface TabTreeViewProps {
   onToggleExpand: (nodeId: string) => void;
   onDragEnd?: (event: DragEndEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
+  // Task 4.13: 未読状態管理
+  isTabUnread?: (tabId: number) => boolean;
+  getUnreadChildCount?: (nodeId: string) => number;
 }
 
 // Context Menu types
 export type MenuAction =
   | 'close'
   | 'closeOthers'
+  | 'closeSubtree'
   | 'duplicate'
   | 'pin'
   | 'unpin'
   | 'newWindow'
   | 'group'
   | 'ungroup'
-  | 'reload';
+  | 'reload'
+  | 'copyUrl';
 
 export interface ContextMenuProps {
   targetTabIds: number[];
@@ -201,4 +210,6 @@ export interface ContextMenuProps {
   onClose: () => void;
   isPinned?: boolean;
   isGrouped?: boolean;
+  hasChildren?: boolean;
+  tabUrl?: string;
 }

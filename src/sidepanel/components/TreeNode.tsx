@@ -120,7 +120,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   return (
     <>
       <div
-        data-testid={`tree-node-${node.id}`}
+        data-testid={`tree-node-${tab.id}`}
+        data-node-id={node.id}
+        data-expanded={node.isExpanded ? 'true' : 'false'}
+        data-depth={node.depth}
+        data-parent-group={node.groupId || ''}
         className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${
           isActive ? 'bg-blue-100' : ''
         }`}
@@ -133,7 +137,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         {/* 展開/折りたたみトグルボタン */}
         {hasChildren && (
           <button
-            data-testid={`toggle-expand-${node.id}`}
+            data-testid="expand-button"
             onClick={handleToggleClick}
             className="mr-2 w-4 h-4 flex items-center justify-center text-gray-600"
             aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
@@ -199,6 +203,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           onClose={() => setContextMenuOpen(false)}
           isPinned={isPinned}
           isGrouped={isGrouped}
+          hasChildren={hasChildren}
+          tabUrl={tab.url}
         />
       )}
     </>

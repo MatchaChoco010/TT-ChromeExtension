@@ -11,7 +11,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ThemeProvider } from '@/sidepanel/providers/ThemeProvider';
-import SidePanelRoot from '@/sidepanel/components/SidePanelRoot';
 import type { UserSettings } from '@/types';
 
 // Vivaldiブラウザ固有のAPIをモック
@@ -170,6 +169,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
+        childTabBehavior: 'promote',
       };
 
       // Act
@@ -344,6 +344,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
+        childTabBehavior: 'promote',
       };
 
       // Set settings in storage before rendering
@@ -428,7 +429,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
       window.vivaldi = undefined;
 
       // Act - タブ操作
-      const tabs = await chrome.tabs.query({ currentWindow: true });
+      await chrome.tabs.query({ currentWindow: true });
       await chrome.tabs.update(1, { active: true });
 
       // Assert
@@ -457,7 +458,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
       };
 
       // Act
-      const { container } = render(
+      render(
         <ThemeProvider>
           <div data-testid="side-panel-root">Side Panel Content</div>
         </ThemeProvider>
@@ -481,6 +482,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
         closeWarningThreshold: 5,
         showUnreadIndicator: true,
         autoSnapshotInterval: 10,
+        childTabBehavior: 'promote',
       };
 
       // Set settings before rendering

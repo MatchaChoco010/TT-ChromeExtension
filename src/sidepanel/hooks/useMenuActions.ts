@@ -5,20 +5,29 @@ import type { MenuAction } from '@/types';
  * useMenuActions
  *
  * コンテキストメニューのアクションを実行するカスタムフック
- * Requirements: 12.2, 12.3, 12.4
+ * Requirements: 3.11, 12.2, 12.3, 12.4
  */
 export const useMenuActions = () => {
   /**
    * メニューアクションを実行
    * @param action - 実行するアクション
    * @param tabIds - 対象のタブID配列
+   * @param options - オプション（URLなど）
    */
-  const executeAction = useCallback(async (action: MenuAction, tabIds: number[]) => {
+  const executeAction = useCallback(async (action: MenuAction, tabIds: number[], options?: { url?: string }) => {
     try {
       switch (action) {
         case 'close':
           // タブを閉じる
           await chrome.tabs.remove(tabIds);
+          break;
+
+        case 'closeSubtree':
+          // サブツリーを閉じる (Service Worker に委譲)
+          await chrome.runtime.sendMessage({
+            type: 'CLOSE_SUBTREE',
+            payload: { tabId: tabIds[0] },
+          });
           break;
 
         case 'closeOthers':
@@ -83,6 +92,19 @@ export const useMenuActions = () => {
             type: 'DISSOLVE_GROUP',
             payload: { tabIds },
           });
+          break;
+
+        case 'copyUrl':
+          // URLをコピー
+          if (options?.url) {
+            await navigator.clipboard.writeText(options.url);
+          } else if (tabIds.length === 1) {
+            // URLが渡されていない場合はタブからURLを取得
+            const tab = await chrome.tabs.get(tabIds[0]);
+            if (tab.url) {
+              await navigator.clipboard.writeText(tab.url);
+            }
+          }
           break;
 
         default:

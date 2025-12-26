@@ -3,7 +3,21 @@
     "allow": [
       "Bash(test:*)",
       "Skill(kiro:spec-impl)",
-      "Skill(kiro:spec-impl:*)"
+      "Skill(kiro:spec-impl:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(tee:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run build:extension:*)",
+      "Bash(npm run:*)",
+      "Bash(npx vite:*)",
+      "Bash(HEADED=true npm run test:e2e:*)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
   }
 }
