@@ -39,6 +39,10 @@ test.describe('SidePanelUtils', () => {
     extensionContext,
     sidePanelPage,
   }) => {
+    // 初期のツリーノード数を取得
+    const initialNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+    const initialCount = await initialNodes.count();
+
     // 新しいタブを作成するアクション
     const action = async () => {
       await createTab(extensionContext, 'https://example.com');
@@ -46,6 +50,13 @@ test.describe('SidePanelUtils', () => {
 
     // リアルタイム更新を検証（例外が発生しない）
     await assertRealTimeUpdate(sidePanelPage, action);
+
+    // 作成したタブがUIに反映されるまでポーリングで待機
+    await expect(async () => {
+      const currentNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+      const currentCount = await currentNodes.count();
+      expect(currentCount).toBeGreaterThan(initialCount);
+    }).toPass({ timeout: 10000 });
   });
 
   test('assertRealTimeUpdateはタブ削除もSide Panelで検証する', async ({
@@ -55,6 +66,12 @@ test.describe('SidePanelUtils', () => {
     // 事前にタブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
 
+    // タブがUIに反映されるまでポーリングで待機
+    await expect(async () => {
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+      await expect(tabNode).toBeVisible();
+    }).toPass({ timeout: 10000 });
+
     // タブを削除するアクション
     const action = async () => {
       await closeTab(extensionContext, tabId);
@@ -62,6 +79,12 @@ test.describe('SidePanelUtils', () => {
 
     // リアルタイム更新を検証（例外が発生しない）
     await assertRealTimeUpdate(sidePanelPage, action);
+
+    // タブがUIから削除されるまでポーリングで待機
+    await expect(async () => {
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+      await expect(tabNode).not.toBeVisible();
+    }).toPass({ timeout: 10000 });
   });
 
   test('assertSmoothScrollingは大量タブ時のスクロール動作を検証する', async ({
@@ -73,6 +96,14 @@ test.describe('SidePanelUtils', () => {
     for (let i = 0; i < tabCount; i++) {
       await createTab(extensionContext, `https://example.com/page${i}`);
     }
+
+    // すべてのタブがUIに反映されるまでポーリングで待機
+    await expect(async () => {
+      const treeNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+      const count = await treeNodes.count();
+      // 作成したタブ + 初期タブ（sidePanelPageのタブ）が存在することを確認
+      expect(count).toBeGreaterThanOrEqual(tabCount);
+    }).toPass({ timeout: 10000 });
 
     // スムーズなスクロールを検証（例外が発生しない）
     await assertSmoothScrolling(sidePanelPage, tabCount);

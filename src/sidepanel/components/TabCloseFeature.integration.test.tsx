@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TreeNode from './TreeNode';
 import type { TabNode, TabInfo } from '@/types';
@@ -62,7 +62,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-node-1');
+      const treeNode = screen.getByTestId('tree-node-1');
 
       // 最初は閉じるボタンが表示されていない
       expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
@@ -91,7 +91,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-node-1');
+      const treeNode = screen.getByTestId('tree-node-1');
 
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
@@ -121,7 +121,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-node-1');
+      const treeNode = screen.getByTestId('tree-node-1');
 
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
@@ -165,7 +165,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-parent-1');
+      const treeNode = screen.getByTestId('tree-node-1');
 
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
@@ -210,7 +210,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-parent-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
@@ -257,7 +257,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-parent-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
@@ -304,7 +304,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-parent-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
@@ -346,7 +346,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-parent-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
@@ -391,7 +391,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-parent-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
@@ -433,7 +433,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-parent-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
@@ -464,7 +464,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-node-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
@@ -496,7 +496,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
         />,
       );
 
-      const treeNode = screen.getByTestId('tree-node-node-1');
+      const treeNode = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 

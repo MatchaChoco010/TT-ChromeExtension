@@ -31,8 +31,7 @@ export class StorageService implements IStorageService {
     try {
       const result = await chrome.storage.local.get(key);
       return result[key] ?? null;
-    } catch (error) {
-      console.error(`StorageService.get error for key "${key}":`, error);
+    } catch (_error) {
       return null;
     }
   }
@@ -49,7 +48,6 @@ export class StorageService implements IStorageService {
     try {
       await chrome.storage.local.set({ [key]: value });
     } catch (error) {
-      console.error(`StorageService.set error for key "${key}":`, error);
       throw error;
     }
   }
@@ -62,7 +60,6 @@ export class StorageService implements IStorageService {
     try {
       await chrome.storage.local.remove(key);
     } catch (error) {
-      console.error(`StorageService.remove error for key "${key}":`, error);
       throw error;
     }
   }

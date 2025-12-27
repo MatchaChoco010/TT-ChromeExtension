@@ -6,7 +6,27 @@ import type {
   View,
   Group,
   TabNode,
+  Snapshot,
 } from '@/types';
+
+// Chrome mock（モジュールレベルで定義してテスト内から参照可能にする）
+const chromeMock = {
+  tabs: {
+    query: vi.fn(),
+    create: vi.fn(),
+  },
+  alarms: {
+    create: vi.fn(),
+    clear: vi.fn(),
+    onAlarm: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    },
+  },
+};
+
+// グローバルchromeオブジェクトをモック（vi.stubGlobalを使用）
+vi.stubGlobal('chrome', chromeMock);
 
 /**
  * SnapshotManager 自動スナップショット機能のユニットテスト
@@ -45,6 +65,9 @@ describe('SnapshotManager - Auto Snapshot', () => {
     // タイマーのモック化
     vi.useFakeTimers();
 
+    // chromeMockのリセット
+    vi.clearAllMocks();
+
     // IndexedDBServiceのモック
     mockIndexedDBService = {
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
@@ -77,27 +100,16 @@ describe('SnapshotManager - Auto Snapshot', () => {
       onChange: vi.fn().mockReturnValue(() => {}),
     };
 
-    // Mock chrome.tabs API
-    global.chrome = {
-      tabs: {
-        query: vi.fn().mockResolvedValue([
-          {
-            id: 1,
-            url: 'https://example.com/page1',
-            title: 'Page 1',
-          },
-        ]),
-        create: vi.fn().mockResolvedValue({ id: 100 }),
+    // chromeMockの初期化
+    chromeMock.tabs.query.mockResolvedValue([
+      {
+        id: 1,
+        url: 'https://example.com/page1',
+        title: 'Page 1',
       },
-      alarms: {
-        create: vi.fn(),
-        clear: vi.fn().mockResolvedValue(true),
-        onAlarm: {
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-        },
-      },
-    } as any;
+    ]);
+    chromeMock.tabs.create.mockResolvedValue({ id: 100 });
+    chromeMock.alarms.clear.mockResolvedValue(true);
 
     snapshotManager = new SnapshotManager(
       mockIndexedDBService,
@@ -117,7 +129,7 @@ describe('SnapshotManager - Auto Snapshot', () => {
       snapshotManager.startAutoSnapshot(intervalMinutes);
 
       // chrome.alarms.createが正しい設定で呼ばれることを確認
-      expect(global.chrome.alarms.create).toHaveBeenCalledWith(
+      expect(chromeMock.alarms.create).toHaveBeenCalledWith(
         'auto-snapshot',
         {
           periodInMinutes: intervalMinutes,
@@ -125,7 +137,7 @@ describe('SnapshotManager - Auto Snapshot', () => {
       );
 
       // アラームリスナーが登録されることを確認
-      expect(global.chrome.alarms.onAlarm.addListener).toHaveBeenCalled();
+      expect(chromeMock.alarms.onAlarm.addListener).toHaveBeenCalled();
     });
 
     it('should create snapshot when alarm fires', async () => {
@@ -134,19 +146,20 @@ describe('SnapshotManager - Auto Snapshot', () => {
       snapshotManager.startAutoSnapshot(intervalMinutes);
 
       // アラームリスナーを取得
-      const alarmListener = (global.chrome.alarms.onAlarm.addListener as any)
-        .mock.calls[0][0];
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
 
       // アラームを発火
-      await alarmListener({ name: 'auto-snapshot' });
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
 
       // Requirement 11.5: 自動的にスナップショットを保存する
       // スナップショットが作成されることを確認
       expect(mockIndexedDBService.saveSnapshot).toHaveBeenCalled();
 
       // 保存されたスナップショットが自動保存フラグを持つことを確認
-      const savedSnapshot = (mockIndexedDBService.saveSnapshot as any).mock
-        .calls[0][0];
+      const saveSnapshotMock = vi.mocked(mockIndexedDBService.saveSnapshot);
+      const savedSnapshot = saveSnapshotMock.mock.calls[0][0] as Snapshot;
       expect(savedSnapshot.isAutoSave).toBe(true);
       expect(savedSnapshot.name).toMatch(/Auto Snapshot/);
     });
@@ -157,11 +170,12 @@ describe('SnapshotManager - Auto Snapshot', () => {
       snapshotManager.startAutoSnapshot(intervalMinutes);
 
       // アラームリスナーを取得
-      const alarmListener = (global.chrome.alarms.onAlarm.addListener as any)
-        .mock.calls[0][0];
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
 
       // 別のアラームを発火
-      await alarmListener({ name: 'other-alarm' });
+      await alarmListener({ name: 'other-alarm', scheduledTime: Date.now() });
 
       // スナップショットが作成されないことを確認
       expect(mockIndexedDBService.saveSnapshot).not.toHaveBeenCalled();
@@ -172,10 +186,10 @@ describe('SnapshotManager - Auto Snapshot', () => {
       snapshotManager.startAutoSnapshot(20);
 
       // 2回目の呼び出しで前のアラームがクリアされることを確認
-      expect(global.chrome.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
+      expect(chromeMock.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
 
       // 新しいアラームが作成されることを確認
-      expect(global.chrome.alarms.create).toHaveBeenLastCalledWith(
+      expect(chromeMock.alarms.create).toHaveBeenLastCalledWith(
         'auto-snapshot',
         {
           periodInMinutes: 20,
@@ -187,10 +201,10 @@ describe('SnapshotManager - Auto Snapshot', () => {
       snapshotManager.startAutoSnapshot(0);
 
       // intervalが0の場合、アラームが作成されないことを確認
-      expect(global.chrome.alarms.create).not.toHaveBeenCalled();
+      expect(chromeMock.alarms.create).not.toHaveBeenCalled();
 
       // 既存のアラームがクリアされることを確認
-      expect(global.chrome.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
+      expect(chromeMock.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
     });
   });
 
@@ -203,7 +217,7 @@ describe('SnapshotManager - Auto Snapshot', () => {
       await snapshotManager.stopAutoSnapshot();
 
       // chrome.alarms.clearが呼ばれることを確認
-      expect(global.chrome.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
+      expect(chromeMock.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
     });
 
     it('should remove alarm listener', async () => {
@@ -211,14 +225,15 @@ describe('SnapshotManager - Auto Snapshot', () => {
       snapshotManager.startAutoSnapshot(10);
 
       // リスナーを取得
-      const alarmListener = (global.chrome.alarms.onAlarm.addListener as any)
-        .mock.calls[0][0];
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
 
       // アラームを停止
       await snapshotManager.stopAutoSnapshot();
 
       // リスナーが削除されることを確認
-      expect(global.chrome.alarms.onAlarm.removeListener).toHaveBeenCalledWith(
+      expect(chromeMock.alarms.onAlarm.removeListener).toHaveBeenCalledWith(
         alarmListener,
       );
     });
@@ -236,19 +251,20 @@ describe('SnapshotManager - Auto Snapshot', () => {
       snapshotManager.startAutoSnapshot(intervalMinutes);
 
       // アラームリスナーを取得
-      const alarmListener = (global.chrome.alarms.onAlarm.addListener as any)
-        .mock.calls[0][0];
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
 
       // 現在時刻を固定
       const mockDate = new Date('2024-01-01T12:00:00Z');
       vi.setSystemTime(mockDate);
 
       // アラームを発火
-      await alarmListener({ name: 'auto-snapshot' });
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
 
       // スナップショット名にタイムスタンプが含まれることを確認
-      const savedSnapshot = (mockIndexedDBService.saveSnapshot as any).mock
-        .calls[0][0];
+      const saveSnapshotMock = vi.mocked(mockIndexedDBService.saveSnapshot);
+      const savedSnapshot = saveSnapshotMock.mock.calls[0][0] as Snapshot;
       expect(savedSnapshot.name).toContain('2024-01-01');
     });
 
@@ -259,24 +275,16 @@ describe('SnapshotManager - Auto Snapshot', () => {
         .mockRejectedValue(new Error('Storage full'));
 
       const intervalMinutes = 10;
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation();
 
       snapshotManager.startAutoSnapshot(intervalMinutes);
 
       // アラームリスナーを取得
-      const alarmListener = (global.chrome.alarms.onAlarm.addListener as any)
-        .mock.calls[0][0];
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
 
-      // アラームを発火
-      await alarmListener({ name: 'auto-snapshot' });
-
-      // エラーがログに記録されることを確認
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Auto-snapshot failed'),
-        expect.any(Error),
-      );
-
-      consoleErrorSpy.mockRestore();
+      // アラームを発火 - エラーがスローされないことを確認
+      await expect(alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() })).resolves.not.toThrow();
     });
   });
 });

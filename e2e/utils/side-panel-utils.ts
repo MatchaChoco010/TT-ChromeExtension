@@ -83,8 +83,8 @@ export async function assertRealTimeUpdate(
   // アクションを実行
   await action();
 
-  // アクション実行後、少し待機してUI更新の時間を与える
-  await sidePanelPage.waitForTimeout(500);
+  // アクション実行後、DOMの更新が完了するまで待機
+  await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
 
   // Side Panelが引き続き表示されていることを確認
   await expect(sidePanelRoot).toBeVisible();
@@ -144,8 +144,28 @@ export async function assertSmoothScrolling(
       }
     });
 
-    // スクロール完了まで少し待機
-    await page.waitForTimeout(500);
+    // スクロール完了をポーリングで待機
+    await page.evaluate(() => {
+      return new Promise<void>((resolve) => {
+        let container = document.querySelector('[data-testid="tab-tree-view"]');
+        if (!container) {
+          container = document.querySelector('[data-testid="side-panel-root"]');
+        }
+        if (!container) {
+          resolve();
+          return;
+        }
+        const targetTop = container.scrollHeight - container.clientHeight;
+        const checkScroll = () => {
+          if (Math.abs(container!.scrollTop - targetTop) < 5) {
+            resolve();
+          } else {
+            requestAnimationFrame(checkScroll);
+          }
+        };
+        checkScroll();
+      });
+    });
 
     // 上にスクロール
     await page.evaluate(() => {
@@ -158,8 +178,27 @@ export async function assertSmoothScrolling(
       }
     });
 
-    // スクロール完了まで少し待機
-    await page.waitForTimeout(500);
+    // スクロール完了をポーリングで待機
+    await page.evaluate(() => {
+      return new Promise<void>((resolve) => {
+        let container = document.querySelector('[data-testid="tab-tree-view"]');
+        if (!container) {
+          container = document.querySelector('[data-testid="side-panel-root"]');
+        }
+        if (!container) {
+          resolve();
+          return;
+        }
+        const checkScroll = () => {
+          if (container!.scrollTop < 5) {
+            resolve();
+          } else {
+            requestAnimationFrame(checkScroll);
+          }
+        };
+        checkScroll();
+      });
+    });
   }
 
   // スムーズスクロールが完了したことを確認

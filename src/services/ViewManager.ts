@@ -75,7 +75,6 @@ export class ViewManager {
   deleteView(viewId: string): void {
     // デフォルトビューは削除できない
     if (viewId === this.defaultView.id) {
-      console.warn('ViewManager.deleteView: Cannot delete default view');
       return;
     }
 
@@ -99,7 +98,6 @@ export class ViewManager {
   switchView(viewId: string): void {
     // 存在しないビューIDの場合は何もしない
     if (!this.views.has(viewId)) {
-      console.warn(`ViewManager.switchView: View ${viewId} not found`);
       return;
     }
 
@@ -120,7 +118,6 @@ export class ViewManager {
     const view = this.views.get(viewId);
 
     if (!view) {
-      console.warn(`ViewManager.updateView: View ${viewId} not found`);
       return;
     }
 
@@ -146,9 +143,6 @@ export class ViewManager {
 
     // currentViewIdが不正な場合はデフォルトビューを返す
     if (!currentView) {
-      console.warn(
-        `ViewManager.getCurrentView: Current view ${this.currentViewId} not found, returning default view`,
-      );
       return this.defaultView;
     }
 
@@ -193,9 +187,6 @@ export class ViewManager {
    */
   getTabsByView(viewId: string): TabNode[] {
     if (!this.treeStateManager) {
-      console.warn(
-        'ViewManager.getTabsByView: TreeStateManager is not set',
-      );
       return [];
     }
     return this.treeStateManager.getTree(viewId);
@@ -222,17 +213,11 @@ export class ViewManager {
 
     // 移動先のビューが存在するか確認
     if (!this.views.has(targetViewId)) {
-      console.warn(
-        `ViewManager.moveTabToView: Target view ${targetViewId} not found`,
-      );
       return;
     }
 
     // TreeStateManagerが設定されていない場合は何もしない
     if (!this.treeStateManager) {
-      console.warn(
-        'ViewManager.moveTabToView: TreeStateManager is not set',
-      );
       return;
     }
 
@@ -258,8 +243,8 @@ export class ViewManager {
       };
 
       await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);
-    } catch (error) {
-      console.error('ViewManager.persistState error:', error);
+    } catch (_error) {
+      // Persist state failed silently
     }
   }
 
@@ -288,8 +273,8 @@ export class ViewManager {
       if (treeState.currentViewId && this.views.has(treeState.currentViewId)) {
         this.currentViewId = treeState.currentViewId;
       }
-    } catch (error) {
-      console.error('ViewManager.loadState error:', error);
+    } catch (_error) {
+      // Load state failed silently
     }
   }
 }

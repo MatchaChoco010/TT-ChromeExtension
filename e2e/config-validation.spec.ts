@@ -19,11 +19,11 @@ test.describe('Playwright Configuration', () => {
     // Verify testMatch pattern
     expect(configContent).toContain('**/*.spec.ts');
 
-    // Verify timeout configuration (30 seconds = 30000ms)
-    expect(configContent).toContain('timeout: 30000');
+    // Verify timeout configuration is present (60 seconds)
+    expect(configContent).toMatch(/timeout:\s*60000/);
 
-    // Verify retry strategy for CI
-    expect(configContent).toContain('retries: process.env.CI ? 2 : 0');
+    // Verify retry strategy is present (0 retries - no retry dependency)
+    expect(configContent).toMatch(/retries:\s*0/);
 
     // Verify reporter configuration (HTML, JUnit, list)
     expect(configContent).toContain("'html'");
@@ -36,6 +36,9 @@ test.describe('Playwright Configuration', () => {
 
     // Verify Chromium project
     expect(configContent).toContain('chromium');
+
+    // Verify CI-aware worker configuration
+    expect(configContent).toContain('getWorkerCount');
   });
 
   test('package.json should have @playwright/test in devDependencies', async () => {

@@ -9,6 +9,7 @@ import SnapshotSection from './SnapshotSection';
 import SettingsPanel from './SettingsPanel';
 import { indexedDBService } from '@/storage/IndexedDBService';
 import { storageService } from '@/storage/StorageService';
+import type { TabNode } from '@/types';
 
 interface SidePanelRootProps {
   children?: React.ReactNode;
@@ -33,6 +34,8 @@ const TreeViewContent: React.FC = () => {
     // Task 4.13: 未読状態管理
     isTabUnread,
     getUnreadChildCount,
+    // Task 8.5.4: アクティブタブID
+    activeTabId,
   } = useTreeState();
 
   const { settings, updateSettings } = useTheme();
@@ -56,14 +59,14 @@ const TreeViewContent: React.FC = () => {
   };
 
   // ノードをツリー構造に変換
-  const buildTree = (): typeof treeState extends { nodes: infer N } ? N extends Record<string, infer T> ? T[] : never : never => {
+  const buildTree = (): TabNode[] => {
     if (!treeState) return [];
 
     // 各ノードに対して children 配列を再構築
-    const nodesWithChildren: Record<string, any> = {};
+    const nodesWithChildren: Record<string, TabNode> = {};
 
     // まず、すべてのノードのコピーを作成（children は空配列で初期化）
-    Object.entries(treeState.nodes).forEach(([id, node]: [string, any]) => {
+    Object.entries(treeState.nodes).forEach(([id, node]) => {
       nodesWithChildren[id] = {
         ...node,
         children: [],
@@ -71,15 +74,15 @@ const TreeViewContent: React.FC = () => {
     });
 
     // 親子関係を構築
-    Object.entries(treeState.nodes).forEach(([id, node]: [string, any]) => {
+    Object.entries(treeState.nodes).forEach(([id, node]) => {
       if (node.parentId && nodesWithChildren[node.parentId]) {
         nodesWithChildren[node.parentId].children.push(nodesWithChildren[id]);
       }
     });
 
     // ルートノードのみを返す
-    const rootNodes: any[] = [];
-    Object.values(nodesWithChildren).forEach((node: any) => {
+    const rootNodes: TabNode[] = [];
+    Object.values(nodesWithChildren).forEach((node) => {
       if (!node.parentId) {
         rootNodes.push(node);
       }
@@ -196,6 +199,7 @@ const TreeViewContent: React.FC = () => {
           onDragEnd={handleDragEnd}
           isTabUnread={isTabUnread}
           getUnreadChildCount={getUnreadChildCount}
+          activeTabId={activeTabId ?? undefined}
         />
       </div>
     </div>

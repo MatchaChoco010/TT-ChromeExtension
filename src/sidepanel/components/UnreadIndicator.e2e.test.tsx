@@ -5,6 +5,7 @@ import TreeNode from './TreeNode';
 import { UnreadTracker } from '@/services/UnreadTracker';
 import { StorageService } from '@/storage/StorageService';
 import type { TabNode, TabInfo } from '@/types';
+import type { MockChrome, MockStorageLocal, MockStorage, MockRuntimeOnMessage } from '@/test/test-types';
 
 /**
  * E2Eテスト: Task 10.3 - 未読インジケータの統合
@@ -26,26 +27,36 @@ describe('Task 10.3: 未読インジケータ E2Eテスト', () => {
 
   beforeEach(async () => {
     // モックChrome APIのセットアップ
-    global.chrome = {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({}),
-          set: vi.fn().mockResolvedValue(undefined),
-          remove: vi.fn().mockResolvedValue(undefined),
-        },
-        onChanged: {
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-        },
+    const mockStorageLocal: MockStorageLocal = {
+      get: vi.fn().mockResolvedValue({}),
+      set: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const mockStorage: MockStorage = {
+      local: mockStorageLocal,
+      onChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
       },
+    };
+
+    const mockRuntimeOnMessage: MockRuntimeOnMessage = {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    };
+
+    const mockChrome: Partial<MockChrome> = {
+      storage: mockStorage,
       runtime: {
         sendMessage: vi.fn().mockResolvedValue({}),
-        onMessage: {
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-        },
+        getURL: vi.fn((path: string) => `chrome-extension://mock-id/${path}`),
+        onMessage: mockRuntimeOnMessage,
       },
-    } as any;
+    };
+
+    global.chrome = mockChrome as unknown as typeof chrome;
 
     storageService = new StorageService();
     unreadTracker = new UnreadTracker(storageService);
@@ -190,7 +201,7 @@ describe('Task 10.3: 未読インジケータ E2Eテスト', () => {
       expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
 
       // 4. タブをクリックしてアクティブ化
-      const treeNode = screen.getByTestId(`tree-node-${node.id}`);
+      const treeNode = screen.getByTestId(`tree-node-${tabId}`);
       await user.click(treeNode);
 
       // onActivateが呼ばれたことを確認
@@ -267,7 +278,7 @@ describe('Task 10.3: 未読インジケータ E2Eテスト', () => {
       expect(badges).toHaveLength(3);
 
       // 2番目のタブをアクティブ化
-      const secondTab = screen.getByTestId('tree-node-node-402');
+      const secondTab = screen.getByTestId('tree-node-402');
       await user.click(secondTab);
 
       await waitFor(() => {

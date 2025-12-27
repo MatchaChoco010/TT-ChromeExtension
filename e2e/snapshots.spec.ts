@@ -14,6 +14,7 @@
  */
 
 import { test, expect } from './fixtures/extension';
+import type { Page } from '@playwright/test';
 import {
   TEST_SNAPSHOT_NAMES,
   SNAPSHOT_SELECTORS,
@@ -23,25 +24,31 @@ import {
 /**
  * スナップショットセクションを展開するヘルパー関数
  */
-async function expandSnapshotSection(sidePanelPage: any) {
+async function expandSnapshotSection(sidePanelPage: Page): Promise<void> {
+  // バックグラウンドスロットリングを回避
+  await sidePanelPage.bringToFront();
+  await sidePanelPage.evaluate(() => window.focus());
+
   // スナップショットセクションが表示されるまで待機
   await sidePanelPage.waitForSelector(SNAPSHOT_SELECTORS.SECTION, {
     timeout: 10000,
   });
 
-  // セクションヘッダーをクリックして展開
+  // セクションヘッダーをクリックして展開（クリック可能になるまで待機）
   const sectionHeader = sidePanelPage.locator(
     `${SNAPSHOT_SELECTORS.SECTION} button`
   );
+  await expect(sectionHeader).toBeVisible({ timeout: 5000 });
   await sectionHeader.click();
 
-  // 作成ボタンが表示されるまで待機
-  await sidePanelPage.waitForSelector(SNAPSHOT_SELECTORS.CREATE_BUTTON, {
-    timeout: 5000,
-  });
+  // 作成ボタンが表示されるまで待機（ポーリング）
+  await expect(
+    sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON)
+  ).toBeVisible({ timeout: 5000 });
 }
 
-test.describe('スナップショット機能', () => {
+// IndexedDBを使用するため直列実行
+test.describe.serial('スナップショット機能', () => {
   test.describe('スナップショットの保存', () => {
     test('現在のタブツリー状態をスナップショットとして保存できる', async ({
       sidePanelPage,
@@ -51,8 +58,12 @@ test.describe('スナップショット機能', () => {
       const page = await extensionContext.newPage();
       await page.goto('about:blank');
 
-      // Side Panelでツリーが更新されるのを待機
-      await sidePanelPage.waitForTimeout(1000);
+      // Side Panelでツリーが更新されるのを待機（タブノードが表示されるまでポーリング）
+      await expect(async () => {
+        const tabNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+        const count = await tabNodes.count();
+        expect(count).toBeGreaterThan(0);
+      }).toPass({ timeout: 10000 });
 
       // スナップショットセクションを展開
       await expandSnapshotSection(sidePanelPage);
@@ -60,18 +71,21 @@ test.describe('スナップショット機能', () => {
       // スナップショット作成ボタンをクリック
       await sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON).click();
 
-      // スナップショット名を入力
+      // スナップショット名を入力（入力フィールドが安定するまで待機）
       const nameInput = sidePanelPage.locator(SNAPSHOT_SELECTORS.NAME_INPUT);
-      await expect(nameInput).toBeVisible({ timeout: 3000 });
+      await expect(nameInput).toBeVisible({ timeout: 5000 });
+      await expect(nameInput).toBeEnabled({ timeout: 3000 });
       await nameInput.fill(TEST_SNAPSHOT_NAMES.MANUAL_1);
 
       // 保存を確定（Enter押下）
       await sidePanelPage.keyboard.press('Enter');
 
-      // スナップショットリストに追加されたことを確認
-      await sidePanelPage.waitForTimeout(1000);
+      // 入力フィールドが非表示になるのを待機（保存処理の完了を確認）
+      await expect(nameInput).not.toBeVisible({ timeout: 5000 });
+
+      // スナップショットリストに追加されたことを確認（ポーリング）
       const snapshotList = sidePanelPage.locator(SNAPSHOT_SELECTORS.LIST);
-      await expect(snapshotList).toBeVisible();
+      await expect(snapshotList).toBeVisible({ timeout: 5000 });
 
       // スナップショット名が表示されていることを確認
       await expect(
@@ -95,18 +109,27 @@ test.describe('スナップショット機能', () => {
       const testPage2 = await extensionContext.newPage();
       await testPage2.goto('about:blank');
 
-      // Side Panelでツリーが更新されるのを待機
-      await sidePanelPage.waitForTimeout(1000);
+      // Side Panelでツリーが更新されるのを待機（タブノードが表示されるまでポーリング）
+      await expect(async () => {
+        const tabNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+        const count = await tabNodes.count();
+        expect(count).toBeGreaterThan(1);
+      }).toPass({ timeout: 10000 });
 
       // スナップショットセクションを展開
       await expandSnapshotSection(sidePanelPage);
 
       // スナップショットを作成
       await sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON).click();
+
       const nameInput = sidePanelPage.locator(SNAPSHOT_SELECTORS.NAME_INPUT);
-      await expect(nameInput).toBeVisible({ timeout: 3000 });
+      await expect(nameInput).toBeVisible({ timeout: 5000 });
+      await expect(nameInput).toBeEnabled({ timeout: 3000 });
       await nameInput.fill('Restore Test Snapshot');
       await sidePanelPage.keyboard.press('Enter');
+
+      // 入力フィールドが非表示になるのを待機（保存処理の完了を確認）
+      await expect(nameInput).not.toBeVisible({ timeout: 5000 });
 
       // スナップショットが作成されたことを確認
       await expect(
@@ -129,12 +152,11 @@ test.describe('スナップショット機能', () => {
       await expect(keepOption).toBeVisible({ timeout: 3000 });
       await keepOption.click();
 
-      // 復元が完了するまで待機
-      await sidePanelPage.waitForTimeout(3000);
-
-      // タブ数が増えていることを確認（復元されたタブが追加された）
-      const finalPageCount = extensionContext.pages().length;
-      expect(finalPageCount).toBeGreaterThanOrEqual(initialPageCount);
+      // 復元が完了するまで待機（タブ数の変化をポーリングで確認）
+      await expect(async () => {
+        const finalPageCount = extensionContext.pages().length;
+        expect(finalPageCount).toBeGreaterThanOrEqual(initialPageCount);
+      }).toPass({ timeout: 10000 });
 
       // クリーンアップ
       await testPage1.close();
@@ -148,7 +170,13 @@ test.describe('スナップショット機能', () => {
       // テスト用のタブを作成してスナップショットを保存
       const testPage = await extensionContext.newPage();
       await testPage.goto('about:blank');
-      await sidePanelPage.waitForTimeout(1000);
+
+      // Side Panelでツリーが更新されるのを待機
+      await expect(async () => {
+        const tabNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+        const count = await tabNodes.count();
+        expect(count).toBeGreaterThan(0);
+      }).toPass({ timeout: 10000 });
 
       // スナップショットセクションを展開
       await expandSnapshotSection(sidePanelPage);
@@ -156,10 +184,18 @@ test.describe('スナップショット機能', () => {
       // スナップショットを作成
       await sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON).click();
       const nameInput = sidePanelPage.locator(SNAPSHOT_SELECTORS.NAME_INPUT);
-      await expect(nameInput).toBeVisible({ timeout: 3000 });
+      await expect(nameInput).toBeVisible({ timeout: 5000 });
+      await expect(nameInput).toBeEnabled({ timeout: 3000 });
       await nameInput.fill('Option Test Snapshot');
       await sidePanelPage.keyboard.press('Enter');
-      await sidePanelPage.waitForTimeout(1000);
+
+      // 入力フィールドが非表示になるのを待機（保存処理の完了を確認）
+      await expect(nameInput).not.toBeVisible({ timeout: 5000 });
+
+      // スナップショットが作成されるのを待機
+      await expect(
+        sidePanelPage.locator(`text=Option Test Snapshot`)
+      ).toBeVisible({ timeout: SNAPSHOT_TIMEOUTS.CREATE });
 
       // 復元ボタンをクリック
       const snapshotItem = sidePanelPage
@@ -176,8 +212,8 @@ test.describe('スナップショット機能', () => {
       );
 
       // 両方のオプションが表示されていることを確認
-      await expect(closeOption).toBeVisible({ timeout: 3000 });
-      await expect(keepOption).toBeVisible({ timeout: 1000 });
+      await expect(closeOption).toBeVisible({ timeout: 5000 });
+      await expect(keepOption).toBeVisible({ timeout: 5000 });
 
       // クリーンアップ（オプションを選択せずにキャンセル）
       await testPage.close();
@@ -192,16 +228,26 @@ test.describe('スナップショット機能', () => {
       // テスト用のスナップショットを作成
       const testPage = await extensionContext.newPage();
       await testPage.goto('about:blank');
-      await sidePanelPage.waitForTimeout(1000);
+
+      // Side Panelでツリーが更新されるのを待機
+      await expect(async () => {
+        const tabNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+        const count = await tabNodes.count();
+        expect(count).toBeGreaterThan(0);
+      }).toPass({ timeout: 10000 });
 
       // スナップショットセクションを展開
       await expandSnapshotSection(sidePanelPage);
 
       await sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON).click();
       const nameInput = sidePanelPage.locator(SNAPSHOT_SELECTORS.NAME_INPUT);
-      await expect(nameInput).toBeVisible({ timeout: 3000 });
+      await expect(nameInput).toBeVisible({ timeout: 5000 });
+      await expect(nameInput).toBeEnabled({ timeout: 3000 });
       await nameInput.fill('Delete Test Snapshot');
       await sidePanelPage.keyboard.press('Enter');
+
+      // 入力フィールドが非表示になるのを待機（保存処理の完了を確認）
+      await expect(nameInput).not.toBeVisible({ timeout: 5000 });
 
       // スナップショットが作成されたことを確認
       await expect(
@@ -236,14 +282,28 @@ test.describe('スナップショット機能', () => {
       for (let i = 1; i <= 3; i++) {
         const testPage = await extensionContext.newPage();
         await testPage.goto('about:blank');
-        await sidePanelPage.waitForTimeout(500);
+
+        // Side Panelでツリーが更新されるのを待機
+        await expect(async () => {
+          const tabNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+          const count = await tabNodes.count();
+          expect(count).toBeGreaterThan(0);
+        }).toPass({ timeout: 10000 });
 
         await sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON).click();
         const nameInput = sidePanelPage.locator(SNAPSHOT_SELECTORS.NAME_INPUT);
-        await expect(nameInput).toBeVisible({ timeout: 3000 });
+        await expect(nameInput).toBeVisible({ timeout: 5000 });
+        await expect(nameInput).toBeEnabled({ timeout: 3000 });
         await nameInput.fill(`Multi Snapshot ${i}`);
         await sidePanelPage.keyboard.press('Enter');
-        await sidePanelPage.waitForTimeout(500);
+
+        // 入力フィールドが非表示になるのを待機（保存処理の完了を確認）
+        await expect(nameInput).not.toBeVisible({ timeout: 5000 });
+
+        // スナップショットが作成されるのを待機
+        await expect(
+          sidePanelPage.locator(`text=Multi Snapshot ${i}`)
+        ).toBeVisible({ timeout: 5000 });
 
         await testPage.close();
       }
@@ -251,13 +311,13 @@ test.describe('スナップショット機能', () => {
       // 3つのスナップショットがリストに表示されていることを確認
       await expect(
         sidePanelPage.locator(`text=Multi Snapshot 1`)
-      ).toBeVisible({ timeout: 3000 });
+      ).toBeVisible({ timeout: 5000 });
       await expect(
         sidePanelPage.locator(`text=Multi Snapshot 2`)
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 5000 });
       await expect(
         sidePanelPage.locator(`text=Multi Snapshot 3`)
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 5000 });
 
       // 2番目のスナップショットを復元
       const snapshot2 = sidePanelPage
@@ -272,8 +332,8 @@ test.describe('スナップショット機能', () => {
       await expect(keepOption).toBeVisible({ timeout: 3000 });
       await keepOption.click();
 
-      // 復元が完了するまで待機
-      await sidePanelPage.waitForTimeout(2000);
+      // 復元オプションダイアログが閉じるのを待機
+      await expect(keepOption).not.toBeVisible({ timeout: 5000 });
 
       // テストはスナップショットの選択と復元オプションの表示を確認
       expect(true).toBeTruthy();
@@ -305,7 +365,13 @@ test.describe('スナップショット機能', () => {
       // テスト用のタブを作成
       const testPage = await extensionContext.newPage();
       await testPage.goto('about:blank');
-      await sidePanelPage.waitForTimeout(1000);
+
+      // Side Panelでツリーが更新されるのを待機
+      await expect(async () => {
+        const tabNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+        const count = await tabNodes.count();
+        expect(count).toBeGreaterThan(0);
+      }).toPass({ timeout: 10000 });
 
       // スナップショットセクションを展開
       await expandSnapshotSection(sidePanelPage);
@@ -313,15 +379,19 @@ test.describe('スナップショット機能', () => {
       // 手動でスナップショットを作成
       await sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON).click();
       const nameInput = sidePanelPage.locator(SNAPSHOT_SELECTORS.NAME_INPUT);
-      await expect(nameInput).toBeVisible({ timeout: 3000 });
+      await expect(nameInput).toBeVisible({ timeout: 5000 });
+      await expect(nameInput).toBeEnabled({ timeout: 3000 });
       await nameInput.fill('Manual Only Snapshot');
       await sidePanelPage.keyboard.press('Enter');
+
+      // 入力フィールドが非表示になるのを待機（保存処理の完了を確認）
+      await expect(nameInput).not.toBeVisible({ timeout: 5000 });
 
       // スナップショットが作成されたことを確認
       const snapshotItem = sidePanelPage
         .locator(SNAPSHOT_SELECTORS.ITEM)
         .filter({ hasText: 'Manual Only Snapshot' });
-      await expect(snapshotItem).toBeVisible({ timeout: 3000 });
+      await expect(snapshotItem).toBeVisible({ timeout: 5000 });
 
       // 自動保存バッジが存在しないことを確認
       const autoBadge = snapshotItem.locator(SNAPSHOT_SELECTORS.AUTO_BADGE);
@@ -340,17 +410,31 @@ test.describe('スナップショット機能', () => {
       // テスト用のスナップショットを作成
       const testPage = await extensionContext.newPage();
       await testPage.goto('about:blank');
-      await sidePanelPage.waitForTimeout(1000);
+
+      // Side Panelでツリーが更新されるのを待機
+      await expect(async () => {
+        const tabNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+        const count = await tabNodes.count();
+        expect(count).toBeGreaterThan(0);
+      }).toPass({ timeout: 10000 });
 
       // スナップショットセクションを展開
       await expandSnapshotSection(sidePanelPage);
 
       await sidePanelPage.locator(SNAPSHOT_SELECTORS.CREATE_BUTTON).click();
       const nameInput = sidePanelPage.locator(SNAPSHOT_SELECTORS.NAME_INPUT);
-      await expect(nameInput).toBeVisible({ timeout: 3000 });
+      await expect(nameInput).toBeVisible({ timeout: 5000 });
+      await expect(nameInput).toBeEnabled({ timeout: 3000 });
       await nameInput.fill('Export Test Snapshot');
       await sidePanelPage.keyboard.press('Enter');
-      await sidePanelPage.waitForTimeout(1000);
+
+      // 入力フィールドが非表示になるのを待機（保存処理の完了を確認）
+      await expect(nameInput).not.toBeVisible({ timeout: 5000 });
+
+      // スナップショットが作成されるのを待機
+      await expect(
+        sidePanelPage.locator(`text=Export Test Snapshot`)
+      ).toBeVisible({ timeout: 5000 });
 
       // エクスポートボタンが表示されていることを確認
       const snapshotItem = sidePanelPage

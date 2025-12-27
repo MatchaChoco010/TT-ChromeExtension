@@ -21,13 +21,34 @@ import {
   STORE_NAME,
 } from './test-data/indexeddb-fixtures';
 
-test.describe('IndexedDB統合', () => {
-  test.describe('IndexedDB基本操作', () => {
-    test('IndexedDBにデータを保存できる', async ({ extensionContext }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      expect(serviceWorkers.length).toBeGreaterThan(0);
+test.describe.serial('IndexedDB統合', () => {
+  // テスト間でIndexedDBの状態が共有されるため直列実行する
 
-      const worker = serviceWorkers[0];
+  // 各テスト前にデータベースをクリーンアップ
+  test.beforeEach(async ({ extensionContext }) => {
+    // Service Workerが利用可能になるまで待機
+    let [worker] = extensionContext.serviceWorkers();
+    if (!worker) {
+      worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
+    }
+
+    await worker.evaluate(async (dbName) => {
+      return new Promise<void>((resolve) => {
+        const deleteRequest = indexedDB.deleteDatabase(dbName);
+        deleteRequest.onsuccess = () => resolve();
+        deleteRequest.onerror = () => resolve();
+        deleteRequest.onblocked = () => resolve();
+      });
+    }, DB_NAME);
+  });
+
+  test.describe.serial('IndexedDB基本操作', () => {
+    test('IndexedDBにデータを保存できる', async ({ extensionContext }) => {
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
+      }
 
       // IndexedDBにデータを保存
       const result = await worker.evaluate(
@@ -81,10 +102,11 @@ test.describe('IndexedDB統合', () => {
     });
 
     test('IndexedDBからデータを読み込める', async ({ extensionContext }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      expect(serviceWorkers.length).toBeGreaterThan(0);
-
-      const worker = serviceWorkers[0];
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
+      }
 
       // まずデータを保存
       await worker.evaluate(
@@ -174,10 +196,11 @@ test.describe('IndexedDB統合', () => {
     });
 
     test('IndexedDBからデータを削除できる', async ({ extensionContext }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      expect(serviceWorkers.length).toBeGreaterThan(0);
-
-      const worker = serviceWorkers[0];
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
+      }
       const testId = 'delete-test-snapshot';
 
       // まずデータを保存
@@ -288,17 +311,15 @@ test.describe('IndexedDB統合', () => {
     });
   });
 
-  test.describe('大量データの処理', () => {
+  test.describe.serial('大量データの処理', () => {
     test('100個のスナップショットデータを処理できる', async ({
       extensionContext,
     }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      if (serviceWorkers.length === 0) {
-        test.skip();
-        return;
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
       }
-
-      const worker = serviceWorkers[0];
 
       // 100個のスナップショットデータを生成してIndexedDBに保存
       const largeData = generateLargeSnapshotData(100);
@@ -370,13 +391,11 @@ test.describe('IndexedDB統合', () => {
     test('大量データの読み込みがパフォーマンス要件を満たす', async ({
       extensionContext,
     }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      if (serviceWorkers.length === 0) {
-        test.skip();
-        return;
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
       }
-
-      const worker = serviceWorkers[0];
 
       // 読み込みパフォーマンスを計測
       const result = await worker.evaluate(
@@ -429,14 +448,15 @@ test.describe('IndexedDB統合', () => {
     });
   });
 
-  test.describe('エラーハンドリング', () => {
+  test.describe.serial('エラーハンドリング', () => {
     test('IndexedDBが利用可能であることを確認', async ({
       extensionContext,
     }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      expect(serviceWorkers.length).toBeGreaterThan(0);
-
-      const worker = serviceWorkers[0];
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
+      }
 
       const hasIndexedDB = await worker.evaluate(() => {
         return typeof indexedDB !== 'undefined';
@@ -448,13 +468,11 @@ test.describe('IndexedDB統合', () => {
     test('不正なデータベースバージョンでのエラーハンドリング', async ({
       extensionContext,
     }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      if (serviceWorkers.length === 0) {
-        test.skip();
-        return;
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
       }
-
-      const worker = serviceWorkers[0];
 
       // 古いバージョンでデータベースを開こうとした場合のエラーハンドリング
       const result = await worker.evaluate(async () => {
@@ -472,10 +490,10 @@ test.describe('IndexedDB統合', () => {
             resolve({ hasErrorHandler: true });
           };
 
-          // タイムアウト
+          // タイムアウト（余裕を持って5秒に設定）
           setTimeout(() => {
             resolve({ hasErrorHandler: true });
-          }, 1000);
+          }, 5000);
         });
       });
 
@@ -483,14 +501,15 @@ test.describe('IndexedDB統合', () => {
     });
   });
 
-  test.describe('データ永続化', () => {
+  test.describe.serial('データ永続化', () => {
     test('データベースを閉じて再度開いてもデータが保持される', async ({
       extensionContext,
     }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      expect(serviceWorkers.length).toBeGreaterThan(0);
-
-      const worker = serviceWorkers[0];
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
+      }
       const testId = 'persistence-test-snapshot';
       const testName = 'Persistence Test';
 
@@ -530,45 +549,54 @@ test.describe('IndexedDB統合', () => {
         { dbName: DB_NAME, storeName: STORE_NAME, id: testId, name: testName }
       );
 
-      // データベースを再度開いてデータを読み込み
+      // データベースを再度開いてデータを読み込み（ポーリングで永続化完了を待機）
       const result = await worker.evaluate(
-        async ({ dbName, storeName, id }) => {
-          return new Promise<{ found: boolean; name: string | null }>(
-            (resolve) => {
-              const request = indexedDB.open(dbName);
+        async ({ dbName, storeName, id, expectedName }) => {
+          // ポーリングでデータが読み取れるまで待機
+          for (let i = 0; i < 30; i++) {
+            const readResult = await new Promise<{ found: boolean; name: string | null }>(
+              (resolve) => {
+                const request = indexedDB.open(dbName);
 
-              request.onerror = () => resolve({ found: false, name: null });
+                request.onerror = () => resolve({ found: false, name: null });
 
-              request.onsuccess = () => {
-                const db = request.result;
-                if (!db.objectStoreNames.contains(storeName)) {
-                  db.close();
-                  resolve({ found: false, name: null });
-                  return;
-                }
+                request.onsuccess = () => {
+                  const db = request.result;
+                  if (!db.objectStoreNames.contains(storeName)) {
+                    db.close();
+                    resolve({ found: false, name: null });
+                    return;
+                  }
 
-                const transaction = db.transaction([storeName], 'readonly');
-                const store = transaction.objectStore(storeName);
-                const getRequest = store.get(id);
+                  const transaction = db.transaction([storeName], 'readonly');
+                  const store = transaction.objectStore(storeName);
+                  const getRequest = store.get(id);
 
-                getRequest.onsuccess = () => {
-                  const record = getRequest.result;
-                  db.close();
-                  resolve({
-                    found: !!record,
-                    name: record ? record.name : null,
-                  });
+                  getRequest.onsuccess = () => {
+                    const record = getRequest.result;
+                    db.close();
+                    resolve({
+                      found: !!record,
+                      name: record ? record.name : null,
+                    });
+                  };
+
+                  getRequest.onerror = () => {
+                    db.close();
+                    resolve({ found: false, name: null });
+                  };
                 };
+              }
+            );
 
-                getRequest.onerror = () => {
-                  db.close();
-                  resolve({ found: false, name: null });
-                };
-              };
+            if (readResult.found && readResult.name === expectedName) {
+              return readResult;
             }
-          );
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          return { found: false, name: null };
         },
-        { dbName: DB_NAME, storeName: STORE_NAME, id: testId }
+        { dbName: DB_NAME, storeName: STORE_NAME, id: testId, expectedName: testName }
       );
 
       expect(result.found).toBe(true);
@@ -578,13 +606,11 @@ test.describe('IndexedDB統合', () => {
     test('複数のトランザクションが順序通り処理される', async ({
       extensionContext,
     }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      if (serviceWorkers.length === 0) {
-        test.skip();
-        return;
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
       }
-
-      const worker = serviceWorkers[0];
 
       // 複数の書き込みを順次実行
       const result = await worker.evaluate(
@@ -640,15 +666,13 @@ test.describe('IndexedDB統合', () => {
     });
   });
 
-  test.describe('同時アクセス', () => {
+  test.describe.serial('同時アクセス', () => {
     test('同時アクセス時のデータ整合性', async ({ extensionContext }) => {
-      const serviceWorkers = extensionContext.serviceWorkers();
-      if (serviceWorkers.length === 0) {
-        test.skip();
-        return;
+      // Service Workerを取得（なければ待機）
+      let [worker] = extensionContext.serviceWorkers();
+      if (!worker) {
+        worker = await extensionContext.waitForEvent('serviceworker', { timeout: 10000 });
       }
-
-      const worker = serviceWorkers[0];
 
       // 同時に複数の書き込み操作を実行
       const result = await worker.evaluate(

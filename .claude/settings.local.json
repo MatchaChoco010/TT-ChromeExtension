@@ -13,7 +13,9 @@
       "Bash(npm run build:extension:*)",
       "Bash(npm run:*)",
       "Bash(npx vite:*)",
-      "Bash(HEADED=true npm run test:e2e:*)"
+      "Bash(HEADED=true npm run test:e2e:*)",
+      "mcp__ide__getDiagnostics",
+      "WebSearch"
     ]
   },
   "sandbox": {

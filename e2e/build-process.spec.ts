@@ -6,13 +6,14 @@ import * as path from 'path';
  * ビルドプロセス統合のテスト
  * Requirement 2: Chrome拡張機能のロードとテスト実行基盤
  *
- * Note: このテストスイートはglobalSetupを呼び出さずに実行されます。
- * globalSetup自体は他のE2Eテストによって間接的にテストされます。
+ * Note: このテストスイートはPlaywrightのglobalSetup実行後に実行されます。
+ * globalSetupがテスト実行前に拡張機能をビルドするため、dist/ディレクトリと
+ * ビルド成果物が存在することを検証できます。
  */
 test.describe('ビルドプロセス統合', () => {
-  test.skip('dist/ディレクトリが存在し、ビルド成果物が含まれていること', () => {
+  test('dist/ディレクトリが存在し、ビルド成果物が含まれていること', () => {
     // このテストはglobalSetupがビルドを実行した後にパスすることを検証
-    // globalSetupは実際のE2Eテスト実行時に自動的に呼ばれる
+    // globalSetupはPlaywrightがテスト実行前に自動的に呼び出し、拡張機能をビルドする
     const distPath = path.join(process.cwd(), 'dist');
 
     // dist/ディレクトリが存在することを検証

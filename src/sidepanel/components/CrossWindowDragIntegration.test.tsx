@@ -3,9 +3,21 @@ import { render, waitFor } from '@testing-library/react';
 import React from 'react';
 import { CrossWindowDragHandler } from './CrossWindowDragHandler';
 import { useCrossWindowDrag } from '../hooks/useCrossWindowDrag';
+import type { TabNode } from '@/types';
 
 // Don't mock useCrossWindowDrag for integration test
 vi.unmock('../hooks/useCrossWindowDrag');
+
+// Sample TabNode for testing
+const createTestTabNode = (tabId: number): TabNode => ({
+  id: `node-${tabId}`,
+  tabId,
+  parentId: null,
+  children: [],
+  isExpanded: true,
+  depth: 0,
+  viewId: 'view-1',
+});
 
 describe('CrossWindowDragHandler Integration', () => {
   let mockSendMessage: ReturnType<typeof vi.fn>;
@@ -13,7 +25,7 @@ describe('CrossWindowDragHandler Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockSendMessage = vi.fn((message, callback) => {
+    mockSendMessage = vi.fn((_message, callback) => {
       if (callback) {
         callback({ success: true, data: null });
       }
@@ -52,7 +64,7 @@ describe('CrossWindowDragHandler Integration', () => {
 
       React.useEffect(() => {
         // Simulate drag start
-        handleDragStart(123, { nodeId: 'test' });
+        handleDragStart(123, [createTestTabNode(123)]);
 
         // Simulate drag end inside panel
         handleDragEnd(false);
@@ -93,7 +105,7 @@ describe('CrossWindowDragHandler Integration', () => {
           success: true,
           data: {
             tabId: 123,
-            treeData: {},
+            treeData: [createTestTabNode(123)],
             sourceWindowId: 1,
           },
         });
@@ -141,7 +153,7 @@ describe('CrossWindowDragHandler Integration', () => {
           success: true,
           data: {
             tabId: 456,
-            treeData: {},
+            treeData: [createTestTabNode(456)],
             sourceWindowId: 2, // Different window
           },
         });

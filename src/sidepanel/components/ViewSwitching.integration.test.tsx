@@ -12,9 +12,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ViewSwitcher } from './ViewSwitcher';
 import { ViewManager } from '@/services/ViewManager';
-import { TreeStateManager } from '@/services/TreeStateManager';
 import { StorageService } from '@/storage/StorageService';
 import type { View } from '@/types';
+import type { MockChrome, MockStorageLocal, MockStorage } from '@/test/test-types';
 
 /**
  * ViewManager と TreeStateManager を使用したビュー切り替えのテストハーネス
@@ -87,18 +87,26 @@ const ViewSwitchingTestHarness: React.FC = () => {
 describe('Task 8.5: ビュー切り替えの統合テスト', () => {
   beforeEach(() => {
     // モックのchrome.storageを設定
-    global.chrome = {
-      storage: {
-        local: {
-          get: vi.fn().mockResolvedValue({}),
-          set: vi.fn().mockResolvedValue(undefined),
-          remove: vi.fn().mockResolvedValue(undefined),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
+    const mockStorageLocal: MockStorageLocal = {
+      get: vi.fn().mockResolvedValue({}),
+      set: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const mockStorage: MockStorage = {
+      local: mockStorageLocal,
+      onChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+    };
+
+    const mockChrome: Partial<MockChrome> = {
+      storage: mockStorage,
+    };
+
+    global.chrome = mockChrome as unknown as typeof chrome;
   });
 
   describe('Acceptance Criteria 6.2: 新しいビューを作成できることを確認', () => {

@@ -14,7 +14,7 @@ import { createTab, activateTab, assertUnreadBadge, closeTab } from './utils/tab
 extensionTest.describe('未読インジケータ機能', () => {
   extensionTest(
     'タブがバックグラウンドで読み込まれた場合、未読バッジが表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
       await initialPage.waitForLoadState('load');
@@ -27,12 +27,12 @@ extensionTest.describe('未読インジケータ機能', () => {
         { active: false }
       );
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
-      // ツリーが表示されるまで待機
+      // ツリーが表示されるまで待機（フィクスチャがSide Panelのナビゲーションを完了済み）
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // タブノードがDOMに表示されるまで待機
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // 未読バッジが表示されることを確認
       await assertUnreadBadge(sidePanelPage, bgTabId);
@@ -44,7 +44,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
   extensionTest(
     '未読タブをアクティブにした場合、未読バッジが消える',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
       await initialPage.waitForLoadState('load');
@@ -57,10 +57,12 @@ extensionTest.describe('未読インジケータ機能', () => {
         { active: false }
       );
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
+      // ツリーが表示されるまで待機（フィクスチャがSide Panelのナビゲーションを完了済み）
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // タブノードがDOMに表示されるまで待機
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // 未読バッジが表示されることを確認
       await assertUnreadBadge(sidePanelPage, bgTabId);
@@ -68,16 +70,11 @@ extensionTest.describe('未読インジケータ機能', () => {
       // タブをアクティブ化
       await activateTab(extensionContext, bgTabId);
 
-      // 少し待機して状態更新を待つ
-      await sidePanelPage.waitForTimeout(500);
-
       // 未読バッジが消えることを確認（タブIDに関連するバッジがないこと）
-      // タブのデータ属性でノードを特定
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
       const unreadBadgeInNode = tabNode.locator('[data-testid="unread-badge"]');
 
-      // バッジが表示されていないことを確認
-      await expect(unreadBadgeInNode).toHaveCount(0, { timeout: 5000 });
+      // バッジが表示されなくなるまでポーリング（UIの更新を待つ）
+      await expect(unreadBadgeInNode).toHaveCount(0, { timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, bgTabId);
@@ -86,7 +83,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
   extensionTest(
     '親タブの子に未読タブがある場合、親タブにも未読インジケータが表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
       await initialPage.waitForLoadState('load');
@@ -107,23 +104,25 @@ extensionTest.describe('未読インジケータ機能', () => {
         { active: false }
       );
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
+      // ツリーが表示されるまで待機（フィクスチャがSide Panelのナビゲーションを完了済み）
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
-
-      // 子タブに未読バッジが表示されることを確認
-      await assertUnreadBadge(sidePanelPage, childTabId);
 
       // 親タブに未読インジケータ（またはカウント）が表示されることを確認
       // 親タブのノードを探す
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-      await expect(parentNode).toBeVisible({ timeout: 5000 });
+      await expect(parentNode).toBeVisible({ timeout: 10000 });
+
+      // 子タブノードがDOMに表示されるまで待機
+      const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTabId}"]`);
+      await expect(childNode).toBeVisible({ timeout: 10000 });
+
+      // 子タブに未読バッジが表示されることを確認
+      await assertUnreadBadge(sidePanelPage, childTabId);
 
       // 親タブに未読子タブのインジケータが表示されることを確認
       // 親タブノード内に未読カウントまたはインジケータがあることを確認
       const parentUnreadIndicator = parentNode.locator('[data-testid="unread-child-indicator"], [data-testid="unread-count"]');
-      await expect(parentUnreadIndicator.first()).toBeVisible({ timeout: 5000 });
+      await expect(parentUnreadIndicator.first()).toBeVisible({ timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, childTabId);
@@ -133,7 +132,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
   extensionTest(
     '複数の未読タブがある場合、未読数がカウントされて表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
       await initialPage.waitForLoadState('load');
@@ -158,10 +157,16 @@ extensionTest.describe('未読インジケータ機能', () => {
         { active: false }
       );
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
+      // ツリーが表示されるまで待機（フィクスチャがSide Panelのナビゲーションを完了済み）
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // 各タブノードがDOMに表示されるまで待機
+      const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId1}"]`);
+      const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId2}"]`);
+      const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId3}"]`);
+      await expect(tabNode1).toBeVisible({ timeout: 10000 });
+      await expect(tabNode2).toBeVisible({ timeout: 10000 });
+      await expect(tabNode3).toBeVisible({ timeout: 10000 });
 
       // 各タブに未読バッジが表示されることを確認
       await assertUnreadBadge(sidePanelPage, bgTabId1);
@@ -170,9 +175,9 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       // 全体の未読カウントが表示されることを確認（ヘッダーやサマリーエリアで）
       // または各未読バッジの数が正しいことを確認
+      // Playwrightのexpectでポーリングして待機
       const allUnreadBadges = sidePanelPage.locator('[data-testid="unread-badge"]');
-      const badgeCount = await allUnreadBadges.count();
-      expect(badgeCount).toBeGreaterThanOrEqual(3);
+      await expect(allUnreadBadges).toHaveCount(3, { timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, bgTabId3);

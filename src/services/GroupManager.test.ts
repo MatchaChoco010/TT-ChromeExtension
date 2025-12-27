@@ -16,13 +16,13 @@ describe('GroupManager', () => {
     mockGroups = {};
 
     mockStorageService = {
-      get: vi.fn(async (key) => {
+      get: vi.fn().mockImplementation(async (key: string) => {
         if (key === 'groups') {
           return mockGroups;
         }
         return null;
       }),
-      set: vi.fn(async (key, value) => {
+      set: vi.fn().mockImplementation(async (key: string, value: unknown) => {
         if (key === 'groups') {
           mockGroups = value as Record<string, Group>;
         }

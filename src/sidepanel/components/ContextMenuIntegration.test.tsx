@@ -4,23 +4,7 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
-
-// Chrome API のモック
-global.chrome = {
-  tabs: {
-    remove: vi.fn(),
-    duplicate: vi.fn(),
-    update: vi.fn(),
-    reload: vi.fn(),
-    query: vi.fn(),
-  },
-  windows: {
-    create: vi.fn(),
-  },
-  runtime: {
-    sendMessage: vi.fn(),
-  },
-} as any;
+import { chromeMock } from '@/test/chrome-mock';
 
 /**
  * Task 15.2: MenuActions とメニュー項目の実装 - 統合テスト
@@ -29,13 +13,13 @@ global.chrome = {
 describe('ContextMenu Integration with MenuActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    chromeMock.clearAllListeners();
   });
 
   describe('Requirement 12.3: メニューから操作を選択すると対応するアクションが実行される', () => {
     it('「タブを閉じる」をクリックするとタブが閉じられる', async () => {
       const user = userEvent.setup();
-      const mockRemove = vi.fn().mockResolvedValue(undefined);
-      (chrome.tabs.remove as any) = mockRemove;
+      chromeMock.tabs.remove.mockResolvedValue(undefined);
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -61,13 +45,12 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(closeButton);
 
-      expect(mockRemove).toHaveBeenCalledWith([1, 2]);
+      expect(chromeMock.tabs.remove).toHaveBeenCalledWith([1, 2]);
     });
 
     it('「タブを複製」をクリックするとタブが複製される', async () => {
       const user = userEvent.setup();
-      const mockDuplicate = vi.fn().mockResolvedValue({ id: 3 });
-      (chrome.tabs.duplicate as any) = mockDuplicate;
+      chromeMock.tabs.duplicate.mockResolvedValue({ id: 3 } as chrome.tabs.Tab);
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -93,13 +76,12 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(duplicateButton);
 
-      expect(mockDuplicate).toHaveBeenCalledWith(1);
+      expect(chromeMock.tabs.duplicate).toHaveBeenCalledWith(1);
     });
 
     it('「タブをピン留め」をクリックするとタブがピン留めされる', async () => {
       const user = userEvent.setup();
-      const mockUpdate = vi.fn().mockResolvedValue({ id: 1, pinned: true });
-      (chrome.tabs.update as any) = mockUpdate;
+      chromeMock.tabs.update.mockResolvedValue({ id: 1, pinned: true } as chrome.tabs.Tab);
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -126,13 +108,12 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(pinButton);
 
-      expect(mockUpdate).toHaveBeenCalledWith(1, { pinned: true });
+      expect(chromeMock.tabs.update).toHaveBeenCalledWith(1, { pinned: true });
     });
 
     it('「ピン留めを解除」をクリックするとピン留めが解除される', async () => {
       const user = userEvent.setup();
-      const mockUpdate = vi.fn().mockResolvedValue({ id: 1, pinned: false });
-      (chrome.tabs.update as any) = mockUpdate;
+      chromeMock.tabs.update.mockResolvedValue({ id: 1, pinned: false } as chrome.tabs.Tab);
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -159,13 +140,12 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(unpinButton);
 
-      expect(mockUpdate).toHaveBeenCalledWith(1, { pinned: false });
+      expect(chromeMock.tabs.update).toHaveBeenCalledWith(1, { pinned: false });
     });
 
     it('「タブを再読み込み」をクリックするとタブが再読み込みされる', async () => {
       const user = userEvent.setup();
-      const mockReload = vi.fn().mockResolvedValue(undefined);
-      (chrome.tabs.reload as any) = mockReload;
+      chromeMock.tabs.reload.mockResolvedValue(undefined);
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -191,15 +171,14 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(reloadButton);
 
-      expect(mockReload).toHaveBeenCalledTimes(2);
-      expect(mockReload).toHaveBeenNthCalledWith(1, 1);
-      expect(mockReload).toHaveBeenNthCalledWith(2, 2);
+      expect(chromeMock.tabs.reload).toHaveBeenCalledTimes(2);
+      expect(chromeMock.tabs.reload).toHaveBeenNthCalledWith(1, 1);
+      expect(chromeMock.tabs.reload).toHaveBeenNthCalledWith(2, 2);
     });
 
     it('「新しいウィンドウで開く」をクリックすると新しいウィンドウが作成される', async () => {
       const user = userEvent.setup();
-      const mockCreate = vi.fn().mockResolvedValue({ id: 2 });
-      (chrome.windows.create as any) = mockCreate;
+      chromeMock.windows.create.mockResolvedValue({ id: 2 } as chrome.windows.Window);
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -225,13 +204,12 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(newWindowButton);
 
-      expect(mockCreate).toHaveBeenCalledWith({ tabId: 1 });
+      expect(chromeMock.windows.create).toHaveBeenCalledWith({ tabId: 1 });
     });
 
     it('「タブをグループ化」をクリックするとグループが作成される', async () => {
       const user = userEvent.setup();
-      const mockSendMessage = vi.fn().mockResolvedValue({ success: true });
-      (chrome.runtime.sendMessage as any) = mockSendMessage;
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -258,7 +236,7 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(groupButton);
 
-      expect(mockSendMessage).toHaveBeenCalledWith({
+      expect(chromeMock.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'CREATE_GROUP',
         payload: { tabIds: [1, 2, 3] },
       });
@@ -266,8 +244,7 @@ describe('ContextMenu Integration with MenuActions', () => {
 
     it('「グループを解除」をクリックするとグループが解除される', async () => {
       const user = userEvent.setup();
-      const mockSendMessage = vi.fn().mockResolvedValue({ success: true });
-      (chrome.runtime.sendMessage as any) = mockSendMessage;
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -294,7 +271,7 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(ungroupButton);
 
-      expect(mockSendMessage).toHaveBeenCalledWith({
+      expect(chromeMock.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'DISSOLVE_GROUP',
         payload: { tabIds: [1, 2] },
       });
@@ -302,15 +279,13 @@ describe('ContextMenu Integration with MenuActions', () => {
 
     it('「他のタブを閉じる」をクリックすると選択されたタブ以外が閉じられる', async () => {
       const user = userEvent.setup();
-      const mockQuery = vi.fn().mockResolvedValue([
+      chromeMock.tabs.query.mockResolvedValue([
         { id: 1 },
         { id: 2 },
         { id: 3 },
         { id: 4 },
-      ]);
-      const mockRemove = vi.fn().mockResolvedValue(undefined);
-      (chrome.tabs.query as any) = mockQuery;
-      (chrome.tabs.remove as any) = mockRemove;
+      ] as chrome.tabs.Tab[]);
+      chromeMock.tabs.remove.mockResolvedValue(undefined);
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -336,8 +311,8 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(closeOthersButton);
 
-      expect(mockQuery).toHaveBeenCalledWith({ currentWindow: true });
-      expect(mockRemove).toHaveBeenCalledWith([1, 4]);
+      expect(chromeMock.tabs.query).toHaveBeenCalledWith({ currentWindow: true });
+      expect(chromeMock.tabs.remove).toHaveBeenCalledWith([1, 4]);
     });
   });
 });

@@ -1,7 +1,16 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { DndContext, closestCenter, DragOverEvent } from '@dnd-kit/core';
+import {
+  DndContext,
+  closestCenter,
+  DragOverEvent,
+  MouseSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import type { TabNode, TabTreeViewProps, MenuAction } from '@/types';
 import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
@@ -20,6 +29,8 @@ interface TreeNodeItemProps {
   isTabUnread?: (tabId: number) => boolean;
   // Task 4.13: 子孫の未読数を取得する関数
   getUnreadChildCount?: (nodeId: string) => number;
+  // Task 8.5.4: アクティブタブID
+  activeTabId?: number;
 }
 
 /**
@@ -34,6 +45,7 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   isDraggable,
   isTabUnread,
   getUnreadChildCount,
+  activeTabId,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -43,6 +55,8 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   // Task 4.13: 未読状態とカウントを計算
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
   const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
+  // Task 8.5.4: アクティブ状態を計算
+  const isActive = activeTabId === node.tabId;
 
   const {
     attributes,
@@ -84,7 +98,7 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-sortable-item={`sortable-item-${node.id}`}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${isDragging ? 'bg-blue-100 border-2 border-blue-500' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${isDragging ? 'bg-blue-100 border-2 border-blue-500' : ''} ${isActive && !isDragging ? 'bg-blue-100' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={() => onNodeClick(node.tabId)}
         onContextMenu={handleContextMenu}
@@ -151,6 +165,7 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               isDraggable={isDraggable}
               isTabUnread={isTabUnread}
               getUnreadChildCount={getUnreadChildCount}
+              activeTabId={activeTabId}
             />
           ))}
         </div>
@@ -170,6 +185,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   onToggleExpand,
   isTabUnread,
   getUnreadChildCount,
+  activeTabId,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -179,6 +195,8 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   // Task 4.13: 未読状態とカウントを計算
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
   const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
+  // Task 8.5.4: アクティブ状態を計算
+  const isActive = activeTabId === node.tabId;
 
   // Task 4.11: 右クリック時のコンテキストメニュー表示
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -201,7 +219,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-node-id={node.id}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
+        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${isActive ? 'bg-blue-100' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={() => onNodeClick(node.tabId)}
         onContextMenu={handleContextMenu}
@@ -266,6 +284,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               isDraggable={false}
               isTabUnread={isTabUnread}
               getUnreadChildCount={getUnreadChildCount}
+              activeTabId={activeTabId}
             />
           ))}
         </div>
@@ -304,7 +323,25 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onDragOver,
   isTabUnread,
   getUnreadChildCount,
+  activeTabId,
 }) => {
+  // dnd-kit sensors: MouseSensor + TouchSensor + KeyboardSensor
+  // PointerSensorはPlaywrightなどのE2Eテストツールでヘッドレスモードで問題が発生するため使用しない
+  // activationConstraint: { distance: 8 } で誤操作を防止
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: {
+      distance: 8,
+    },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 250,
+      tolerance: 5,
+    },
+  });
+  const keyboardSensor = useSensor(KeyboardSensor);
+  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
+
   // currentViewIdでフィルタリング
   const filteredNodes = useMemo(
     () => nodes.filter((node) => node.viewId === currentViewId),
@@ -331,6 +368,39 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         clearTimeout(hoverTimerRef.current);
       }
     };
+  }, []);
+
+  /**
+   * ドラッグ終了イベントハンドラ
+   * ホバータイマーをクリアしてから元のonDragEndを呼び出す
+   */
+  const handleDragEnd = React.useCallback(
+    (event: Parameters<NonNullable<typeof onDragEnd>>[0]) => {
+      // ドラッグ終了時にホバータイマーをクリア
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+      lastHoverNodeIdRef.current = null;
+
+      // 元のonDragEndを呼び出す
+      if (onDragEnd) {
+        onDragEnd(event);
+      }
+    },
+    [onDragEnd]
+  );
+
+  /**
+   * ドラッグキャンセルイベントハンドラ
+   * Escapeキー等でドラッグがキャンセルされた場合にホバータイマーをクリア
+   */
+  const handleDragCancel = React.useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    lastHoverNodeIdRef.current = null;
   }, []);
 
   /**
@@ -417,6 +487,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
             isDraggable={isDraggable}
             isTabUnread={isTabUnread}
             getUnreadChildCount={getUnreadChildCount}
+            activeTabId={activeTabId}
           />
         ) : (
           <TreeNodeItem
@@ -427,6 +498,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
             isDraggable={false}
             isTabUnread={isTabUnread}
             getUnreadChildCount={getUnreadChildCount}
+            activeTabId={activeTabId}
           />
         )
       )}
@@ -437,11 +509,13 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     <div data-testid="tab-tree-view" className="w-full">
       {filteredNodes.length === 0 ? (
         <div className="p-4 text-gray-500 text-sm">No tabs in this view</div>
-      ) : isDraggable && onDragEnd ? (
+      ) : isDraggable ? (
         <DndContext
+          sensors={sensors}
           collisionDetection={closestCenter}
-          onDragEnd={onDragEnd}
+          onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
+          onDragCancel={handleDragCancel}
         >
           <SortableContext
             items={allNodeIds}

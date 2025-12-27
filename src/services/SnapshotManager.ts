@@ -1,6 +1,5 @@
 import type {
   Snapshot,
-  SnapshotData,
   TabSnapshot,
   IIndexedDBService,
   IStorageService,
@@ -82,7 +81,6 @@ export class SnapshotManager {
 
       return snapshot;
     } catch (error) {
-      console.error('SnapshotManager.createSnapshot error:', error);
       throw error;
     }
   }
@@ -108,7 +106,6 @@ export class SnapshotManager {
       // ビューを復元（将来実装）
       // グループを復元（将来実装）
     } catch (error) {
-      console.error('SnapshotManager.restoreSnapshot error:', error);
       throw error;
     }
   }
@@ -122,7 +119,6 @@ export class SnapshotManager {
     try {
       await this.indexedDBService.deleteSnapshot(snapshotId);
     } catch (error) {
-      console.error('SnapshotManager.deleteSnapshot error:', error);
       throw error;
     }
   }
@@ -136,7 +132,6 @@ export class SnapshotManager {
     try {
       return await this.indexedDBService.getAllSnapshots();
     } catch (error) {
-      console.error('SnapshotManager.getSnapshots error:', error);
       throw error;
     }
   }
@@ -163,7 +158,6 @@ export class SnapshotManager {
 
       return JSON.stringify(exportData, null, 2);
     } catch (error) {
-      console.error('SnapshotManager.exportSnapshot error:', error);
       throw error;
     }
   }
@@ -189,7 +183,6 @@ export class SnapshotManager {
 
       return snapshot;
     } catch (error) {
-      console.error('SnapshotManager.importSnapshot error:', error);
       throw error;
     }
   }
@@ -282,9 +275,8 @@ export class SnapshotManager {
             const timestamp = new Date().toISOString().split('T')[0];
             const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
             await this.createSnapshot(name, true);
-            console.log('Auto-snapshot created:', name);
-          } catch (error) {
-            console.error('Auto-snapshot failed:', error);
+          } catch (_error) {
+            // Auto-snapshot failed silently
           }
         }
       };
@@ -296,12 +288,7 @@ export class SnapshotManager {
       chrome.alarms.create(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME, {
         periodInMinutes: intervalMinutes,
       });
-
-      console.log(
-        `Auto-snapshot enabled with interval: ${intervalMinutes} minutes`,
-      );
     } catch (error) {
-      console.error('SnapshotManager.startAutoSnapshot error:', error);
       throw error;
     }
   }
@@ -319,10 +306,7 @@ export class SnapshotManager {
         chrome.alarms.onAlarm.removeListener(this.alarmListener);
         this.alarmListener = null;
       }
-
-      console.log('Auto-snapshot disabled');
     } catch (error) {
-      console.error('SnapshotManager.stopAutoSnapshot error:', error);
       throw error;
     }
   }

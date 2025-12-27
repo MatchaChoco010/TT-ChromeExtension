@@ -1,13 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCrossWindowDrag } from './useCrossWindowDrag';
+import type { TabNode } from '@/types';
+
+// Sample TabNode for testing
+const createTestTabNode = (tabId: number): TabNode => ({
+  id: `node-${tabId}`,
+  tabId,
+  parentId: null,
+  children: [],
+  isExpanded: true,
+  depth: 0,
+  viewId: 'view-1',
+});
 
 describe('useCrossWindowDrag', () => {
   let mockSendMessage: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     // Mock chrome.runtime.sendMessage
-    mockSendMessage = vi.fn((message, callback) => {
+    mockSendMessage = vi.fn((_message, callback) => {
       if (callback) {
         callback({ success: true });
       }
@@ -34,7 +46,7 @@ describe('useCrossWindowDrag', () => {
       );
 
       const tabId = 123;
-      const treeData = { nodeId: 'node-1', children: [] };
+      const treeData: TabNode[] = [createTestTabNode(123)];
 
       await act(async () => {
         await result.current.handleDragStart(tabId, treeData);
@@ -57,7 +69,7 @@ describe('useCrossWindowDrag', () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      mockSendMessage.mockImplementation((message, callback) => {
+      mockSendMessage.mockImplementation((_message, callback) => {
         if (callback) {
           callback({ success: false, error: 'Test error' });
         }
@@ -71,7 +83,7 @@ describe('useCrossWindowDrag', () => {
       );
 
       await act(async () => {
-        await result.current.handleDragStart(123, {});
+        await result.current.handleDragStart(123, []);
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -111,7 +123,7 @@ describe('useCrossWindowDrag', () => {
             success: true,
             data: {
               tabId: 123,
-              treeData: {},
+              treeData: [createTestTabNode(123)],
               sourceWindowId: 1,
             },
           });
@@ -154,7 +166,7 @@ describe('useCrossWindowDrag', () => {
             success: true,
             data: {
               tabId: 123,
-              treeData: {},
+              treeData: [createTestTabNode(123)],
               sourceWindowId: 1,
             },
           });
@@ -192,7 +204,7 @@ describe('useCrossWindowDrag', () => {
             success: true,
             data: {
               tabId: 123,
-              treeData: {},
+              treeData: [createTestTabNode(123)],
               sourceWindowId: 2, // Different window
             },
           });
@@ -266,7 +278,7 @@ describe('useCrossWindowDrag', () => {
             success: true,
             data: {
               tabId: 123,
-              treeData: {},
+              treeData: [createTestTabNode(123)],
               sourceWindowId: 1, // Same window
             },
           });

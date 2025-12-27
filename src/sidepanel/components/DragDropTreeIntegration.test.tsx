@@ -8,45 +8,15 @@
  * - TreeStateManager と連携してツリー状態を更新
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor, act } from '@testing-library/react';
 import { DragEndEvent } from '@dnd-kit/core';
-import TabTreeView from './TabTreeView';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
-import React from 'react';
-
-// テストコンポーネント: ドラッグ&ドロップを統合
-function DragDropTreeTestComponent() {
-  const { treeState, handleDragEnd } = useTreeState();
-
-  const handleNodeClick = vi.fn();
-  const handleToggleExpand = vi.fn();
-
-  if (!treeState) {
-    return <div>Loading...</div>;
-  }
-
-  const rootNodes = Object.values(treeState.nodes).filter(
-    (node) => node.parentId === null
-  );
-
-  return (
-    <TabTreeView
-      nodes={rootNodes}
-      currentViewId={treeState.currentViewId}
-      onNodeClick={handleNodeClick}
-      onToggleExpand={handleToggleExpand}
-      onDragEnd={handleDragEnd}
-    />
-  );
-}
+import type { TreeState } from '@/types';
+import { getMockChrome } from '@/test/test-types';
 
 describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () => {
-  let sendMessageMock: any;
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    sendMessageMock = vi.fn().mockResolvedValue(undefined);
 
     // chrome.storage.local のモック
     global.chrome = {
@@ -100,32 +70,50 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
         },
       },
       runtime: {
-        sendMessage: sendMessageMock,
+        sendMessage: vi.fn().mockResolvedValue(undefined),
         onMessage: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
       },
-    } as any;
+      tabs: {
+        query: vi.fn().mockResolvedValue([{ id: 1 }]),
+        onActivated: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
+      },
+    } as unknown as typeof chrome;
   });
 
   it('タブを別のタブの子として配置できる (Acceptance Criteria 3.2)', async () => {
-    render(
-      <TreeStateProvider>
-        <DragDropTreeTestComponent />
-      </TreeStateProvider>
-    );
+    // useTreeStateから直接handleDragEndを取得して呼び出すためのコンポーネント
+    let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
+    let testTreeState: TreeState | null = null;
+    function TestHookComponent() {
+      const { handleDragEnd, treeState } = useTreeState();
+      testHandleDragEnd = handleDragEnd;
+      testTreeState = treeState;
+      return null;
+    }
 
-    // 初期状態の確認
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <TestHookComponent />
+        </TreeStateProvider>
+      );
+    });
+
+    // treeStateが初期化されるまで待機
     await waitFor(() => {
-      expect(screen.getByTestId('tree-node-node-1')).toBeInTheDocument();
-      expect(screen.getByTestId('tree-node-node-2')).toBeInTheDocument();
-      expect(screen.getByTestId('tree-node-node-3')).toBeInTheDocument();
+      expect(testTreeState).not.toBeNull();
+      expect(testHandleDragEnd).toBeDefined();
     });
 
     // ドラッグ&ドロップイベントをシミュレート
     // node-2 を node-1 の子として配置
-    const dragEndEvent: DragEndEvent = {
+    const dragEndEvent = {
       active: {
         id: 'node-2',
         data: { current: undefined },
@@ -140,63 +128,61 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
       delta: { x: 0, y: 0 },
       activatorEvent: new MouseEvent('mouseup'),
       collisions: null,
-    };
-
-    // useTreeStateから直接handleDragEndを取得して呼び出す
-    let testHandleDragEnd: any;
-    function TestHookComponent() {
-      const { handleDragEnd } = useTreeState();
-      testHandleDragEnd = handleDragEnd;
-      return null;
-    }
-
-    render(
-      <TreeStateProvider>
-        <TestHookComponent />
-      </TreeStateProvider>
-    );
-
-    await waitFor(() => {
-      expect(testHandleDragEnd).toBeDefined();
-    });
+    } as unknown as DragEndEvent;
 
     // handleDragEndを呼び出す
-    await testHandleDragEnd(dragEndEvent);
-
-    // Service Workerへのメッセージが送信されたことを確認
-    await waitFor(() => {
-      expect(sendMessageMock).toHaveBeenCalledWith({
-        type: 'UPDATE_TREE',
-        payload: {
-          nodeId: 'node-2',
-          newParentId: 'node-1',
-          index: 0,
-        },
-      });
+    await act(async () => {
+      await testHandleDragEnd!(dragEndEvent);
     });
 
-    // ストレージが更新されたことを確認
-    expect(chrome.storage.local.set).toHaveBeenCalled();
+    // ストレージが更新されたことを確認（ツリー状態が保存される）
+    await waitFor(() => {
+      expect(chrome.storage.local.set).toHaveBeenCalled();
+    });
+
+    // ストレージに保存されたデータを検証
+    const mockChrome = getMockChrome();
+    const setCall = mockChrome.storage.local.set.mock.calls[0];
+    expect(setCall).toBeDefined();
+    const savedState = setCall[0].tree_state as TreeState;
+    expect(savedState).toBeDefined();
+    // node-2の親がnode-1になっていることを確認
+    expect(savedState.nodes['node-2'].parentId).toBe('node-1');
+    // node-2の深さが1になっていることを確認
+    expect(savedState.nodes['node-2'].depth).toBe(1);
   });
 
   it('タブを同階層で順序変更できる (Acceptance Criteria 3.3)', async () => {
     // 同階層での順序変更のテスト
-    // このテストは、ドロップ位置が「間」である場合の処理を確認する
+    // このテストは、タブを別のタブの子として配置する処理を確認する
 
-    render(
-      <TreeStateProvider>
-        <DragDropTreeTestComponent />
-      </TreeStateProvider>
-    );
+    // useTreeStateから直接handleDragEndを取得して呼び出すためのコンポーネント
+    let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
+    let testTreeState: TreeState | null = null;
+    function TestHookComponent() {
+      const { handleDragEnd, treeState } = useTreeState();
+      testHandleDragEnd = handleDragEnd;
+      testTreeState = treeState;
+      return null;
+    }
 
-    // 初期状態の確認
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <TestHookComponent />
+        </TreeStateProvider>
+      );
+    });
+
+    // treeStateが初期化されるまで待機
     await waitFor(() => {
-      expect(screen.getByTestId('tree-node-node-1')).toBeInTheDocument();
+      expect(testTreeState).not.toBeNull();
+      expect(testHandleDragEnd).toBeDefined();
     });
 
     // ドラッグ&ドロップイベントをシミュレート
     // node-3 を node-2 の子として配置
-    const dragEndEvent: DragEndEvent = {
+    const dragEndEvent = {
       active: {
         id: 'node-3',
         data: { current: undefined },
@@ -211,40 +197,36 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
       delta: { x: 0, y: 0 },
       activatorEvent: new MouseEvent('mouseup'),
       collisions: null,
-    };
-
-    // useTreeStateから直接handleDragEndを取得して呼び出す
-    let testHandleDragEnd: any;
-    function TestHookComponent() {
-      const { handleDragEnd } = useTreeState();
-      testHandleDragEnd = handleDragEnd;
-      return null;
-    }
-
-    render(
-      <TreeStateProvider>
-        <TestHookComponent />
-      </TreeStateProvider>
-    );
-
-    await waitFor(() => {
-      expect(testHandleDragEnd).toBeDefined();
-    });
+    } as unknown as DragEndEvent;
 
     // handleDragEndを呼び出す
-    await testHandleDragEnd(dragEndEvent);
-
-    // Service Workerへのメッセージが送信されたことを確認
-    await waitFor(() => {
-      expect(sendMessageMock).toHaveBeenCalled();
+    await act(async () => {
+      await testHandleDragEnd!(dragEndEvent);
     });
+
+    // ストレージが更新されたことを確認
+    await waitFor(() => {
+      expect(chrome.storage.local.set).toHaveBeenCalled();
+    });
+
+    // ストレージに保存されたデータを検証
+    const mockChrome = getMockChrome();
+    const setCall = mockChrome.storage.local.set.mock.calls[0];
+    expect(setCall).toBeDefined();
+    const savedState = setCall[0].tree_state as TreeState;
+    expect(savedState).toBeDefined();
+    // node-3の親がnode-2になっていることを確認
+    expect(savedState.nodes['node-3'].parentId).toBe('node-2');
+    // node-3の深さが1になっていることを確認
+    expect(savedState.nodes['node-3'].depth).toBe(1);
   });
 
   it('循環参照を防ぐ', async () => {
     // 親を子の子として配置しようとした場合、操作をキャンセルする
 
     // 親子関係を持つツリーを設定
-    (chrome.storage.local.get as any).mockResolvedValue({
+    const mockChrome = getMockChrome();
+    mockChrome.storage.local.get.mockResolvedValue({
       tree_state: {
         views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
         currentViewId: 'default',
@@ -285,25 +267,34 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
       },
     });
 
-    let testHandleDragEnd: any;
+    let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
+    let testTreeState: TreeState | null = null;
     function TestHookComponent() {
-      const { handleDragEnd } = useTreeState();
+      const { handleDragEnd, treeState } = useTreeState();
       testHandleDragEnd = handleDragEnd;
+      testTreeState = treeState;
       return null;
     }
 
-    render(
-      <TreeStateProvider>
-        <TestHookComponent />
-      </TreeStateProvider>
-    );
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <TestHookComponent />
+        </TreeStateProvider>
+      );
+    });
 
+    // treeStateが初期化されるまで待機
     await waitFor(() => {
+      expect(testTreeState).not.toBeNull();
       expect(testHandleDragEnd).toBeDefined();
     });
 
+    // ストレージsetのモックをクリアして、handleDragEndでの呼び出しのみをカウント
+    mockChrome.storage.local.set.mockClear();
+
     // 循環参照を試みる: node-1 を node-2 の子として配置
-    const dragEndEvent: DragEndEvent = {
+    const dragEndEvent = {
       active: {
         id: 'node-1',
         data: { current: undefined },
@@ -318,13 +309,15 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
       delta: { x: 0, y: 0 },
       activatorEvent: new MouseEvent('mouseup'),
       collisions: null,
-    };
+    } as unknown as DragEndEvent;
 
-    await testHandleDragEnd(dragEndEvent);
-
-    // 循環参照が検出され、メッセージが送信されないことを確認
-    await waitFor(() => {
-      expect(sendMessageMock).not.toHaveBeenCalled();
+    await act(async () => {
+      await testHandleDragEnd!(dragEndEvent);
     });
+
+    // 循環参照が検出され、ストレージが更新されないことを確認
+    // 少し待ってからチェック
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
   });
 });

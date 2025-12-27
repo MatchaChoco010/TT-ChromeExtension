@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TreeStateManager } from './TreeStateManager';
-import type { TabNode, TreeState, IStorageService } from '@/types';
+import type { IStorageService } from '@/types';
 
 describe('TreeStateManager', () => {
   let manager: TreeStateManager;
@@ -13,11 +13,11 @@ describe('TreeStateManager', () => {
 
     // モックストレージサービスを作成
     mockStorageService = {
-      get: vi.fn(async (key: string) => mockStorageData[key] ?? null),
-      set: vi.fn(async (key: string, value: unknown) => {
+      get: vi.fn().mockImplementation(async (key: string) => mockStorageData[key] ?? null),
+      set: vi.fn().mockImplementation(async (key: string, value: unknown) => {
         mockStorageData[key] = value;
       }),
-      remove: vi.fn(async (key: string) => {
+      remove: vi.fn().mockImplementation(async (key: string) => {
         delete mockStorageData[key];
       }),
       onChange: vi.fn(() => () => {}),
@@ -35,15 +35,6 @@ describe('TreeStateManager', () => {
   describe('getTree', () => {
     it('指定されたviewIdのタブツリーを取得できる', async () => {
       const viewId = 'view-1';
-      const mockNode: TabNode = {
-        id: 'node-1',
-        tabId: 1,
-        parentId: null,
-        children: [],
-        isExpanded: true,
-        depth: 0,
-        viewId,
-      };
 
       // ツリーに初期データを設定
       await manager.addTab(
@@ -297,11 +288,11 @@ describe('TreeStateManager', () => {
         { id: 2, url: 'https://example.com/2', title: 'Tab2', windowId: 1 },
       ] as chrome.tabs.Tab[];
 
-      global.chrome = {
+      vi.stubGlobal('chrome', {
         tabs: {
           query: vi.fn().mockResolvedValue(mockTabs),
         },
-      } as unknown as typeof chrome;
+      });
 
       await manager.syncWithChromeTabs();
 

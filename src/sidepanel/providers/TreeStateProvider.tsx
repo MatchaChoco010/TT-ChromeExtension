@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { TreeState, TabNode, View, Group } from '@/types';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { STORAGE_KEYS } from '@/storage/StorageService';
@@ -28,6 +28,8 @@ interface TreeStateContextType {
   isTabUnread: (tabId: number) => boolean;
   getUnreadCount: () => number;
   getUnreadChildCount: (nodeId: string) => number;
+  // Task 8.5.4: アクティブタブID
+  activeTabId: number | null;
 }
 
 const TreeStateContext = createContext<TreeStateContextType | undefined>(
@@ -127,6 +129,10 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const [groups, setGroups] = useState<Record<string, Group>>({});
   // Task 4.13: 未読タブ状態
   const [unreadTabIds, setUnreadTabIds] = useState<Set<number>>(new Set());
+  // Task 8.5.4: アクティブタブID
+  const [activeTabId, setActiveTabId] = useState<number | null>(null);
+  // Task 10.2.1: ローカル更新中フラグ（storage.onChangedからの更新をスキップするため）
+  const isLocalUpdateRef = useRef<boolean>(false);
 
   // Task 4.9: ストレージからグループを読み込む
   const loadGroups = React.useCallback(async () => {
@@ -135,8 +141,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       if (result.groups) {
         setGroups(result.groups);
       }
-    } catch (err) {
-      console.error('Failed to load groups:', err);
+    } catch (_err) {
+      // Failed to load groups silently
     }
   }, []);
 
@@ -147,8 +153,20 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       if (result[STORAGE_KEYS.UNREAD_TABS]) {
         setUnreadTabIds(new Set(result[STORAGE_KEYS.UNREAD_TABS]));
       }
-    } catch (err) {
-      console.error('Failed to load unread tabs:', err);
+    } catch (_err) {
+      // Failed to load unread tabs silently
+    }
+  }, []);
+
+  // Task 8.5.4: 現在のアクティブタブを読み込む
+  const loadActiveTab = React.useCallback(async () => {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab?.id) {
+        setActiveTabId(activeTab.id);
+      }
+    } catch (_err) {
+      // Failed to load active tab silently
     }
   }, []);
 
@@ -198,8 +216,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             };
             setTreeState(initialState);
           }
-        } catch (error) {
-          console.error('Failed to sync tabs:', error);
+        } catch (_error) {
           // 同期に失敗しても初期状態を設定
           const initialState: TreeState = {
             views: [
@@ -224,15 +241,15 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   useEffect(() => {
-    // 初期化時にストレージからツリー状態とグループと未読タブをロード
+    // 初期化時にストレージからツリー状態とグループと未読タブとアクティブタブをロード
     const initializeTreeState = async () => {
       setIsLoading(true);
-      await Promise.all([loadTreeState(), loadGroups(), loadUnreadTabs()]);
+      await Promise.all([loadTreeState(), loadGroups(), loadUnreadTabs(), loadActiveTab()]);
       setIsLoading(false);
     };
 
     initializeTreeState();
-  }, [loadTreeState, loadGroups, loadUnreadTabs]);
+  }, [loadTreeState, loadGroups, loadUnreadTabs, loadActiveTab]);
 
   useEffect(() => {
     // STATE_UPDATED メッセージをリッスン
@@ -251,21 +268,35 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, [loadTreeState]);
 
+  // Task 8.5.4: タブのアクティブ化イベントをリッスン
+  useEffect(() => {
+    const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
+      setActiveTabId(activeInfo.tabId);
+    };
+
+    chrome.tabs.onActivated.addListener(handleTabActivated);
+
+    return () => {
+      chrome.tabs.onActivated.removeListener(handleTabActivated);
+    };
+  }, []);
+
   useEffect(() => {
     // chrome.storage.onChanged をリッスン
     const storageListener = (
       changes: { [key: string]: chrome.storage.StorageChange }
     ) => {
-      // TEMPORARILY DISABLED to debug depth issue
-      // TODO: Re-enable after fixing the race condition between local state updates and storage updates
-      /*
+      // Task 10.2.1: ローカル更新中はスキップ（レースコンディション防止）
+      if (isLocalUpdateRef.current) {
+        return;
+      }
+
       if (changes.tree_state && changes.tree_state.newValue) {
         // ストレージの変更を状態に反映
         // JSONシリアライズで失われた children 参照を再構築
         const reconstructedState = reconstructChildrenReferences(changes.tree_state.newValue);
         setTreeState(reconstructedState);
       }
-      */
     };
 
     chrome.storage.onChanged.addListener(storageListener);
@@ -276,10 +307,19 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   const updateTreeState = async (state: TreeState) => {
-    // Update local state first for immediate UI response
-    setTreeState(state);
-    // Then save to storage (storage listener will also trigger, but with same data)
-    await chrome.storage.local.set({ tree_state: state });
+    // Task 10.2.1: ローカル更新フラグを設定（storage.onChangedからの更新をスキップするため）
+    isLocalUpdateRef.current = true;
+    try {
+      // Update local state first for immediate UI response
+      setTreeState(state);
+      // Then save to storage (storage listener will also trigger, but with same data)
+      await chrome.storage.local.set({ tree_state: state });
+    } finally {
+      // フラグをリセット（次のイベントループでストレージリスナーが完了した後）
+      setTimeout(() => {
+        isLocalUpdateRef.current = false;
+      }, 0);
+    }
   };
 
   /**
@@ -405,7 +445,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       };
 
       if (isDescendant(activeId, overId)) {
-        console.error('Circular reference detected');
         return;
       }
 
@@ -438,7 +477,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       // 深さを再計算（parentIdベースで、children配列に依存しない）
       const calculateDepth = (nodeId: string, visited: Set<string> = new Set()): number => {
         if (visited.has(nodeId)) {
-          console.error('[handleDragEnd] Circular dependency detected for', nodeId);
           return 0;
         }
         visited.add(nodeId);
@@ -657,6 +695,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         isTabUnread,
         getUnreadCount,
         getUnreadChildCount,
+        // Task 8.5.4: アクティブタブID
+        activeTabId,
       }}
     >
       {children}

@@ -1,13 +1,19 @@
 // Chrome API mock for testing
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { vi } from 'vitest';
 
-interface MockListener {
-  callback: (...args: any[]) => void;
+/**
+ * Generic callback function type for Chrome API events.
+ * Uses 'never[]' for args to allow any callback signature to be assigned.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GenericCallback = (...args: any[]) => unknown;
+
+interface MockListener<T extends GenericCallback> {
+  callback: T;
 }
 
-class MockEvent<T extends (...args: any[]) => void> {
-  private listeners: MockListener[] = [];
+class MockEvent<T extends GenericCallback> {
+  private listeners: MockListener<T>[] = [];
 
   addListener(callback: T): void {
     this.listeners.push({ callback });
@@ -24,6 +30,10 @@ class MockEvent<T extends (...args: any[]) => void> {
     return this.listeners.some((l) => l.callback === callback);
   }
 
+  hasListeners(): boolean {
+    return this.listeners.length > 0;
+  }
+
   trigger(...args: Parameters<T>): void {
     this.listeners.forEach((l) => l.callback(...args));
   }
@@ -35,7 +45,7 @@ class MockEvent<T extends (...args: any[]) => void> {
 
 export class ChromeMock {
   // Internal storage map for chrome.storage.local
-  private storageData: Record<string, any> = {};
+  private storageData: Record<string, unknown> = {};
 
   tabs = {
     onCreated: new MockEvent<(tab: chrome.tabs.Tab) => void>(),
@@ -55,35 +65,40 @@ export class ChromeMock {
     onActivated: new MockEvent<
       (activeInfo: chrome.tabs.TabActiveInfo) => void
     >(),
-    get: vi.fn(),
-    move: vi.fn(),
-    update: vi.fn(),
-    remove: vi.fn(),
-    query: vi.fn(),
+    get: vi.fn<(tabId: number) => Promise<chrome.tabs.Tab | null>>(() => Promise.resolve(null)),
+    move: vi.fn<(tabIds: number | number[], moveProperties: chrome.tabs.MoveProperties) => Promise<chrome.tabs.Tab | chrome.tabs.Tab[]>>(() => Promise.resolve([] as chrome.tabs.Tab[])),
+    update: vi.fn<(tabId: number, updateProperties: chrome.tabs.UpdateProperties) => Promise<chrome.tabs.Tab | null>>(() => Promise.resolve(null)),
+    remove: vi.fn<(tabIds: number | number[]) => Promise<void>>(() => Promise.resolve()),
+    query: vi.fn<(queryInfo: chrome.tabs.QueryInfo) => Promise<chrome.tabs.Tab[]>>(() => Promise.resolve([])),
+    duplicate: vi.fn<(tabId: number) => Promise<chrome.tabs.Tab | undefined>>(() => Promise.resolve(undefined)),
+    reload: vi.fn<(tabId?: number) => Promise<void>>(() => Promise.resolve()),
+    create: vi.fn<(createProperties: chrome.tabs.CreateProperties) => Promise<chrome.tabs.Tab>>(() => Promise.resolve({} as chrome.tabs.Tab)),
   };
 
   windows = {
     onCreated: new MockEvent<(window: chrome.windows.Window) => void>(),
     onRemoved: new MockEvent<(windowId: number) => void>(),
-    create: vi.fn(),
-    get: vi.fn(),
+    create: vi.fn<(createData?: chrome.windows.CreateData) => Promise<chrome.windows.Window>>(() => Promise.resolve({} as chrome.windows.Window)),
+    get: vi.fn<(windowId: number, getInfo?: { populate?: boolean }) => Promise<chrome.windows.Window>>(() => Promise.resolve({} as chrome.windows.Window)),
   };
 
   runtime = {
     onMessage: new MockEvent<
       (
-        message: any,
+        message: Record<string, unknown>,
         sender: chrome.runtime.MessageSender,
-        sendResponse: (response?: any) => void,
+        sendResponse: (response?: unknown) => void,
       ) => boolean | void
     >(),
-    sendMessage: vi.fn(() => Promise.resolve()),
+    sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(() => Promise.resolve()),
     getURL: vi.fn((path: string) => `chrome-extension://test/${path}`),
-    lastError: undefined,
+    lastError: undefined as chrome.runtime.LastError | undefined,
   };
 
   sidePanel = {
-    setOptions: vi.fn(),
+    open: vi.fn(() => Promise.resolve()),
+    getOptions: vi.fn(() => Promise.resolve({ enabled: true })),
+    setOptions: vi.fn(() => Promise.resolve()),
   };
 
   storage = {
@@ -99,7 +114,7 @@ export class ChromeMock {
               : {},
           );
         }
-        const result: Record<string, any> = {};
+        const result: Record<string, unknown> = {};
         keys.forEach((key) => {
           if (key in this.storageData) {
             result[key] = this.storageData[key];
@@ -107,7 +122,7 @@ export class ChromeMock {
         });
         return Promise.resolve(result);
       }),
-      set: vi.fn((items: Record<string, any>) => {
+      set: vi.fn((items: Record<string, unknown>) => {
         Object.assign(this.storageData, items);
         return Promise.resolve();
       }),
@@ -123,12 +138,10 @@ export class ChromeMock {
         return Promise.resolve();
       }),
     },
-    onChanged: new MockEvent<
-      (
-        changes: { [key: string]: chrome.storage.StorageChange },
-        areaName: string,
-      ) => void
-    >(),
+    onChanged: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    },
   };
 
   clearAllListeners(): void {
@@ -140,7 +153,8 @@ export class ChromeMock {
     this.windows.onCreated.clear();
     this.windows.onRemoved.clear();
     this.runtime.onMessage.clear();
-    this.storage.onChanged.clear();
+    this.storage.onChanged.addListener.mockClear();
+    this.storage.onChanged.removeListener.mockClear();
 
     // Clear storage data
     this.storageData = {};
@@ -154,5 +168,6 @@ export class ChromeMock {
 // Create a singleton mock instance
 export const chromeMock = new ChromeMock();
 
-// Setup global chrome object
-(globalThis as any).chrome = chromeMock;
+// Setup global chrome object using vitest's stubGlobal
+// This properly handles type conflicts with @types/chrome
+vi.stubGlobal('chrome', chromeMock);

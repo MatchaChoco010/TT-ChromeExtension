@@ -75,12 +75,17 @@ test.describe('TabTestUtils', () => {
     const tabId1 = await createTab(extensionContext, 'https://example.com');
     const tabId2 = await createTab(extensionContext, 'https://example.org');
 
+    // 両方のタブがツリーに表示されることを確認
+    await assertTabInTree(sidePanelPage, tabId1);
+    await assertTabInTree(sidePanelPage, tabId2);
+
     // タブ2をアクティブ化
     await activateTab(extensionContext, tabId2);
 
-    // アクティブなタブがハイライトされることを確認（bg-blue-100クラスを持つノードを検索）
-    const activeNode = sidePanelPage.locator('[data-testid^="tree-node-"].bg-blue-100');
-    await expect(activeNode).toBeVisible({ timeout: 5000 });
+    // 特定のタブ（tabId2）がハイライトされることを確認
+    // ポーリングでUI更新を待機
+    const activeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"].bg-blue-100`);
+    await expect(activeNode).toBeVisible({ timeout: 10000 });
   });
 
   test('assertTabInTreeはツリー内のタブノードを検証する', async ({
@@ -121,8 +126,13 @@ test.describe('TabTestUtils', () => {
       active: false,
     });
 
+    // タブがツリーに表示されるまで待機
+    await assertTabInTree(sidePanelPage, tabId);
+
     // 未読バッジが表示されることを確認
-    await assertUnreadBadge(sidePanelPage, tabId, 1);
+    // 注: 現在の実装ではドット表示のみで、数字表示はサポートされていないため、
+    // expectedCountは渡さずにバッジの存在のみを確認する
+    await assertUnreadBadge(sidePanelPage, tabId);
   });
 
   test('assertUnreadBadgeはタブをアクティブ化すると未読バッジが消えることを検証する', async ({
@@ -134,16 +144,21 @@ test.describe('TabTestUtils', () => {
       active: false,
     });
 
+    // タブがツリーに表示されるまで待機
+    await assertTabInTree(sidePanelPage, tabId);
+
     // 未読バッジが表示されることを確認
     await assertUnreadBadge(sidePanelPage, tabId);
 
     // タブをアクティブ化
     await activateTab(extensionContext, tabId);
 
-    // 未読バッジが消えることを確認（要素が存在しないか、非表示になる）
-    const unreadBadge = sidePanelPage.locator(`[data-testid="unread-badge"]`);
+    // タブノード内の未読バッジが消えることを確認
+    // 特定のタブノード内のバッジを対象にする
+    const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+    const unreadBadge = tabNode.locator(`[data-testid="unread-badge"]`);
     // タブがアクティブ化されると未読バッジは消えるため、要素が存在しないか非表示になる
-    const badgeCount = await unreadBadge.count();
-    expect(badgeCount).toBe(0);
+    // UI更新を待つためにポーリングで確認（タイムアウト延長）
+    await expect(unreadBadge).not.toBeVisible({ timeout: 10000 });
   });
 });

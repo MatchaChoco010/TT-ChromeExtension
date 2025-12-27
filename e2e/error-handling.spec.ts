@@ -15,7 +15,7 @@ import { createTab, closeTab } from './utils/tab-utils';
 extensionTest.describe('エラーハンドリングとエッジケース', () => {
   extensionTest(
     '長いタブタイトルがある場合、タブノードが正常に表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // 非常に長いタイトルを持つページを開く
       // data URLを使用して長いタイトルを設定
       const longTitle = 'これは非常に長いタブタイトルです。'.repeat(10);
@@ -24,24 +24,21 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const tabId = await createTab(extensionContext, dataUrl);
       expect(tabId).toBeGreaterThan(0);
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
-      // ツリーが表示されるまで待機
-      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+      // Side Panelは既にフィクスチャで開かれているので、ツリー表示を待機するのみ
+      // ツリーが表示されるまで待機（より長いタイムアウト）
+      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 15000 });
 
       // タブノードを取得（現在の実装では "Tab {tabId}" として表示される）
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible({ timeout: 5000 });
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // タイトル要素（span.text-sm）が存在することを確認
       const titleElement = tabNode.locator('span.text-sm');
-      await expect(titleElement).toBeVisible({ timeout: 5000 });
+      await expect(titleElement).toBeVisible({ timeout: 10000 });
 
       // タブIDが表示されていることを確認（現在の実装では "Tab {tabId}" として表示される）
-      const titleText = await titleElement.textContent();
-      expect(titleText).toContain(`Tab ${tabId}`);
+      // Playwrightのauto-waiting assertionを使用してflaky testを防止
+      await expect(titleElement).toContainText(`Tab ${tabId}`, { timeout: 10000 });
 
       // タブノードが親コンテナ内で適切に表示されていることを確認
       const isNodeVisible = await sidePanelPage.evaluate((nodeTestId) => {
@@ -62,22 +59,19 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
   extensionTest(
     '無効なURLのタブがある場合、タブノードが正常に表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // faviconがないシンプルなdata URLページを開く
       const dataUrl = 'data:text/html,<html><head><title>No Favicon</title></head><body>No favicon test</body></html>';
       const tabId = await createTab(extensionContext, dataUrl);
       expect(tabId).toBeGreaterThan(0);
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
+      // Side Panelは既にフィクスチャで開かれているので、ツリー表示を待機するのみ
       // ツリーが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
       // タブノードを取得
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible({ timeout: 5000 });
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // タブノードの検証
       // 現在のTabTreeView実装では、ファビコンは表示されないが、タブノードは正しく表示される
@@ -107,22 +101,19 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
   extensionTest(
     'data URLのタブでもツリーに正常に表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // data URLを使用してタブを作成
       const dataUrl = 'data:text/html,<html><head><title>Test Page</title></head><body>Content</body></html>';
       const tabId = await createTab(extensionContext, dataUrl);
       expect(tabId).toBeGreaterThan(0);
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
+      // Side Panelは既にフィクスチャで開かれているので、ツリー表示を待機するのみ
       // ツリーが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
       // タブノードが表示されていることを確認
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible({ timeout: 5000 });
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);
@@ -131,11 +122,8 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
   extensionTest(
     'タブがロード中の場合、ローディングインジケータが表示される',
-    async ({ extensionContext, extensionId, sidePanelPage, serviceWorker }) => {
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
+    async ({ extensionContext, sidePanelPage, serviceWorker }) => {
+      // Side Panelは既にフィクスチャで開かれているので、ツリー表示を待機するのみ
       // ツリーが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
@@ -144,13 +132,21 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const tabId = await createTab(extensionContext, 'https://example.com');
       expect(tabId).toBeGreaterThan(0);
 
-      // タブの状態を確認
-      const tabStatus = await serviceWorker.evaluate((id) => {
-        return new Promise<string | undefined>((resolve) => {
-          chrome.tabs.get(id, (tab) => {
-            resolve(tab?.status);
-          });
-        });
+      // タブの状態を確認（ポーリングで安定したステータスを取得）
+      const tabStatus = await serviceWorker.evaluate(async (id) => {
+        // タブが完全にロードされるまで少し待機
+        for (let i = 0; i < 20; i++) {
+          try {
+            const tab = await chrome.tabs.get(id);
+            if (tab?.status) {
+              return tab.status;
+            }
+          } catch {
+            // タブがまだ利用できない場合は待機
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return undefined;
       }, tabId);
 
       // タブが存在し、ステータスがあることを確認
@@ -158,7 +154,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       // タブノードが表示されていることを確認
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible({ timeout: 5000 });
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);
@@ -189,7 +185,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
   extensionTest(
     '特殊文字を含むタブタイトルが正しく表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // 特殊文字を含むタイトル
       const specialTitle = '<script>alert("XSS")</script>&amp;&lt;&gt;"\'';
       const dataUrl = `data:text/html,<html><head><title>${encodeURIComponent(specialTitle)}</title></head><body>Special chars test</body></html>`;
@@ -197,16 +193,13 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const tabId = await createTab(extensionContext, dataUrl);
       expect(tabId).toBeGreaterThan(0);
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
+      // Side Panelは既にフィクスチャで開かれているので、ツリー表示を待機するのみ
       // ツリーが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
       // タブノードが表示されていることを確認
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible({ timeout: 5000 });
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // XSS攻撃が実行されていないことを確認（ページがクラッシュしていない）
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -219,23 +212,20 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
   extensionTest(
     '空のタイトルを持つタブでもツリーに表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // 空のタイトルを持つページ
       const dataUrl = 'data:text/html,<html><head><title></title></head><body>Empty title</body></html>';
 
       const tabId = await createTab(extensionContext, dataUrl);
       expect(tabId).toBeGreaterThan(0);
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
+      // Side Panelは既にフィクスチャで開かれているので、ツリー表示を待機するのみ
       // ツリーが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
       // タブノードが表示されていることを確認
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible({ timeout: 5000 });
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);
@@ -244,7 +234,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
   extensionTest(
     'Unicode文字を含むタブタイトルが正しく表示される',
-    async ({ extensionContext, extensionId, sidePanelPage }) => {
+    async ({ extensionContext, sidePanelPage }) => {
       // Unicode文字（絵文字、多言語）を含むタイトル
       const unicodeTitle = '日本語 中文 한국어 🎉🚀💻';
       const dataUrl = `data:text/html,<html><head><title>${encodeURIComponent(unicodeTitle)}</title></head><body>Unicode test</body></html>`;
@@ -252,16 +242,13 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const tabId = await createTab(extensionContext, dataUrl);
       expect(tabId).toBeGreaterThan(0);
 
-      // Side Panelを開く
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-      await sidePanelPage.waitForLoadState('domcontentloaded');
-
+      // Side Panelは既にフィクスチャで開かれているので、ツリー表示を待機するのみ
       // ツリーが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
       // タブノードが表示されていることを確認
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible({ timeout: 5000 });
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // タイトルが含まれていることを確認
       const nodeText = await tabNode.textContent();

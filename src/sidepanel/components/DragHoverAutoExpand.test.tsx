@@ -7,9 +7,8 @@
  * - ホバー時間が閾値(1秒)を超えた場合に折りたたまれたブランチを展開
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import TabTreeView from './TabTreeView';
-import { act } from 'react';
 
 describe('Task 6.4: ドラッグホバー時のブランチ自動展開', () => {
   beforeEach(() => {
@@ -90,12 +89,17 @@ describe('Task 6.4: ドラッグホバー時のブランチ自動展開', () => 
       />
     );
 
-    // node-3のトグルボタンが▶であることを確認（折りたたまれている）
-    const toggleButton = screen.getByTestId('toggle-expand-node-3');
+    // node-3 (tabId=3) のトグルボタンが▶であることを確認（折りたたまれている）
+    // TabTreeViewは data-testid="tree-node-{tabId}" を使用
+    const parentNode = screen.getByTestId('tree-node-3');
+    expect(parentNode).toBeInTheDocument();
+
+    // トグルボタンは data-testid="expand-button" を使用
+    const toggleButton = screen.getByTestId('expand-button');
     expect(toggleButton.textContent).toBe('▶');
 
-    // 子ノードnode-4は表示されていない（折りたたまれているため）
-    expect(screen.queryByTestId('tree-node-node-4')).not.toBeInTheDocument();
+    // 子ノードnode-4 (tabId=4) は表示されていない（折りたたまれているため）
+    expect(screen.queryByTestId('tree-node-4')).not.toBeInTheDocument();
 
     vi.useFakeTimers(); // フェイクタイマーに戻す
   });

@@ -320,7 +320,8 @@ describe('GroupNode', () => {
         />
       );
 
-      const groupNode = screen.getByTestId('group-node-group-1');
+      // グループノードが存在することを確認
+      expect(screen.getByTestId('group-node-group-1')).toBeInTheDocument();
 
       // 閉じるボタンが存在しないことを確認
       expect(screen.queryByTestId('close-button-group-1')).not.toBeInTheDocument();

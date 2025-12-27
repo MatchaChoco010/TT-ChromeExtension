@@ -159,13 +159,18 @@ export class TreeStateManager {
   ): Promise<void> {
     const node = this.nodes.get(nodeId);
     if (!node) {
-      console.warn(`TreeStateManager.moveNode: Node ${nodeId} not found`);
       return;
     }
 
     // 循環参照のチェック
-    if (newParentId && this.isDescendant(newParentId, nodeId)) {
-      console.error(`TreeStateManager.moveNode: Circular reference detected`);
+    // nodeId の子孫に newParentId があるかをチェック
+    // （つまり、移動先の親が自分自身の子孫であれば循環参照）
+    if (newParentId && this.isDescendant(nodeId, newParentId)) {
+      return;
+    }
+
+    // 自己参照のチェック（自分自身を親にしようとした場合）
+    if (newParentId === nodeId) {
       return;
     }
 
@@ -223,7 +228,8 @@ export class TreeStateManager {
       const tabs = await chrome.tabs.query({});
 
       // 現在のビューIDを取得（デフォルトビューを使用）
-      const defaultViewId = 'default-view';
+      // Must match TreeStateProvider's default currentViewId
+      const defaultViewId = 'default';
 
       // タブをopenerTabIdの依存関係順にソート（親が先、子が後）
       // これにより、親タブが必ず子タブより先にTreeに追加される
@@ -268,8 +274,8 @@ export class TreeStateManager {
 
       // ストレージに永続化
       await this.persistState();
-    } catch (error) {
-      console.error('TreeStateManager.syncWithChromeTabs error:', error);
+    } catch (_error) {
+      // Error syncing with Chrome tabs silently
     }
   }
 
@@ -360,7 +366,7 @@ export class TreeStateManager {
 
     const treeState: TreeState = {
       views: [], // ビュー管理は別モジュールで実装予定
-      currentViewId: 'default-view',
+      currentViewId: 'default', // Must match TreeStateProvider's default currentViewId
       nodes: nodesRecord,
       tabToNode: tabToNodeRecord,
     };
@@ -422,8 +428,8 @@ export class TreeStateManager {
           recalculateDepth(node, 0);
         }
       });
-    } catch (error) {
-      console.error('TreeStateManager.loadState error:', error);
+    } catch (_error) {
+      // Error loading state silently
     }
   }
 

@@ -144,8 +144,7 @@ export type MessageType =
   | { type: 'ACTIVATE_TAB'; payload: { tabId: number } }
   | {
       type: 'SET_DRAG_STATE';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      payload: { tabId: number; treeData: any; sourceWindowId: number };
+      payload: { tabId: number; treeData: TabNode[]; sourceWindowId: number };
     }
   | { type: 'GET_DRAG_STATE' }
   | { type: 'CLEAR_DRAG_STATE' }
@@ -187,6 +186,8 @@ export interface TabTreeViewProps {
   // Task 4.13: 未読状態管理
   isTabUnread?: (tabId: number) => boolean;
   getUnreadChildCount?: (nodeId: string) => number;
+  // Task 8.5.4: アクティブタブID
+  activeTabId?: number;
 }
 
 // Context Menu types

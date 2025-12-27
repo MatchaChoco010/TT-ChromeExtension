@@ -1,25 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SnapshotManagement from './SnapshotManagement';
-import type { Snapshot } from '@/types';
+import type { Snapshot, IIndexedDBService } from '@/types';
+import type { SnapshotManager } from '@/services/SnapshotManager';
+import type { MockSnapshotManager, MockIndexedDBService } from '@/test/test-types';
 
 /**
  * Task 14.3: スナップショット履歴管理の統合テスト
  * Requirements: 11.6 - 古いスナップショット削除機能（例: 最新10件を保持）
  */
 describe('SnapshotManagement Integration', () => {
-  let mockSnapshotManager: {
-    getSnapshots: ReturnType<typeof vi.fn>;
-    createSnapshot: ReturnType<typeof vi.fn>;
-    restoreSnapshot: ReturnType<typeof vi.fn>;
-    deleteSnapshot: ReturnType<typeof vi.fn>;
-    exportSnapshot: ReturnType<typeof vi.fn>;
-    importSnapshot: ReturnType<typeof vi.fn>;
-  };
-
-  let mockIndexedDBService: {
-    deleteOldSnapshots: ReturnType<typeof vi.fn>;
-  };
+  let mockSnapshotManager: MockSnapshotManager;
+  let mockIndexedDBService: MockIndexedDBService;
 
   const mockSnapshots: Snapshot[] = Array.from({ length: 15 }, (_, i) => ({
     id: `snapshot-${i}`,
@@ -55,8 +47,8 @@ describe('SnapshotManagement Integration', () => {
   it('should load and display all snapshots on mount', async () => {
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
       />,
     );
 
@@ -74,8 +66,8 @@ describe('SnapshotManagement Integration', () => {
 
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
       />,
     );
 
@@ -101,8 +93,8 @@ describe('SnapshotManagement Integration', () => {
 
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
       />,
     );
 
@@ -142,26 +134,26 @@ describe('SnapshotManagement Integration', () => {
     const mockExportData = JSON.stringify({ id: 'snapshot-0', name: 'Test' });
     mockSnapshotManager.exportSnapshot.mockResolvedValue(mockExportData);
 
-    const mockLink = {
+    const mockLink: Partial<HTMLAnchorElement> = {
       href: '',
       download: '',
       click: vi.fn(),
-      style: {},
+      style: {} as CSSStyleDeclaration,
     };
     const originalCreateElement = document.createElement.bind(document);
     const createElementSpy = vi
       .spyOn(document, 'createElement')
       .mockImplementation((tagName: string) => {
         if (tagName === 'a') {
-          return mockLink as any;
+          return mockLink as HTMLAnchorElement;
         }
         return originalCreateElement(tagName);
       });
 
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
       />,
     );
 
@@ -204,8 +196,8 @@ describe('SnapshotManagement Integration', () => {
 
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
       />,
     );
 
@@ -254,8 +246,8 @@ describe('SnapshotManagement Integration', () => {
 
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
         maxSnapshots={10}
       />,
     );
@@ -283,8 +275,8 @@ describe('SnapshotManagement Integration', () => {
   it('should display warning when snapshot count exceeds maximum', async () => {
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
         maxSnapshots={10}
       />,
     );
@@ -305,8 +297,8 @@ describe('SnapshotManagement Integration', () => {
 
     render(
       <SnapshotManagement
-        snapshotManager={mockSnapshotManager as any}
-        indexedDBService={mockIndexedDBService as any}
+        snapshotManager={mockSnapshotManager as unknown as SnapshotManager}
+        indexedDBService={mockIndexedDBService as IIndexedDBService}
         maxSnapshots={10}
       />,
     );

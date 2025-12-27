@@ -14,6 +14,7 @@
 import { test, expect } from './fixtures/extension';
 import { createWindow, moveTabToWindow, assertWindowTreeSync } from './utils/window-utils';
 import { createTab } from './utils/tab-utils';
+import { waitForWindowClosed } from './utils/polling-utils';
 
 test.describe('クロスウィンドウドラッグ&ドロップ', () => {
   test('タブを別ウィンドウに移動した場合、元のウィンドウのツリーから削除され、移動先ウィンドウのツリーに追加される', async ({
@@ -35,6 +36,8 @@ test.describe('クロスウィンドウドラッグ&ドロップ', () => {
     const tabId = await createTab(extensionContext, 'https://example.com');
     expect(tabId).toBeGreaterThan(0);
 
+    // createTab内でストレージ同期を待機済みなので追加待機は不要
+
     // タブが元のウィンドウに存在することを確認
     const tabBefore = await serviceWorker.evaluate(
       ({ tabId }) => {
@@ -49,8 +52,12 @@ test.describe('クロスウィンドウドラッグ&ドロップ', () => {
     expect(newWindowId).toBeGreaterThan(0);
     expect(newWindowId).not.toBe(originalWindowId);
 
+    // createWindow内でウィンドウ登録を待機済みなので追加待機は不要
+
     // タブを新しいウィンドウに移動
     await moveTabToWindow(extensionContext, tabId, newWindowId);
+
+    // moveTabToWindow内でタブ移動完了を待機済みなので追加待機は不要
 
     // タブが新しいウィンドウに移動したことを確認
     const tabAfter = await serviceWorker.evaluate(
@@ -356,8 +363,8 @@ test.describe('クロスウィンドウドラッグ&ドロップ', () => {
       { windowId: newWindowId }
     );
 
-    // 少し待機
-    await sidePanelPage.waitForTimeout(500);
+    // ウィンドウが閉じられるまで待機
+    await waitForWindowClosed(extensionContext, newWindowId);
 
     // 元のウィンドウのツリー状態が正しいことを検証
     await assertWindowTreeSync(extensionContext, originalWindowId);

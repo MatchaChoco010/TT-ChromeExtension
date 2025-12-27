@@ -9,11 +9,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { TreeStateManager } from '@/services/TreeStateManager';
 import { StorageService } from '@/storage/StorageService';
 import { ThemeProvider } from '@/sidepanel/providers/ThemeProvider';
-import type { UserSettings } from '@/types';
+import type { UserSettings, StorageChanges } from '@/types';
+import type { MockChrome } from '@/test/test-types';
 
 describe('Task 16.4: エラーハンドリングとエッジケース', () => {
   describe('タブAPI失敗時の挙動', () => {
@@ -27,37 +28,24 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
 
     it('chrome.tabs.get が失敗してもクラッシュしない', async () => {
       // タブ取得APIをモック（エラーを投げる）
-      const mockTabsGet = vi.fn().mockRejectedValue(new Error('Tab not found'));
-      global.chrome = {
-        ...global.chrome,
-        tabs: {
-          ...global.chrome.tabs,
-          get: mockTabsGet,
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.tabs.get).mockRejectedValue(new Error('Tab not found'));
 
       // エラーが発生しても例外を投げないことを確認
       await expect(async () => {
         try {
           await chrome.tabs.get(999);
-        } catch (error) {
+        } catch (_error) {
           // エラーをログに記録するが、処理は継続
-          console.error('Tab API failed:', error);
         }
       }).not.toThrow();
 
-      expect(mockTabsGet).toHaveBeenCalledWith(999);
+      expect(mockChrome.tabs.get).toHaveBeenCalledWith(999);
     });
 
     it('chrome.tabs.move が失敗した場合、元の状態を維持', async () => {
-      const mockTabsMove = vi.fn().mockRejectedValue(new Error('Move failed'));
-      global.chrome = {
-        ...global.chrome,
-        tabs: {
-          ...global.chrome.tabs,
-          move: mockTabsMove,
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.tabs.move).mockRejectedValue(new Error('Move failed'));
 
       // タブを追加
       const tab: chrome.tabs.Tab = {
@@ -94,94 +82,63 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
     });
 
     it('chrome.tabs.remove が失敗してもUIは静かに失敗する', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const mockTabsRemove = vi.fn().mockRejectedValue(new Error('Remove failed'));
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.tabs.remove).mockRejectedValue(new Error('Remove failed'));
 
-      global.chrome = {
-        ...global.chrome,
-        tabs: {
-          ...global.chrome.tabs,
-          remove: mockTabsRemove,
-        },
-      } as any;
-
+      let errorCaught = false;
       try {
         await chrome.tabs.remove(1);
-      } catch (error) {
-        console.error('Failed to remove tab:', error);
+      } catch (_error) {
+        errorCaught = true;
       }
 
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      consoleErrorSpy.mockRestore();
+      expect(errorCaught).toBe(true);
     });
   });
 
   describe('ストレージ容量超過時の警告', () => {
-    let originalChromeStorage: any;
+    let originalStorageSet: typeof chrome.storage.local.set | undefined;
 
     beforeEach(() => {
-      originalChromeStorage = global.chrome?.storage;
+      originalStorageSet = global.chrome?.storage?.local?.set;
     });
 
     afterEach(() => {
-      if (originalChromeStorage) {
-        global.chrome = {
-          ...global.chrome,
-          storage: originalChromeStorage,
-        };
+      if (originalStorageSet) {
+        const mockChrome = global.chrome as unknown as MockChrome;
+        vi.mocked(mockChrome.storage.local.set).mockImplementation(originalStorageSet as ReturnType<typeof vi.fn>);
       }
     });
 
     it('chrome.storage.local.set がQUOTA_BYTES_PER_ITEMエラーを投げたとき警告を表示', async () => {
       const storageService = new StorageService();
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       // ストレージAPIをモック（容量超過エラー）
       const quotaError = new Error('QUOTA_BYTES_PER_ITEM quota exceeded');
-      const mockStorageSet = vi.fn().mockRejectedValue(quotaError);
-
-      global.chrome = {
-        ...global.chrome,
-        storage: {
-          ...global.chrome.storage,
-          local: {
-            ...global.chrome.storage.local,
-            set: mockStorageSet,
-          },
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.storage.local.set).mockRejectedValue(quotaError);
 
       // 大きなデータを保存しようとする
+      // 実際の型に関係なく、set が呼ばれたことで reject されることを確認
       const largeData = {
         views: Array(1000).fill({
           id: 'view-1',
           name: 'Test View',
           color: '#ff0000',
         }),
+        currentViewId: 'view-1',
+        nodes: {},
+        tabToNode: {},
       };
 
       await expect(
-        storageService.set('tree_state', largeData as any)
+        storageService.set('tree_state', largeData)
       ).rejects.toThrow();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('StorageService.set error'),
-        quotaError
-      );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it('IndexedDB容量超過時にエラーメッセージを表示', async () => {
       const { IndexedDBService } = await import('@/storage/IndexedDBService');
       const idbService = new IndexedDBService();
-
-      // IndexedDBをモック（容量超過）
-      const quotaError = new Error('QuotaExceededError');
-      quotaError.name = 'QuotaExceededError';
-
-      // saveSnapshot内でエラーがスローされることを確認
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       // 大量のスナップショットを保存しようとする
       const largeSnapshot = {
@@ -200,46 +157,27 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
       // （実環境では容量制限に達する可能性がある）
       try {
         await idbService.saveSnapshot(largeSnapshot);
-      } catch (error: any) {
-        if (error.name === 'QuotaExceededError') {
-          console.error('Storage quota exceeded. Consider deleting old snapshots.');
-        }
+      } catch (_error: unknown) {
+        // QuotaExceededError would be handled silently
       }
-
-      consoleErrorSpy.mockRestore();
     });
   });
 
   describe('循環参照検出', () => {
     let storageService: StorageService;
     let treeStateManager: TreeStateManager;
-    let consoleErrorSpy: any;
 
     beforeEach(() => {
       storageService = new StorageService();
       treeStateManager = new TreeStateManager(storageService);
-      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       // ストレージAPIをモック
-      global.chrome = {
-        ...global.chrome,
-        storage: {
-          ...global.chrome.storage,
-          local: {
-            get: vi.fn().mockResolvedValue({}),
-            set: vi.fn().mockResolvedValue(undefined),
-          },
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.storage.local.get).mockResolvedValue({});
+      vi.mocked(mockChrome.storage.local.set).mockResolvedValue(undefined);
     });
 
-    afterEach(() => {
-      consoleErrorSpy.mockRestore();
-    });
-
-    // KNOWN ISSUE: 循環参照検出が正しく動作していない
-    // isDescendantは子ノードの配列をチェックしているが、親子関係が更新される前にチェックしている可能性がある
-    it.skip('親ノードを自分の子として移動しようとした場合、操作をキャンセル', async () => {
+    it('親ノードを自分の子として移動しようとした場合、操作をキャンセル', async () => {
       // ノードツリーを構築: A -> B -> C
       const tabA: chrome.tabs.Tab = {
         id: 1,
@@ -297,24 +235,8 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
       expect(nodeC?.parentId).toBe('node-2');
 
       // A を C の子に移動しようとする（これは循環参照になる）
-      // TreeStateManager は isDescendant でこれを検出し、操作をキャンセルする
-
-      // デバッグ: 移動前の状態を確認
-      console.log('Before move:');
-      console.log('A.parentId:', nodeA?.parentId);
-      console.log('B.parentId:', nodeB?.parentId);
-      console.log('C.parentId:', nodeC?.parentId);
-
+      // TreeStateManager は循環参照を検出し、操作をキャンセルする
       await treeStateManager.moveNode('node-1', 'node-3', 0);
-
-      // デバッグ: 移動後の状態を確認
-      console.log('After move:');
-      const debugA = treeStateManager.getNodeByTabId(1);
-      const debugB = treeStateManager.getNodeByTabId(2);
-      const debugC = treeStateManager.getNodeByTabId(3);
-      console.log('A.parentId:', debugA?.parentId);
-      console.log('B.parentId:', debugB?.parentId);
-      console.log('C.parentId:', debugC?.parentId);
 
       // 元の構造が維持されていることを確認（循環参照が防止された証拠）
       const nodeAAfter = treeStateManager.getNodeByTabId(1);
@@ -323,12 +245,9 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
       expect(nodeBAfter?.parentId).toBe('node-1'); // B は依然として A の子
       const nodeCAfter = treeStateManager.getNodeByTabId(3);
       expect(nodeCAfter?.parentId).toBe('node-2'); // C は依然として B の子
-
-      // 循環参照が実際に検出されていることを確認
-      // （構造が変わっていないことで証明される）
     });
 
-    it.skip('ノードを自分自身の親にしようとした場合、操作をキャンセル', async () => {
+    it('ノードを自分自身の親にしようとした場合、操作をキャンセル', async () => {
       const tab: chrome.tabs.Tab = {
         id: 1,
         index: 0,
@@ -392,30 +311,24 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
+        childTabBehavior: 'promote',
       };
 
       // モックストレージに設定を保存
-      global.chrome = {
-        ...global.chrome,
-        storage: {
-          ...global.chrome.storage,
-          local: {
-            get: vi.fn().mockResolvedValue({ user_settings: settings }),
-            set: vi.fn().mockResolvedValue(undefined),
-          },
-          onChanged: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.storage.local.get).mockResolvedValue({ user_settings: settings });
+      vi.mocked(mockChrome.storage.local.set).mockResolvedValue(undefined);
+      vi.mocked(mockChrome.storage.onChanged.addListener).mockImplementation(() => {});
+      vi.mocked(mockChrome.storage.onChanged.removeListener).mockImplementation(() => {});
 
-      render(
-        <ThemeProvider>
-          <div>Test Content</div>
-        </ThemeProvider>,
-        { container }
-      );
+      await act(async () => {
+        render(
+          <ThemeProvider>
+            <div>Test Content</div>
+          </ThemeProvider>,
+          { container }
+        );
+      });
 
       // エラー通知が表示されるまで待機
       await waitFor(
@@ -446,27 +359,20 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         childTabBehavior: 'promote',
       };
 
-      global.chrome = {
-        ...global.chrome,
-        storage: {
-          ...global.chrome.storage,
-          local: {
-            get: vi.fn().mockResolvedValue({ user_settings: settings }),
-            set: vi.fn().mockResolvedValue(undefined),
-          },
-          onChanged: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.storage.local.get).mockResolvedValue({ user_settings: settings });
+      vi.mocked(mockChrome.storage.local.set).mockResolvedValue(undefined);
+      vi.mocked(mockChrome.storage.onChanged.addListener).mockImplementation(() => {});
+      vi.mocked(mockChrome.storage.onChanged.removeListener).mockImplementation(() => {});
 
-      render(
-        <ThemeProvider>
-          <div>Test Content</div>
-        </ThemeProvider>,
-        { container }
-      );
+      await act(async () => {
+        render(
+          <ThemeProvider>
+            <div>Test Content</div>
+          </ThemeProvider>,
+          { container }
+        );
+      });
 
       await waitFor(
         () => {
@@ -496,27 +402,20 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         childTabBehavior: 'promote',
       };
 
-      global.chrome = {
-        ...global.chrome,
-        storage: {
-          ...global.chrome.storage,
-          local: {
-            get: vi.fn().mockResolvedValue({ user_settings: settings }),
-            set: vi.fn().mockResolvedValue(undefined),
-          },
-          onChanged: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.storage.local.get).mockResolvedValue({ user_settings: settings });
+      vi.mocked(mockChrome.storage.local.set).mockResolvedValue(undefined);
+      vi.mocked(mockChrome.storage.onChanged.addListener).mockImplementation(() => {});
+      vi.mocked(mockChrome.storage.onChanged.removeListener).mockImplementation(() => {});
 
-      render(
-        <ThemeProvider>
-          <div>Test Content</div>
-        </ThemeProvider>,
-        { container }
-      );
+      await act(async () => {
+        render(
+          <ThemeProvider>
+            <div>Test Content</div>
+          </ThemeProvider>,
+          { container }
+        );
+      });
 
       await waitFor(
         () => {
@@ -545,36 +444,27 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
         childTabBehavior: 'promote',
       };
 
-      const mockGet = vi.fn().mockResolvedValue({ user_settings: initialSettings });
-      const mockSet = vi.fn().mockResolvedValue(undefined);
-      const listeners: Array<(changes: any, areaName: string) => void> = [];
+      const listeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
 
-      global.chrome = {
-        ...global.chrome,
-        storage: {
-          ...global.chrome.storage,
-          local: {
-            get: mockGet,
-            set: mockSet,
-          },
-          onChanged: {
-            addListener: vi.fn((listener) => {
-              listeners.push(listener);
-            }),
-            removeListener: vi.fn((listener) => {
-              const index = listeners.indexOf(listener);
-              if (index > -1) listeners.splice(index, 1);
-            }),
-          },
-        },
-      } as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.storage.local.get).mockResolvedValue({ user_settings: initialSettings });
+      vi.mocked(mockChrome.storage.local.set).mockResolvedValue(undefined);
+      vi.mocked(mockChrome.storage.onChanged.addListener).mockImplementation((listener: (changes: StorageChanges, areaName: string) => void) => {
+        listeners.push(listener);
+      });
+      vi.mocked(mockChrome.storage.onChanged.removeListener).mockImplementation((listener: (changes: StorageChanges, areaName: string) => void) => {
+        const index = listeners.indexOf(listener);
+        if (index > -1) listeners.splice(index, 1);
+      });
 
-      render(
-        <ThemeProvider>
-          <div>Test Content</div>
-        </ThemeProvider>,
-        { container }
-      );
+      await act(async () => {
+        render(
+          <ThemeProvider>
+            <div>Test Content</div>
+          </ThemeProvider>,
+          { container }
+        );
+      });
 
       // エラー通知が表示される
       await waitFor(() => {
@@ -590,16 +480,18 @@ describe('Task 16.4: エラーハンドリングとエッジケース', () => {
       };
 
       // ストレージ変更イベントをトリガー
-      listeners.forEach((listener) => {
-        listener(
-          {
-            user_settings: {
-              oldValue: initialSettings,
-              newValue: fixedSettings,
+      await act(async () => {
+        listeners.forEach((listener) => {
+          listener(
+            {
+              user_settings: {
+                oldValue: initialSettings,
+                newValue: fixedSettings,
+              },
             },
-          },
-          'local'
-        );
+            'local'
+          );
+        });
       });
 
       // エラー通知が消えることを確認

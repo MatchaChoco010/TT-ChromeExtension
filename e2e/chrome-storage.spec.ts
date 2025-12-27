@@ -175,9 +175,7 @@ test.describe('chrome.storage API統合', () => {
         timeout: 3000,
       });
 
-      // 変更前のフォントサイズを取得
       const fontSizeInput = sidePanelPage.locator('input#fontSize');
-      const initialValue = await fontSizeInput.inputValue();
 
       // Act: Service Workerからchrome.storageを更新
       // Note: ThemeProviderは 'user_settings' キーを使用している
@@ -249,14 +247,11 @@ test.describe('chrome.storage API統合', () => {
         });
       }, newSettings);
 
-      // Assert: すべての設定がUIに反映される
+      // Assert: すべての設定がUIに反映される（両方を同時にチェック）
       await expect(async () => {
         const fontSizeValue = await sidePanelPage.locator('input#fontSize').inputValue();
-        expect(fontSizeValue).toBe('18');
-      }).toPass({ timeout: 5000 });
-
-      await expect(async () => {
         const fontFamilyValue = await sidePanelPage.locator('input#fontFamily').inputValue();
+        expect(fontSizeValue).toBe('18');
         expect(fontFamilyValue).toContain('Consolas');
       }).toPass({ timeout: 5000 });
     });

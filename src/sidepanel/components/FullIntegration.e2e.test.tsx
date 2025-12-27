@@ -8,7 +8,7 @@
  * - スナップショット保存と復元の動作確認
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
@@ -19,9 +19,8 @@ import ViewSwitcher from './ViewSwitcher';
 import TabTreeView from './TabTreeView';
 import SnapshotManagement from './SnapshotManagement';
 import { ContextMenu } from './ContextMenu';
-import type { TabNode } from '@/types';
-import { SnapshotManager } from '@/services/SnapshotManager';
-import { IndexedDBService } from '@/storage/IndexedDBService';
+import type { SnapshotManager } from '@/services/SnapshotManager';
+import type { IndexedDBService } from '@/storage/IndexedDBService';
 
 describe('Task 16.1: 全機能の統合テスト', () => {
   beforeEach(() => {
@@ -29,13 +28,13 @@ describe('Task 16.1: 全機能の統合テスト', () => {
     vi.clearAllMocks();
 
     // chrome.storage のモック初期化
-    const mockStorage: Record<string, any> = {};
-    global.chrome.storage.local.get = vi.fn((keys, callback) => {
+    const mockStorage: Record<string, unknown> = {};
+    chrome.storage.local.get = vi.fn().mockImplementation((keys, callback) => {
       if (typeof keys === 'function') {
         callback = keys;
         keys = null;
       }
-      const result: Record<string, any> = {};
+      const result: Record<string, unknown> = {};
       if (keys === null) {
         Object.assign(result, mockStorage);
       } else if (Array.isArray(keys)) {
@@ -45,22 +44,22 @@ describe('Task 16.1: 全機能の統合テスト', () => {
           }
         });
       } else if (typeof keys === 'object') {
-        Object.keys(keys).forEach((key) => {
-          result[key] = mockStorage[key] ?? keys[key];
+        Object.keys(keys as Record<string, unknown>).forEach((key) => {
+          result[key] = mockStorage[key] ?? (keys as Record<string, unknown>)[key];
         });
       }
       callback?.(result);
       return Promise.resolve(result);
     });
 
-    global.chrome.storage.local.set = vi.fn((items, callback) => {
+    chrome.storage.local.set = vi.fn().mockImplementation((items, callback) => {
       Object.assign(mockStorage, items);
       callback?.();
       return Promise.resolve();
     });
 
     // chrome.tabs のモック
-    global.chrome.tabs.query = vi.fn(() =>
+    chrome.tabs.query = vi.fn().mockImplementation(() =>
       Promise.resolve([
         {
           id: 1,
@@ -86,7 +85,7 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       ])
     );
 
-    global.chrome.tabs.update = vi.fn((tabId, updateProperties, callback) => {
+    chrome.tabs.update = vi.fn().mockImplementation((tabId, updateProperties, callback) => {
       callback?.({
         id: tabId,
         active: updateProperties.active ?? false,
@@ -97,7 +96,7 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       } as chrome.tabs.Tab);
     });
 
-    global.chrome.tabs.create = vi.fn((createProperties, callback) => {
+    chrome.tabs.create = vi.fn().mockImplementation((createProperties, callback) => {
       const newTab = {
         id: Date.now(),
         title: 'New Tab',
@@ -109,13 +108,13 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       return Promise.resolve(newTab);
     });
 
-    global.chrome.tabs.remove = vi.fn((tabIds, callback) => {
+    chrome.tabs.remove = vi.fn().mockImplementation((_tabIds, callback) => {
       callback?.();
       return Promise.resolve();
     });
 
     // chrome.runtime のモック
-    global.chrome.runtime.sendMessage = vi.fn((message, callback) => {
+    chrome.runtime.sendMessage = vi.fn().mockImplementation((_message, callback) => {
       callback?.({ success: true });
       return Promise.resolve({ success: true });
     });
@@ -123,7 +122,9 @@ describe('Task 16.1: 全機能の統合テスト', () => {
 
   it('シナリオ1: サイドパネル表示からタブツリー操作まで一連のフロー', async () => {
     // 1. サイドパネルをレンダリング
-    render(<SidePanelRoot />);
+    await act(async () => {
+      render(<SidePanelRoot />);
+    });
 
     // 2. サイドパネルが表示されることを確認
     await waitFor(() => {
@@ -139,52 +140,53 @@ describe('Task 16.1: 全機能の統合テスト', () => {
   });
 
   it('シナリオ2: ドラッグ&ドロップによるツリー再構成', async () => {
-    const user = userEvent.setup();
-
     // モックのドラッグイベントハンドラ
     const handleDragEnd = vi.fn((event: DragEndEvent) => {
       // ドラッグ終了時の処理
       const { active, over } = event;
       if (over && active.id !== over.id) {
-        // ツリー構造を更新
-        console.log(`Moved ${active.id} to ${over.id}`);
+        // ツリー構造を更新（モック処理）
+        void active.id;
+        void over.id;
       }
     });
 
-    render(
-      <ThemeProvider>
-        <TreeStateProvider>
-          <DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-            <TabTreeView
-              nodes={[
-                {
-                  id: 'node-1',
-                  tabId: 1,
-                  parentId: null,
-                  children: [],
-                  isExpanded: true,
-                  depth: 0,
-                  viewId: 'default',
-                },
-                {
-                  id: 'node-2',
-                  tabId: 2,
-                  parentId: null,
-                  children: [],
-                  isExpanded: true,
-                  depth: 0,
-                  viewId: 'default',
-                },
-              ]}
-              currentViewId="default"
-              onNodeClick={vi.fn()}
-              onToggleExpand={vi.fn()}
-              onDragEnd={handleDragEnd}
-            />
-          </DndContext>
-        </TreeStateProvider>
-      </ThemeProvider>
-    );
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <TreeStateProvider>
+            <DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
+              <TabTreeView
+                nodes={[
+                  {
+                    id: 'node-1',
+                    tabId: 1,
+                    parentId: null,
+                    children: [],
+                    isExpanded: true,
+                    depth: 0,
+                    viewId: 'default',
+                  },
+                  {
+                    id: 'node-2',
+                    tabId: 2,
+                    parentId: null,
+                    children: [],
+                    isExpanded: true,
+                    depth: 0,
+                    viewId: 'default',
+                  },
+                ]}
+                currentViewId="default"
+                onNodeClick={vi.fn()}
+                onToggleExpand={vi.fn()}
+                onDragEnd={handleDragEnd}
+              />
+            </DndContext>
+          </TreeStateProvider>
+        </ThemeProvider>
+      );
+    });
 
     // タブが表示されることを確認
     expect(screen.getByText('Tab 1')).toBeInTheDocument();
@@ -245,15 +247,15 @@ describe('Task 16.1: 全機能の統合テスト', () => {
 
   it('シナリオ4: スナップショット保存と復元', async () => {
     // モックのSnapshotManagerとIndexedDBServiceを作成
-    const mockIndexedDBService = {
+    const mockIndexedDBService: Partial<IndexedDBService> = {
       saveSnapshot: vi.fn(),
       getSnapshot: vi.fn(),
       getAllSnapshots: vi.fn().mockResolvedValue([]),
       deleteSnapshot: vi.fn(),
       deleteOldSnapshots: vi.fn(),
-    } as any;
+    };
 
-    const mockSnapshotManager = {
+    const mockSnapshotManager: Partial<SnapshotManager> = {
       createSnapshot: vi.fn(),
       restoreSnapshot: vi.fn(),
       deleteSnapshot: vi.fn(),
@@ -262,14 +264,16 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       importSnapshot: vi.fn(),
       startAutoSnapshot: vi.fn(),
       stopAutoSnapshot: vi.fn(),
-    } as any;
+    };
 
-    render(
-      <SnapshotManagement
-        snapshotManager={mockSnapshotManager}
-        indexedDBService={mockIndexedDBService}
-      />
-    );
+    await act(async () => {
+      render(
+        <SnapshotManagement
+          snapshotManager={mockSnapshotManager as SnapshotManager}
+          indexedDBService={mockIndexedDBService as IndexedDBService}
+        />
+      );
+    });
 
     // 1. スナップショット管理UIが表示されることを確認
     await waitFor(() => {
@@ -307,7 +311,9 @@ describe('Task 16.1: 全機能の統合テスト', () => {
   });
 
   it('シナリオ6: エンドツーエンド - 新規タブ作成からグループ化、スナップショットまで', async () => {
-    render(<SidePanelRoot />);
+    await act(async () => {
+      render(<SidePanelRoot />);
+    });
 
     // 1. サイドパネルが表示されることを確認
     await waitFor(() => {
@@ -329,7 +335,9 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       Promise.reject(new Error('Tab query failed'))
     );
 
-    render(<SidePanelRoot />);
+    await act(async () => {
+      render(<SidePanelRoot />);
+    });
 
     // エラーバウンダリが機能することを確認
     // Note: 実際の実装ではエラーメッセージが表示される
@@ -340,7 +348,9 @@ describe('Task 16.1: 全機能の統合テスト', () => {
   });
 
   it('シナリオ8: 設定変更の即時反映', async () => {
-    render(<SidePanelRoot />);
+    await act(async () => {
+      render(<SidePanelRoot />);
+    });
 
     // 1. サイドパネルが表示されることを確認
     await waitFor(() => {

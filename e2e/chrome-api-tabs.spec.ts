@@ -43,6 +43,28 @@ test.describe('chrome.tabs API統合', () => {
       // pendingUrlを確認するか、タブ作成後のURLを確認する
       expect(createdTab.pendingUrl || createdTab.url || '').toContain('example.com');
 
+      // タブが完全に登録されるまで待機（chrome.tabs.query()で正しく取得できるようになるまでポーリング）
+      // より堅牢な待機：リトライ回数を増やし、タイムアウト時にエラーをスローする
+      const expectedCount = initialTabCount + 1;
+      const tabRegistered = await serviceWorker.evaluate(async (expected: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({});
+          if (tabs.length >= expected) {
+            return true;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        return false;
+      }, expectedCount);
+
+      // タブが登録されなかった場合は明示的なエラーメッセージを出力
+      if (!tabRegistered) {
+        const currentTabs = await serviceWorker.evaluate(() => chrome.tabs.query({}));
+        throw new Error(
+          `タブの登録がタイムアウトしました。期待: ${expectedCount}, 実際: ${currentTabs.length}`
+        );
+      }
+
       // タブ数が増加したことを確認
       const afterTabs = await serviceWorker.evaluate(() => {
         return chrome.tabs.query({});
@@ -89,11 +111,29 @@ test.describe('chrome.tabs API統合', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期タブ数を取得
+      const initialTabs = await serviceWorker.evaluate(() => {
+        return chrome.tabs.query({});
+      });
+      const initialTabCount = initialTabs.length;
+
       // タブを作成
       const tab = await serviceWorker.evaluate(async () => {
         return await chrome.tabs.create({ url: 'https://example.com' });
       });
       expect(tab.id).toBeDefined();
+
+      // タブが完全に登録されるまでポーリングで待機
+      const expectedCount = initialTabCount + 1;
+      await serviceWorker.evaluate(async (expected: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({});
+          if (tabs.length >= expected) {
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }, expectedCount);
 
       // タブ数を取得
       const beforeTabs = await serviceWorker.evaluate(() => {
@@ -105,6 +145,18 @@ test.describe('chrome.tabs API統合', () => {
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.remove(tabId!);
       }, tab.id);
+
+      // タブが削除されるまでポーリングで待機
+      const expectedAfterCount = beforeTabCount - 1;
+      await serviceWorker.evaluate(async (expected: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({});
+          if (tabs.length <= expected) {
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }, expectedAfterCount);
 
       // タブ数が減少したことを確認
       const afterTabs = await serviceWorker.evaluate(() => {
@@ -125,6 +177,12 @@ test.describe('chrome.tabs API統合', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期タブ数を取得
+      const initialTabs = await serviceWorker.evaluate(() => {
+        return chrome.tabs.query({});
+      });
+      const initialTabCount = initialTabs.length;
+
       // 複数タブを作成
       const tab1 = await serviceWorker.evaluate(async () => {
         return await chrome.tabs.create({ url: 'https://example.com/1' });
@@ -136,6 +194,18 @@ test.describe('chrome.tabs API統合', () => {
         return await chrome.tabs.create({ url: 'https://example.com/3' });
       });
 
+      // タブが完全に登録されるまでポーリングで待機
+      const expectedCount = initialTabCount + 3;
+      await serviceWorker.evaluate(async (expected: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({});
+          if (tabs.length >= expected) {
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }, expectedCount);
+
       // タブ数を取得
       const beforeTabs = await serviceWorker.evaluate(() => {
         return chrome.tabs.query({});
@@ -143,12 +213,25 @@ test.describe('chrome.tabs API統合', () => {
       const beforeTabCount = beforeTabs.length;
 
       // 複数タブを一括削除
+      const tabIdsToRemove = [tab1.id!, tab2.id!, tab3.id!];
       await serviceWorker.evaluate(
         async (tabIds) => {
           await chrome.tabs.remove(tabIds as number[]);
         },
-        [tab1.id!, tab2.id!, tab3.id!]
+        tabIdsToRemove
       );
+
+      // タブが削除されるまでポーリングで待機
+      const expectedAfterCount = beforeTabCount - 3;
+      await serviceWorker.evaluate(async (expected: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({});
+          if (tabs.length <= expected) {
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }, expectedAfterCount);
 
       // タブ数が3つ減少したことを確認
       const afterTabs = await serviceWorker.evaluate(() => {
@@ -181,8 +264,20 @@ test.describe('chrome.tabs API統合', () => {
         tab.id
       );
 
-      // 更新が反映されるまで待機
-      await sidePanelPage.waitForTimeout(500);
+      // URLが更新されるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.url && tab.url.includes('example.org')) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
 
       // タブのURLが変更されたことを確認
       const currentTab = await serviceWorker.evaluate(async (tabId) => {
@@ -214,8 +309,20 @@ test.describe('chrome.tabs API統合', () => {
         return await chrome.tabs.update(tabId!, { active: true });
       }, tab1.id);
 
-      // 更新を待機
-      await sidePanelPage.waitForTimeout(300);
+      // tab1がアクティブになるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 30; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.active) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab1.id!);
 
       // tab1がアクティブであることを確認
       const currentTab1 = await serviceWorker.evaluate(async (tabId) => {
@@ -228,8 +335,20 @@ test.describe('chrome.tabs API統合', () => {
         return await chrome.tabs.update(tabId!, { active: true });
       }, tab2.id);
 
-      // 更新を待機
-      await sidePanelPage.waitForTimeout(300);
+      // tab2がアクティブになるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 30; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.active) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab2.id!);
 
       // tab2がアクティブであることを確認
       const currentTab2 = await serviceWorker.evaluate(async (tabId) => {
@@ -257,6 +376,21 @@ test.describe('chrome.tabs API統合', () => {
         return await chrome.tabs.update(tabId!, { pinned: true });
       }, tab.id);
 
+      // ピン留め状態が更新されるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.pinned) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
+
       // ピン留めされたことを確認
       const pinnedTab = await serviceWorker.evaluate(async (tabId) => {
         return await chrome.tabs.get(tabId!);
@@ -267,6 +401,21 @@ test.describe('chrome.tabs API統合', () => {
       await serviceWorker.evaluate(async (tabId) => {
         return await chrome.tabs.update(tabId!, { pinned: false });
       }, tab.id);
+
+      // ピン留め解除状態が更新されるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (!tab.pinned) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
 
       // ピン留めが解除されたことを確認
       const unpinnedTab = await serviceWorker.evaluate(async (tabId) => {
@@ -286,11 +435,29 @@ test.describe('chrome.tabs API統合', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期タブ数を取得
+      const initialTabs = await serviceWorker.evaluate(async () => {
+        return await chrome.tabs.query({});
+      });
+      const initialTabCount = initialTabs.length;
+
       // タブを作成
       await serviceWorker.evaluate(async () => {
         await chrome.tabs.create({ url: 'https://example.com/1' });
         await chrome.tabs.create({ url: 'https://example.com/2' });
       });
+
+      // タブが完全に登録されるまでポーリングで待機
+      const expectedCount = initialTabCount + 2;
+      await serviceWorker.evaluate(async (expected: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({});
+          if (tabs.length >= expected) {
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }, expectedCount);
 
       // 全タブを取得
       const allTabs = await serviceWorker.evaluate(async () => {
@@ -298,7 +465,7 @@ test.describe('chrome.tabs API統合', () => {
       });
 
       // タブが取得できることを確認
-      expect(allTabs.length).toBeGreaterThanOrEqual(2);
+      expect(allTabs.length).toBeGreaterThanOrEqual(initialTabCount + 2);
     });
 
     test('chrome.tabs.query()でアクティブタブを取得できる', async ({
@@ -314,6 +481,21 @@ test.describe('chrome.tabs API統合', () => {
       const tab = await serviceWorker.evaluate(async () => {
         return await chrome.tabs.create({ url: 'https://example.com', active: true });
       });
+
+      // タブがアクティブになるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.active) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
 
       // アクティブタブを取得
       const activeTabs = await serviceWorker.evaluate(async () => {
@@ -334,11 +516,40 @@ test.describe('chrome.tabs API統合', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 異なるURLのタブを作成
-      await serviceWorker.evaluate(async () => {
-        await chrome.tabs.create({ url: 'https://example.com/test' });
-        await chrome.tabs.create({ url: 'https://example.org/other' });
-      });
+      // 異なるURLのタブを作成し、作成されたタブのIDと期待するURLを取得
+      const tabsToCreate = [
+        { url: 'https://example.com/test', expectedHost: 'example.com' },
+        { url: 'https://example.org/other', expectedHost: 'example.org' },
+      ];
+
+      const createdTabs = await serviceWorker.evaluate(async (tabs: { url: string; expectedHost: string }[]) => {
+        const results: { id: number | undefined; expectedHost: string }[] = [];
+        for (const t of tabs) {
+          const tab = await chrome.tabs.create({ url: t.url });
+          results.push({ id: tab.id, expectedHost: t.expectedHost });
+        }
+        return results;
+      }, tabsToCreate);
+
+      // 各タブが期待するURLを持つまで待機（より堅牢な待機条件）
+      await serviceWorker.evaluate(async (tabs: { id: number | undefined; expectedHost: string }[]) => {
+        const waitForTabUrl = async (tabId: number, expectedHost: string): Promise<void> => {
+          for (let i = 0; i < 50; i++) {
+            const tab = await chrome.tabs.get(tabId);
+            // 期待するホストが含まれているかチェック
+            if (tab.url && tab.url.includes(expectedHost)) {
+              return;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          // タイムアウトしてもエラーにせず続行（テスト側でアサーションがある）
+        };
+        for (const tab of tabs) {
+          if (tab.id !== undefined) {
+            await waitForTabUrl(tab.id, tab.expectedHost);
+          }
+        }
+      }, createdTabs);
 
       // URLでフィルタリング（example.comのみ）
       const filteredTabs = await serviceWorker.evaluate(async () => {
@@ -346,6 +557,7 @@ test.describe('chrome.tabs API統合', () => {
       });
 
       // example.comのタブのみが取得されることを確認
+      expect(filteredTabs.length).toBeGreaterThan(0);
       for (const tab of filteredTabs) {
         expect(tab.url).toContain('example.com');
       }
@@ -366,6 +578,21 @@ test.describe('chrome.tabs API統合', () => {
         await chrome.tabs.update(t.id!, { pinned: true });
         return t;
       });
+
+      // ピン留め状態が更新されるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.pinned) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
 
       // ピン留めタブを取得
       const pinnedTabs = await serviceWorker.evaluate(async () => {
@@ -430,8 +657,16 @@ test.describe('chrome.tabs API統合', () => {
       // タブを削除
       await closeTab(extensionContext, tabId);
 
-      // ツリーからタブが削除されていることを確認（少し待機）
-      await sidePanelPage.waitForTimeout(500);
+      // ツリーからタブが削除されるまでポーリングで待機
+      await serviceWorker.evaluate(async (deletedTabId: number) => {
+        for (let i = 0; i < 30; i++) {
+          const result = await chrome.storage.local.get('tree_state');
+          if (!result.tree_state?.tabToNode?.[deletedTabId]) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tabId);
 
       treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
@@ -462,8 +697,20 @@ test.describe('chrome.tabs API統合', () => {
         await chrome.tabs.update(tabId!, { url: 'https://example.com' });
       }, tab.id);
 
-      // 更新を待機
-      await sidePanelPage.waitForTimeout(1000);
+      // URLが更新されるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.url && tab.url.includes('example.com')) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
 
       // タブ情報が更新されていることを確認
       const updatedTab = await serviceWorker.evaluate(async (tabId) => {
@@ -525,8 +772,16 @@ test.describe('chrome.tabs API統合', () => {
         active: false,
       });
 
-      // 少し待機してから未読状態を確認（イベントハンドラの処理を待つ）
-      await sidePanelPage.waitForTimeout(500);
+      // 未読状態がストレージに保存されるまでポーリングで待機
+      await serviceWorker.evaluate(async (createdTabId: number) => {
+        for (let i = 0; i < 30; i++) {
+          const result = await chrome.storage.local.get('unread_tabs');
+          if (Array.isArray(result.unread_tabs) && result.unread_tabs.includes(createdTabId)) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tabId);
 
       // 未読状態を確認（配列として保存されている）
       let unreadState = await serviceWorker.evaluate(async () => {
@@ -539,8 +794,16 @@ test.describe('chrome.tabs API統合', () => {
       // タブをアクティブ化
       await activateTab(extensionContext, tabId);
 
-      // 少し待機
-      await sidePanelPage.waitForTimeout(500);
+      // 未読状態がクリアされるまでポーリングで待機
+      await serviceWorker.evaluate(async (activatedTabId: number) => {
+        for (let i = 0; i < 30; i++) {
+          const result = await chrome.storage.local.get('unread_tabs');
+          if (!result.unread_tabs || !result.unread_tabs.includes(activatedTabId)) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tabId);
 
       // 未読状態がクリアされたことを確認
       unreadState = await serviceWorker.evaluate(async () => {
@@ -642,7 +905,17 @@ test.describe('chrome.tabs API統合', () => {
 
       // タブを削除
       await closeTab(extensionContext, tabId);
-      await sidePanelPage.waitForTimeout(500);
+
+      // ツリーからノードが削除されるまでポーリングで待機
+      await serviceWorker.evaluate(async (deletedTabId: number) => {
+        for (let i = 0; i < 30; i++) {
+          const result = await chrome.storage.local.get('tree_state');
+          if (!result.tree_state?.tabToNode?.[deletedTabId]) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tabId);
 
       // ツリーからノードが削除されていることを確認
       treeState = await serviceWorker.evaluate(async () => {

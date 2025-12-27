@@ -6,8 +6,28 @@ import type {
   View,
   Group,
   TabNode,
-  Snapshot,
+  TabSnapshot,
 } from '@/types';
+
+// Chrome mock（モジュールレベルで定義）
+const chromeMock = {
+  tabs: {
+    query: vi.fn(),
+    create: vi.fn(),
+  },
+  alarms: {
+    create: vi.fn(),
+    clear: vi.fn(),
+    onAlarm: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    },
+  },
+};
+
+// グローバルchromeオブジェクトをモック（vi.stubGlobalを使用）
+vi.stubGlobal('chrome', chromeMock);
+
 
 /**
  * SnapshotManager 統合テスト
@@ -42,7 +62,7 @@ describe('SnapshotManager - Integration Tests', () => {
       id: 'node-1',
       tabId: 1,
       parentId: null,
-      children: ['node-2'],
+      children: [],
       isExpanded: true,
       depth: 0,
       viewId: 'view-1',
@@ -73,7 +93,7 @@ describe('SnapshotManager - Integration Tests', () => {
 
     // StorageServiceのモック
     mockStorageService = {
-      get: vi.fn().mockImplementation((key) => {
+      get: vi.fn().mockImplementation((key: string) => {
         if (key === 'tree_state') {
           return Promise.resolve({
             views: testViews,
@@ -95,49 +115,38 @@ describe('SnapshotManager - Integration Tests', () => {
       onChange: vi.fn().mockReturnValue(() => {}),
     };
 
-    // Mock chrome.tabs API
-    global.chrome = {
-      tabs: {
-        query: vi.fn().mockResolvedValue([
-          {
-            id: 1,
-            url: 'https://example.com/page1',
-            title: 'Page 1',
-            windowId: 1,
-          },
-          {
-            id: 2,
-            url: 'https://example.com/page2',
-            title: 'Page 2 - Child of Page 1',
-            windowId: 1,
-          },
-          {
-            id: 3,
-            url: 'https://example.com/page3',
-            title: 'Page 3',
-            windowId: 1,
-          },
-        ]),
-        create: vi.fn().mockImplementation(({ url }) => {
-          // タブIDをインクリメント
-          const newId = 100 + (chrome.tabs.create as any).mock.calls.length;
-          return Promise.resolve({
-            id: newId,
-            url,
-            title: `Tab ${newId}`,
-            windowId: 1,
-          });
-        }),
+    // chromeMockの初期化
+    chromeMock.tabs.query.mockResolvedValue([
+      {
+        id: 1,
+        url: 'https://example.com/page1',
+        title: 'Page 1',
+        windowId: 1,
       },
-      alarms: {
-        create: vi.fn(),
-        clear: vi.fn().mockResolvedValue(true),
-        onAlarm: {
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-        },
+      {
+        id: 2,
+        url: 'https://example.com/page2',
+        title: 'Page 2 - Child of Page 1',
+        windowId: 1,
       },
-    } as any;
+      {
+        id: 3,
+        url: 'https://example.com/page3',
+        title: 'Page 3',
+        windowId: 1,
+      },
+    ]);
+    chromeMock.tabs.create.mockImplementation(({ url }: { url: string }) => {
+      // タブIDをインクリメント
+      const newId = 100 + chromeMock.tabs.create.mock.calls.length;
+      return Promise.resolve({
+        id: newId,
+        url,
+        title: `Tab ${newId}`,
+        windowId: 1,
+      });
+    });
+    chromeMock.alarms.clear.mockResolvedValue(true);
 
     snapshotManager = new SnapshotManager(
       indexedDBService,
@@ -184,7 +193,7 @@ describe('SnapshotManager - Integration Tests', () => {
       expect(parsed.data.tabs).toHaveLength(3);
 
       // 各タブに必須フィールドが含まれることを確認
-      parsed.data.tabs.forEach((tab: any) => {
+      parsed.data.tabs.forEach((tab: TabSnapshot) => {
         expect(tab).toHaveProperty('url');
         expect(tab).toHaveProperty('title');
         expect(tab).toHaveProperty('parentId');
@@ -193,12 +202,12 @@ describe('SnapshotManager - Integration Tests', () => {
 
       // 親子関係が正しく保存されることを確認
       const tab2 = parsed.data.tabs.find(
-        (t: any) => t.url === 'https://example.com/page2',
+        (t: TabSnapshot) => t.url === 'https://example.com/page2',
       );
       expect(tab2.parentId).toBe('node-1');
 
       const tab1 = parsed.data.tabs.find(
-        (t: any) => t.url === 'https://example.com/page1',
+        (t: TabSnapshot) => t.url === 'https://example.com/page1',
       );
       expect(tab1.parentId).toBeNull();
     });
@@ -261,24 +270,24 @@ describe('SnapshotManager - Integration Tests', () => {
       const snapshot = await snapshotManager.createSnapshot('Restore Test');
 
       // chrome.tabs.createのモックをリセット
-      (global.chrome.tabs.create as any).mockClear();
+      chromeMock.tabs.create.mockClear();
 
       // スナップショットから復元
       await snapshotManager.restoreSnapshot(snapshot.id);
 
       // タブが作成されることを確認
-      expect(global.chrome.tabs.create).toHaveBeenCalledTimes(3);
+      expect(chromeMock.tabs.create).toHaveBeenCalledTimes(3);
 
       // 正しいURLでタブが作成されることを確認
-      const calls = (global.chrome.tabs.create as any).mock.calls;
-      const urls = calls.map((call: any) => call[0].url);
+      const calls = chromeMock.tabs.create.mock.calls as Array<[{ url: string; active: boolean }]>;
+      const urls = calls.map((call) => call[0].url);
 
       expect(urls).toContain('https://example.com/page1');
       expect(urls).toContain('https://example.com/page2');
       expect(urls).toContain('https://example.com/page3');
 
       // タブが非アクティブで作成されることを確認
-      calls.forEach((call: any) => {
+      calls.forEach((call) => {
         expect(call[0].active).toBe(false);
       });
     });
@@ -294,18 +303,18 @@ describe('SnapshotManager - Integration Tests', () => {
       const parsed = JSON.parse(exportedData);
 
       // 親子関係が保存されていることを確認
-      const tabs = parsed.data.tabs;
-      const parentTab = tabs.find((t: any) => t.parentId === null);
-      const childTab = tabs.find((t: any) => t.parentId === 'node-1');
+      const tabs = parsed.data.tabs as TabSnapshot[];
+      const parentTab = tabs.find((t) => t.parentId === null);
+      const childTab = tabs.find((t) => t.parentId === 'node-1');
 
       expect(parentTab).toBeDefined();
       expect(childTab).toBeDefined();
-      expect(childTab.parentId).toBe('node-1');
+      expect(childTab?.parentId).toBe('node-1');
     });
 
     it('should handle snapshot restoration with empty tabs gracefully', async () => {
       // 空のツリー状態を設定
-      mockStorageService.get = vi.fn().mockImplementation((key) => {
+      mockStorageService.get = vi.fn().mockImplementation((key: string) => {
         if (key === 'tree_state') {
           return Promise.resolve({
             views: testViews,
@@ -321,7 +330,7 @@ describe('SnapshotManager - Integration Tests', () => {
       });
 
       // chrome.tabs.queryが空配列を返すように設定
-      (global.chrome.tabs.query as any).mockResolvedValue([]);
+      chromeMock.tabs.query.mockResolvedValue([]);
 
       const snapshot = await snapshotManager.createSnapshot('Empty Test');
 
@@ -343,7 +352,7 @@ describe('SnapshotManager - Integration Tests', () => {
       snapshotManager.startAutoSnapshot(intervalMinutes);
 
       // アラームが正しく設定されることを確認
-      expect(global.chrome.alarms.create).toHaveBeenCalledWith(
+      expect(chromeMock.alarms.create).toHaveBeenCalledWith(
         'auto-snapshot',
         {
           periodInMinutes: intervalMinutes,
@@ -351,13 +360,13 @@ describe('SnapshotManager - Integration Tests', () => {
       );
 
       // アラームリスナーを取得
-      const alarmListener = (global.chrome.alarms.onAlarm.addListener as any)
-        .mock.calls[0][0];
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[(alarm: chrome.alarms.Alarm) => void]>;
+      const alarmListener = addListenerCalls[0][0];
 
       // アラームを複数回発火してスナップショットが作成されることを確認
-      await alarmListener({ name: 'auto-snapshot' });
-      await alarmListener({ name: 'auto-snapshot' });
-      await alarmListener({ name: 'auto-snapshot' });
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
 
       // 3回のスナップショットが作成されることを確認
       const snapshots = await snapshotManager.getSnapshots();
@@ -376,11 +385,11 @@ describe('SnapshotManager - Integration Tests', () => {
       snapshotManager.startAutoSnapshot(intervalMinutes);
 
       // アラームリスナーを取得
-      const alarmListener = (global.chrome.alarms.onAlarm.addListener as any)
-        .mock.calls[0][0];
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[(alarm: chrome.alarms.Alarm) => void]>;
+      const alarmListener = addListenerCalls[0][0];
 
       // アラームを発火
-      await alarmListener({ name: 'auto-snapshot' });
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
 
       // スナップショットが作成されることを確認
       const snapshots = await snapshotManager.getSnapshots();
@@ -393,34 +402,36 @@ describe('SnapshotManager - Integration Tests', () => {
     });
 
     it('should stop auto-snapshots when interval is set to 0', async () => {
+
       // 自動スナップショットを開始
       snapshotManager.startAutoSnapshot(10);
 
       // 一度リセット
-      (global.chrome.alarms.create as any).mockClear();
+      chromeMock.alarms.create.mockClear();
 
       // 間隔を0に設定して停止
       snapshotManager.startAutoSnapshot(0);
 
       // アラームがクリアされることを確認
-      expect(global.chrome.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
+      expect(chromeMock.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
 
       // 新しいアラームが作成されないことを確認
-      expect(global.chrome.alarms.create).not.toHaveBeenCalled();
+      expect(chromeMock.alarms.create).not.toHaveBeenCalled();
     });
 
     it('should maintain auto-snapshot state across restarts', async () => {
+
       // 自動スナップショットを開始
       snapshotManager.startAutoSnapshot(10);
 
       // リスナーが登録されることを確認
-      expect(global.chrome.alarms.onAlarm.addListener).toHaveBeenCalled();
+      expect(chromeMock.alarms.onAlarm.addListener).toHaveBeenCalled();
 
       // 停止
       await snapshotManager.stopAutoSnapshot();
 
       // リスナーが削除されることを確認
-      expect(global.chrome.alarms.onAlarm.removeListener).toHaveBeenCalled();
+      expect(chromeMock.alarms.onAlarm.removeListener).toHaveBeenCalled();
     });
   });
 
@@ -523,15 +534,16 @@ describe('SnapshotManager - Integration Tests', () => {
       const parsed = JSON.parse(jsonString);
 
       // ビューIDが保持されることを確認
-      const tab1 = parsed.data.tabs.find(
-        (t: any) => t.url === 'https://example.com/page1',
+      const tabs = parsed.data.tabs as TabSnapshot[];
+      const tab1 = tabs.find(
+        (t) => t.url === 'https://example.com/page1',
       );
-      const tab3 = parsed.data.tabs.find(
-        (t: any) => t.url === 'https://example.com/page3',
+      const tab3 = tabs.find(
+        (t) => t.url === 'https://example.com/page3',
       );
 
-      expect(tab1.viewId).toBe('view-1');
-      expect(tab3.viewId).toBe('view-2');
+      expect(tab1?.viewId).toBe('view-1');
+      expect(tab3?.viewId).toBe('view-2');
     });
 
     it('should preserve group information in snapshots', async () => {

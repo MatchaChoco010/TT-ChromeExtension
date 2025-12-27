@@ -3,7 +3,6 @@
  * Requirements: 1.4, 2.1
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { TabNode } from '@/types';
 
 // テスト用のモック
 const mockStorageService = {
@@ -20,6 +19,7 @@ const mockChrome = {
     onRemoved: { addListener: vi.fn() },
     onMoved: { addListener: vi.fn() },
     onUpdated: { addListener: vi.fn() },
+    onActivated: { addListener: vi.fn() },
     remove: vi.fn(),
     move: vi.fn(),
   },
@@ -28,14 +28,18 @@ const mockChrome = {
   },
   storage: {
     local: {
-      get: vi.fn(),
-      set: vi.fn(),
+      get: vi.fn().mockResolvedValue({}),
+      set: vi.fn().mockResolvedValue(undefined),
+    },
+    onChanged: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
     },
   },
 };
 
-// グローバルchromeオブジェクトをモック
-global.chrome = mockChrome as any;
+// グローバルchromeオブジェクトをモック（vi.stubGlobalを使用）
+vi.stubGlobal('chrome', mockChrome);
 
 describe('Task 5.4: ツリー同期とリアルタイム更新', () => {
   beforeEach(() => {
@@ -46,9 +50,9 @@ describe('Task 5.4: ツリー同期とリアルタイム更新', () => {
     it('syncWithChromeTabs: 既存タブをツリー状態に同期できる', async () => {
       // テスト用のタブを準備
       const tabs: chrome.tabs.Tab[] = [
-        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0 },
-        { id: 2, url: 'https://example.com/2', title: 'Tab 2', index: 1, openerTabId: 1 },
-        { id: 3, url: 'https://example.com/3', title: 'Tab 3', index: 2 },
+        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+        { id: 2, url: 'https://example.com/2', title: 'Tab 2', index: 1, openerTabId: 1, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+        { id: 3, url: 'https://example.com/3', title: 'Tab 3', index: 2, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
       ];
 
       mockChrome.tabs.query.mockResolvedValue(tabs);
@@ -80,7 +84,7 @@ describe('Task 5.4: ツリー同期とリアルタイム更新', () => {
 
     it('syncWithChromeTabs: 既にツリーに存在するタブは重複追加されない', async () => {
       const tabs: chrome.tabs.Tab[] = [
-        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0 },
+        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
       ];
 
       mockChrome.tabs.query.mockResolvedValue(tabs);
@@ -144,6 +148,15 @@ describe('Task 5.4: ツリー同期とリアルタイム更新', () => {
         url: 'https://new-url.com',
         title: 'New Title',
         index: 0,
+        pinned: false,
+        highlighted: false,
+        windowId: 1,
+        active: false,
+        incognito: false,
+        selected: false,
+        discarded: false,
+        autoDiscardable: true,
+        groupId: -1,
       };
 
       // ハンドラを呼び出す
@@ -170,6 +183,15 @@ describe('Task 5.4: ツリー同期とリアルタイム更新', () => {
         url: 'https://example.com',
         title: 'Test',
         index: 0,
+        pinned: false,
+        highlighted: false,
+        windowId: 1,
+        active: false,
+        incognito: false,
+        selected: false,
+        discarded: false,
+        autoDiscardable: true,
+        groupId: -1,
       };
       await manager.addTab(tab, null, 'default-view');
 

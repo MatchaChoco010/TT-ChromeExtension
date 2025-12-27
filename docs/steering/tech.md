@@ -16,24 +16,113 @@ Chrome Extension Manifest V3アーキテクチャを採用。Service WorkerとSi
 
 - **@dnd-kit**: ドラッグ&ドロップ機能（sortable tree実装）
 - **React Testing Library + Vitest**: コンポーネントテスト
+- **Playwright**: Chrome拡張機能のE2Eテスト
 - **fake-indexeddb**: ストレージテスト用のモック
 
 ## Development Standards
 
-### Type Safety
+### Type Safety（必須）
+
 - TypeScript strict mode有効（`strict: true`）
 - `noUnusedLocals`, `noUnusedParameters`でコード品質を保証
 - Chrome APIは`@types/chrome`による型定義を使用
+- **型エラーゼロは必須**: 各機能追加で`npm run type-check`がエラーなしで通過すること
+- **`any`の使用禁止**: プロダクションコード・テストコード両方で`any`は基本禁止
+  - 例外: 外部ライブラリの型定義が`any`を使用している場合のみ許容
+  - 自分が実装する範囲内では`any`を使う必要はない
 
 ### Code Quality
 - **ESLint**: TypeScript/React推奨設定 + Prettier統合
 - **Prettier**: 自動フォーマット（`.ts`, `.tsx`, `.css`対象）
 - **Linting**: `npm run lint`でチェック、`lint:fix`で自動修正
 
-### Testing
+### Testing（必須要件）
 - **Vitest**: 高速なユニット/統合テスト
 - **Testing Library**: Reactコンポーネントのユーザー視点テスト
-- テスト種別: `*.test.ts(x)`, `*.integration.test.tsx`, `*.e2e.test.tsx`
+- **Playwright**: Chrome拡張機能のE2Eテスト
+- テスト種別: `*.test.ts(x)`, `*.integration.test.tsx`, `e2e/*.spec.ts`
+
+## 機能追加時の必須要件
+
+### テスト完全通過（必須）
+
+**全ての機能追加で以下を確認すること:**
+
+1. **既存テストの通過**: `npm test` と `npm run test:e2e` が全てパスすること
+2. **型チェック通過**: `npm run type-check` がエラーなしで通過すること
+3. **新機能のテスト追加**: 新機能には対応するテスト（ユニット/統合/E2E）を追加すること
+
+### 既存E2Eテストの確認と修正
+
+新機能を追加する際は:
+- **全E2Eテストを確認**: 既存テストに影響がないか確認
+- **シナリオ修正の必要性を判断**: UIや挙動の変更により修正が必要なテストを特定
+- **修正タスクの追加**: 必要な修正をタスクリストに積むこと
+
+### E2Eテスト品質基準
+
+#### フレーキーテストの回避（必須）
+
+**固定時間待機（`waitForTimeout`）は禁止**。ポーリングで状態確定を待つこと:
+
+```typescript
+// ❌ BAD: 固定時間待機
+await page.waitForTimeout(500);
+
+// ✅ GOOD: ポーリングで状態確定を待機
+await waitForTabInTreeState(context, tabId);
+await waitForParentChildRelation(context, childTabId, parentTabId);
+```
+
+利用可能なポーリングユーティリティ（`e2e/utils/polling-utils.ts`）:
+- `waitForTabInTreeState` - タブがツリーに追加されるまで待機
+- `waitForTabRemovedFromTreeState` - タブがツリーから削除されるまで待機
+- `waitForParentChildRelation` - 親子関係が反映されるまで待機
+- `waitForTabActive` - タブがアクティブになるまで待機
+- `waitForSidePanelReady` - Side Panelの準備完了まで待機
+- その他多数
+
+#### フレーキーテスト検証（必須）
+
+新規E2Eテスト追加時は以下で安定性を検証:
+
+```bash
+# 10回以上繰り返し実行して100%通過を確認
+npx playwright test --repeat-each=10 path/to/new.spec.ts
+```
+
+#### Chrome Background Throttling対策
+
+**重要**: ChromeはバックグラウンドタブでタイマーとrequestAnimationFrameを1秒間隔にスロットリングします。
+
+**解決策**: ドラッグ操作前にページをフォーカス状態にする
+
+```typescript
+// バックグラウンドスロットリングを回避
+await sidePanelPage.bringToFront();
+await sidePanelPage.evaluate(() => window.focus());
+
+// この後でドラッグ操作を実行
+await startDrag(sidePanelPage, tabId);
+```
+
+この対策を怠ると`mouse.move`が958ms（本来7ms）かかり、dnd-kitの衝突検出が1秒間隔でしか動作しなくなります。
+
+#### テスト実行時間の最適化
+
+- E2Eテストは**必要十分な短い時間**で実行されること
+- 本質的に待機が必要なタスク以外で時間がかかる場合は**原因を調査して修正**すること
+- 遅いテストの原因例:
+  - 不必要なwaitForTimeout
+  - 非効率なセレクタ
+  - 過度なリトライ設定
+
+#### テストコードの均質性
+
+新規テストを書く際は:
+- **既存テストを参照**: 類似テストのコーディングパターンを踏襲
+- **共通ユーティリティを活用**: `e2e/utils/`の関数を再利用
+- **命名規則を遵守**: `*.spec.ts`形式、describe/test構造
 
 ## Development Environment
 

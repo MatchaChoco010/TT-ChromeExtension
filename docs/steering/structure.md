@@ -35,10 +35,20 @@
 **Purpose**: クロスカッティングな統合テスト（パフォーマンス、互換性）
 **Example**: `performance.test.tsx`, `vivaldi-compatibility.test.tsx`
 
+### E2E Tests (`/e2e/`)
+**Purpose**: Playwrightによる実ブラウザE2Eテスト
+**Subdirectories**:
+- `fixtures/`: カスタムフィクスチャ（拡張機能ロード等）
+- `utils/`: テストユーティリティ（tab-utils, drag-drop-utils, polling-utils等）
+- `test-data/`: テストデータとフィクスチャ
+
+**Example**: `tab-lifecycle.spec.ts`, `drag-drop-reorder.spec.ts`, `utils/polling-utils.ts`
+
 ## Naming Conventions
 
 - **Components**: PascalCase（`TreeNode.tsx`, `SettingsPanel.tsx`）
-- **Tests**: `*.test.ts(x)` (unit), `*.integration.test.tsx` (integration), `*.e2e.test.tsx` (e2e)
+- **Unit/Integration Tests**: `*.test.ts(x)` (unit), `*.integration.test.tsx` (integration)
+- **E2E Tests**: `e2e/*.spec.ts`（Playwright形式）
 - **Services/Utilities**: PascalCase for classes, camelCase for functions
 - **Types**: PascalCase interfaces/types（`TabNode`, `UserSettings`）
 

@@ -54,8 +54,10 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       extensionId,
       sidePanelPage,
     }) => {
-      // 初期状態のタブノード数を取得
+      // 初期状態のタブノード数を取得（ツリーが安定するまで待機）
       await assertTreeVisible(sidePanelPage);
+      // タブノードが少なくとも1つ表示されるまで待機してから数を取得
+      await expect(sidePanelPage.locator('[data-testid^="tree-node-"]').first()).toBeVisible({ timeout: 10000 });
       const initialTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
 
       // 新しいタブを作成
@@ -121,12 +123,9 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
         await chrome.tabs.update(tabId, { url: 'https://example.com' });
       }, tabId);
 
-      // 少し待機して更新を確認
-      await sidePanelPage.waitForTimeout(1000);
-
-      // タブノードがまだ表示されていることを確認
+      // タブノードがまだ表示されていることを確認（ポーリングで待機）
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);
@@ -164,12 +163,14 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
       const expandButton = parentNode.locator('[data-testid="expand-button"]');
 
-      // 展開ボタンがあるか、または親ノードが展開状態であることを確認
-      const hasExpandButton = await expandButton.count();
-      const isExpanded = await parentNode.getAttribute('data-expanded');
-
-      // 展開ボタンがあるか、すでに展開されている場合はOK
-      expect(hasExpandButton > 0 || isExpanded === 'true').toBeTruthy();
+      // 展開ボタンがあるか、または親ノードが展開状態であることをポーリングで確認
+      // （親子関係がUIに反映されるまで待機）
+      await expect(async () => {
+        const hasExpandButton = await expandButton.count();
+        const isExpanded = await parentNode.getAttribute('data-expanded');
+        // 展開ボタンがあるか、すでに展開されている場合はOK
+        expect(hasExpandButton > 0 || isExpanded === 'true').toBeTruthy();
+      }).toPass({ timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, childTabId);
@@ -293,12 +294,9 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
         await expect(tabNode).toBeVisible();
       }).toPass({ timeout: 10000 });
 
-      // ページのロードを待機（favIconがロードされるまで）
-      await sidePanelPage.waitForTimeout(2000);
-
-      // タブノードが表示されていることを確認
+      // タブノードが表示されていることを確認（favIconのロードを含む）
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);

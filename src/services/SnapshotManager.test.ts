@@ -85,8 +85,8 @@ describe('SnapshotManager', () => {
       onChange: vi.fn().mockReturnValue(() => {}),
     };
 
-    // Mock chrome.tabs API
-    global.chrome = {
+    // Mock chrome.tabs API（vi.stubGlobalを使用）
+    vi.stubGlobal('chrome', {
       tabs: {
         query: vi.fn().mockResolvedValue([
           {
@@ -102,7 +102,7 @@ describe('SnapshotManager', () => {
         ]),
         create: vi.fn().mockResolvedValue({ id: 100 }),
       },
-    } as any;
+    });
 
     snapshotManager = new SnapshotManager(
       mockIndexedDBService,

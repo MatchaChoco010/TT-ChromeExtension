@@ -36,18 +36,38 @@ test.describe('chrome.windows API統合', () => {
     const windowId = await createWindow(extensionContext);
     expect(windowId).toBeGreaterThan(0);
 
-    // ウィンドウが作成されたことをchrome.windows APIで確認
-    const windowsAfter = await serviceWorker.evaluate(() => {
-      return chrome.windows.getAll();
-    });
+    // ウィンドウが作成されるまでポーリングで待機（レースコンディション対策）
+    await expect
+      .poll(
+        async () => {
+          const windows = await serviceWorker.evaluate(() => {
+            return chrome.windows.getAll();
+          });
+          return windows.length;
+        },
+        {
+          message: 'ウィンドウが作成されるのを待機',
+          timeout: 5000,
+        }
+      )
+      .toBe(windowCountBefore + 1);
 
-    // ウィンドウ数が増えていることを確認
-    expect(windowsAfter.length).toBe(windowCountBefore + 1);
-
-    // 作成したウィンドウが存在することを確認
-    const createdWindow = windowsAfter.find((win: chrome.windows.Window) => win.id === windowId);
-    expect(createdWindow).toBeDefined();
-    expect(createdWindow?.id).toBe(windowId);
+    // 作成したウィンドウが存在することをポーリングで確認（ウィンドウコンテキスト確立待ち）
+    await expect
+      .poll(
+        async () => {
+          const windows = await serviceWorker.evaluate(() => {
+            return chrome.windows.getAll();
+          });
+          const createdWindow = windows.find((win: chrome.windows.Window) => win.id === windowId);
+          return createdWindow?.id;
+        },
+        {
+          message: 'ウィンドウコンテキストが確立されるのを待機',
+          timeout: 5000,
+        }
+      )
+      .toBe(windowId);
   });
 
   test('chrome.windows.remove()でウィンドウを閉じた場合、ウィンドウ内の全タブがツリーから削除される', async ({
@@ -93,8 +113,18 @@ test.describe('chrome.windows API統合', () => {
     expect(tabId1).toBeGreaterThan(0);
     expect(tabId2).toBeGreaterThan(0);
 
-    // 少し待機してタブが作成されることを確実にする
-    await sidePanelPage.waitForTimeout(500);
+    // タブが作成されるまでポーリングで待機
+    await serviceWorker.evaluate(async (params: { tabId1: number; tabId2: number }) => {
+      for (let i = 0; i < 30; i++) {
+        const tabs = await chrome.tabs.query({});
+        const tab1Exists = tabs.some((tab: chrome.tabs.Tab) => tab.id === params.tabId1);
+        const tab2Exists = tabs.some((tab: chrome.tabs.Tab) => tab.id === params.tabId2);
+        if (tab1Exists && tab2Exists) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }, { tabId1: tabId1!, tabId2: tabId2! });
 
     // タブが作成されたことを確認
     const tabsBefore = await serviceWorker.evaluate(() => {
@@ -110,8 +140,18 @@ test.describe('chrome.windows API統合', () => {
       return chrome.windows.remove(windowId);
     }, windowId);
 
-    // 少し待機してウィンドウが閉じられることを確実にする
-    await sidePanelPage.waitForTimeout(500);
+    // ウィンドウ内のタブが削除されるまでポーリングで待機
+    await serviceWorker.evaluate(async (params: { tabId1: number; tabId2: number }) => {
+      for (let i = 0; i < 30; i++) {
+        const tabs = await chrome.tabs.query({});
+        const tab1Exists = tabs.some((tab: chrome.tabs.Tab) => tab.id === params.tabId1);
+        const tab2Exists = tabs.some((tab: chrome.tabs.Tab) => tab.id === params.tabId2);
+        if (!tab1Exists && !tab2Exists) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }, { tabId1: tabId1!, tabId2: tabId2! });
 
     // ウィンドウ内の全タブが削除されたことを確認
     const tabsAfter = await serviceWorker.evaluate(() => {
@@ -146,8 +186,16 @@ test.describe('chrome.windows API統合', () => {
 
     expect(windowId).toBeGreaterThan(0);
 
-    // 少し待機してウィンドウが作成されることを確実にする
-    await sidePanelPage.waitForTimeout(300);
+    // ウィンドウが作成されるまでポーリングで待機
+    await serviceWorker.evaluate(async (createdWindowId: number) => {
+      for (let i = 0; i < 30; i++) {
+        const windows = await chrome.windows.getAll();
+        if (windows.some((win: chrome.windows.Window) => win.id === createdWindowId)) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }, windowId!);
 
     // ウィンドウが作成されたことを確認
     const windowsBefore = await serviceWorker.evaluate(() => {
@@ -161,8 +209,17 @@ test.describe('chrome.windows API統合', () => {
       return chrome.windows.update(windowId!, { focused: true });
     }, windowId);
 
-    // 少し待機してフォーカス状態が更新されることを確実にする
-    await sidePanelPage.waitForTimeout(300);
+    // フォーカス状態が更新されるまでポーリングで待機
+    await serviceWorker.evaluate(async (focusedWindowId: number) => {
+      for (let i = 0; i < 30; i++) {
+        const windows = await chrome.windows.getAll();
+        const win = windows.find((w: chrome.windows.Window) => w.id === focusedWindowId);
+        if (win && win.focused) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }, windowId!);
 
     // フォーカス状態が更新されたことを確認
     const windowsAfter = await serviceWorker.evaluate(() => {
@@ -188,6 +245,24 @@ test.describe('chrome.windows API統合', () => {
 
     expect(windowId1).toBeGreaterThan(0);
     expect(windowId2).toBeGreaterThan(0);
+
+    // 両方のウィンドウがgetAll()で取得できるまでポーリングで待機（レースコンディション対策）
+    await expect
+      .poll(
+        async () => {
+          const windows = await serviceWorker.evaluate(() => {
+            return chrome.windows.getAll({ populate: true });
+          });
+          const hasWindow1 = windows.some((win: chrome.windows.Window) => win.id === windowId1);
+          const hasWindow2 = windows.some((win: chrome.windows.Window) => win.id === windowId2);
+          return hasWindow1 && hasWindow2;
+        },
+        {
+          message: '両方のウィンドウがgetAll()で取得できるのを待機',
+          timeout: 5000,
+        }
+      )
+      .toBe(true);
 
     // 全ウィンドウを取得
     const windows = await serviceWorker.evaluate(() => {
@@ -224,6 +299,24 @@ test.describe('chrome.windows API統合', () => {
     expect(windowId1).toBeGreaterThan(0);
     expect(windowId2).toBeGreaterThan(0);
 
+    // 両方のウィンドウが完全に利用可能になるまでポーリングで待機（レースコンディション対策）
+    await expect
+      .poll(
+        async () => {
+          const windows = await serviceWorker.evaluate(() => {
+            return chrome.windows.getAll();
+          });
+          const hasWindow1 = windows.some((win: chrome.windows.Window) => win.id === windowId1);
+          const hasWindow2 = windows.some((win: chrome.windows.Window) => win.id === windowId2);
+          return hasWindow1 && hasWindow2;
+        },
+        {
+          message: '両方のウィンドウが利用可能になるのを待機',
+          timeout: 5000,
+        }
+      )
+      .toBe(true);
+
     // ウィンドウ1にタブを作成
     const tabId1 = await serviceWorker.evaluate(
       (windowId) => {
@@ -255,8 +348,18 @@ test.describe('chrome.windows API統合', () => {
     expect(tabId1).toBeGreaterThan(0);
     expect(tabId2).toBeGreaterThan(0);
 
-    // 少し待機してタブが作成されることを確実にする
-    await sidePanelPage.waitForTimeout(500);
+    // タブが作成されるまでポーリングで待機
+    await serviceWorker.evaluate(async (params: { tabId1: number; tabId2: number }) => {
+      for (let i = 0; i < 30; i++) {
+        const tabs = await chrome.tabs.query({});
+        const tab1Exists = tabs.some((tab: chrome.tabs.Tab) => tab.id === params.tabId1);
+        const tab2Exists = tabs.some((tab: chrome.tabs.Tab) => tab.id === params.tabId2);
+        if (tab1Exists && tab2Exists) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }, { tabId1: tabId1!, tabId2: tabId2! });
 
     // ウィンドウ1のタブを取得
     const tabs1 = await serviceWorker.evaluate((windowId) => {

@@ -3,6 +3,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SnapshotList from './SnapshotList';
 import type { Snapshot } from '@/types';
 
+// テスト用のモックFile型（必要なプロパティのみ）
+interface MockFile {
+  text: () => Promise<string>;
+  name: string;
+  type: string;
+}
+
 /**
  * Task 14.3: スナップショット履歴管理 - SnapshotList コンポーネントのテスト
  * Requirements: 11.6 - スナップショット一覧表示、削除、エクスポート/インポート機能
@@ -44,16 +51,13 @@ describe('SnapshotList Component', () => {
     },
   ];
 
-  let mockOnRestore: ReturnType<typeof vi.fn>;
-  let mockOnDelete: ReturnType<typeof vi.fn>;
-  let mockOnExport: ReturnType<typeof vi.fn>;
-  let mockOnImport: ReturnType<typeof vi.fn>;
+  const mockOnRestore = vi.fn<(snapshotId: string) => void>();
+  const mockOnDelete = vi.fn<(snapshotId: string) => void>();
+  const mockOnExport = vi.fn<(snapshotId: string) => void>();
+  const mockOnImport = vi.fn<(jsonData: string) => void>();
 
   beforeEach(() => {
-    mockOnRestore = vi.fn();
-    mockOnDelete = vi.fn();
-    mockOnExport = vi.fn();
-    mockOnImport = vi.fn();
+    vi.clearAllMocks();
   });
 
   it('should render snapshot list with all snapshots', () => {
@@ -191,11 +195,11 @@ describe('SnapshotList Component', () => {
 
     // モックファイルを作成（.text() メソッドを持つオブジェクト）
     const jsonData = JSON.stringify({ id: 'test', name: 'Test Snapshot' });
-    const mockFile = {
-      text: vi.fn().mockResolvedValue(jsonData),
+    const mockFile: MockFile = {
+      text: vi.fn<() => Promise<string>>().mockResolvedValue(jsonData),
       name: 'snapshot.json',
       type: 'application/json',
-    } as unknown as File;
+    };
 
     // FileList をモック
     Object.defineProperty(fileInput, 'files', {

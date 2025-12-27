@@ -39,13 +39,25 @@ export async function createWindow(context: BrowserContext): Promise<number> {
     });
   });
 
-  // 少し待機して、ウィンドウの作成を確実にする
-  const [page] = context.pages();
-  if (page) {
-    await page.waitForTimeout(300);
-  }
+  const windowId = window.id as number;
 
-  return window.id as number;
+  // ウィンドウがChrome内部状態に完全に登録されるまでポーリングで待機
+  await serviceWorker.evaluate(async (windowId: number) => {
+    for (let i = 0; i < 50; i++) {
+      try {
+        const windows = await chrome.windows.getAll();
+        const found = windows.find(w => w.id === windowId);
+        if (found) {
+          return;
+        }
+      } catch {
+        // エラーは無視して続行
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }, windowId);
+
+  return windowId;
 }
 
 /**
@@ -73,11 +85,23 @@ export async function moveTabToWindow(
     { tabId, windowId }
   );
 
-  // タブが移動するまで少し待機
-  const [page] = context.pages();
-  if (page) {
-    await page.waitForTimeout(300);
-  }
+  // タブが指定ウィンドウに移動完了するまでポーリングで待機
+  await serviceWorker.evaluate(
+    async ({ tabId, windowId }) => {
+      for (let i = 0; i < 50; i++) {
+        try {
+          const tab = await chrome.tabs.get(tabId);
+          if (tab.windowId === windowId) {
+            return;
+          }
+        } catch {
+          // エラーは無視して続行
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    },
+    { tabId, windowId }
+  );
 }
 
 /**
@@ -100,11 +124,8 @@ export async function dragTabToWindow(
   // 現在のコンテキストを取得
   const context = page.context();
 
-  // 内部的にmoveTabToWindowを使用
+  // 内部的にmoveTabToWindowを使用（ポーリング待機込み）
   await moveTabToWindow(context, tabId, targetWindowId);
-
-  // ドラッグ&ドロップ操作後の待機
-  await page.waitForTimeout(300);
 }
 
 /**
@@ -119,18 +140,35 @@ export async function assertWindowTreeSync(
 ): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  // Service Workerコンテキストでウィンドウのタブを取得
+  // ウィンドウのタブがストレージに同期されるまでポーリングで待機
+  await serviceWorker.evaluate(async (windowId: number) => {
+    for (let i = 0; i < 50; i++) {
+      try {
+        const tabs = await chrome.tabs.query({ windowId });
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+
+        if (treeState?.tabToNode && tabs.length > 0) {
+          // すべてのタブがツリー状態に存在することを確認
+          const allTabsSynced = tabs.every(
+            (tab: chrome.tabs.Tab) => tab.id && treeState.tabToNode[tab.id]
+          );
+          if (allTabsSynced) {
+            return;
+          }
+        }
+      } catch {
+        // エラーは無視して続行
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }, windowId);
+
+  // 最終的にタブが存在することを確認
   const tabs = await serviceWorker.evaluate((windowId) => {
     return chrome.tabs.query({ windowId });
   }, windowId);
 
-  // タブが存在することを確認（ウィンドウが存在し、同期されていることを示す）
   expect(tabs).toBeDefined();
   expect(Array.isArray(tabs)).toBe(true);
-
-  // 少し待機して、ツリーの同期を確実にする
-  const [page] = context.pages();
-  if (page) {
-    await page.waitForTimeout(200);
-  }
 }

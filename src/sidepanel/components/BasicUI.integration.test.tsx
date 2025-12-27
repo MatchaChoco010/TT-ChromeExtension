@@ -3,7 +3,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SidePanelRoot from './SidePanelRoot';
 import TabTreeView from './TabTreeView';
-import { TreeStateProvider } from '../providers/TreeStateProvider';
 import type { TabNode } from '@/types';
 
 /**
@@ -131,12 +130,12 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
       // タブツリービューが表示されることを確認
       expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
 
-      // 親タブが表示されることを確認
-      expect(screen.getByTestId('tree-node-node-1')).toBeInTheDocument();
-      expect(screen.getByTestId('tree-node-node-3')).toBeInTheDocument();
+      // 親タブが表示されることを確認（data-testidはtab.idを使用: tree-node-{tabId}）
+      expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
 
       // 子タブが表示されることを確認
-      expect(screen.getByTestId('tree-node-node-2')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
 
     it('各タブのファビコン、タイトル、階層レベルを表示すること (AC 1.3)', () => {
@@ -175,9 +174,9 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
         />
       );
 
-      // 親タブと子タブが表示されることを確認
-      const parentNode = screen.getByTestId('tree-node-parent');
-      const childNode = screen.getByTestId('tree-node-child');
+      // 親タブと子タブが表示されることを確認（data-testidはtab.idを使用: tree-node-{tabId}）
+      const parentNode = screen.getByTestId('tree-node-1');
+      const childNode = screen.getByTestId('tree-node-2');
 
       expect(parentNode).toBeInTheDocument();
       expect(childNode).toBeInTheDocument();
@@ -215,9 +214,9 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
         />
       );
 
-      // 初期状態を確認
-      expect(screen.getByTestId('tree-node-node-1')).toBeInTheDocument();
-      expect(screen.queryByTestId('tree-node-node-2')).not.toBeInTheDocument();
+      // 初期状態を確認（data-testidはtab.idを使用: tree-node-{tabId}）
+      expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+      expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
 
       // 新しいタブが追加された状態に更新
       const updatedNodes: TabNode[] = [
@@ -242,9 +241,9 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
         />
       );
 
-      // 新しいタブが表示されることを確認
-      expect(screen.getByTestId('tree-node-node-1')).toBeInTheDocument();
-      expect(screen.getByTestId('tree-node-node-2')).toBeInTheDocument();
+      // 新しいタブが表示されることを確認（data-testidはtab.idを使用: tree-node-{tabId}）
+      expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
   });
 
@@ -287,8 +286,8 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
         />
       );
 
-      // タブ1をクリック
-      const tab1Element = screen.getByTestId('tree-node-node-1');
+      // タブ1をクリック（data-testidはtab.idを使用: tree-node-{tabId}）
+      const tab1Element = screen.getByTestId('tree-node-1');
       await user.click(tab1Element);
 
       // onNodeClickコールバックが正しいtabIdで呼ばれることを確認
@@ -296,7 +295,7 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
       expect(mockOnNodeClick).toHaveBeenCalledTimes(1);
 
       // タブ2をクリック
-      const tab2Element = screen.getByTestId('tree-node-node-2');
+      const tab2Element = screen.getByTestId('tree-node-2');
       await user.click(tab2Element);
 
       // onNodeClickコールバックが正しいtabIdで呼ばれることを確認
@@ -307,8 +306,6 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
 
   describe('統合シナリオ: サイドパネルからタブツリー表示まで', () => {
     it('サイドパネルが開いてからタブをツリー表示し、クリックでアクティブ化できること', async () => {
-      const user = userEvent.setup();
-
       // モックのストレージデータを設定
       const mockTreeState = {
         views: [

@@ -85,6 +85,12 @@ test.describe('WindowTestUtils', () => {
     extensionContext,
     serviceWorker,
   }) => {
+    // 最初に現在のウィンドウIDを取得（タブ作成前）
+    const initialWindow = await serviceWorker.evaluate(() => {
+      return chrome.windows.getCurrent();
+    });
+    const currentWindowId = initialWindow.id as number;
+
     // 最初のウィンドウにタブを作成（about:blankを使用して高速化）
     const tab1Id = await createTab(extensionContext, 'about:blank');
     const tab2Id = await createTab(extensionContext, 'about:blank');
@@ -96,13 +102,6 @@ test.describe('WindowTestUtils', () => {
     await moveTabToWindow(extensionContext, tab1Id, newWindowId);
 
     // 両方のウィンドウのツリー状態が同期されていることを確認
-    const windows = await serviceWorker.evaluate(() => {
-      return chrome.windows.getAll();
-    });
-
-    // 現在のウィンドウIDを取得
-    const currentWindowId = windows[0].id as number;
-
     await assertWindowTreeSync(extensionContext, currentWindowId);
     await assertWindowTreeSync(extensionContext, newWindowId);
 

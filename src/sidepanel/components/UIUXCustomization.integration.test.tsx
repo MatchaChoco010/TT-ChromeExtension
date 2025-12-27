@@ -10,16 +10,16 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
 import { ThemeProvider, useTheme } from '@/sidepanel/providers/ThemeProvider';
 import SettingsPanel from './SettingsPanel';
 import TreeNode from './TreeNode';
-import type { UserSettings, TabNode, TabInfo } from '@/types';
+import type { UserSettings, TabNode, TabInfo, StorageChanges } from '@/types';
+import type { StorageChangeListener } from '@/test/test-types';
 
 describe('Task 13.4: UI/UXカスタマイズのインテグレーションテスト', () => {
   let mockGet: ReturnType<typeof vi.fn>;
   let mockSet: ReturnType<typeof vi.fn>;
-  let onChangedListeners: Array<(changes: any) => void> = [];
+  let onChangedListeners: StorageChangeListener[] = [];
 
   beforeEach(() => {
     onChangedListeners = [];
@@ -28,30 +28,30 @@ describe('Task 13.4: UI/UXカスタマイズのインテグレーションテス
     mockSet = vi.fn();
 
     // グローバルなchromeオブジェクトをモック
-    (global as any).chrome = {
+    vi.stubGlobal('chrome', {
       storage: {
         local: {
           get: mockGet,
           set: mockSet,
         },
         onChanged: {
-          addListener: vi.fn((listener: (changes: any) => void) => {
+          addListener: vi.fn((listener: StorageChangeListener) => {
             onChangedListeners.push(listener);
           }),
-          removeListener: vi.fn((listener: (changes: any) => void) => {
+          removeListener: vi.fn((listener: StorageChangeListener) => {
             onChangedListeners = onChangedListeners.filter((l) => l !== listener);
           }),
         },
       },
-    };
+    });
 
     // chrome.storage.local.setが呼ばれたときにonChangedリスナーをトリガー
-    mockSet.mockImplementation(async (items: any) => {
-      const changes: any = {};
+    mockSet.mockImplementation(async (items: Record<string, unknown>) => {
+      const changes: StorageChanges = {};
       for (const key in items) {
-        changes[key] = { newValue: items[key] };
+        changes[key] = { oldValue: undefined, newValue: items[key] };
       }
-      onChangedListeners.forEach((listener) => listener(changes));
+      onChangedListeners.forEach((listener) => listener(changes, 'local'));
       return Promise.resolve();
     });
 

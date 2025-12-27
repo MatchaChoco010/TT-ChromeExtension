@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TreeStateManager } from './TreeStateManager';
 import { StorageService } from '@/storage/StorageService';
-import type { TabNode } from '@/types';
 
 /**
  * Task 7.3: サブツリー全体の移動

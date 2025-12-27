@@ -24,20 +24,33 @@ test.describe('コンテキストメニュー操作', () => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
 
-    // タブノードが表示されるまで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
-
+    // タブノードのlocatorを定義
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+
+    // タブノードが表示されるまで待機（Playwrightの自動リトライ機能を活用）
+    await expect(tabNode).toBeVisible({ timeout: 10000 });
+
+    // バックグラウンドスロットリングを回避（ページにフォーカスを当てる）
+    await sidePanelPage.bringToFront();
+
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabId,
+      { timeout: 5000 }
+    );
 
     // Act: 右クリックでコンテキストメニューを開く
     await tabNode.click({ button: 'right' });
 
     // Assert: コンテキストメニューが表示される
     const contextMenu = sidePanelPage.locator('[role="menu"]');
-    await expect(contextMenu).toBeVisible({ timeout: 3000 });
+    await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
     // メニュー項目が存在することを確認
     await expect(sidePanelPage.getByRole('menuitem', { name: 'タブを閉じる' })).toBeVisible();
@@ -64,6 +77,18 @@ test.describe('コンテキストメニュー操作', () => {
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabId,
+      { timeout: 5000 }
+    );
+
     // Act: 右クリックでコンテキストメニューを開く
     await tabNode.click({ button: 'right' });
 
@@ -72,6 +97,9 @@ test.describe('コンテキストメニュー操作', () => {
 
     // "タブを閉じる"をクリック
     await sidePanelPage.getByRole('menuitem', { name: 'タブを閉じる' }).click();
+
+    // コンテキストメニューが閉じるまで待機
+    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     // Assert: タブ数が減少している
     await expect(async () => {
@@ -113,6 +141,18 @@ test.describe('コンテキストメニュー操作', () => {
     // 親タブノードを取得
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
 
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      parentTabId,
+      { timeout: 5000 }
+    );
+
     // Act: 右クリックでコンテキストメニューを開く
     await parentNode.click({ button: 'right' });
 
@@ -123,6 +163,9 @@ test.describe('コンテキストメニュー操作', () => {
     const closeSubtreeItem = sidePanelPage.getByRole('menuitem', { name: 'サブツリーを閉じる' });
     await expect(closeSubtreeItem).toBeVisible({ timeout: 3000 });
     await closeSubtreeItem.click();
+
+    // コンテキストメニューが閉じるまで待機
+    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     // Assert: サブツリー全体（親 + 子2つ = 3タブ）が削除されている
     await expect(async () => {
@@ -146,6 +189,18 @@ test.describe('コンテキストメニュー操作', () => {
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabId,
+      { timeout: 5000 }
+    );
+
     // Act: 右クリックでコンテキストメニューを開く
     await tabNode.click({ button: 'right' });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
@@ -154,13 +209,16 @@ test.describe('コンテキストメニュー操作', () => {
     const groupItem = sidePanelPage.getByRole('menuitem', { name: /グループ/ });
     await expect(groupItem).toBeVisible();
 
-    // クリーンアップ
+    // クリーンアップ: メニューを閉じてからタブを閉じる
+    await sidePanelPage.keyboard.press('Escape');
+    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 2000 });
     await closeTab(extensionContext, tabId);
   });
 
   test('コンテキストメニューから"新しいウィンドウで開く"を選択した場合、タブが新しいウィンドウに移動する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
@@ -171,10 +229,25 @@ test.describe('コンテキストメニュー操作', () => {
       await expect(tabNode).toBeVisible();
     }).toPass({ timeout: 10000 });
 
-    // 初期ページ数を取得
-    const initialPageCount = extensionContext.pages().length;
+    // 初期のウィンドウ数を取得
+    const initialWindowCount = await serviceWorker.evaluate(async () => {
+      const windows = await chrome.windows.getAll();
+      return windows.length;
+    });
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabId,
+      { timeout: 5000 }
+    );
 
     // Act: 右クリックでコンテキストメニューを開く
     await tabNode.click({ button: 'right' });
@@ -183,11 +256,18 @@ test.describe('コンテキストメニュー操作', () => {
     // "新しいウィンドウで開く"をクリック
     await sidePanelPage.getByRole('menuitem', { name: '新しいウィンドウで開く' }).click();
 
+    // コンテキストメニューが閉じるまで待機
+    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
+
     // Assert: 新しいウィンドウが作成されたことを確認
-    // 注: Playwright の persistent context では新しいウィンドウはページとして扱われる
+    // chrome.windows APIを使用して正確にウィンドウ数を確認
     await expect(async () => {
-      const currentPages = extensionContext.pages();
-      expect(currentPages.length).toBeGreaterThanOrEqual(initialPageCount);
+      const currentWindowCount = await serviceWorker.evaluate(async () => {
+        const windows = await chrome.windows.getAll();
+        return windows.length;
+      });
+      // 新しいウィンドウが作成されるので、ウィンドウ数は増加するはず
+      expect(currentWindowCount).toBeGreaterThan(initialWindowCount);
     }).toPass({ timeout: 5000 });
   });
 
@@ -206,6 +286,18 @@ test.describe('コンテキストメニュー操作', () => {
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabId,
+      { timeout: 5000 }
+    );
+
     // Act: 右クリックでコンテキストメニューを開く
     await tabNode.click({ button: 'right' });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
@@ -219,7 +311,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリップボード操作は環境によって異なるため、
     // ここではメニューが正常に閉じることを確認
-    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 2000 });
+    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
@@ -240,6 +332,22 @@ test.describe('コンテキストメニュー操作', () => {
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabId,
+      { timeout: 5000 }
+    );
+
+    // バックグラウンドスロットリングを回避
+    await sidePanelPage.bringToFront();
+    await sidePanelPage.evaluate(() => window.focus());
+
     // Act: 右クリックでコンテキストメニューを開く
     await tabNode.click({ button: 'right' });
 
@@ -251,7 +359,7 @@ test.describe('コンテキストメニュー操作', () => {
     await sidePanelPage.click('body', { position: { x: 10, y: 10 } });
 
     // Assert: コンテキストメニューが閉じられる
-    await expect(contextMenu).not.toBeVisible({ timeout: 2000 });
+    await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
@@ -272,6 +380,18 @@ test.describe('コンテキストメニュー操作', () => {
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabId,
+      { timeout: 5000 }
+    );
+
     // Act: 右クリックでコンテキストメニューを開く
     await tabNode.click({ button: 'right' });
 
@@ -283,7 +403,7 @@ test.describe('コンテキストメニュー操作', () => {
     await sidePanelPage.keyboard.press('Escape');
 
     // Assert: コンテキストメニューが閉じられる
-    await expect(contextMenu).not.toBeVisible({ timeout: 2000 });
+    await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);

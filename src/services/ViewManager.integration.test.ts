@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ViewManager } from './ViewManager';
 import { TreeStateManager } from './TreeStateManager';
 import { StorageService } from '@/storage/StorageService';
@@ -14,19 +14,16 @@ describe('ViewManager と TreeStateManager の統合テスト', () => {
   let storageService: StorageService;
 
   beforeEach(() => {
-    // モックのchrome.storageを設定
-    global.chrome = {
+    // モックのchrome.storageを設定（vi.stubGlobalを使用）
+    vi.stubGlobal('chrome', {
       storage: {
         local: {
           get: () => Promise.resolve({}),
           set: () => Promise.resolve(),
           remove: () => Promise.resolve(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
+        },
+      },
+    });
 
     storageService = new StorageService();
     viewManager = new ViewManager(storageService);

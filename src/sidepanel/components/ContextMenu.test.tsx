@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ContextMenu, type MenuAction } from './ContextMenu';
+import { ContextMenu } from './ContextMenu';
 
 describe('ContextMenu', () => {
   describe('Requirement 12.1: 右クリック時のメニュー表示と位置計算', () => {
@@ -331,7 +331,6 @@ describe('ContextMenu', () => {
       );
 
       const menu = screen.getByRole('menu');
-      const style = menu.style;
 
       // メニュー幅を200pxと仮定した場合、750 + 200 > 800 なので調整される
       // 実際の調整ロジックは実装で確認

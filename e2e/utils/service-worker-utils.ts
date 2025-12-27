@@ -94,7 +94,7 @@ export async function waitForMessageFromServiceWorker(
   const messagePromise = worker.evaluate(
     (type) => {
       return new Promise<Record<string, unknown>>((resolve) => {
-        const listener = (message: any) => {
+        const listener = (message: Record<string, unknown>) => {
           if (message.type === type) {
             chrome.runtime.onMessage.removeListener(listener);
             resolve(message);

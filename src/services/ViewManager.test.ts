@@ -223,7 +223,7 @@ describe('ViewManager', () => {
     });
 
     it('存在しないビューIDを指定した場合は何も変更されない', () => {
-      const view = viewManager.createView('Work', '#ff0000');
+      viewManager.createView('Work', '#ff0000');
       const viewsBefore = [...viewManager.getViews()];
 
       viewManager.updateView('non-existent-view-id', { name: 'Should not update' });
@@ -249,8 +249,7 @@ describe('ViewManager', () => {
 
       await viewManager.loadState();
 
-      const views = viewManager.getViews();
-      expect(views).toHaveLength(2);
+      expect(viewManager.getViews()).toHaveLength(2);
       expect(viewManager.getCurrentView().id).toBe('view-1');
     });
 

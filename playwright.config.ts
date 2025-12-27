@@ -6,6 +6,17 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * @see https://playwright.dev/docs/test-configuration
  */
+
+// ワーカー数の設定
+const getWorkerCount = () => {
+  if (process.env.CI === 'true') {
+    // CI環境ではデフォルトのワーカー数を使用
+    return undefined;
+  }
+  // ローカル環境では8ワーカーに制限
+  return 8;
+};
+
 export default defineConfig({
   // グローバルセットアップ（テスト実行前に拡張機能をビルド）
   globalSetup: './e2e/scripts/global-setup.ts',
@@ -17,18 +28,19 @@ export default defineConfig({
   testMatch: '**/*.spec.ts',
 
   // グローバルタイムアウト設定
-  timeout: 30000, // 30秒
+  // Service Worker起動（30秒）+ テスト実行時間を考慮
+  timeout: 60000,
 
   // アサーションタイムアウト
   expect: {
-    timeout: 5000, // 5秒
+    timeout: 5000,
   },
 
-  // リトライ戦略（CI環境では2回リトライ）
-  retries: process.env.CI ? 2 : 0,
+  // リトライ設定（リトライに依存しない設計）
+  retries: 0,
 
-  // 並列実行設定（CI環境では2ワーカー）
-  workers: process.env.CI ? 2 : undefined,
+  // 並列実行設定
+  workers: getWorkerCount(),
 
   // レポート設定
   reporter: [

@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { TreeStateProvider } from '@/sidepanel/providers/TreeStateProvider';
-import TabTreeView from './TabTreeView';
 import GroupNode from './GroupNode';
 import { GroupManager } from '@/services/GroupManager';
-import { TreeStateManager } from '@/services/TreeStateManager';
-import type { TabNode, Group, UserSettings } from '@/types';
+import type { Group, IStorageService } from '@/types';
 import '@/test/chrome-mock';
 
 /**
@@ -20,8 +17,7 @@ import '@/test/chrome-mock';
  */
 describe('グループ化機能の統合テスト (Task 9.4)', () => {
   let mockGroupManager: GroupManager;
-  let mockTreeStateManager: TreeStateManager;
-  let mockStorageService: any;
+  let mockStorageService: IStorageService;
 
   beforeEach(() => {
     // ストレージサービスのモック
@@ -33,7 +29,6 @@ describe('グループ化機能の統合テスト (Task 9.4)', () => {
     };
 
     mockGroupManager = new GroupManager(mockStorageService);
-    mockTreeStateManager = new TreeStateManager(mockStorageService);
   });
 
   afterEach(() => {
@@ -216,17 +211,17 @@ describe('グループ化機能の統合テスト (Task 9.4)', () => {
 
     it('複数のグループが異なるタイトルと色を持てること', async () => {
       // Given: 異なるプロパティを持つ3つのグループを作成
-      const group1 = await mockGroupManager.createGroup(
+      await mockGroupManager.createGroup(
         [1],
         'ワーク',
         '#ff0000',
       );
-      const group2 = await mockGroupManager.createGroup(
+      await mockGroupManager.createGroup(
         [2],
         'プライベート',
         '#00ff00',
       );
-      const group3 = await mockGroupManager.createGroup(
+      await mockGroupManager.createGroup(
         [3],
         'リサーチ',
         '#0000ff',

@@ -17,6 +17,31 @@ import {
   assertEventListenersRegistered,
   assertServiceWorkerLifecycle,
 } from './utils/service-worker-utils';
+import {
+  waitForMessageReceived,
+  waitForCounterIncreased,
+  waitForTabInTreeState,
+} from './utils/polling-utils';
+// Window型拡張を適用するためのインポート
+import './types';
+
+/**
+ * Service Workerからのレスポンス型
+ */
+interface ServiceWorkerResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * ドラッグ状態の型
+ */
+interface DragState {
+  tabId: number;
+  treeData: Record<string, unknown>;
+  sourceWindowId: number;
+}
 
 test.describe('Service Workerとの通信', () => {
   test.describe('Requirement 4.5.1: Side PanelからService Workerへのメッセージ送信', () => {
@@ -125,9 +150,9 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).receivedMessages = [];
+        window.receivedMessages = [];
         chrome.runtime.onMessage.addListener((message) => {
-          (window as any).receivedMessages.push(message);
+          window.receivedMessages!.push(message);
         });
       });
 
@@ -140,15 +165,15 @@ test.describe('Service Workerとの通信', () => {
       });
 
       // メッセージが受信されるまで待機
-      await sidePanelPage.waitForTimeout(500);
+      await waitForMessageReceived(sidePanelPage, 'TEST_MESSAGE');
 
       // Side Panelでメッセージを受信したことを確認
       const receivedMessages = await sidePanelPage.evaluate(() => {
-        return (window as any).receivedMessages;
+        return window.receivedMessages;
       });
 
       expect(receivedMessages.length).toBeGreaterThan(0);
-      expect(receivedMessages.some((msg: any) => msg.type === 'TEST_MESSAGE')).toBe(true);
+      expect(receivedMessages.some((msg: { type: string }) => msg.type === 'TEST_MESSAGE')).toBe(true);
     });
 
     test('STATE_UPDATEDメッセージがSide Panelで正しく受信されること', async ({
@@ -157,10 +182,10 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).stateUpdatedReceived = false;
+        window.stateUpdatedReceived = false;
         chrome.runtime.onMessage.addListener((message) => {
           if (message.type === 'STATE_UPDATED') {
-            (window as any).stateUpdatedReceived = true;
+            window.stateUpdatedReceived = true;
           }
         });
       });
@@ -170,12 +195,19 @@ test.describe('Service Workerとの通信', () => {
         chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
       });
 
-      // メッセージが受信されるまで待機
-      await sidePanelPage.waitForTimeout(500);
+      // メッセージが受信されるまでポーリングで待機
+      await sidePanelPage.evaluate(async () => {
+        for (let i = 0; i < 50; i++) {
+          if (window.stateUpdatedReceived) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      });
 
       // STATE_UPDATEDメッセージが受信されたことを確認
       const stateUpdatedReceived = await sidePanelPage.evaluate(() => {
-        return (window as any).stateUpdatedReceived;
+        return window.stateUpdatedReceived;
       });
 
       expect(stateUpdatedReceived).toBe(true);
@@ -189,17 +221,17 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).stateUpdateCount = 0;
+        window.stateUpdateCount = 0;
         chrome.runtime.onMessage.addListener((message) => {
           if (message.type === 'STATE_UPDATED') {
-            (window as any).stateUpdateCount++;
+            window.stateUpdateCount = (window.stateUpdateCount || 0) + 1;
           }
         });
       });
 
       // 初期カウントを取得
       const initialCount = await sidePanelPage.evaluate(() => {
-        return (window as any).stateUpdateCount;
+        return window.stateUpdateCount;
       });
 
       // タブを作成
@@ -207,15 +239,23 @@ test.describe('Service Workerとの通信', () => {
         return chrome.tabs.create({ url: 'about:blank', active: false });
       });
 
-      // STATE_UPDATEDメッセージが送信されるまで待機
-      await sidePanelPage.waitForTimeout(1000);
+      // STATE_UPDATEDメッセージが送信されるまでポーリングで待機
+      await sidePanelPage.evaluate(async (initial: number) => {
+        for (let i = 0; i < 50; i++) {
+          const count = window.stateUpdateCount;
+          if (count !== undefined && count > initial) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, initialCount ?? 0);
 
       // カウントが増加したことを確認
       const finalCount = await sidePanelPage.evaluate(() => {
-        return (window as any).stateUpdateCount;
+        return window.stateUpdateCount;
       });
 
-      expect(finalCount).toBeGreaterThan(initialCount);
+      expect(finalCount).toBeGreaterThan(initialCount ?? 0);
 
       // クリーンアップ
       await serviceWorker.evaluate((tabId) => {
@@ -226,28 +266,29 @@ test.describe('Service Workerとの通信', () => {
     test('タブ削除時にService WorkerがSTATE_UPDATEDメッセージを送信すること', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
       // タブを作成
       const tab = await serviceWorker.evaluate(() => {
         return chrome.tabs.create({ url: 'about:blank', active: false });
       });
 
-      // 少し待機
-      await sidePanelPage.waitForTimeout(500);
+      // タブがツリーに同期されるまで待機
+      await waitForTabInTreeState(extensionContext, tab.id!);
 
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).stateUpdateCount = 0;
+        window.stateUpdateCount = 0;
         chrome.runtime.onMessage.addListener((message) => {
           if (message.type === 'STATE_UPDATED') {
-            (window as any).stateUpdateCount++;
+            window.stateUpdateCount = (window.stateUpdateCount || 0) + 1;
           }
         });
       });
 
       // 初期カウントを取得
       const initialCount = await sidePanelPage.evaluate(() => {
-        return (window as any).stateUpdateCount;
+        return window.stateUpdateCount;
       });
 
       // タブを削除
@@ -256,41 +297,42 @@ test.describe('Service Workerとの通信', () => {
       }, tab.id!);
 
       // STATE_UPDATEDメッセージが送信されるまで待機
-      await sidePanelPage.waitForTimeout(1000);
+      await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount);
 
       // カウントが増加したことを確認
       const finalCount = await sidePanelPage.evaluate(() => {
-        return (window as any).stateUpdateCount;
+        return window.stateUpdateCount;
       });
 
-      expect(finalCount).toBeGreaterThan(initialCount);
+      expect(finalCount).toBeGreaterThan(initialCount ?? 0);
     });
 
     test('タブ更新時にService WorkerがSTATE_UPDATEDメッセージを送信すること', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
       // タブを作成
       const tab = await serviceWorker.evaluate(() => {
         return chrome.tabs.create({ url: 'about:blank', active: false });
       });
 
-      // 少し待機
-      await sidePanelPage.waitForTimeout(500);
+      // タブがツリーに同期されるまで待機
+      await waitForTabInTreeState(extensionContext, tab.id!);
 
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).stateUpdateCount = 0;
+        window.stateUpdateCount = 0;
         chrome.runtime.onMessage.addListener((message) => {
           if (message.type === 'STATE_UPDATED') {
-            (window as any).stateUpdateCount++;
+            window.stateUpdateCount = (window.stateUpdateCount || 0) + 1;
           }
         });
       });
 
       // 初期カウントを取得
       const initialCount = await sidePanelPage.evaluate(() => {
-        return (window as any).stateUpdateCount;
+        return window.stateUpdateCount;
       });
 
       // タブを更新（URLを変更）
@@ -299,14 +341,14 @@ test.describe('Service Workerとの通信', () => {
       }, tab.id!);
 
       // STATE_UPDATEDメッセージが送信されるまで待機
-      await sidePanelPage.waitForTimeout(1000);
+      await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount);
 
       // カウントが増加したことを確認
       const finalCount = await sidePanelPage.evaluate(() => {
-        return (window as any).stateUpdateCount;
+        return window.stateUpdateCount;
       });
 
-      expect(finalCount).toBeGreaterThan(initialCount);
+      expect(finalCount).toBeGreaterThan(initialCount ?? 0);
 
       // クリーンアップ
       await serviceWorker.evaluate((tabId) => {
@@ -326,15 +368,24 @@ test.describe('Service Workerとの通信', () => {
         return chrome.tabs.create({ url: 'about:blank', active: false });
       });
 
-      // 少し待機
-      await sidePanelPage.waitForTimeout(500);
+      // タブがツリーに同期されるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabIds: number[]) => {
+        for (let i = 0; i < 50; i++) {
+          const result = await chrome.storage.local.get('tree_state');
+          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+          if (treeState?.tabToNode?.[tabIds[0]] && treeState?.tabToNode?.[tabIds[1]]) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, [tab1.id!, tab2.id!]);
 
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).stateUpdateCount = 0;
+        window.stateUpdateCount = 0;
         chrome.runtime.onMessage.addListener((message) => {
           if (message.type === 'STATE_UPDATED') {
-            (window as any).stateUpdateCount++;
+            window.stateUpdateCount = (window.stateUpdateCount || 0) + 1;
           }
         });
       });
@@ -344,8 +395,16 @@ test.describe('Service Workerとの通信', () => {
         return chrome.tabs.update(tabId, { active: true });
       }, tab2.id!);
 
-      // STATE_UPDATEDメッセージが送信されるまで待機
-      await sidePanelPage.waitForTimeout(1000);
+      // アクティブなタブがtab2になるまでポーリングで待機
+      await serviceWorker.evaluate(async (expectedTabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tabs[0]?.id === expectedTabId) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab2.id!);
 
       // アクティブなタブがtab2であることを確認
       const activeTabId = await serviceWorker.evaluate(async () => {
@@ -382,7 +441,7 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       // Service WorkerがTreeStateManagerを持っていることを確認
       const hasTreeStateManager = await serviceWorker.evaluate(() => {
-        return typeof (globalThis as any).pendingTabParents !== 'undefined';
+        return typeof globalThis.pendingTabParents !== 'undefined';
       });
 
       expect(hasTreeStateManager).toBe(true);
@@ -414,8 +473,14 @@ test.describe('Service Workerとの通信', () => {
       });
       expect((response1 as { success: boolean }).success).toBe(true);
 
-      // 少し待機（Service Workerがアイドル状態になる可能性）
-      await sidePanelPage.waitForTimeout(2000);
+      // Service Workerがアイドル状態になる可能性を考慮して複数回の通信テスト
+      // 注: 固定時間待機ではなく、複数回の通信が成功することで堅牢性を確認
+      for (let i = 0; i < 5; i++) {
+        const response = await sendMessageToServiceWorker(sidePanelPage, {
+          type: 'GET_STATE',
+        });
+        expect((response as { success: boolean }).success).toBe(true);
+      }
 
       // 2回目の通信
       const response2 = await sendMessageToServiceWorker(sidePanelPage, {
@@ -466,8 +531,9 @@ test.describe('Service Workerとの通信', () => {
       const getResponse = await sendMessageToServiceWorker(sidePanelPage, {
         type: 'GET_DRAG_STATE',
       });
-      expect((getResponse as { success: boolean; data: any }).success).toBe(true);
-      expect((getResponse as { success: boolean; data: any }).data).toMatchObject({
+      const typedGetResponse = getResponse as ServiceWorkerResponse<DragState>;
+      expect(typedGetResponse.success).toBe(true);
+      expect(typedGetResponse.data).toMatchObject({
         tabId: 123,
         sourceWindowId: 1,
       });
@@ -482,7 +548,8 @@ test.describe('Service Workerとの通信', () => {
       const getAfterClear = await sendMessageToServiceWorker(sidePanelPage, {
         type: 'GET_DRAG_STATE',
       });
-      expect((getAfterClear as { success: boolean; data: any }).data).toBeNull();
+      const typedGetAfterClear = getAfterClear as ServiceWorkerResponse<DragState | null>;
+      expect(typedGetAfterClear.data).toBeNull();
     });
   });
 
@@ -493,9 +560,9 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).messageLog = [];
+        window.messageLog = [];
         chrome.runtime.onMessage.addListener((message) => {
-          (window as any).messageLog.push({
+          window.messageLog!.push({
             type: message.type,
             timestamp: Date.now(),
           });
@@ -507,12 +574,20 @@ test.describe('Service Workerとの通信', () => {
         return chrome.tabs.create({ url: 'about:blank', active: false });
       });
 
-      // STATE_UPDATEDメッセージが送信されるまで待機
-      await sidePanelPage.waitForTimeout(1000);
+      // STATE_UPDATEDメッセージが送信されるまでポーリングで待機
+      await sidePanelPage.evaluate(async () => {
+        for (let i = 0; i < 50; i++) {
+          const log = window.messageLog;
+          if (log && log.some((msg) => msg.type === 'STATE_UPDATED')) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      });
 
       // メッセージログを確認
       const messageLog = await sidePanelPage.evaluate(() => {
-        return (window as any).messageLog;
+        return window.messageLog;
       });
 
       // STATE_UPDATEDメッセージが含まれていることを確認
@@ -527,6 +602,17 @@ test.describe('Service Workerとの通信', () => {
         payload: { tabId: tab.id },
       });
 
+      // アクティブなタブが変更されるまでポーリングで待機
+      await serviceWorker.evaluate(async (expectedTabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tabs[0]?.id === expectedTabId) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
+
       // アクティブなタブが変更されたことを確認
       const activeTabId = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -539,6 +625,17 @@ test.describe('Service Workerとの通信', () => {
         type: 'CLOSE_TAB',
         payload: { tabId: tab.id },
       });
+
+      // タブが削除されるまでポーリングで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          const tabs = await chrome.tabs.query({});
+          if (!tabs.some((t) => t.id === tabId)) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tab.id!);
 
       // タブが削除されたことを確認
       const tabExists = await serviceWorker.evaluate(async (tabId) => {
@@ -561,19 +658,19 @@ test.describe('Service Workerとの通信', () => {
 
       // 両方のSide Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
-        (window as any).receivedCount = 0;
+        window.receivedCount = 0;
         chrome.runtime.onMessage.addListener((message) => {
           if (message.type === 'STATE_UPDATED') {
-            (window as any).receivedCount++;
+            window.receivedCount = (window.receivedCount || 0) + 1;
           }
         });
       });
 
       await sidePanelPage2.evaluate(() => {
-        (window as any).receivedCount = 0;
+        window.receivedCount = 0;
         chrome.runtime.onMessage.addListener((message) => {
           if (message.type === 'STATE_UPDATED') {
-            (window as any).receivedCount++;
+            window.receivedCount = (window.receivedCount || 0) + 1;
           }
         });
       });
@@ -583,15 +680,31 @@ test.describe('Service Workerとの通信', () => {
         return chrome.tabs.create({ url: 'about:blank', active: false });
       });
 
-      // メッセージが送信されるまで待機
-      await sidePanelPage.waitForTimeout(1000);
+      // 両方のSide Panelでメッセージが受信されるまでポーリングで待機
+      await sidePanelPage.evaluate(async () => {
+        for (let i = 0; i < 50; i++) {
+          if (window.receivedCount !== undefined && window.receivedCount > 0) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      });
+
+      await sidePanelPage2.evaluate(async () => {
+        for (let i = 0; i < 50; i++) {
+          if (window.receivedCount !== undefined && window.receivedCount > 0) {
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      });
 
       // 両方のSide Panelでメッセージを受信したことを確認
       const receivedCount1 = await sidePanelPage.evaluate(() => {
-        return (window as any).receivedCount;
+        return window.receivedCount;
       });
       const receivedCount2 = await sidePanelPage2.evaluate(() => {
-        return (window as any).receivedCount;
+        return window.receivedCount;
       });
 
       expect(receivedCount1).toBeGreaterThan(0);

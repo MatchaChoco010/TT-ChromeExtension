@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import SidePanelRoot from '@/sidepanel/components/SidePanelRoot';
 import { IndexedDBService } from '@/storage/IndexedDBService';
 import type { TabNode, Snapshot } from '@/types';
@@ -47,11 +47,11 @@ function generateMockTabs(count: number): TabNode[] {
 
 describe('Task 16.2: パフォーマンステスト', () => {
   describe('100タブ以上でのレンダリング性能', () => {
-    it('100タブのレンダリングが500ms以内に完了すること', () => {
+    it('100タブのレンダリングが500ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(100);
 
       // Chrome API のモック
-      global.chrome = {
+      const chromeMock = {
         runtime: {
           sendMessage: vi.fn().mockResolvedValue({
             success: true,
@@ -70,26 +70,35 @@ describe('Task 16.2: パフォーマンステスト', () => {
           local: {
             get: vi.fn().mockResolvedValue({}),
             set: vi.fn().mockResolvedValue(undefined),
-            onChanged: {
-              addListener: vi.fn(),
-              removeListener: vi.fn(),
-            },
+          },
+          onChanged: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
           },
         },
-      } as any;
+        tabs: {
+          onActivated: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          query: vi.fn().mockResolvedValue([]),
+        },
+      };
+      vi.stubGlobal('chrome', chromeMock);
 
-      const renderTime = measurePerformance(() => {
-        render(<SidePanelRoot />);
+      const renderTime = await measureAsyncPerformance(async () => {
+        await act(async () => {
+          render(<SidePanelRoot />);
+        });
       });
 
       expect(renderTime).toBeLessThan(500);
-      console.log(`100タブのレンダリング時間: ${renderTime.toFixed(2)}ms`);
     });
 
-    it('200タブのレンダリングが1000ms以内に完了すること', () => {
+    it('200タブのレンダリングが1000ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(200);
 
-      global.chrome = {
+      const chromeMock = {
         runtime: {
           sendMessage: vi.fn().mockResolvedValue({
             success: true,
@@ -108,21 +117,30 @@ describe('Task 16.2: パフォーマンステスト', () => {
           local: {
             get: vi.fn().mockResolvedValue({}),
             set: vi.fn().mockResolvedValue(undefined),
-            onChanged: {
-              addListener: vi.fn(),
-              removeListener: vi.fn(),
-            },
+          },
+          onChanged: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
           },
         },
-      } as any;
+        tabs: {
+          onActivated: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          query: vi.fn().mockResolvedValue([]),
+        },
+      };
+      vi.stubGlobal('chrome', chromeMock);
 
-      const renderTime = measurePerformance(() => {
-        render(<SidePanelRoot />);
+      const renderTime = await measureAsyncPerformance(async () => {
+        await act(async () => {
+          render(<SidePanelRoot />);
+        });
       });
 
       // 200タブなので少し余裕を持たせる
       expect(renderTime).toBeLessThan(1000);
-      console.log(`200タブのレンダリング時間: ${renderTime.toFixed(2)}ms`);
     });
   });
 
@@ -156,7 +174,6 @@ describe('Task 16.2: パフォーマンステスト', () => {
       });
 
       expect(saveTime).toBeLessThan(100);
-      console.log(`スナップショット保存時間: ${saveTime.toFixed(2)}ms`);
     });
 
     it('スナップショット読み込みが100ms以内に完了すること', async () => {
@@ -184,7 +201,6 @@ describe('Task 16.2: パフォーマンステスト', () => {
       });
 
       expect(loadTime).toBeLessThan(100);
-      console.log(`スナップショット読み込み時間: ${loadTime.toFixed(2)}ms`);
     });
 
     it('全スナップショット取得が100ms以内に完了すること', async () => {
@@ -214,7 +230,6 @@ describe('Task 16.2: パフォーマンステスト', () => {
       });
 
       expect(loadAllTime).toBeLessThan(100);
-      console.log(`全スナップショット取得時間: ${loadAllTime.toFixed(2)}ms`);
     });
   });
 
@@ -252,12 +267,6 @@ describe('Task 16.2: パフォーマンステスト', () => {
       const targetFrameTime = 1000 / 60; // 60fps = 16.67ms per frame
 
       expect(averageFrameTime).toBeLessThan(targetFrameTime);
-      console.log(
-        `平均フレーム時間: ${averageFrameTime.toFixed(2)}ms (目標: ${targetFrameTime.toFixed(2)}ms)`
-      );
-      console.log(
-        `推定フレームレート: ${(1000 / averageFrameTime).toFixed(2)}fps (目標: 60fps)`
-      );
     });
   });
 
@@ -267,11 +276,12 @@ describe('Task 16.2: パフォーマンステスト', () => {
         set: vi.fn().mockResolvedValue(undefined),
       };
 
-      global.chrome = {
+      const chromeMock = {
         storage: {
-          local: mockStorage as any,
+          local: mockStorage,
         },
-      } as any;
+      };
+      vi.stubGlobal('chrome', chromeMock);
 
       // 100回の連続した書き込みをシミュレート
       const writeOperations = Array.from({ length: 100 }, (_, i) => ({
@@ -288,7 +298,6 @@ describe('Task 16.2: パフォーマンステスト', () => {
       // デバウンスにより1回の書き込みに集約されることを確認
       expect(mockStorage.set).toHaveBeenCalledTimes(1);
       expect(totalTime).toBeLessThan(50);
-      console.log(`デバウンス後の書き込み時間: ${totalTime.toFixed(2)}ms`);
     });
   });
 });

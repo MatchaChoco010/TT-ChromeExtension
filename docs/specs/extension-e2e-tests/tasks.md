@@ -8,7 +8,7 @@
 
 ## 実装タスク
 
-- [ ] 1. Playwrightテスト環境の基盤構築
+- [x] 1. Playwrightテスト環境の基盤構築
 - [x] 1.1 (P) Playwrightパッケージのインストールと設定ファイル作成
   - `@playwright/test`パッケージをdevDependenciesに追加
   - `playwright.config.ts`を作成し、Chromiumブラウザ設定、タイムアウト（30秒）、リトライ戦略（CI環境で2回）を定義
@@ -36,7 +36,7 @@
   - **全てのテストがヘッドレスモード(`npm run test:e2e`)でPASSすることを確認**
   - _Requirements: 1.4, 1.5, 6.1, 6.6, 8.5, 8.6_
 
-- [ ] 2. 拡張機能ロード基盤の実装
+- [x] 2. 拡張機能ロード基盤の実装
 - [x] 2.1 ExtensionFixtureの実装
   - `e2e/fixtures/extension.ts`を作成し、カスタムフィクスチャを定義
   - `launchPersistentContext`でChromiumブラウザを起動し、`dist/`ディレクトリから拡張機能をロード
@@ -51,7 +51,7 @@
   - ビルド失敗時の明確なエラーメッセージ出力を実装
   - _Requirements: 2_
 
-- [ ] 3. テストユーティリティの実装
+- [x] 3. テストユーティリティの実装
 - [x] 3.1 (P) TabTestUtilsの実装
   - `e2e/utils/tab-utils.ts`を作成
   - タブ作成（`createTab`）、削除（`closeTab`）、アクティブ化（`activateTab`）の共通ヘルパー関数を実装
@@ -89,7 +89,7 @@
   - Playwright Worker APIの`worker.evaluate()`でService Worker内のコード実行
   - _Requirements: 4.5_
 
-- [ ] 4. コアユーザーフローのE2Eテスト実装と機能実装
+- [x] 4. コアユーザーフローのE2Eテスト実装と機能実装
 
 **重要**: 本セクションの全てのタスクは、E2Eテストの実装に加えて、テストをPASSさせるために必要な機能（Side Panel UI、ドラッグ&ドロップ、ビュー切り替え等）の実装も含みます。タスク完了の条件は「全てのテストが `npm run test:e2e` (ヘッドレスモード) で成功すること」です。
 
@@ -206,7 +206,7 @@
   - **全てのテストがヘッドレスモード(`npm run test:e2e`)でPASSすることを確認**
   - _Requirements: 3.14_
 
-- [ ] 5. ブラウザAPI統合テストと機能実装
+- [x] 5. ブラウザAPI統合テストと機能実装
 
 **重要**: 本セクションの全てのタスクは、E2Eテストの実装に加えて、テストをPASSさせるために必要なChrome API統合機能の実装も含みます。タスク完了の条件は「全てのテストが `npm run test:e2e` (ヘッドレスモード) で成功すること」です。
 
@@ -250,7 +250,7 @@
   - **全てのテストがヘッドレスモード(`npm run test:e2e`)でPASSすることを確認**
   - _Requirements: 4.5_
 
-- [ ] 6. CI/CD統合とレポート生成
+- [x] 6. CI/CD統合とレポート生成
 - [x] 6.1 GitHub Actionsワークフローの作成
   - `.github/workflows/e2e-tests.yml`を作成
   - Node.js 20のセットアップ、依存関係インストール（`npm ci`）、Playwrightブラウザインストール（`npx playwright install --with-deps chromium`）を定義
@@ -267,7 +267,7 @@
   - **全てのテストがヘッドレスモード(`npm run test:e2e`)でPASSすることを確認**
   - _Requirements: 6, 8_
 
-- [ ] 7. 既存テストとの統合と棲み分け
+- [x] 7. 既存テストとの統合と棲み分け
 - [x] 7.1 package.jsonスクリプトの整理
   - `package.json`の`scripts`セクションを更新し、`test`コマンドがVitestのみを実行することを確認
   - `test:e2e`コマンドがPlaywrightのみを実行、`test:all`コマンドがVitestとPlaywrightを順次実行することを確認
@@ -344,7 +344,7 @@
 
 ### 8.1 config-validation.spec.ts の修正
 
-- [ ] 8.1.1 (P) package.jsonのE2Eテストスクリプト検証テストの修正
+- [x] 8.1.1 (P) package.jsonのE2Eテストスクリプト検証テストの修正
   - `e2e/config-validation.spec.ts:48` の失敗を調査
   - テストが期待する `test:e2e` スクリプトの値と実際の値の不整合を修正
   - テストコードまたは package.json スクリプト定義を修正してテストをPASSさせる
@@ -353,14 +353,14 @@
 
 ### 8.2 tab-lifecycle.spec.ts の修正
 
-- [ ] 8.2.1 (P) 新しいタブ作成テストの修正
+- [x] 8.2.1 (P) 新しいタブ作成テストの修正
   - `e2e/tab-lifecycle.spec.ts:21` の失敗を調査
   - タブ作成時のツリーノード追加検証ロジックを確認
   - テストコードまたは機能実装を修正してテストをPASSさせる
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.1_
 
-- [ ] 8.2.2 (P) タブタイトル・URL変更反映テストの修正
+- [x] 8.2.2 (P) タブタイトル・URL変更反映テストの修正
   - `e2e/tab-lifecycle.spec.ts:165` の失敗を調査
   - タブのタイトルまたはURL変更時のリアルタイム更新検証ロジックを確認
   - テストコードまたは機能実装を修正してテストをPASSさせる
@@ -369,28 +369,28 @@
 
 ### 8.3 drag-drop-reorder.spec.ts の修正
 
-- [ ] 8.3.1 (P) ルートレベルタブ並び替えテストの修正
+- [x] 8.3.1 (P) ルートレベルタブ並び替えテストの修正
   - `e2e/drag-drop-reorder.spec.ts:19` の失敗を調査
   - ルートレベルのタブを別のルートレベルのタブ間にドロップする際の順序変更検証ロジックを確認
   - ドラッグ&ドロップのシミュレーション方法またはアサーション条件を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.3.2 (P) 子タブ間並び替えテストの修正
+- [x] 8.3.2 (P) 子タブ間並び替えテストの修正
   - `e2e/drag-drop-reorder.spec.ts:51` の失敗を調査
   - 同じ親の子タブ間での並び替え検証ロジックを確認
   - ドラッグ&ドロップのシミュレーション方法またはアサーション条件を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.3.3 (P) サブツリー内タブ並び替えテストの修正
+- [x] 8.3.3 (P) サブツリー内タブ並び替えテストの修正
   - `e2e/drag-drop-reorder.spec.ts:88` の失敗を調査
   - 複数の子を持つサブツリー内でのタブ並び替え検証ロジックを確認
   - ドラッグ&ドロップのシミュレーション方法またはアサーション条件を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.3.4 (P) ドロップインジケータ表示テストの修正
+- [x] 8.3.4 (P) ドロップインジケータ表示テストの修正
   - `e2e/drag-drop-reorder.spec.ts:131` の失敗を調査
   - ドラッグ中のドロップインジケータ表示検証ロジックを確認
   - ドロップインジケータのセレクタまたは表示タイミングの条件を修正
@@ -399,7 +399,7 @@
 
 ### 8.4 drag-drop-complex.spec.ts の修正
 
-- [ ] 8.4.1 (P) 折りたたみ状態サブツリー移動テストの修正
+- [x] 8.4.1 (P) 折りたたみ状態サブツリー移動テストの修正
   - `e2e/drag-drop-complex.spec.ts:368` の失敗を調査
   - 折りたたまれた状態のサブツリーを移動した際の展開状態保持検証ロジックを確認
   - テストコードまたは機能実装を修正してテストをPASSさせる
@@ -408,37 +408,37 @@
 
 ### 8.5 utils/tab-utils.spec.ts の修正
 
-- [ ] 8.5.1 (P) createTabユーティリティテストの修正
+- [x] 8.5.1 (P) createTabユーティリティテストの修正
   - `e2e/utils/tab-utils.spec.ts:20` の失敗を調査
   - `createTab`関数の実装またはテストアサーションを修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.1, 4.1_
 
-- [ ] 8.5.2 (P) createTab（親タブ指定）ユーティリティテストの修正
+- [x] 8.5.2 (P) createTab（親タブ指定）ユーティリティテストの修正
   - `e2e/utils/tab-utils.spec.ts:34` の失敗を調査
   - 親タブを指定して子タブを作成する`createTab`関数の実装またはテストを修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.1, 4.1_
 
-- [ ] 8.5.3 (P) closeTabユーティリティテストの修正
+- [x] 8.5.3 (P) closeTabユーティリティテストの修正
   - `e2e/utils/tab-utils.spec.ts:53` の失敗を調査
   - `closeTab`関数の実装またはテストアサーションを修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.1, 4.1_
 
-- [ ] 8.5.4 (P) activateTabユーティリティテストの修正
+- [x] 8.5.4 (P) activateTabユーティリティテストの修正
   - `e2e/utils/tab-utils.spec.ts:70` の失敗を調査
   - `activateTab`関数の実装またはテストアサーションを修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.1, 4.1_
 
-- [ ] 8.5.5 (P) assertTabInTreeユーティリティテストの修正
+- [x] 8.5.5 (P) assertTabInTreeユーティリティテストの修正
   - `e2e/utils/tab-utils.spec.ts:86` の失敗を調査
   - `assertTabInTree`関数の実装またはテストアサーションを修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.1, 4.1_
 
-- [ ] 8.5.6 (P) assertUnreadBadgeユーティリティテストの修正
+- [x] 8.5.6 (P) assertUnreadBadgeユーティリティテストの修正
   - `e2e/utils/tab-utils.spec.ts:115` の失敗を調査
   - `assertUnreadBadge`関数で未読数の検証ロジックを修正
   - 未読バッジのテキスト内容検証方法を修正
@@ -447,53 +447,487 @@
 
 ### 8.6 utils/drag-drop-utils.spec.ts の修正
 
-- [ ] 8.6.1 (P) startDragユーティリティテストの修正
+- [x] 8.6.1 (P) startDragユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:15` の失敗を調査
   - `startDrag`関数のドラッグ開始シミュレーション実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.6.2 (P) hoverOverTabユーティリティテストの修正
+- [x] 8.6.2 (P) hoverOverTabユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:31` の失敗を調査
   - `hoverOverTab`関数のホバーシミュレーション実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.6.3 (P) dropTabユーティリティテストの修正
+- [x] 8.6.3 (P) dropTabユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:53` の失敗を調査
   - `dropTab`関数のドロップシミュレーション実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.6.4 (P) reorderTabs（before）ユーティリティテストの修正
+- [x] 8.6.4 (P) reorderTabs（before）ユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:69` の失敗を調査
   - `reorderTabs`関数（before位置）の並び替え実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.6.5 (P) reorderTabs（after）ユーティリティテストの修正
+- [x] 8.6.5 (P) reorderTabs（after）ユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:87` の失敗を調査
   - `reorderTabs`関数（after位置）の並び替え実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.6.6 (P) moveTabToParentユーティリティテストの修正
+- [x] 8.6.6 (P) moveTabToParentユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:106` の失敗を調査
   - `moveTabToParent`関数の親子関係作成実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.3_
 
-- [ ] 8.6.7 (P) assertDropIndicatorユーティリティテストの修正
+- [x] 8.6.7 (P) assertDropIndicatorユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:126` の失敗を調査
   - `assertDropIndicator`関数のドロップインジケータ検証実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.2_
 
-- [ ] 8.6.8 (P) assertAutoExpandユーティリティテストの修正
+- [x] 8.6.8 (P) assertAutoExpandユーティリティテストの修正
   - `e2e/utils/drag-drop-utils.spec.ts:148` の失敗を調査
   - `assertAutoExpand`関数のホバー自動展開検証実装を修正
   - **テストがヘッドレスモードでPASSすることを確認**
   - _Requirements: 3.5_
+
+## 9. 既存Vitestテストの修正
+
+**重要**: E2Eテスト実装に伴い、TreeStateProviderやコンポーネントの変更により既存のVitestテストが失敗しています。各テストファイルを個別に修正し、`npm test` でPASSさせます。
+
+**根本原因**: E2E対応で追加されたchrome.tabs.onActivated, chrome.runtime.sendMessageなどのChrome APIコールに対し、既存のchrome-mock.tsが対応していないため、テスト時にundefinedエラーが発生しています。
+
+### 9.1 Chrome Mockの拡張
+
+- [x] 9.1.1 (P) chrome-mock.tsへのchrome.tabs.onActivatedモック追加
+  - `src/test/chrome-mock.ts`を更新し、`chrome.tabs.onActivated`イベントリスナーのモックを追加
+  - `addListener`, `removeListener`, `hasListeners`メソッドを実装
+  - TreeStateProviderで使用されているイベントパターンに対応
+  - **`npm test`でTreeStateProvider関連のテストがPASSすることを確認**
+
+- [x] 9.1.2 (P) chrome-mock.tsへのchrome.runtime.sendMessageモック追加
+  - `src/test/chrome-mock.ts`を更新し、`chrome.runtime.sendMessage`関数のモックを追加
+  - Promise形式のレスポンスを返すモック実装
+  - TreeStateProviderのタブ同期処理に対応
+  - **`npm test`でTreeStateProvider関連のテストがPASSすることを確認**
+
+### 9.2 TreeStateProvider.test.tsx の修正
+
+- [x] 9.2.1 (P) TreeStateProvider初期ロードテストの修正
+  - `src/sidepanel/providers/TreeStateProvider.test.tsx`の「初期ロード時にストレージからツリー状態を読み込む」テストを修正
+  - chrome.tabs.query, chrome.tabs.onActivatedのモックを適切に設定
+  - **テストがPASSすることを確認**
+
+- [x] 9.2.2 (P) TreeStateProvider STATE_UPDATEDテストの修正
+  - `src/sidepanel/providers/TreeStateProvider.test.tsx`の「STATE_UPDATED メッセージを受信したときにストレージから状態を再読み込みする」テストを修正
+  - chrome.runtime.onMessageのモックを適切に設定
+  - **テストがPASSすることを確認**
+
+- [x] 9.2.3 (P) TreeStateProvider storage.onChangedテストの修正
+  - `src/sidepanel/providers/TreeStateProvider.test.tsx`の「storage.onChanged イベントを受信したときに状態を更新する」テストを修正
+  - chrome.storage.onChangedのモックを適切に設定
+  - **テストはit.skipとして意図的にスキップ（機能が一時的に無効化されているため）**
+
+### 9.3 DragDropTreeIntegration.test.tsx の修正
+
+- [x] 9.3.1 (P) ドラッグ&ドロップ子配置テストの修正
+  - `src/sidepanel/components/DragDropTreeIntegration.test.tsx`の「タブを別のタブの子として配置できる」テストを修正
+  - TreeStateProviderのセットアップにchrome APIモックを追加
+  - **テストがPASSすることを確認**
+
+- [x] 9.3.2 (P) ドラッグ&ドロップ順序変更テストの修正
+  - `src/sidepanel/components/DragDropTreeIntegration.test.tsx`の「タブを同階層で順序変更できる」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.3.3 (P) ドラッグ&ドロップ循環参照防止テストの修正
+  - `src/sidepanel/components/DragDropTreeIntegration.test.tsx`の「循環参照を防ぐ」テストを修正
+  - **テストがPASSすることを確認**
+
+### 9.4 PanelDragDropIntegration.test.tsx の修正
+
+- [x] 9.4.1 (P) パネル内D&D統合テスト（シナリオ1）の修正
+  - `src/sidepanel/components/PanelDragDropIntegration.test.tsx`の「シナリオ1: タブを子として配置、同階層で移動を連続して実行」テストを修正
+  - TreeStateProviderのセットアップにchrome APIモックを追加
+  - **テストがPASSすることを確認**
+
+- [x] 9.4.2 (P) パネル内D&D統合テスト（AC 3.2）の修正
+  - `src/sidepanel/components/PanelDragDropIntegration.test.tsx`の「Acceptance Criteria 3.2: タブをドラッグして別のタブの子として配置できる」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.4.3 (P) パネル内D&D統合テスト（AC 3.3）の修正
+  - `src/sidepanel/components/PanelDragDropIntegration.test.tsx`の「Acceptance Criteria 3.3: タブを同階層で順序変更できる」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.4.4 (P) パネル内D&D統合テスト（AC 3.4）の修正
+  - `src/sidepanel/components/PanelDragDropIntegration.test.tsx`の「Acceptance Criteria 3.4: ホバー時にブランチが自動展開される」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.4.5 (P) パネル内D&D統合テスト（循環参照）の修正
+  - `src/sidepanel/components/PanelDragDropIntegration.test.tsx`のエラーケース「循環参照を防ぐ」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.4.6 (P) パネル内D&D統合テスト（同ノードドロップ）の修正
+  - `src/sidepanel/components/PanelDragDropIntegration.test.tsx`のエラーケース「同じノードへのドロップは操作をキャンセルする」テストを修正
+  - **テストがPASSすることを確認**
+
+### 9.5 BasicUI.integration.test.tsx の修正
+
+- [x] 9.5.1 (P) タブツリー表示テストの修正
+  - `src/sidepanel/components/BasicUI.integration.test.tsx`の「現在のウィンドウの全タブをツリー構造で表示すること」テストを修正
+  - TreeNodeコンポーネントのdata-testidがtabIdを使用していることに合わせてテストのセレクタを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.5.2 (P) ファビコン・タイトル表示テストの修正
+  - `src/sidepanel/components/BasicUI.integration.test.tsx`の「各タブのファビコン、タイトル、階層レベルを表示すること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.5.3 (P) リアルタイム更新テストの修正
+  - `src/sidepanel/components/BasicUI.integration.test.tsx`の「タブが開かれたり閉じられたりしたときにサイドパネルがリアルタイムで更新されること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.5.4 (P) タブアクティブ化テストの修正
+  - `src/sidepanel/components/BasicUI.integration.test.tsx`の「サイドパネル内のタブをクリックしたときに対応するタブがアクティブになること」テストを修正
+  - **テストがPASSすることを確認**
+
+### 9.6 DragHoverAutoExpand.test.tsx の修正
+
+- [x] 9.6.1 (P) ドラッグホバー自動展開テストの修正
+  - `src/sidepanel/components/DragHoverAutoExpand.test.tsx`の「折りたたまれたブランチを持つノードが正しくレンダリングされる」テストを修正
+  - TreeStateProviderのセットアップにchrome APIモックを追加
+  - **テストがPASSすることを確認**
+
+### 9.7 TabCloseFeature.integration.test.tsx の修正
+
+- [x] 9.7.1 (P) タブ閉じるボタン表示テストの修正
+  - `src/sidepanel/components/TabCloseFeature.integration.test.tsx`の「タブノードにマウスをホバーすると、閉じるボタンが表示される」テストを修正
+  - TreeNodeコンポーネントがtab.idを使ったdata-testidを生成するため、テストのセレクタを`tree-node-node-1`から`tree-node-1`に修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.7.2 (P) タブ閉じるボタン非表示テストの修正
+  - `src/sidepanel/components/TabCloseFeature.integration.test.tsx`の「タブノードからマウスを離すと、閉じるボタンが非表示になる」テストを修正
+  - data-testidセレクタを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.7.3 (P) 閉じるボタンクリックコールバックテストの修正
+  - `src/sidepanel/components/TabCloseFeature.integration.test.tsx`の「閉じるボタンをクリックすると、onCloseコールバックが呼ばれる」テストを修正
+  - data-testidセレクタを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.7.4 (P) 確認ダイアログ表示テストの修正
+  - `src/sidepanel/components/TabCloseFeature.integration.test.tsx`の確認ダイアログ関連テスト（6件）を修正
+  - 折りたたまれた子タブを持つ親タブ、確認ダイアログOK/キャンセル、展開された親タブ等のケースのdata-testidセレクタを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.7.5 (P) 警告閾値テストの修正
+  - `src/sidepanel/components/TabCloseFeature.integration.test.tsx`の警告閾値関連テスト（3件）を修正
+  - 閾値未満、閾値以上、閾値1の場合のケースのdata-testidセレクタを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.7.6 (P) エッジケーステストの修正
+  - `src/sidepanel/components/TabCloseFeature.integration.test.tsx`のエッジケーステスト（2件）を修正
+  - 単一タブ閉じ、クリックイベント伝播防止のケースのdata-testidセレクタを修正
+  - **テストがPASSすることを確認**
+
+### 9.8 TabTreeView.test.tsx の修正
+
+- [x] 9.8.1 (P) 単一タブノード表示テストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`の「単一のタブノードを表示できること」テストを修正
+  - TreeStateProviderのセットアップにchrome APIモックを追加
+  - **テストがPASSすることを確認**
+
+- [x] 9.8.2 (P) ビューフィルタリングテストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`の「currentViewIdに一致するノードのみを表示すること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.8.3 (P) 子ノード再帰表示テストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`の「子ノードを再帰的に表示できること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.8.4 (P) 折りたたみ表示テストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`の「折りたたまれたノードの子を非表示にできること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.8.5 (P) ノードクリックコールバックテストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`の「ノードクリック時にonNodeClickが呼ばれること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.8.6 (P) 展開トグルテストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`の「展開/折りたたみトグルクリック時にonToggleExpandが呼ばれること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.8.7 (P) 深い階層レンダリングテストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`の「深い階層のツリーを正しくレンダリングできること」テストを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.8.8 (P) SortableTree統合テストの修正
+  - `src/sidepanel/components/TabTreeView.test.tsx`のSortableTree Integration関連テスト（3件）を修正
+  - ドラッグ可能アイテム、ハイライト表示、ドロップ位置視覚化のケースを修正
+  - **テストがPASSすることを確認**
+
+### 9.9 TreeNode.test.tsx の修正
+
+- [x] 9.9.1 (P) インデント適用テストの修正
+  - `src/sidepanel/components/TreeNode.test.tsx`の「depthに基づいてインデントを適用できること」テストを修正
+  - TreeStateProviderのセットアップにchrome APIモックを追加
+  - **テストがPASSすることを確認**
+
+- [x] 9.9.2 (P) 展開トグルボタンテストの修正
+  - `src/sidepanel/components/TreeNode.test.tsx`の展開/折りたたみトグル関連テスト（3件）を修正
+  - 展開トグル表示、クリックコールバック、アイコン変更のケースを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.9.3 (P) タブアクティブ化テストの修正
+  - `src/sidepanel/components/TreeNode.test.tsx`のタブアクティブ化関連テスト（2件）を修正
+  - onActivateコールバック、アクティブスタイルのケースを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.9.4 (P) タブを閉じる機能テストの修正
+  - `src/sidepanel/components/TreeNode.test.tsx`のタブを閉じる機能関連テスト（3件）を修正
+  - ホバー時閉じるボタン表示、クリックコールバック、子ノード情報のケースを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.9.5 (P) 確認ダイアログ統合テストの修正
+  - `src/sidepanel/components/TreeNode.test.tsx`の確認ダイアログ統合テスト（6件）を修正
+  - ダイアログ表示、タブ数表示、OK/キャンセル、展開ブランチ、子なしのケースを修正
+  - **テストがPASSすることを確認**
+
+- [x] 9.9.6 (P) 警告閾値テストの修正
+  - `src/sidepanel/components/TreeNode.test.tsx`の警告閾値関連テスト（4件）を修正
+  - 閾値未満、閾値以上、閾値ちょうど、デフォルト値のケースを修正
+  - **テストがPASSすることを確認**
+
+### 9.10 UnreadIndicator.e2e.test.tsx の修正
+
+- [x] 9.10.1 (P) 未読インジケータタブアクティブ化テストの修正
+  - `src/sidepanel/components/UnreadIndicator.e2e.test.tsx`の「タブをクリックしてアクティブ化すると未読バッジが削除される」テストを修正
+  - TreeStateProviderのセットアップにchrome APIモックを追加
+  - **テストがPASSすることを確認**
+
+- [x] 9.10.2 (P) 複数未読タブアクティブ化テストの修正
+  - `src/sidepanel/components/UnreadIndicator.e2e.test.tsx`の「複数の未読タブから1つをアクティブ化すると、そのタブだけ既読になる」テストを修正
+  - **テストがPASSすることを確認**
+
+### 9.11 全テスト統合検証
+
+- [x] 9.11.1 全Vitestテストの実行と検証
+  - `npm test`を実行し、全ての既存テスト（約50ファイル）がPASSすることを確認
+  - 失敗しているテストがあれば個別に修正
+  - **全464件以上のテストがPASSすることを確認**
+
+- [x] 9.11.2 全E2Eテストの実行と検証
+  - `npm run test:e2e`を実行し、全てのE2Eテスト（224件）がPASSすることを確認
+  - 既存テスト修正による影響がないことを確認
+  - **全てのテストがヘッドレスモードでPASSすることを確認**
+
+- [x] 9.11.3 全テスト統合実行
+  - `npm run test:all`を実行し、VitestとPlaywrightの両方が順次実行されPASSすることを確認
+  - CI/CD環境での実行を想定した最終検証
+  - **全てのテストがPASSすることを確認**
+
+## 10. スキップテストの調査と解消
+
+**重要**: 全てのテストがスキップなしでPASSすることが、機能追加完了の最終条件です。本セクションでは、現在スキップされている4件のテスト（Vitest 3件、E2E 1件）を調査し、修正または正当な理由を文書化します。
+
+### 10.1 スキップテストの調査と対応方針決定
+
+- [x] 10.1.1 (P) スキップテストの一覧と原因調査レポート作成
+  - 現在スキップされている全テスト（4件）をリストアップし、各テストのスキップ理由を調査
+  - 対象テスト:
+    1. `TreeStateProvider.test.tsx:163` - storage.onChangedイベントハンドリング
+    2. `error-handling.test.tsx:242` - 親ノードを自分の子として移動（循環参照検出）
+    3. `error-handling.test.tsx:331` - ノードを自分自身の親にしようとした場合
+    4. `build-process.spec.ts:13` - dist/ディレクトリ存在検証
+  - 各テストについて以下を調査:
+    - スキップの技術的理由（コードコメント、関連Issue等）
+    - テスト対象の機能が実際に動作しているかどうか
+    - 修正可能かどうか、または設計上の制約でテスト不可能かどうか
+  - 調査結果を文書化（このタスクファイルの下部に調査レポートセクションを追加）
+  - _Requirements: 7_
+
+### 10.2 TreeStateProvider storage.onChanged テストの解消
+
+- [x] 10.2.1 storage.onChanged機能の有効化とテスト修正
+  - `src/sidepanel/providers/TreeStateProvider.tsx:288-297`のコメントアウトされたstorage.onChangedハンドリングコードを調査
+  - 「TEMPORARILY DISABLED to debug depth issue」の根本原因を特定
+  - ローカル状態更新とストレージ更新間のレースコンディションを解決
+  - storage.onChangedハンドリングを有効化し、`TreeStateProvider.test.tsx:163`のテストをスキップ解除してPASSさせる
+  - **または**: 修正不可能な場合、技術的理由を文書化し、テストコードを削除
+  - **全てのテストがPASSすることを確認**
+  - _Requirements: 7_
+  - **実装完了 (2025-12-27)**: isLocalUpdateRefフラグを追加してローカル更新中はstorage.onChangedからの更新をスキップするように修正。レースコンディションを解決しテストがPASS。
+
+### 10.3 循環参照検出テストの解消
+
+- [x] 10.3.1 (P) isDescendant関数の循環参照検出ロジック修正
+  - `src/services/TreeStateManager.ts:437`の`isDescendant`関数を調査
+  - 「KNOWN ISSUE: 循環参照検出が正しく動作していない」の根本原因を特定
+  - 親子関係更新前にチェックしている問題を修正
+  - `error-handling.test.tsx:242`（親ノードを自分の子として移動）のテストをスキップ解除してPASSさせる
+  - **または**: 修正不可能な場合、技術的理由を文書化し、テストコードを削除
+  - **全てのテストがPASSすることを確認**
+  - _Requirements: 7_
+  - **実装完了 (2025-12-27)**: isDescendant関数の引数順序を修正。移動先の親(newParentId)が移動対象ノード(nodeId)の子孫かどうかをチェックするように変更。また自己参照チェックを追加。テストがPASS。
+
+- [x] 10.3.2 (P) 自己参照検出テストの解消
+  - `error-handling.test.tsx:331`（ノードを自分自身の親にしようとした場合）のテストを調査
+  - 上記10.3.1の修正が適用された場合、このテストも同時にPASSするか確認
+  - スキップを解除してテストをPASSさせる
+  - **または**: 修正不可能な場合、技術的理由を文書化し、テストコードを削除
+  - **全てのテストがPASSすることを確認**
+  - _Requirements: 7_
+  - **実装完了 (2025-12-27)**: 10.3.1で追加した自己参照チェック(`newParentId === nodeId`)により、テストがPASS。
+
+### 10.4 E2E build-process.spec.ts テストの解消
+
+- [x] 10.4.1 ビルドプロセス検証テストの設計見直しと修正
+  - `e2e/build-process.spec.ts:13`のテストがスキップされている理由を分析
+  - 現在の問題: globalSetupがテスト実行前に呼ばれないため、dist/ディレクトリが存在しない
+  - 解決策を検討:
+    1. テスト内でビルドを実行する方法
+    2. globalSetupに依存しない形でテストを書き換える方法
+    3. 他のE2Eテストで間接的に検証されている場合、このテストを削除する方法
+  - 選択した解決策を実装し、テストをスキップ解除してPASSさせる
+  - **または**: テスト不可能な場合、正当な理由を文書化し、テストコードを削除
+  - **全てのテストがPASSすることを確認**
+  - _Requirements: 2, 7_
+  - **実装完了 (2025-12-27)**: 当初の問題分析が誤っていた。globalSetupはPlaywrightがテスト実行前に必ず呼び出すため、テスト実行時点ではdist/ディレクトリは存在する。test.skipをtestに変更し、コメントを更新してテストがPASS。E2Eテスト225件全てがスキップなしでPASS。
+
+### 10.5 最終検証とテストコード品質保証
+
+- [x] 10.5.1 全スキップテスト解消の最終確認
+  - `npm test -- --run`を実行し、スキップテストが0件であることを確認
+  - `npm run test:e2e`を実行し、スキップテストが0件であることを確認
+  - 全てのテストがPASS（GREEN状態）であることを確認
+  - テスト不可能と判断したテストがあれば、その理由がタスクファイルに文書化されていることを確認
+  - **全てのテストがスキップなしでPASSすることを確認**
+  - _Requirements: 7_
+  - **実装完了 (2025-12-27)**: 全てのテストがスキップなしでPASSすることを確認。
+    - Vitestテスト: 523件全てPASS、スキップ0件
+    - E2Eテスト (Playwright): 225件全てPASS、スキップ0件
+    - 意図的なスキップ: headless-mode.spec.ts:50のみ（CI環境でheadedモードテストはスキップ、これは意図的な設計上のスキップ）
+
+---
+
+## スキップテスト調査レポート
+
+**調査日時**: 2025-12-27
+**調査者**: AI実装タスク 10.1.1
+
+### 現在のテスト状況
+
+- **Vitestテスト**: 523 passed, 0 skipped (合計 523 tests) ※2025-12-27更新
+- **E2Eテスト (Playwright)**: 225 passed, 0 skipped (合計 225 tests) ※2025-12-27更新
+
+**注記**: 意図的なスキップ（headless-mode.spec.ts:50、CI環境でheadedモードテストをスキップ）を除く
+
+### 調査対象テスト一覧
+
+| No | テストファイル | テスト名 | スキップ理由 | 修正可否 | 対応方針 | 状態 |
+|----|--------------|---------|------------|---------|---------|------|
+| 1 | TreeStateProvider.test.tsx:163 | storage.onChangedイベントハンドリング | 機能が一時的に無効化 | 修正可能（要設計検討） | 後続タスクで対応 | **解決済** |
+| 2 | error-handling.test.tsx:242 | 親ノードを自分の子として移動 | isDescendant関数のロジック問題 | 修正可能 | 後続タスクで対応 | **解決済** |
+| 3 | error-handling.test.tsx:331 | ノードを自分自身の親にする | 上記と同一の原因 | 修正可能 | 後続タスクで対応 | **解決済** |
+| 4 | build-process.spec.ts:13 | dist/ディレクトリ存在検証 | globalSetup実行タイミング問題 | 設計上の制約 | 削除を検討 | **解決済** (問題分析誤り、test.skipをtestに変更) |
+| 5 | headless-mode.spec.ts:50 | HEADED=trueでheadedモードに切替 | CI環境では実行不可 | 意図的なスキップ | 現状維持 | 意図的スキップ |
+
+### 調査結果詳細
+
+#### 1. TreeStateProvider.test.tsx:163 - storage.onChangedイベントハンドリング
+
+**スキップ理由**:
+- `src/sidepanel/providers/TreeStateProvider.tsx`の288-297行目で、storage.onChangedハンドリングが一時的に無効化されている
+- コメント: "TEMPORARILY DISABLED to debug depth issue"
+- ローカル状態更新とストレージ更新間のレースコンディションが原因
+
+**技術的詳細**:
+```typescript
+// TEMPORARILY DISABLED to debug depth issue
+// TODO: Re-enable after fixing the race condition between local state updates and storage updates
+/*
+if (changes.tree_state && changes.tree_state.newValue) {
+  const reconstructedState = reconstructChildrenReferences(changes.tree_state.newValue);
+  setTreeState(reconstructedState);
+}
+*/
+```
+
+**修正可否**: 修正可能
+**対応方針**: タスク10.2.1で対応。レースコンディションの解決が必要。
+
+---
+
+#### 2. error-handling.test.tsx:242 - 親ノードを自分の子として移動
+
+**スキップ理由**:
+- `TreeStateManager.isDescendant()`関数が循環参照を正しく検出できていない
+- コメント: "KNOWN ISSUE: 循環参照検出が正しく動作していない"
+- isDescendantは子ノードの配列をチェックしているが、親子関係が更新される前にチェックしている可能性がある
+
+**技術的詳細**:
+- `TreeStateManager.moveNode()`の166-170行目で循環参照チェックを実施
+- `isDescendant(newParentId, nodeId)`の引数順序は正しいが、チェックタイミングに問題がある可能性
+- テストケース: A -> B -> C の構造で、AをCの子に移動しようとする場合
+
+**修正可否**: 修正可能
+**対応方針**: タスク10.3.1で対応。isDescendant関数のロジック修正が必要。
+
+---
+
+#### 3. error-handling.test.tsx:331 - ノードを自分自身の親にする
+
+**スキップ理由**:
+- 上記No.2と同一の原因（循環参照検出の問題）
+- 自己参照は循環参照の特殊ケース
+
+**修正可否**: 修正可能
+**対応方針**: タスク10.3.2で対応。No.2の修正と同時に解決される見込み。
+
+---
+
+#### 4. build-process.spec.ts:13 - dist/ディレクトリ存在検証
+
+**スキップ理由**:
+- テストがglobalSetupの実行を前提としているが、単体テストとして実行される際にglobalSetupが呼ばれない
+- コメント: "globalSetupは実際のE2Eテスト実行時に自動的に呼ばれる"
+
+**技術的詳細**:
+- このテストはビルドプロセスの統合を検証するもの
+- 他のE2Eテストが成功している時点で、ビルドプロセスは間接的に検証されている
+- 同一ファイル内の他のテスト（globalSetup設定確認、スクリプト存在確認）は正常にパス
+
+**修正可否**: 設計上の制約により修正困難
+**対応方針**: タスク10.4.1で対応。テストの削除または設計見直しを検討。
+
+---
+
+#### 5. headless-mode.spec.ts:50 - HEADED=trueでheadedモードに切替
+
+**スキップ理由**:
+- CI環境ではheadedモード（ブラウザ画面表示）でのテスト実行ができない
+- `test.skip(process.env.CI === 'true', 'CI環境ではheadedモードのテストはスキップされます')`
+
+**技術的詳細**:
+- CI環境では表示デバイスがないため、headedモードは実行不可
+- ローカル環境で`HEADED=true`を設定して手動実行することで検証可能
+- これは意図的な設計上のスキップであり、修正対象ではない
+
+**修正可否**: 意図的なスキップ（修正不要）
+**対応方針**: 現状維持。CI環境でのスキップは適切な設計判断。
+
+---
+
+### 優先順位と対応計画
+
+1. **優先度高**: No.2, No.3 - 循環参照検出の修正（コア機能に関わる問題）
+2. **優先度中**: No.1 - storage.onChangedハンドリングの有効化（レースコンディション解決）
+3. **優先度低**: No.4 - ビルドプロセステストの設計見直し
+4. **対応不要**: No.5 - 意図的なスキップのため現状維持
+
+---
 
 ## タスク完了基準
 
@@ -503,6 +937,7 @@
 2. ✅ **機能の実装**: テストをPASSさせるために必要な機能（UI、ロジック、API統合等）が実装されている
 3. ✅ **テストのPASS**: 全てのテストが `npm run test:e2e` (ヘッドレスモード) で成功する（GREEN状態）
 4. ✅ **要件の充足**: Requirements で定義された全ての受入基準が満たされている
+5. ✅ **スキップテストの解消**: 全てのテストがスキップなしで実行される、またはテスト不可能な理由が文書化されている
 
 **テスト実行コマンド**:
 - ヘッドレスモード（推奨）: `npm run test:e2e`

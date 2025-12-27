@@ -124,7 +124,8 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      // TreeNodeコンポーネントはdata-testid={`tree-node-${tab.id}`}を使用している
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       // depth * 20 + 8 = 2 * 20 + 8 = 48px
       expect(treeNodeElement).toHaveStyle({ paddingLeft: '48px' });
     });
@@ -148,7 +149,7 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByTestId('toggle-expand-node-1')).toBeInTheDocument();
+      expect(screen.getByTestId('expand-button')).toBeInTheDocument();
     });
 
     it('子ノードがない場合は展開トグルボタンを表示しないこと', () => {
@@ -167,7 +168,7 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.queryByTestId('toggle-expand-node-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('expand-button')).not.toBeInTheDocument();
     });
 
     it('展開トグルボタンをクリックするとonToggleが呼ばれること', async () => {
@@ -188,7 +189,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const toggleButton = screen.getByTestId('toggle-expand-node-1');
+      const toggleButton = screen.getByTestId('expand-button');
       await user.click(toggleButton);
 
       expect(mockOnToggle).toHaveBeenCalledWith('node-1');
@@ -213,7 +214,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const toggleButton = screen.getByTestId('toggle-expand-node-1');
+      const toggleButton = screen.getByTestId('expand-button');
       expect(toggleButton).toHaveTextContent('▼');
 
       // 折りたたみ状態に変更
@@ -252,7 +253,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       await user.click(treeNodeElement);
 
       expect(mockOnActivate).toHaveBeenCalledWith(1);
@@ -274,7 +275,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       expect(treeNodeElement).not.toHaveClass('bg-blue-100');
 
       // アクティブ状態に変更
@@ -418,7 +419,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
 
       // 初期状態では閉じるボタンは表示されていない
       expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
@@ -448,7 +449,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
 
       // ホバーして閉じるボタンを表示
       fireEvent.mouseEnter(treeNodeElement);
@@ -480,7 +481,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
 
       // ホバーして閉じるボタンを表示
       fireEvent.mouseEnter(treeNodeElement);
@@ -514,7 +515,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
 
       // ホバーして閉じるボタンを表示
       fireEvent.mouseEnter(treeNodeElement);
@@ -547,7 +548,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -576,7 +577,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -609,7 +610,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -642,7 +643,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -669,7 +670,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -702,7 +703,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -734,7 +735,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -764,7 +765,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
@@ -794,7 +795,7 @@ describe('TreeNode', () => {
         />
       );
 
-      const treeNodeElement = screen.getByTestId('tree-node-node-1');
+      const treeNodeElement = screen.getByTestId('tree-node-1');
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);

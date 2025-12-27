@@ -26,7 +26,7 @@ describe('CloseButton', () => {
     const onClose = vi.fn();
     const onParentClick = vi.fn();
 
-    const { container } = render(
+    render(
       <div onClick={onParentClick}>
         <CloseButton onClose={onClose} />
       </div>

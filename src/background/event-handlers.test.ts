@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { chromeMock } from '@/test/chrome-mock';
-import type { MessageType } from '@/types';
+import type { MessageType, TabNode } from '@/types';
 import {
   registerTabEventListeners,
   registerWindowEventListeners,
@@ -8,6 +8,17 @@ import {
   getDragState,
   setDragState,
 } from './event-handlers';
+
+// Sample TabNode for testing
+const createTestTabNode = (tabId: number): TabNode => ({
+  id: `node-${tabId}`,
+  tabId,
+  parentId: null,
+  children: [],
+  isExpanded: true,
+  depth: 0,
+  viewId: 'view-1',
+});
 
 describe('Service Worker - Tab Events', () => {
   beforeEach(() => {
@@ -191,17 +202,26 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
 
-    expect(sendResponse).toHaveBeenCalledWith({ success: true, data: null });
+    // 非同期処理の完了を待つ
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalled();
+    });
+
+    // レスポンスの構造を検証
+    const response = sendResponse.mock.calls[0][0];
+    expect(response.success).toBe(true);
+    expect(response.data).toBeDefined();
+    expect(Array.isArray(response.data.tree)).toBe(true);
   });
 
   it('ACTIVATE_TAB メッセージでタブをアクティブ化する', async () => {
     registerMessageListener();
 
     // Mock chrome.tabs.update to call callback
-    chromeMock.tabs.update.mockImplementation(
+    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockImplementation(
       (
-        tabId: number,
-        updateProperties: chrome.tabs.UpdateProperties,
+        _tabId: number,
+        _updateProperties: chrome.tabs.UpdateProperties,
         callback?: () => void,
       ) => {
         if (callback) callback();
@@ -226,8 +246,8 @@ describe('Service Worker - Messaging', () => {
   it('CLOSE_TAB メッセージでタブを閉じる', async () => {
     registerMessageListener();
 
-    chromeMock.tabs.remove.mockImplementation(
-      (tabIds: number | number[], callback?: () => void) => {
+    (chromeMock.tabs.remove as ReturnType<typeof vi.fn>).mockImplementation(
+      (_tabIds: number | number[], callback?: () => void) => {
         if (callback) callback();
       },
     );
@@ -249,10 +269,10 @@ describe('Service Worker - Messaging', () => {
   it('MOVE_TAB_TO_WINDOW メッセージでタブを別ウィンドウに移動する', async () => {
     registerMessageListener();
 
-    chromeMock.tabs.move.mockImplementation(
+    (chromeMock.tabs.move as ReturnType<typeof vi.fn>).mockImplementation(
       (
-        tabIds: number | number[],
-        moveProperties: chrome.tabs.MoveProperties,
+        _tabIds: number | number[],
+        _moveProperties: chrome.tabs.MoveProperties,
         callback?: () => void,
       ) => {
         if (callback) callback();
@@ -277,8 +297,8 @@ describe('Service Worker - Messaging', () => {
   it('CREATE_WINDOW_WITH_TAB メッセージで新しいウィンドウを作成する', async () => {
     registerMessageListener();
 
-    chromeMock.windows.create.mockImplementation(
-      (createData?: chrome.windows.CreateData, callback?: () => void) => {
+    (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockImplementation(
+      (_createData?: chrome.windows.CreateData, callback?: () => void) => {
         if (callback) callback();
       },
     );
@@ -300,9 +320,10 @@ describe('Service Worker - Messaging', () => {
   it('SET_DRAG_STATE メッセージでドラッグ状態を保存する', async () => {
     registerMessageListener();
 
+    const treeData = [createTestTabNode(111)];
     const message: MessageType = {
       type: 'SET_DRAG_STATE',
-      payload: { tabId: 111, treeData: { test: 'data' }, sourceWindowId: 5 },
+      payload: { tabId: 111, treeData, sourceWindowId: 5 },
     };
     const sendResponse = vi.fn();
 
@@ -311,7 +332,7 @@ describe('Service Worker - Messaging', () => {
     expect(sendResponse).toHaveBeenCalledWith({ success: true, data: null });
     expect(getDragState()).toEqual({
       tabId: 111,
-      treeData: { test: 'data' },
+      treeData,
       sourceWindowId: 5,
     });
   });
@@ -320,7 +341,8 @@ describe('Service Worker - Messaging', () => {
     registerMessageListener();
 
     // First set the drag state
-    setDragState({ tabId: 222, treeData: { test: 'data' }, sourceWindowId: 6 });
+    const treeData = [createTestTabNode(222)];
+    setDragState({ tabId: 222, treeData, sourceWindowId: 6 });
 
     const message: MessageType = { type: 'GET_DRAG_STATE' };
     const sendResponse = vi.fn();
@@ -329,7 +351,7 @@ describe('Service Worker - Messaging', () => {
 
     expect(sendResponse).toHaveBeenCalledWith({
       success: true,
-      data: { tabId: 222, treeData: { test: 'data' }, sourceWindowId: 6 },
+      data: { tabId: 222, treeData, sourceWindowId: 6 },
     });
   });
 
@@ -337,7 +359,7 @@ describe('Service Worker - Messaging', () => {
     registerMessageListener();
 
     // First set the drag state
-    setDragState({ tabId: 333, treeData: { test: 'data' }, sourceWindowId: 7 });
+    setDragState({ tabId: 333, treeData: [createTestTabNode(333)], sourceWindowId: 7 });
 
     const clearMessage: MessageType = { type: 'CLEAR_DRAG_STATE' };
     const clearResponse = vi.fn();
@@ -362,15 +384,16 @@ describe('Service Worker - Messaging', () => {
     registerMessageListener();
 
     // Window 1 でドラッグ状態を設定
+    const treeData = [createTestTabNode(444)];
     const setMessage: MessageType = {
       type: 'SET_DRAG_STATE',
-      payload: { tabId: 444, treeData: { test: 'data' }, sourceWindowId: 1 },
+      payload: { tabId: 444, treeData, sourceWindowId: 1 },
     };
     const setResponse = vi.fn();
 
     chromeMock.runtime.onMessage.trigger(
       setMessage,
-      { tab: { windowId: 1 } },
+      { tab: { windowId: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 } as chrome.tabs.Tab },
       setResponse,
     );
 
@@ -382,13 +405,13 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(
       getMessage,
-      { tab: { windowId: 2 } },
+      { tab: { windowId: 2, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 } as chrome.tabs.Tab },
       getResponse,
     );
 
     expect(getResponse).toHaveBeenCalledWith({
       success: true,
-      data: { tabId: 444, treeData: { test: 'data' }, sourceWindowId: 1 },
+      data: { tabId: 444, treeData, sourceWindowId: 1 },
     });
   });
 
@@ -399,11 +422,12 @@ describe('Service Worker - Messaging', () => {
     expect(getDragState()).toBeNull();
 
     // 1. ドラッグ開始時に状態を設定
+    const treeData = [createTestTabNode(555)];
     const setMessage: MessageType = {
       type: 'SET_DRAG_STATE',
       payload: {
         tabId: 555,
-        treeData: { nodeId: 'node-1', children: [] },
+        treeData,
         sourceWindowId: 10,
       },
     };
@@ -414,7 +438,7 @@ describe('Service Worker - Messaging', () => {
     expect(setResponse).toHaveBeenCalledWith({ success: true, data: null });
     expect(getDragState()).toEqual({
       tabId: 555,
-      treeData: { nodeId: 'node-1', children: [] },
+      treeData,
       sourceWindowId: 10,
     });
 
@@ -428,7 +452,7 @@ describe('Service Worker - Messaging', () => {
       success: true,
       data: {
         tabId: 555,
-        treeData: { nodeId: 'node-1', children: [] },
+        treeData,
         sourceWindowId: 10,
       },
     });

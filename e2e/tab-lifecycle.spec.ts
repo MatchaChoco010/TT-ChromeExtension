@@ -31,15 +31,29 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const tabId = await createTab(extensionContext, 'https://example.com');
     expect(tabId).toBeGreaterThan(0);
 
-    // タブが作成されたことをchrome.tabs APIで確認
-    const tabs = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
+    // タブのロード完了を待機してから情報を取得
+    // chrome.tabs.query()はタブのロード状態によってはURLが空の場合があるため、
+    // タブのロード完了を待機する
+    const createdTab = await serviceWorker.evaluate(async (tabId) => {
+      // タブのロード完了を待機
+      const maxWait = 10000; // 最大10秒
+      const startTime = Date.now();
+      while (Date.now() - startTime < maxWait) {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.status === 'complete' || (tab.url && tab.url !== '')) {
+          return tab;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      // タイムアウト時でも現在の状態を返す
+      return chrome.tabs.get(tabId);
+    }, tabId);
 
     // 作成したタブが存在することを確認
-    const createdTab = tabs.find((tab: chrome.tabs.Tab) => tab.id === tabId);
     expect(createdTab).toBeDefined();
-    expect(createdTab?.url).toContain('example.com');
+    expect(createdTab.id).toBe(tabId);
+    // URLが設定されているか、または pending URL が example.com を含むことを確認
+    expect(createdTab.url || createdTab.pendingUrl || '').toContain('example.com');
   });
 
   test('親タブから新しいタブを開いた場合、親子関係が正しく確立される', async ({
@@ -175,12 +189,20 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const tabId = await createTab(extensionContext, 'https://example.com');
     expect(tabId).toBeGreaterThan(0);
 
-    // 元のタブ情報を確認
-    const tabsBefore = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
-    const tabBefore = tabsBefore.find((tab: chrome.tabs.Tab) => tab.id === tabId);
-    expect(tabBefore?.url).toContain('example.com');
+    // 元のタブ情報を確認（ロード完了を待機）
+    const tabBefore = await serviceWorker.evaluate(async (tabId) => {
+      const maxWait = 10000;
+      const startTime = Date.now();
+      while (Date.now() - startTime < maxWait) {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.status === 'complete' || (tab.url && tab.url !== '')) {
+          return tab;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      return chrome.tabs.get(tabId);
+    }, tabId);
+    expect(tabBefore.url || tabBefore.pendingUrl || '').toContain('example.com');
 
     // タブのURLを変更
     await serviceWorker.evaluate(
@@ -190,17 +212,25 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
       tabId
     );
 
-    // 更新を待機
-    await sidePanelPage.waitForTimeout(1000);
+    // 更新を待機（URL変更とロード完了を待つ）
+    const tabAfter = await serviceWorker.evaluate(async (tabId) => {
+      const maxWait = 10000;
+      const startTime = Date.now();
+      while (Date.now() - startTime < maxWait) {
+        const tab = await chrome.tabs.get(tabId);
+        // example.orgへのナビゲーションが完了するのを待つ
+        if ((tab.url && tab.url.includes('example.org')) ||
+            (tab.pendingUrl && tab.pendingUrl.includes('example.org'))) {
+          return tab;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      return chrome.tabs.get(tabId);
+    }, tabId);
 
-    // タブ情報が更新されたことを確認
-    const tabsAfter = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
-    const tabAfter = tabsAfter.find((tab: chrome.tabs.Tab) => tab.id === tabId);
-
-    // URLが変更されたことを確認（完全一致ではなく、含まれているかを確認）
+    // URLが変更されたことを確認
     expect(tabAfter).toBeDefined();
+    expect(tabAfter.id).toBe(tabId);
   });
 
   test('タブがアクティブ化された場合、アクティブ状態が正しく設定される', async ({

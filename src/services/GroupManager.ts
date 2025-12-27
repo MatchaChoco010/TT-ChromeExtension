@@ -1,5 +1,4 @@
 import type { Group, IStorageService } from '@/types';
-import { STORAGE_KEYS } from '@/storage/StorageService';
 
 /**
  * GroupManager
@@ -20,7 +19,7 @@ export class GroupManager {
    * @returns 作成されたグループ
    */
   async createGroup(
-    tabIds: number[],
+    _tabIds: number[],
     name: string,
     color: string,
   ): Promise<Group> {
@@ -93,7 +92,7 @@ export class GroupManager {
    */
   async getGroups(): Promise<Group[]> {
     // ストレージから最新のグループ情報を読み込む
-    const storedGroups = await this.storageService.get(STORAGE_KEYS.GROUPS);
+    const storedGroups = await this.storageService.get('groups');
 
     if (storedGroups) {
       // ストレージからグループを復元
@@ -115,6 +114,6 @@ export class GroupManager {
       groupsRecord[id] = group;
     }
 
-    await this.storageService.set(STORAGE_KEYS.GROUPS, groupsRecord);
+    await this.storageService.set('groups', groupsRecord);
   }
 }

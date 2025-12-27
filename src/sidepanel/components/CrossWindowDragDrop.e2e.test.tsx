@@ -28,9 +28,9 @@ class MockStorageService implements IStorageService {
     this.storage.delete(key);
   }
 
-  onChange(callback: (changes: Record<string, { oldValue: unknown; newValue: unknown }>) => void): void {
+  onChange(_callback: (changes: Record<string, { oldValue: unknown; newValue: unknown }>) => void): () => void {
     // Mock implementation
-    void callback;
+    return () => {};
   }
 }
 
@@ -48,7 +48,7 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
     treeStateManager = new TreeStateManager(mockStorageService);
 
     // Mock chrome.runtime.sendMessage
-    mockSendMessage = vi.fn((message, callback) => {
+    mockSendMessage = vi.fn((_message, callback) => {
       if (callback) {
         callback({ success: true, data: null });
       }
@@ -56,16 +56,16 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
     });
 
     // Mock chrome.tabs.move
-    mockTabsMove = vi.fn((tabId, moveProperties, callback) => {
+    mockTabsMove = vi.fn((_tabId, _moveProperties, callback) => {
       if (callback) {
         callback();
       }
     });
 
     // Mock chrome.windows.create
-    mockWindowsCreate = vi.fn((createData, callback) => {
+    mockWindowsCreate = vi.fn((_createData, callback) => {
       if (callback) {
-        callback({ id: 999, ...createData } as chrome.windows.Window);
+        callback({ id: 999, focused: false, alwaysOnTop: false, incognito: false } as chrome.windows.Window);
       }
     });
 
@@ -159,10 +159,10 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
       await treeStateManager.addTab(tab, null, 'default-view');
 
       // Execute: Create new window with tab
-      mockWindowsCreate.mockImplementation((createData, callback) => {
-        expect(createData.tabId).toBe(10);
+      mockWindowsCreate.mockImplementation((_createData, callback) => {
+        expect(_createData.tabId).toBe(10);
         if (callback) {
-          callback({ id: 999, tabId: 10 } as chrome.windows.Window);
+          callback({ id: 999, focused: false, alwaysOnTop: false, incognito: false } as chrome.windows.Window);
         }
       });
 
@@ -210,10 +210,10 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
 
       // Execute: Create window with parent tab
       let newWindowId: number | undefined;
-      mockWindowsCreate.mockImplementation((createData, callback) => {
+      mockWindowsCreate.mockImplementation((_createData, callback) => {
         newWindowId = 999;
         if (callback) {
-          callback({ id: newWindowId, tabId: 20 } as chrome.windows.Window);
+          callback({ id: newWindowId, focused: false, alwaysOnTop: false, incognito: false } as chrome.windows.Window);
         }
       });
 
@@ -224,8 +224,8 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
       });
 
       // Simulate moving children to new window
-      mockTabsMove.mockImplementation((tabId, moveProperties, callback) => {
-        expect(moveProperties.windowId).toBe(newWindowId);
+      mockTabsMove.mockImplementation((_tabId, _moveProperties, callback) => {
+        expect(_moveProperties.windowId).toBe(newWindowId);
         if (callback) callback();
       });
 

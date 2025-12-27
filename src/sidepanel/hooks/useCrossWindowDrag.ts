@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { MessageResponse } from '@/types';
+import type { MessageResponse, TabNode } from '@/types';
 
 interface UseCrossWindowDragProps {
   currentWindowId: number;
@@ -7,8 +7,7 @@ interface UseCrossWindowDragProps {
 
 interface DragState {
   tabId: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  treeData: any;
+  treeData: TabNode[];
   sourceWindowId: number;
 }
 
@@ -22,8 +21,7 @@ export function useCrossWindowDrag({ currentWindowId }: UseCrossWindowDragProps)
    * Sets the drag state in the service worker for cross-window communication
    */
   const handleDragStart = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (tabId: number, treeData: any): Promise<void> => {
+    async (tabId: number, treeData: TabNode[]): Promise<void> => {
       return new Promise((resolve) => {
         chrome.runtime.sendMessage(
           {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TabTreeView from './TabTreeView';
@@ -54,7 +54,8 @@ describe('TabTreeView', () => {
     );
 
     expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
-    expect(screen.getByTestId('tree-node-node-1')).toBeInTheDocument();
+    // 実装では data-testid="tree-node-${node.tabId}" を使用しているため、tabIdで検索
+    expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
   });
 
   it('currentViewIdに一致するノードのみを表示すること', () => {
@@ -73,10 +74,10 @@ describe('TabTreeView', () => {
       />
     );
 
-    // defaultビューのノードのみ表示
-    expect(screen.getByTestId('tree-node-node-1')).toBeInTheDocument();
-    expect(screen.queryByTestId('tree-node-node-2')).not.toBeInTheDocument();
-    expect(screen.getByTestId('tree-node-node-3')).toBeInTheDocument();
+    // defaultビューのノードのみ表示（tabIdで検索）
+    expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
   });
 
   it('子ノードを再帰的に表示できること', () => {
@@ -94,8 +95,9 @@ describe('TabTreeView', () => {
       />
     );
 
-    expect(screen.getByTestId('tree-node-parent-1')).toBeInTheDocument();
-    expect(screen.getByTestId('tree-node-child-1')).toBeInTheDocument();
+    // tabIdで検索（parent-1はtabId=1, child-1はtabId=2）
+    expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+    expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
   });
 
   it('折りたたまれたノードの子を非表示にできること', () => {
@@ -114,9 +116,10 @@ describe('TabTreeView', () => {
       />
     );
 
-    expect(screen.getByTestId('tree-node-parent-1')).toBeInTheDocument();
-    // 折りたたまれているので子は表示されない
-    expect(screen.queryByTestId('tree-node-child-1')).not.toBeInTheDocument();
+    // tabIdで検索（parent-1はtabId=1）
+    expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+    // 折りたたまれているので子は表示されない（child-1はtabId=2）
+    expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
   });
 
   it('ノードクリック時にonNodeClickが呼ばれること', async () => {
@@ -132,7 +135,8 @@ describe('TabTreeView', () => {
       />
     );
 
-    const nodeElement = screen.getByTestId('tree-node-node-1');
+    // tabIdで検索
+    const nodeElement = screen.getByTestId('tree-node-1');
     await user.click(nodeElement);
 
     expect(mockOnNodeClick).toHaveBeenCalledWith(1);
@@ -154,7 +158,8 @@ describe('TabTreeView', () => {
       />
     );
 
-    const toggleButton = screen.getByTestId('toggle-expand-parent-1');
+    // 実装では data-testid="expand-button" を使用（複数ある場合は最初のものを取得）
+    const toggleButton = screen.getByTestId('expand-button');
     await user.click(toggleButton);
 
     expect(mockOnToggleExpand).toHaveBeenCalledWith('parent-1');
@@ -174,9 +179,10 @@ describe('TabTreeView', () => {
       />
     );
 
-    expect(screen.getByTestId('tree-node-parent-1')).toBeInTheDocument();
-    expect(screen.getByTestId('tree-node-child-1')).toBeInTheDocument();
-    expect(screen.getByTestId('tree-node-grandchild-1')).toBeInTheDocument();
+    // tabIdで検索（parent-1はtabId=1, child-1はtabId=2, grandchild-1はtabId=3）
+    expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+    expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
+    expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
   });
 
   describe('SortableTree Integration (Task 6.2)', () => {
@@ -193,8 +199,8 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムには data-sortable-item 属性がある
-      const sortableItem = screen.getByTestId('tree-node-node-1');
+      // ドラッグ可能なアイテムには data-sortable-item 属性がある（tabIdで検索）
+      const sortableItem = screen.getByTestId('tree-node-1');
       expect(sortableItem).toHaveAttribute(
         'data-sortable-item',
         'sortable-item-node-1'
@@ -214,7 +220,8 @@ describe('TabTreeView', () => {
         />
       );
 
-      const nodeElement = screen.getByTestId('tree-node-node-1');
+      // tabIdで検索
+      const nodeElement = screen.getByTestId('tree-node-1');
       // ドラッグ可能なアイテムが存在すること
       expect(nodeElement).toBeInTheDocument();
       expect(nodeElement).toHaveAttribute(
@@ -237,9 +244,9 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムが2つ存在することを確認
-      const sortableItem1 = screen.getByTestId('tree-node-node-1');
-      const sortableItem2 = screen.getByTestId('tree-node-node-2');
+      // ドラッグ可能なアイテムが2つ存在することを確認（tabIdで検索）
+      const sortableItem1 = screen.getByTestId('tree-node-1');
+      const sortableItem2 = screen.getByTestId('tree-node-2');
 
       expect(sortableItem1).toHaveAttribute(
         'data-sortable-item',

@@ -12,6 +12,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ThemeProvider } from '@/sidepanel/providers/ThemeProvider';
 import type { UserSettings } from '@/types';
+import type { MockChrome, MockStorageData } from '@/test/test-types';
 
 // Vivaldiブラウザ固有のAPIをモック
 interface VivaldiTabAPI {
@@ -30,7 +31,7 @@ declare global {
 
 describe('Task 16.3: Vivaldi互換性テスト', () => {
   // Mock storage - shared across tests but reset in beforeEach
-  let mockStorage: Record<string, any> = {};
+  let mockStorage: MockStorageData = {};
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,62 +40,51 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
     mockStorage = {};
 
     // Chrome storage のモック
-    global.chrome.storage.local.get = vi.fn((keys, callback) => {
-      if (typeof keys === 'function') {
-        callback = keys;
-        keys = null;
-      }
-      const result: Record<string, any> = {};
+    const mockChrome = global.chrome as unknown as MockChrome;
+    vi.mocked(mockChrome.storage.local.get).mockImplementation((keys?: string | string[] | null) => {
+      const result: Record<string, unknown> = {};
       if (keys === null || keys === undefined) {
         Object.assign(result, mockStorage);
       } else if (typeof keys === 'string') {
         // Single key as string
         if (keys in mockStorage) {
-          result[keys] = mockStorage[keys];
+          result[keys] = mockStorage[keys as keyof MockStorageData];
         }
       } else if (Array.isArray(keys)) {
         keys.forEach((key) => {
           if (key in mockStorage) {
-            result[key] = mockStorage[key];
+            result[key] = mockStorage[key as keyof MockStorageData];
           }
         });
-      } else if (typeof keys === 'object') {
-        Object.keys(keys).forEach((key) => {
-          result[key] = mockStorage[key] ?? keys[key];
-        });
       }
-      callback?.(result);
       return Promise.resolve(result);
-    }) as any;
+    });
 
-    global.chrome.storage.local.set = vi.fn((items, callback) => {
+    vi.mocked(mockChrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
       Object.assign(mockStorage, items);
-      callback?.();
       return Promise.resolve();
-    }) as any;
+    });
 
     global.chrome.storage.onChanged.addListener = vi.fn();
     global.chrome.storage.onChanged.removeListener = vi.fn();
 
     // Chrome tabs API のモック
-    global.chrome.tabs.query = vi.fn(() =>
-      Promise.resolve([
-        {
-          id: 1,
-          title: 'Tab 1',
-          url: 'https://example.com/1',
-          active: true,
-          windowId: 1,
-        } as chrome.tabs.Tab,
-      ])
-    ) as any;
+    vi.mocked(mockChrome.tabs.query).mockResolvedValue([
+      {
+        id: 1,
+        title: 'Tab 1',
+        url: 'https://example.com/1',
+        active: true,
+        windowId: 1,
+      } as chrome.tabs.Tab,
+    ]);
 
-    global.chrome.tabs.update = vi.fn((tabId, updateProperties) =>
+    vi.mocked(mockChrome.tabs.update).mockImplementation((tabId: number, updateProperties: chrome.tabs.UpdateProperties) =>
       Promise.resolve({
         id: tabId,
         active: updateProperties.active ?? false,
       } as chrome.tabs.Tab)
-    ) as any;
+    );
 
     // Chrome runtime API のモック
     global.chrome.runtime.sendMessage = vi.fn(() => Promise.resolve());
@@ -102,11 +92,9 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
     global.chrome.runtime.onMessage.removeListener = vi.fn();
 
     // Chrome sidePanel API のモック (Manifest V3)
-    global.chrome.sidePanel = {
-      open: vi.fn(() => Promise.resolve()),
-      getOptions: vi.fn(() => Promise.resolve({ enabled: true })),
-      setOptions: vi.fn(() => Promise.resolve()),
-    } as any;
+    vi.mocked(mockChrome.sidePanel.open).mockResolvedValue(undefined);
+    vi.mocked(mockChrome.sidePanel.getOptions).mockResolvedValue({ enabled: true });
+    vi.mocked(mockChrome.sidePanel.setOptions).mockResolvedValue(undefined);
 
     // matchMedia のモック
     Object.defineProperty(window, 'matchMedia', {
@@ -149,7 +137,8 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
         } as chrome.tabs.Tab,
       ];
 
-      global.chrome.tabs.query = vi.fn(() => Promise.resolve(mockTabs)) as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.tabs.query).mockResolvedValue(mockTabs);
 
       // Act
       const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -175,12 +164,8 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
       // Act
       await chrome.storage.local.set({ user_settings: testSettings });
 
-      // Get with callback to match the mock implementation
-      const result = await new Promise<any>((resolve) => {
-        chrome.storage.local.get('user_settings', (result) => {
-          resolve(result);
-        });
-      });
+      // Get settings from storage
+      const result = await chrome.storage.local.get('user_settings');
 
       // Assert
       expect(result.user_settings).toEqual(testSettings);
@@ -235,9 +220,8 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
         } as chrome.tabs.Tab,
       ];
 
-      global.chrome.tabs.query = vi.fn(() =>
-        Promise.resolve(chromeTabs)
-      ) as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.tabs.query).mockResolvedValue(chromeTabs);
 
       // Act
       const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -348,11 +332,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
       };
 
       // Set settings in storage before rendering
-      await new Promise<void>((resolve) => {
-        chrome.storage.local.set({ user_settings: customSettings }, () => {
-          resolve();
-        });
-      });
+      await chrome.storage.local.set({ user_settings: customSettings });
 
       // Act
       render(
@@ -390,9 +370,8 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
         } as chrome.tabs.Tab,
       ];
 
-      global.chrome.tabs.query = vi.fn(() =>
-        Promise.resolve(chromeTabs)
-      ) as any;
+      const mockChrome = global.chrome as unknown as MockChrome;
+      vi.mocked(mockChrome.tabs.query).mockResolvedValue(chromeTabs);
 
       // Act
       const tabs: chrome.tabs.Tab[] = await new Promise((resolve) => {
@@ -486,11 +465,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
       };
 
       // Set settings before rendering
-      await new Promise<void>((resolve) => {
-        chrome.storage.local.set({ user_settings: settings }, () => {
-          resolve();
-        });
-      });
+      await chrome.storage.local.set({ user_settings: settings });
 
       // Act
       render(

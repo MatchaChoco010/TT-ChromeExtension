@@ -15,7 +15,7 @@ describe('SettingsPanel', () => {
     childTabBehavior: 'promote',
   };
 
-  let onSettingsChange: ReturnType<typeof vi.fn>;
+  let onSettingsChange: (settings: UserSettings) => void;
 
   beforeEach(() => {
     onSettingsChange = vi.fn();

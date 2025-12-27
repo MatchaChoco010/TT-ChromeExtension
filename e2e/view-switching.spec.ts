@@ -9,25 +9,7 @@
  * 2. カスタムビューの作成、削除、名前・色変更
  */
 import { test, expect } from './fixtures/extension';
-import { assertTreeVisible } from './utils/side-panel-utils';
-
-/**
- * ビュースイッチャーが表示されるまで待機
- */
-async function waitForViewSwitcher(page: import('@playwright/test').Page) {
-  // Side Panelのルート要素が表示されるまで待機
-  await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
-
-  // ローディングが消えるまで待機
-  try {
-    await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 5000 });
-  } catch {
-    // ローディングが存在しなかった場合は無視
-  }
-
-  // ビュースイッチャーが表示されるまで待機
-  await page.waitForSelector('[data-testid="view-switcher-container"]', { timeout: 10000 });
-}
+import { waitForViewSwitcher } from './utils/polling-utils';
 
 test.describe('ビュー切り替え機能', () => {
   test.describe('ビュー一覧とビュー切り替え', () => {
@@ -57,10 +39,9 @@ test.describe('ビュー切り替え機能', () => {
 
       // デフォルトビューをクリック
       await defaultViewButton.click();
-      await sidePanelPage.waitForTimeout(300);
 
-      // アクティブ状態である
-      await expect(defaultViewButton).toHaveAttribute('data-active', 'true');
+      // アクティブ状態になるまで待機
+      await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
     });
 
     test('ビューボタンをクリックするとビューが切り替わる', async ({
@@ -73,10 +54,7 @@ test.describe('ビュー切り替え機能', () => {
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
 
-      // 新しいビュー(New View)が追加される
-      await sidePanelPage.waitForTimeout(500);
-
-      // 新しいビューボタンが存在する
+      // 新しいビューボタンが追加されるまで待機
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to New View view"]'
       );
@@ -86,13 +64,13 @@ test.describe('ビュー切り替え機能', () => {
       await newViewButton.click();
 
       // 新しいビューがアクティブになる
-      await expect(newViewButton).toHaveAttribute('data-active', 'true');
+      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
       // デフォルトビューは非アクティブになる
       const defaultViewButton = sidePanelPage.locator(
         '[aria-label="Switch to Default view"]'
       );
-      await expect(defaultViewButton).toHaveAttribute('data-active', 'false');
+      await expect(defaultViewButton).toHaveAttribute('data-active', 'false', { timeout: 5000 });
     });
 
     test('ビュー間を切り替えた場合、ツリー表示が即座に更新される', async ({
@@ -109,12 +87,14 @@ test.describe('ビュー切り替え機能', () => {
       // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
-      await sidePanelPage.waitForTimeout(500);
 
-      // 新しいビューをクリック
+      // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to New View view"]'
       );
+      await expect(newViewButton).toBeVisible({ timeout: 5000 });
+
+      // 新しいビューをクリック
       await newViewButton.click();
 
       // ツリービューが存在することを確認
@@ -123,7 +103,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // "No tabs in this view"メッセージが表示される（新しい空のビュー）
       const emptyMessage = sidePanelPage.locator('text=No tabs in this view');
-      await expect(emptyMessage).toBeVisible({ timeout: 3000 });
+      await expect(emptyMessage).toBeVisible({ timeout: 5000 });
     });
   });
 
@@ -146,12 +126,13 @@ test.describe('ビュー切り替え機能', () => {
       // 新しいビュー追加ボタンをクリック
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
-      await sidePanelPage.waitForTimeout(500);
 
-      // ビューの数が増えたことを確認
-      viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
-      const newCount = await viewButtons.count();
-      expect(newCount).toBe(initialCount + 1);
+      // ビューの数が増えたことを確認（ポーリング）
+      await expect(async () => {
+        viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
+        const newCount = await viewButtons.count();
+        expect(newCount).toBe(initialCount + 1);
+      }).toPass({ timeout: 5000 });
     });
 
     test('カスタムビューを作成した場合、新しいビューがビューリストに追加される', async ({
@@ -163,9 +144,8 @@ test.describe('ビュー切り替え機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
-      await sidePanelPage.waitForTimeout(500);
 
-      // 新しいビュー "New View" が表示される
+      // 新しいビュー "New View" が表示されるまで待機
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to New View view"]'
       );
@@ -183,9 +163,8 @@ test.describe('ビュー切り替え機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
-      await sidePanelPage.waitForTimeout(500);
 
-      // 編集ボタンをクリック
+      // 編集ボタンが表示されるまで待機
       const editButton = sidePanelPage.locator(
         '[aria-label="Edit view New View"]'
       );
@@ -209,16 +188,15 @@ test.describe('ビュー切り替え機能', () => {
       // 保存
       const saveButton = sidePanelPage.locator('[aria-label="Save"]');
       await saveButton.click();
-      await sidePanelPage.waitForTimeout(500);
 
-      // 名前が変更されたことを確認
+      // 名前が変更されたことを確認（ボタンが表示されるまで待機）
       const updatedViewButton = sidePanelPage.locator(
         '[aria-label="Switch to My Custom View view"]'
       );
       await expect(updatedViewButton).toBeVisible({ timeout: 5000 });
 
       // 色が変更されたことを確認（data-color属性）
-      await expect(updatedViewButton).toHaveAttribute('data-color', '#ff0000');
+      await expect(updatedViewButton).toHaveAttribute('data-color', '#ff0000', { timeout: 5000 });
     });
 
     test('編集をキャンセルした場合、変更は破棄される', async ({
@@ -245,7 +223,9 @@ test.describe('ビュー切り替え機能', () => {
       // キャンセル
       const cancelButton = sidePanelPage.locator('[aria-label="Cancel"]');
       await cancelButton.click();
-      await sidePanelPage.waitForTimeout(500);
+
+      // 編集フォームが閉じるのを待機
+      await expect(editForm).not.toBeVisible({ timeout: 5000 });
 
       // 元の名前のままであることを確認
       const defaultViewButton = sidePanelPage.locator(
@@ -265,27 +245,30 @@ test.describe('ビュー切り替え機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
-      await sidePanelPage.waitForTimeout(500);
 
-      // 新しいビューに切り替え
+      // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to New View view"]'
       );
+      await expect(newViewButton).toBeVisible({ timeout: 5000 });
+
+      // 新しいビューに切り替え
       await newViewButton.click();
-      await sidePanelPage.waitForTimeout(300);
+
+      // 新しいビューがアクティブになるまで待機
+      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
       // 編集モードに入る
       const editButton = sidePanelPage.locator(
         '[aria-label="Edit view New View"]'
       );
+      await expect(editButton).toBeVisible({ timeout: 5000 });
       await editButton.click();
-      await sidePanelPage.waitForTimeout(300);
 
-      // 削除ボタンをクリック
+      // 削除ボタンが表示されるまで待機してクリック
       const deleteButton = sidePanelPage.locator('[aria-label="Delete view"]');
       await expect(deleteButton).toBeVisible({ timeout: 5000 });
       await deleteButton.click();
-      await sidePanelPage.waitForTimeout(500);
 
       // 新しいビューが削除されたことを確認
       await expect(newViewButton).not.toBeVisible({ timeout: 5000 });
@@ -294,7 +277,7 @@ test.describe('ビュー切り替え機能', () => {
       const defaultViewButton = sidePanelPage.locator(
         '[aria-label="Switch to Default view"]'
       );
-      await expect(defaultViewButton).toHaveAttribute('data-active', 'true');
+      await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
     });
 
     test('デフォルトビューは削除できない', async ({ sidePanelPage }) => {
