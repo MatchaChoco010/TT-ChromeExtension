@@ -49,6 +49,8 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
 
 # Optional npm cache directory
 .npm
