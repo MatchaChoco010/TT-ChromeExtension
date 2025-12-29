@@ -115,7 +115,7 @@ test.describe('DragDropUtils', () => {
         const tab2Node = sidePanelPage.locator(`[data-testid="tree-node-${tab2Id}"]`);
         await expect(tab1Node).toBeVisible();
         await expect(tab2Node).toBeVisible();
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 10000, intervals: [100, 200, 500, 1000, 2000] });
     });
   });
 

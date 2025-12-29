@@ -15,6 +15,8 @@ export const STORAGE_KEYS = {
   GROUPS: 'groups' as const,
   /** Requirement 5.1-5.4: タブタイトル永続化 */
   TAB_TITLES: 'tab_titles' as const,
+  /** Task 2.1 (tab-tree-bugfix): ファビコン永続化 */
+  TAB_FAVICONS: 'tab_favicons' as const,
 } satisfies Record<string, StorageKey>;
 
 /**

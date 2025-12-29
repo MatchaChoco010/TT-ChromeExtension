@@ -32,8 +32,8 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
-      // タイトル要素（span.text-sm）が存在することを確認
-      const titleElement = tabNode.locator('span.text-sm');
+      // タイトル要素が存在することを確認（Task 13.1: span.text-smを[data-testid="tab-title"]に変更）
+      const titleElement = tabNode.locator('[data-testid="tab-title"], [data-testid="discarded-tab-title"]');
       await expect(titleElement).toBeVisible({ timeout: 10000 });
 
       // タイトルが表示されていることを確認（Task 2.1により実際のページタイトルまたは「Loading...」が表示される）
@@ -73,14 +73,14 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
-      // タブノードの検証
+      // タブノードの検証（Task 13.1: span.text-smを[data-testid="tab-title"]に変更）
       // 現在のTabTreeView実装では、ファビコンは表示されないが、タブノードは正しく表示される
       const nodeInfo = await sidePanelPage.evaluate((nodeTestId) => {
         const node = document.querySelector(`[data-testid="${nodeTestId}"]`);
         if (!node) return { exists: false, hasTitle: false };
 
-        // タイトル要素（span.text-sm）を探す
-        const titleSpan = node.querySelector('span.text-sm');
+        // タイトル要素を探す（通常タブまたは休止タブ）
+        const titleSpan = node.querySelector('[data-testid="tab-title"], [data-testid="discarded-tab-title"]');
 
         return {
           exists: true,

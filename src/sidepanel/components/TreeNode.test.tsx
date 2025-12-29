@@ -997,7 +997,7 @@ describe('TreeNode', () => {
       expect(screen.getByText('Loaded Page Title')).toBeInTheDocument();
     });
 
-    it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) に対して「新しいタブ」と表示されること', () => {
+    it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) に対して「スタートページ」と表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
@@ -1019,8 +1019,33 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+      expect(screen.getByText('スタートページ')).toBeInTheDocument();
       expect(screen.queryByText('Start Page')).not.toBeInTheDocument();
+    });
+
+    it('vivaldi://startpage URLに対して「スタートページ」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Speed Dial',
+        url: 'vivaldi://startpage/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('スタートページ')).toBeInTheDocument();
     });
 
     it('chrome-extension://内部URLに対して「新しいタブ」と表示されること', () => {
@@ -1283,6 +1308,117 @@ describe('TreeNode', () => {
       const treeNodeElement = screen.getByTestId('tree-node-1');
       // select-noneクラスが適用されていることを確認
       expect(treeNodeElement).toHaveClass('select-none');
+    });
+  });
+
+  describe('休止タブのグレーアウト表示 (Task 4.1 tab-tree-bugfix: Requirement 3.1, 3.2)', () => {
+    it('休止タブの場合、タイトルにグレーアウトスタイルが適用されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Discarded Tab');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          isDiscarded={true}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // discarded-tab-titleテストIDを持つ要素が存在することを確認
+      const discardedTitle = screen.getByTestId('discarded-tab-title');
+      expect(discardedTitle).toBeInTheDocument();
+      expect(discardedTitle).toHaveClass('text-gray-400');
+    });
+
+    it('休止タブでない場合、グレーアウトスタイルが適用されないこと', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Normal Tab');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          isDiscarded={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // discarded-tab-titleテストIDが存在しないことを確認
+      expect(screen.queryByTestId('discarded-tab-title')).not.toBeInTheDocument();
+      // タイトルは表示されている
+      expect(screen.getByText('Normal Tab')).toBeInTheDocument();
+    });
+
+    it('isDiscardedがundefinedの場合、グレーアウトスタイルが適用されないこと（デフォルト）', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Default Tab');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          // isDiscardedを指定しない（デフォルト値false）
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // discarded-tab-titleテストIDが存在しないことを確認
+      expect(screen.queryByTestId('discarded-tab-title')).not.toBeInTheDocument();
+      // タイトルは表示されている
+      expect(screen.getByText('Default Tab')).toBeInTheDocument();
+    });
+
+    it('休止タブからアクティブタブになった場合、グレーアウトが解除されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Tab Title');
+
+      // 最初は休止タブ
+      const { rerender } = render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          isDiscarded={true}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // 休止タブなのでグレーアウトが適用されている
+      expect(screen.getByTestId('discarded-tab-title')).toBeInTheDocument();
+
+      // 休止状態が解除された
+      rerender(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={true}
+          isDiscarded={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // グレーアウトが解除されている
+      expect(screen.queryByTestId('discarded-tab-title')).not.toBeInTheDocument();
+      expect(screen.getByText('Tab Title')).toBeInTheDocument();
     });
   });
 });

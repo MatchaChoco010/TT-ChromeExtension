@@ -693,6 +693,22 @@ export class TreeStateManager {
     // ストレージに永続化
     await this.persistState();
 
+    // Task 12.3 (tab-tree-bugfix): グループ情報をgroupsストレージにも保存
+    // これにより、TreeStateProviderのgroupsステートと同期される
+    try {
+      const result = await chrome.storage.local.get('groups');
+      const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
+      existingGroups[groupNodeId] = {
+        id: groupNodeId,
+        name: 'グループ',  // デフォルト名
+        color: '#f59e0b',  // オレンジ色のデフォルト
+        isExpanded: true,
+      };
+      await chrome.storage.local.set({ groups: existingGroups });
+    } catch (_err) {
+      // グループストレージの保存に失敗してもグループ作成自体は成功とする
+    }
+
     return groupNodeId;
   }
 

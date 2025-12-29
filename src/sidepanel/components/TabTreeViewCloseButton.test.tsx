@@ -58,6 +58,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     status: 'complete',
     isPinned: false,
     windowId: 1,
+    discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
   });
 
   const mockGetTabInfo = (nodes: TabNode[]): ((tabId: number) => ExtendedTabInfo | undefined) => {

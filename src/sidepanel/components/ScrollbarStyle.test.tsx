@@ -5,7 +5,7 @@
  * 要件9.3: スクロールバーにオーバーレイスタイルを適用し、コンテンツ幅に影響を与えない
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import SidePanelRoot from './SidePanelRoot';
 
 // chrome API のモック
@@ -74,34 +74,26 @@ beforeEach(() => {
 
 describe('スクロールバースタイル改善', () => {
   describe('要件9.1, 9.2, 9.3: スクロールバーのスタイルが適用されること', () => {
-    it('SidePanelRootコンテナにカスタムスクロールバークラスが適用されること', () => {
+    it('SidePanelRootコンテナにカスタムスクロールバークラスが適用されること', async () => {
       render(<SidePanelRoot />);
 
-      // side-panel-root要素を取得
-      const sidePanelRoot = screen.getByTestId('side-panel-root');
-
-      // custom-scrollbarクラスが適用されていることを確認
-      expect(sidePanelRoot.classList.contains('custom-scrollbar')).toBe(true);
+      // 非同期状態更新の完了を待機
+      await waitFor(() => {
+        const sidePanelRoot = screen.getByTestId('side-panel-root');
+        // custom-scrollbarクラスが適用されていることを確認
+        expect(sidePanelRoot.classList.contains('custom-scrollbar')).toBe(true);
+      });
     });
 
     it('タブツリーコンテナにカスタムスクロールバークラスが適用されること', async () => {
       render(<SidePanelRoot />);
 
       // ローディング完了を待つ（tab-tree-rootが表示されるまで）
-      let tabTreeRoot: HTMLElement | null = null;
-      await vi.waitFor(() => {
-        tabTreeRoot = screen.queryByTestId('tab-tree-root');
-        if (!tabTreeRoot) {
-          throw new Error('tab-tree-root not found yet');
-        }
-        return true;
+      await waitFor(() => {
+        const tabTreeRoot = screen.getByTestId('tab-tree-root');
+        // custom-scrollbarクラスが適用されていることを確認
+        expect(tabTreeRoot.classList.contains('custom-scrollbar')).toBe(true);
       }, { timeout: 3000 });
-
-      // tab-tree-root要素が見つかったことを確認
-      expect(tabTreeRoot).not.toBeNull();
-
-      // custom-scrollbarクラスが適用されていることを確認
-      expect(tabTreeRoot!.classList.contains('custom-scrollbar')).toBe(true);
     });
   });
 });

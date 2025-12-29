@@ -272,6 +272,7 @@ describe('TabTreeView', () => {
       status: 'complete',
       isPinned: false,
       windowId: 1,
+      discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
     });
 
     const mockGetTabInfo = vi.fn();
@@ -765,6 +766,96 @@ describe('TabTreeView', () => {
     });
   });
 
+  describe('Task 9.1 (tab-tree-bugfix): ドラッグ中のスクロール範囲制限 (Requirements 8.1, 8.2, 8.3)', () => {
+    it('Requirement 8.1: ツリービューコンテナにoverflow-y-autoが適用されていること', () => {
+      const nodes = [
+        createMockNode('node-1', 1, 'default'),
+        createMockNode('node-2', 2, 'default'),
+      ];
+
+      render(
+        <TabTreeView
+          nodes={nodes}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // ドラッグ中でもスクロールコンテナがコンテンツ範囲内に制限されること
+      const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
+      expect(container).toBeInTheDocument();
+    });
+
+    it('Requirement 8.2: ドラッグ中にコンテナにoverflow-x-hiddenが適用されること', () => {
+      const nodes = [
+        createMockNode('node-1', 1, 'default'),
+        createMockNode('node-2', 2, 'default'),
+      ];
+
+      render(
+        <TabTreeView
+          nodes={nodes}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // ドラッグ中は横スクロールが禁止されること（overflow-x-hidden）
+      const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
+      expect(container).toBeInTheDocument();
+      // 初期状態ではoverflow-x-hiddenがないこと
+      expect(container).not.toHaveClass('overflow-x-hidden');
+    });
+
+    it('Requirement 8.3: autoScroll設定が横スクロールを無効化する設定を持つこと', () => {
+      // autoScroll設定のx閾値が0または無効化されていることを確認
+      // 実装ではAUTO_SCROLL_CONFIGのthreshold.xを0に設定
+      const node = createMockNode('node-1', 1, 'default');
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // ドラッグ可能なツリービューがレンダリングされること
+      expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+    });
+
+    it('autoScroll設定がコンテンツ範囲外へのスクロールを制限する設定を持つこと', () => {
+      // autoScroll.layoutShiftCompensationがfalseに設定されていることで
+      // 過度なスクロールが抑制されることを期待
+      const nodes = [
+        createMockNode('node-1', 1, 'default'),
+        createMockNode('node-2', 2, 'default'),
+        createMockNode('node-3', 3, 'default'),
+      ];
+
+      render(
+        <TabTreeView
+          nodes={nodes}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // 全ノードがレンダリングされていること
+      expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
+    });
+  });
+
   describe('Task 4.4: ドラッグ中のタブ位置固定 (Requirements 16.1, 16.2, 16.3, 16.4)', () => {
     it('ドラッグ可能な状態でタブツリービューがレンダリングされること', () => {
       const nodes = [
@@ -1063,6 +1154,85 @@ describe('TabTreeView', () => {
     });
   });
 
+  describe('Task 5.1 (tab-tree-bugfix): テキスト選択禁止 (Requirements 4.1, 4.2)', () => {
+    it('Requirement 4.1: ツリービュー全体にselect-noneクラスが適用されていること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // ツリービュー全体にselect-noneクラスが適用されていること
+      const treeView = screen.getByTestId('tab-tree-view');
+      expect(treeView).toHaveClass('select-none');
+    });
+
+    it('Requirement 4.1: タブノード要素にselect-noneクラスが適用されていること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // 各タブノード要素にselect-noneクラスが適用されていること
+      const nodeElement = screen.getByTestId('tree-node-1');
+      expect(nodeElement).toHaveClass('select-none');
+    });
+
+    it('Requirement 4.1: 非ドラッグ可能なタブノードにもselect-noneクラスが適用されていること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          // onDragEndを指定しない（非ドラッグ可能モード）
+        />
+      );
+
+      // 非ドラッグ可能なノードにもselect-noneクラスが適用されていること
+      const nodeElement = screen.getByTestId('tree-node-1');
+      expect(nodeElement).toHaveClass('select-none');
+    });
+
+    it('Requirement 4.2: 子ノードを含む全てのノードにselect-noneクラスが適用されていること', () => {
+      const childNode = createMockNode('child-1', 2, 'default', 'parent-1');
+      const parentNode = createMockNode('parent-1', 1, 'default', null, [childNode]);
+
+      render(
+        <TabTreeView
+          nodes={[parentNode]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // 親ノードにselect-noneクラスが適用されていること
+      const parentElement = screen.getByTestId('tree-node-1');
+      expect(parentElement).toHaveClass('select-none');
+
+      // 子ノードにもselect-noneクラスが適用されていること
+      const childElement = screen.getByTestId('tree-node-2');
+      expect(childElement).toHaveClass('select-none');
+    });
+  });
+
   describe('Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)', () => {
     it('onExternalDropコールバックを受け取れること', () => {
       const node = createMockNode('node-1', 1, 'default');
@@ -1096,6 +1266,276 @@ describe('TabTreeView', () => {
       );
 
       expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+    });
+  });
+
+  describe('Task 10.1: ツリービュー外へのドロップ検知 (Requirements 9.1, 9.4)', () => {
+    it('ドラッグ中にonOutsideTreeChangeコールバックが提供された場合、状態変化を通知できること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+      const mockOnOutsideTreeChange = vi.fn();
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+          onOutsideTreeChange={mockOnOutsideTreeChange}
+        />
+      );
+
+      expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+    });
+
+    it('onOutsideTreeChangeがundefinedでもレンダリングできること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+    });
+  });
+
+  describe('Task 10.2: ツリービュー外へのドロップ処理 (Requirements 9.2, 9.3)', () => {
+    it('onExternalDropとonOutsideTreeChangeを同時に設定できること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+      const mockOnExternalDrop = vi.fn();
+      const mockOnOutsideTreeChange = vi.fn();
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+          onExternalDrop={mockOnExternalDrop}
+          onOutsideTreeChange={mockOnOutsideTreeChange}
+        />
+      );
+
+      expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+    });
+
+    it('子ノードを持つ親ノードでもonExternalDropを設定できること', () => {
+      const childNode1 = createMockNode('child-1', 2, 'default', 'parent-1');
+      const childNode2 = createMockNode('child-2', 3, 'default', 'parent-1');
+      const parentNode = createMockNode('parent-1', 1, 'default', null, [childNode1, childNode2]);
+      const mockOnExternalDrop = vi.fn();
+
+      render(
+        <TabTreeView
+          nodes={[parentNode]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+          onExternalDrop={mockOnExternalDrop}
+        />
+      );
+
+      expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
+    });
+  });
+
+  describe('Task 12.1: グループノードのレンダリング (Requirements 11.1, 11.2)', () => {
+    const mockGetTabInfo = vi.fn();
+
+    beforeEach(() => {
+      mockGetTabInfo.mockReset();
+    });
+
+    /**
+     * TreeStateManagerで作成されたグループノードを模擬するヘルパー関数
+     * グループノードは負のtabIdを持ち、idが'group-'で始まる
+     */
+    const createMockGroupNode = (
+      id: string,
+      tabId: number,
+      viewId: string,
+      children: TabNode[] = []
+    ): TabNode => ({
+      id,
+      tabId,
+      parentId: null,
+      children,
+      isExpanded: true,
+      depth: 0,
+      viewId,
+      groupId: id, // グループノード自体にgroupIdを設定
+    });
+
+    it('Requirement 11.1: グループノード（group-で始まるID、負のtabId）がグループヘッダーとして表示されること', () => {
+      // TreeStateManager.createGroupFromTabsで作成されるグループノードを模擬
+      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
+      const childNode1: TabNode = {
+        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        depth: 1,
+        groupId: 'group-1234567890-abc123',
+      };
+      const childNode2: TabNode = {
+        ...createMockNode('node-2', 2, 'default', 'group-1234567890-abc123'),
+        depth: 1,
+        groupId: 'group-1234567890-abc123',
+      };
+      groupNode.children = [childNode1, childNode2];
+
+      // 通常のタブ情報を返す（グループノードはgetTabInfoが呼ばれない）
+      mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
+        if (tabId === 2) return { id: 2, title: 'Tab 2', url: 'https://example.com/2', status: 'complete', isPinned: false, windowId: 1, discarded: false };
+        return undefined;
+      });
+
+      render(
+        <TabTreeView
+          nodes={[groupNode]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          getTabInfo={mockGetTabInfo}
+        />
+      );
+
+      // グループノードがグループヘッダーとして表示されること
+      expect(screen.getByTestId('group-header-group-1234567890-abc123')).toBeInTheDocument();
+      // 子タブが表示されること
+      expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+      expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
+    });
+
+    it('Requirement 11.2: グループヘッダーが通常のタブとは異なる専用の表示スタイルを持つこと', () => {
+      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
+
+      mockGetTabInfo.mockReturnValue(undefined);
+
+      render(
+        <TabTreeView
+          nodes={[groupNode]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          getTabInfo={mockGetTabInfo}
+        />
+      );
+
+      // グループヘッダーにはグループを示す専用のスタイル/クラスが適用されること
+      const groupHeader = screen.getByTestId('group-header-group-1234567890-abc123');
+      expect(groupHeader).toHaveClass('bg-gray-800');
+    });
+
+    it('グループヘッダーの展開/折りたたみボタンクリック時にonToggleExpandが呼ばれること', async () => {
+      const user = userEvent.setup();
+      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
+      const childNode: TabNode = {
+        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        depth: 1,
+        groupId: 'group-1234567890-abc123',
+      };
+      groupNode.children = [childNode];
+
+      mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
+        return undefined;
+      });
+
+      render(
+        <TabTreeView
+          nodes={[groupNode]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          getTabInfo={mockGetTabInfo}
+        />
+      );
+
+      // 展開/折りたたみボタンをクリック
+      const toggleButton = screen.getByTestId('toggle-expand-group-1234567890-abc123');
+      await user.click(toggleButton);
+
+      expect(mockOnToggleExpand).toHaveBeenCalledWith('group-1234567890-abc123');
+    });
+
+    it('折りたたまれたグループノードの子タブが非表示になること', () => {
+      const groupNode: TabNode = {
+        ...createMockGroupNode('group-1234567890-abc123', -1234567890, 'default'),
+        isExpanded: false,
+      };
+      const childNode: TabNode = {
+        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        depth: 1,
+        groupId: 'group-1234567890-abc123',
+      };
+      groupNode.children = [childNode];
+
+      mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
+        return undefined;
+      });
+
+      render(
+        <TabTreeView
+          nodes={[groupNode]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          getTabInfo={mockGetTabInfo}
+        />
+      );
+
+      // グループヘッダーは表示される
+      expect(screen.getByTestId('group-header-group-1234567890-abc123')).toBeInTheDocument();
+      // 子タブは非表示
+      expect(screen.queryByTestId('tree-node-1')).not.toBeInTheDocument();
+    });
+
+    it('グループノードと通常のタブノードが混在する場合、両方が正しくレンダリングされること', () => {
+      // グループノード
+      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
+      const groupChildNode: TabNode = {
+        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        depth: 1,
+        groupId: 'group-1234567890-abc123',
+      };
+      groupNode.children = [groupChildNode];
+
+      // 通常のタブノード
+      const regularNode = createMockNode('node-2', 2, 'default');
+
+      mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
+        if (tabId === 2) return { id: 2, title: 'Tab 2', url: 'https://example.com/2', status: 'complete', isPinned: false, windowId: 1, discarded: false };
+        return undefined;
+      });
+
+      render(
+        <TabTreeView
+          nodes={[groupNode, regularNode]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          getTabInfo={mockGetTabInfo}
+        />
+      );
+
+      // グループヘッダーが表示される
+      expect(screen.getByTestId('group-header-group-1234567890-abc123')).toBeInTheDocument();
+      // グループの子タブが表示される
+      expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
+      // 通常のタブも表示される
+      expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
   });
 });

@@ -26,6 +26,7 @@ import {
   DropTargetType,
   type DropTarget,
   type TabPosition,
+  type ContainerBounds,
 } from './GapDropDetection';
 
 // Task 6.4: ドラッグホバー時のブランチ自動展開の閾値（ミリ秒）
@@ -37,16 +38,21 @@ const INDENT_WIDTH = 20;
 
 // Task 5.2: autoScroll設定
 // 要件7.1, 7.2: スクロール可能範囲を実際のコンテンツ範囲内に制限
+// Task 9.1 (tab-tree-bugfix): 横スクロールを禁止し、コンテンツ範囲内に制限
 const AUTO_SCROLL_CONFIG = {
-  // スクロール開始のしきい値（上下それぞれ15%の領域で自動スクロール開始）
+  // スクロール開始のしきい値
+  // x: 0に設定して横スクロールを完全に無効化（Requirements 8.2）
+  // y: 上下それぞれ15%の領域で自動スクロール開始
   threshold: {
-    x: 0.1,
+    x: 0,  // 横スクロール無効化
     y: 0.15,
   },
-  // 加速度を抑えて過度なスクロールを防止
-  acceleration: 5,
+  // 加速度を抑えて過度なスクロールを防止（Requirements 8.1）
+  acceleration: 3,
   // スクロール間隔を長めに設定して過度なスクロールを防止
-  interval: 10,
+  interval: 15,
+  // レイアウトシフト補正を無効化してスクロール範囲を制限（Requirements 8.3）
+  layoutShiftCompensation: false,
 } as const;
 
 interface TreeNodeItemProps {
@@ -79,6 +85,9 @@ interface TreeNodeItemProps {
   views?: View[];
   currentViewId?: string;
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
+  // Task 12.2 (tab-tree-bugfix): グループ追加サブメニュー用
+  groups?: Record<string, Group>;
+  onAddToGroup?: (groupId: string, tabIds: number[]) => void;
 }
 
 /**
@@ -106,6 +115,8 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   views,
   currentViewId,
   onMoveToView,
+  groups,
+  onAddToGroup,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -200,7 +211,7 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-sortable-item={`sortable-item-${node.id}`}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isDragging ? 'bg-gray-600 border-2 border-gray-500' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 border-2 border-gray-400' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isDragging ? 'bg-gray-600 border-2 border-gray-500' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 border-2 border-gray-400' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
@@ -258,9 +269,14 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           className="flex-1 flex items-center justify-between min-w-0"
         >
           {/* タブタイトルエリア */}
+          {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
           <div className="flex items-center min-w-0 flex-1">
-            {/* Task 2.1: タブタイトル表示 */}
-            <span className="text-sm truncate">
+            {/* Task 2.1: タブタイトル表示 - Task 3.1: フォントサイズはCSS変数から継承 */}
+            {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
+            <span
+              className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
+              data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
+            >
               {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
             </span>
             {/* Task 4.13: 未読バッジ */}
@@ -300,6 +316,8 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           views={views}
           currentViewId={currentViewId}
           onMoveToView={onMoveToView}
+          groups={groups}
+          onAddToGroup={onAddToGroup}
         />
       )}
 
@@ -326,6 +344,8 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               views={views}
               currentViewId={currentViewId}
               onMoveToView={onMoveToView}
+              groups={groups}
+              onAddToGroup={onAddToGroup}
             />
           ))}
         </div>
@@ -356,6 +376,8 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   views,
   currentViewId,
   onMoveToView,
+  groups,
+  onAddToGroup,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -425,7 +447,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-node-id={node.id}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
@@ -481,9 +503,14 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           className="flex-1 flex items-center justify-between min-w-0"
         >
           {/* タブタイトルエリア */}
+          {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
           <div className="flex items-center min-w-0 flex-1">
-            {/* Task 2.1: タブタイトル表示 */}
-            <span className="text-sm truncate">
+            {/* Task 2.1: タブタイトル表示 - Task 3.1: フォントサイズはCSS変数から継承 */}
+            {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
+            <span
+              className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
+              data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
+            >
               {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
             </span>
             {/* Task 4.13: 未読バッジ */}
@@ -523,6 +550,8 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           views={views}
           currentViewId={currentViewId}
           onMoveToView={onMoveToView}
+          groups={groups}
+          onAddToGroup={onAddToGroup}
         />
       )}
 
@@ -574,20 +603,34 @@ const collectAllNodeIds = (nodes: TabNode[]): string[] => {
  * Task 4.3: ドラッグ中のドロップターゲット状態を監視するコンポーネント
  * useDndMonitorはDndContext内で使用する必要があるため、別コンポーネントに分離
  * Task 5.3: tabPositionsも提供（Gapドロップ時のノードID特定用）
+ * Task 10.1: ツリービュー外へのドロップ検知（Requirements 9.1, 9.4）
  */
 interface DragMonitorProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   onDropTargetChange: (target: DropTarget | null, tabPositions?: TabPosition[]) => void;
+  // Task 10.1: ツリービュー外へのドラッグ状態変化を通知
+  onOutsideTreeChange?: (isOutside: boolean) => void;
+  // Task 10.1: ツリービュー外状態を追跡するためのref
+  isOutsideTreeRef?: React.MutableRefObject<boolean>;
 }
 
 const DragMonitor: React.FC<DragMonitorProps> = ({
   containerRef,
   onDropTargetChange,
+  onOutsideTreeChange,
+  isOutsideTreeRef,
 }) => {
   useDndMonitor({
     onDragStart: () => {
       // ドラッグ開始時は初期化
       onDropTargetChange(null);
+      // Task 10.1: ツリー内にいるとマークする
+      if (isOutsideTreeRef) {
+        isOutsideTreeRef.current = false;
+      }
+      if (onOutsideTreeChange) {
+        onOutsideTreeChange(false);
+      }
     },
     onDragMove: (event: DragMoveEvent) => {
       // マウス位置からドロップターゲットを計算
@@ -599,8 +642,44 @@ const DragMonitor: React.FC<DragMonitorProps> = ({
 
       // コンテナ内のタブ要素の位置を取得
       const containerRect = container.getBoundingClientRect();
+
+      // Task 7.1: スクロールオフセットを考慮したマウスY座標計算
+      // スクロールオフセットを取得
+      const scrollTop = container.scrollTop || 0;
+
+      // Task 10.1: マウスの絶対位置を計算（ビューポート座標）
+      // dnd-kitのevent.delta はドラッグ開始位置からの相対移動量
+      const mouseClientX = event.activatorEvent instanceof MouseEvent
+        ? event.activatorEvent.clientX + event.delta.x
+        : 0;
+      const mouseClientY = event.activatorEvent instanceof MouseEvent
+        ? event.activatorEvent.clientY + event.delta.y
+        : 0;
+
+      // Task 10.1: ツリービュー外へのドラッグを検知（Requirements 9.1, 9.4）
+      // マウスがコンテナ境界の外にあるかどうかを確認
+      const isOutside =
+        mouseClientX < containerRect.left ||
+        mouseClientX > containerRect.right ||
+        mouseClientY < containerRect.top ||
+        mouseClientY > containerRect.bottom;
+
+      // Task 10.1: 状態が変化した場合のみ通知（不要な再レンダリングを防止）
+      if (isOutsideTreeRef) {
+        if (isOutsideTreeRef.current !== isOutside) {
+          isOutsideTreeRef.current = isOutside;
+          if (onOutsideTreeChange) {
+            onOutsideTreeChange(isOutside);
+          }
+        }
+      } else if (onOutsideTreeChange) {
+        // isOutsideTreeRefが提供されていない場合でも、コールバックは呼び出す
+        onOutsideTreeChange(isOutside);
+      }
+
+      // マウスのY座標を計算（コンテナ相対、スクロールオフセット考慮）
       const mouseY = event.activatorEvent instanceof MouseEvent
-        ? event.activatorEvent.clientY + event.delta.y - containerRect.top
+        ? event.activatorEvent.clientY + event.delta.y - containerRect.top + scrollTop
         : 0;
 
       // 各タブノードの位置情報を構築
@@ -613,32 +692,66 @@ const DragMonitor: React.FC<DragMonitorProps> = ({
         const rect = element.getBoundingClientRect();
 
         if (nodeId) {
+          // Task 7.1: タブ位置もスクロールオフセットを考慮
           tabPositions.push({
             nodeId,
-            top: rect.top - containerRect.top,
-            bottom: rect.bottom - containerRect.top,
+            top: rect.top - containerRect.top + scrollTop,
+            bottom: rect.bottom - containerRect.top + scrollTop,
             depth,
           });
         }
       });
 
+      // Task 7.1: コンテナ境界を計算（プレースホルダーをコンテナ内に制限）
+      // コンテナの可視領域とコンテンツ全体の境界を考慮
+      const containerBounds: ContainerBounds | undefined = tabPositions.length > 0
+        ? {
+            // コンテナの上端（スクロールオフセット考慮）
+            minY: scrollTop,
+            // コンテナの下端（スクロールオフセット + 可視領域高さ）または最後のタブの下端
+            maxY: Math.max(
+              scrollTop + containerRect.height,
+              tabPositions[tabPositions.length - 1].bottom
+            ),
+          }
+        : undefined;
+
       // ドロップターゲットを計算
       // Task 5.3: tabPositionsも提供（Gapドロップ時のノードID特定用）
-      const target = calculateDropTarget(mouseY, tabPositions);
+      // Task 7.1: containerBoundsを渡してコンテナ外ではNoneを返すようにする
+      const target = calculateDropTarget(mouseY, tabPositions, 0.25, containerBounds);
       onDropTargetChange(target, tabPositions);
     },
     onDragEnd: () => {
       // ドラッグ終了時にリセット
       // Note: リセット前にhandleDragEndが呼ばれるため、dropTargetRefには最新の値が残っている
       onDropTargetChange(null);
+      // Task 10.1: ドラッグ終了時にリセット（ただし、isOutsideTreeRefの値は保持してhandleDragEndで参照可能）
     },
     onDragCancel: () => {
       // ドラッグキャンセル時にリセット
       onDropTargetChange(null);
+      // Task 10.1: キャンセル時もリセット
+      if (isOutsideTreeRef) {
+        isOutsideTreeRef.current = false;
+      }
+      if (onOutsideTreeChange) {
+        onOutsideTreeChange(false);
+      }
     },
   });
 
   return null;
+};
+
+/**
+ * Task 12.1: グループノードかどうかを判定するヘルパー関数
+ * TreeStateManager.createGroupFromTabsで作成されたノードは:
+ * - idが'group-'で始まる
+ * - tabIdが負の値
+ */
+const isGroupNode = (node: TabNode): boolean => {
+  return node.id.startsWith('group-') && node.tabId < 0;
 };
 
 /**
@@ -686,6 +799,68 @@ const GroupNodeHeader: React.FC<GroupNodeHeaderProps> = ({ group, onToggle }) =>
 };
 
 /**
+ * Task 12.1: TreeStateManagerのグループノードヘッダーコンポーネント
+ * TreeStateManager.createGroupFromTabsで作成されたグループノードを表示
+ * Requirement 11.2: 通常のタブとは異なる専用の表示スタイル
+ */
+interface TreeGroupNodeHeaderProps {
+  node: TabNode;
+  onToggle: (nodeId: string) => void;
+  renderChildren: () => React.ReactNode;
+}
+
+const TreeGroupNodeHeader: React.FC<TreeGroupNodeHeaderProps> = ({ node, onToggle, renderChildren }) => {
+  const hasChildren = node.children && node.children.length > 0;
+
+  const handleToggleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggle(node.id);
+  };
+
+  return (
+    <div>
+      <div
+        data-testid={`group-header-${node.id}`}
+        className="flex items-center p-2 bg-gray-800 hover:bg-gray-700 cursor-pointer select-none"
+        style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
+      >
+        {/* 展開/折りたたみボタン */}
+        {hasChildren && (
+          <button
+            data-testid={`toggle-expand-${node.id}`}
+            onClick={handleToggleClick}
+            className="mr-2 w-4 h-4 flex items-center justify-center text-gray-300"
+            aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
+          >
+            {node.isExpanded ? '▼' : '▶'}
+          </button>
+        )}
+
+        {/* グループアイコン（フォルダアイコンとして表示） */}
+        <div className="mr-2 w-4 h-4 flex items-center justify-center text-gray-400 flex-shrink-0">
+          📁
+        </div>
+
+        {/* グループ名（グループIDから抽出またはデフォルト名） */}
+        <span className="text-sm font-medium truncate text-gray-100">
+          グループ
+        </span>
+
+        {/* 子タブ数の表示 */}
+        {hasChildren && (
+          <span className="ml-2 text-xs text-gray-400">
+            ({node.children.length})
+          </span>
+        )}
+      </div>
+
+      {/* 子ノードの表示（展開時のみ） */}
+      {node.isExpanded && renderChildren()}
+    </div>
+  );
+};
+
+/**
  * タブツリービューコンポーネント
  * タブのツリー構造を表示し、現在のビューに基づいてフィルタリングする
  * onDragEndが提供されている場合、ドラッグ&ドロップ機能を有効化
@@ -718,11 +893,15 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   // Task 6.1: グループ機能をツリー内に統合表示
   groups,
   onGroupToggle,
+  // Task 12.2 (tab-tree-bugfix): グループ追加サブメニュー用
+  onAddToGroup,
   // Task 7.2: ビュー移動サブメニュー用
   views,
   onMoveToView,
   // Task 4.3: ツリー外ドロップで新規ウィンドウ作成
   onExternalDrop,
+  // Task 10.1: ツリービュー外へのドロップ検知 (Requirements 9.1, 9.4)
+  onOutsideTreeChange,
 }) => {
   // Task 4.3: ドロップターゲット状態とコンテナ参照
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
@@ -734,6 +913,9 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   // Task 4.4: ドラッグ中のグローバル状態とアクティブノードID
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  // Task 10.1: ツリービュー外へのドラッグ状態を追跡するref（Requirements 9.1, 9.4）
+  // handleDragEnd内で最新値を参照するためにrefを使用
+  const isOutsideTreeRef = useRef<boolean>(false);
 
   // dnd-kit sensors: MouseSensor + TouchSensor + KeyboardSensor
   // PointerSensorはPlaywrightなどのE2Eテストツールでヘッドレスモードで問題が発生するため使用しない
@@ -836,6 +1018,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
    * Task 4.4: ドラッグ終了時にisDraggingをfalseにする
    * Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
    * Task 4.3: ツリー外ドロップの場合はonExternalDropを呼び出す
+   * Task 10.1: isOutsideTreeRefを使用してツリー外ドロップを確実に検知（Requirements 9.1, 9.4）
    */
   const handleDragEnd = React.useCallback(
     (event: Parameters<NonNullable<typeof onDragEnd>>[0]) => {
@@ -851,9 +1034,12 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       }
       lastHoverNodeIdRef.current = null;
 
-      // Task 4.3: ツリー外ドロップの検出
-      // event.overがnullの場合、ドロップ先がツリー外であることを意味する
-      if (!event.over && onExternalDrop && currentActiveNodeId) {
+      // Task 4.3 & Task 10.1: ツリー外ドロップの検出
+      // Task 10.1: dnd-kit標準のevent.overだけでなく、isOutsideTreeRefも使用して確実に検知
+      // isOutsideTreeRef.currentがtrueの場合、マウス位置がツリービュー外にある
+      const isOutsideTree = isOutsideTreeRef.current || !event.over;
+
+      if (isOutsideTree && onExternalDrop && currentActiveNodeId) {
         // ノードIDからタブIDを取得
         const findTabIdByNodeId = (nodeId: string): number | null => {
           for (const node of nodes) {
@@ -879,10 +1065,15 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
         const tabId = findTabIdByNodeId(currentActiveNodeId);
         if (tabId !== null) {
+          // Task 10.1: isOutsideTreeRefをリセット
+          isOutsideTreeRef.current = false;
           onExternalDrop(tabId);
           return;
         }
       }
+
+      // Task 10.1: ツリー外ドロップでない場合もisOutsideTreeRefをリセット
+      isOutsideTreeRef.current = false;
 
       // Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
       const currentDropTarget = dropTargetRef.current;
@@ -1042,7 +1233,24 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   }, [globalIsDragging]);
 
   // タブノードをレンダリングするヘルパー関数
-  const renderTabNode = (node: TabNode) => {
+  // Task 12.1: グループノード（TreeStateManager作成）の場合は専用ヘッダーを表示
+  const renderTabNode = (node: TabNode): React.ReactNode => {
+    // Task 12.1: グループノードの場合は専用コンポーネントでレンダリング
+    if (isGroupNode(node)) {
+      return (
+        <TreeGroupNodeHeader
+          key={node.id}
+          node={node}
+          onToggle={onToggleExpand}
+          renderChildren={() => (
+            <>
+              {node.children.map((child) => renderTabNode(child))}
+            </>
+          )}
+        />
+      );
+    }
+
     if (isDraggable) {
       return (
         <SortableTreeNodeItem
@@ -1068,6 +1276,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           views={views}
           currentViewId={currentViewId}
           onMoveToView={onMoveToView}
+          groups={groups}
+          onAddToGroup={onAddToGroup}
         />
       );
     }
@@ -1089,6 +1299,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         views={views}
         currentViewId={currentViewId}
         onMoveToView={onMoveToView}
+        groups={groups}
+        onAddToGroup={onAddToGroup}
       />
     );
   };
@@ -1124,7 +1336,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   );
 
   return (
-    <div data-testid="tab-tree-view" className="w-full">
+    <div data-testid="tab-tree-view" className="w-full select-none">
       {filteredNodes.length === 0 ? (
         <div className="p-4 text-gray-400 text-sm">No tabs in this view</div>
       ) : isDraggable ? (
@@ -1138,9 +1350,12 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           autoScroll={AUTO_SCROLL_CONFIG}
         >
           {/* Task 4.3: ドラッグ中のドロップターゲット監視 */}
+          {/* Task 10.1: ツリービュー外へのドロップ検知も追加 */}
           <DragMonitor
             containerRef={containerRef}
             onDropTargetChange={handleDropTargetChange}
+            onOutsideTreeChange={onOutsideTreeChange}
+            isOutsideTreeRef={isOutsideTreeRef}
           />
           {/* Task 4.4: strategyをundefinedにしてリアルタイム並べ替えを無効化 */}
           <SortableContext

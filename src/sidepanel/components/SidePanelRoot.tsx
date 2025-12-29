@@ -33,6 +33,8 @@ const TreeViewContent: React.FC = () => {
     // Task 4.9: グループ機能
     groups,
     toggleGroupExpanded,
+    // Task 12.2 (tab-tree-bugfix): グループ追加機能
+    addTabToGroup,
     // Task 4.13: 未読状態管理
     isTabUnread,
     getUnreadChildCount,
@@ -41,6 +43,8 @@ const TreeViewContent: React.FC = () => {
     // Task 3.1: ピン留めタブ機能
     pinnedTabIds,
     tabInfoMap,
+    // Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え
+    handlePinnedTabReorder,
     // Task 1.1: タブ情報取得関数
     getTabInfo,
     // Task 1.3: 複数選択状態管理
@@ -73,6 +77,18 @@ const TreeViewContent: React.FC = () => {
       console.error('Failed to create snapshot:', error);
     }
   }, []);
+
+  // Task 12.2 (tab-tree-bugfix): タブをグループに追加するハンドラ
+  // ContextMenuからgroupIdとtabIdsを受け取り、各タブをグループに追加
+  const handleAddToGroup = useCallback((groupId: string, tabIds: number[]) => {
+    if (!treeState) return;
+    for (const tabId of tabIds) {
+      const nodeId = treeState.tabToNode[tabId];
+      if (nodeId) {
+        addTabToGroup(nodeId, groupId);
+      }
+    }
+  }, [treeState, addTabToGroup]);
 
   const handleNodeClick = (tabId: number) => {
     // タブをアクティブ化
@@ -126,7 +142,8 @@ const TreeViewContent: React.FC = () => {
         return;
       }
       // Task 6.2: 現在のウィンドウに属さないタブを除外（フィルタリングが有効な場合のみ）
-      if (shouldFilterByWindow && !currentWindowTabIds.has(node.tabId)) {
+      // Task 12.3 (tab-tree-bugfix): グループノード（tabId < 0）はフィルタリングから除外
+      if (shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId)) {
         return;
       }
       nodesWithChildren[id] = {
@@ -142,7 +159,8 @@ const TreeViewContent: React.FC = () => {
         return;
       }
       // Task 6.2: 現在のウィンドウに属さないタブはスキップ（フィルタリングが有効な場合のみ）
-      if (shouldFilterByWindow && !currentWindowTabIds.has(node.tabId)) {
+      // Task 12.3 (tab-tree-bugfix): グループノード（tabId < 0）はフィルタリングから除外
+      if (shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId)) {
         return;
       }
       if (node.parentId && nodesWithChildren[node.parentId]) {
@@ -230,11 +248,15 @@ const TreeViewContent: React.FC = () => {
       {/* Task 6.2: スナップショットセクションを削除し、コンテキストメニューからスナップショットを取得可能に */}
       {/* Task 3.1: ピン留めタブセクション（要件1.1: 閉じるボタンなし） */}
       {/* Task 2.2: 右クリックでコンテキストメニュー表示（要件1.6, 1.7） */}
+      {/* Task 6.1 (tab-tree-bugfix): アクティブタブのハイライト */}
+      {/* Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え (Requirements 10.1, 10.2, 10.3, 10.4) */}
       <PinnedTabsSection
         pinnedTabIds={pinnedTabIds}
         tabInfoMap={tabInfoMap}
         onTabClick={handlePinnedTabClick}
         onContextMenu={handlePinnedTabContextMenu}
+        activeTabId={activeTabId}
+        onPinnedTabReorder={handlePinnedTabReorder}
       />
       {/* Task 2.2: ピン留めタブのコンテキストメニュー（要件1.6, 1.7） */}
       {pinnedContextMenu && (
@@ -271,6 +293,8 @@ const TreeViewContent: React.FC = () => {
           // Task 6.1: グループ機能をツリー内に統合表示
           groups={groups}
           onGroupToggle={toggleGroupExpanded}
+          // Task 12.2 (tab-tree-bugfix): グループ追加サブメニュー用
+          onAddToGroup={handleAddToGroup}
           // Task 12.1: ビュー移動サブメニュー用 (Requirements 18.1, 18.2, 18.3)
           views={treeState?.views}
           onMoveToView={moveTabsToView}

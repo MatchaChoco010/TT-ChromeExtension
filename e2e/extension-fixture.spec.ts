@@ -42,9 +42,21 @@ test.describe.serial('ExtensionFixture', () => {
     extensionId,
   }) => {
     // Side PanelのURLが正しいことを検証
-    expect(sidePanelPage.url()).toBe(
-      `chrome-extension://${extensionId}/sidepanel.html`
-    );
+    // Task 13.2 (tab-tree-bugfix): windowIdパラメータを含む形式に対応
+    // URLのベース部分とパスを検証し、windowIdクエリパラメータを許容する
+    const fullUrl = sidePanelPage.url();
+    const baseUrl = `chrome-extension://${extensionId}/sidepanel.html`;
+    expect(fullUrl).toContain(baseUrl);
+
+    // windowIdパラメータが存在することを検証（複数ウィンドウ対応の確認）
+    // chrome-extension:// スキームはURL APIで origin が null になるため、
+    // クエリパラメータを直接パースする
+    const queryString = fullUrl.split('?')[1] || '';
+    const params = new URLSearchParams(queryString);
+    expect(params.has('windowId')).toBe(true);
+    const windowId = params.get('windowId');
+    expect(windowId).toBeTruthy();
+    expect(Number(windowId)).toBeGreaterThan(0);
 
     // ページがロード完了するまでポーリングで待機
     let readyState = '';

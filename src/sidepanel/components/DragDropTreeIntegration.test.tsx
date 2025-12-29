@@ -86,6 +86,19 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
+        // Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
+        onCreated: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        onRemoved: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
+      },
+      // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
+      windows: {
+        getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
       },
     } as unknown as typeof chrome;
   });

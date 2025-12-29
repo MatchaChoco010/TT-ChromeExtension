@@ -268,9 +268,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           </div>
         ) : null}
 
-        {/* タブの内容 */}
+        {/* タブの内容 - Task 3.1: フォントサイズはCSS変数から継承 */}
         <div className="flex-1 flex items-center min-w-0">
-          <span className="text-sm truncate">
+          <span className="truncate">
             {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
           </span>
           <UnreadBadge isUnread={isUnread} showIndicator={true} />

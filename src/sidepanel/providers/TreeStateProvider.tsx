@@ -37,6 +37,8 @@ interface TreeStateContextType {
   getTabInfo: (tabId: number) => ExtendedTabInfo | undefined;
   // Task 1.2: ピン留めタブ専用リスト
   pinnedTabIds: number[];
+  // Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え (Requirements 10.1, 10.2, 10.3, 10.4)
+  handlePinnedTabReorder: (tabId: number, newIndex: number) => Promise<void>;
   // Task 1.3: 複数選択状態管理
   selectedNodeIds: Set<string>;
   lastSelectedNodeId: string | null;
@@ -199,8 +201,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   // Task 6.2: 現在のウィンドウIDを取得する（複数ウィンドウ対応）
-  // 注: サイドパネルのコンテキストでは chrome.windows API が正しく動作しない場合がある
-  // そのため、URLパラメータでwindowIdが明示的に指定された場合のみフィルタリングを有効にする
+  // Task 1.1 (tab-tree-bugfix): chrome.windows.getCurrent()を呼び出して確実にウィンドウIDを取得
   const loadCurrentWindowId = React.useCallback(async () => {
     try {
       // URLパラメータからウィンドウIDを取得（別ウィンドウ用サイドパネルの場合）
@@ -210,23 +211,32 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         setCurrentWindowId(parseInt(windowIdParam, 10));
         return;
       }
-      // URLパラメータがない場合は、currentWindowIdをnullのままにして
-      // フィルタリングを無効化する（全タブを表示）
-      // 実際のChrome拡張機能サイドパネルAPIではウィンドウごとにサイドパネルが開かれるため
-      // この挙動で問題ない
+      // Task 1.1 (tab-tree-bugfix): chrome.windows.getCurrent()を使用してウィンドウIDを取得
+      // これにより各ウィンドウのサイドパネルで自ウィンドウのタブのみが表示される
+      const currentWindow = await chrome.windows.getCurrent();
+      if (currentWindow?.id !== undefined) {
+        setCurrentWindowId(currentWindow.id);
+      }
     } catch (_err) {
       // Failed to load current window ID silently
+      // APIが利用できない場合はnullのまま（全タブを表示）
     }
   }, []);
 
   // Task 1.1: 全タブ情報を読み込む
   // Requirement 5.2: 永続化されたタイトルも復元して使用する
+  // Task 2.1 (tab-tree-bugfix): 永続化されたファビコンも復元して使用する
   // Task 6.2: windowIdを含める（複数ウィンドウ対応）
+  // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
   const loadTabInfoMap = React.useCallback(async () => {
     try {
       // 永続化されたタイトルを取得
-      const storedResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_TITLES);
-      const persistedTitles: Record<number, string> = storedResult[STORAGE_KEYS.TAB_TITLES] || {};
+      const storedTitlesResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_TITLES);
+      const persistedTitles: Record<number, string> = storedTitlesResult[STORAGE_KEYS.TAB_TITLES] || {};
+
+      // Task 2.1 (tab-tree-bugfix): 永続化されたファビコンを取得
+      const storedFaviconsResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_FAVICONS);
+      const persistedFavicons: Record<number, string> = storedFaviconsResult[STORAGE_KEYS.TAB_FAVICONS] || {};
 
       const tabs = await chrome.tabs.query({});
       const newTabInfoMap: TabInfoMap = {};
@@ -237,15 +247,22 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           const persistedTitle = persistedTitles[tab.id];
           const title = tab.title || persistedTitle || '';
 
+          // Task 2.1 (tab-tree-bugfix): 永続化されたファビコンがあればそれを使用
+          // ブラウザ再起動後にタブが読み込まれていない場合に有効
+          const persistedFavicon = persistedFavicons[tab.id];
+          const favIconUrl = tab.favIconUrl || persistedFavicon;
+
           newTabInfoMap[tab.id] = {
             id: tab.id,
             title,
             url: tab.url || '',
-            favIconUrl: tab.favIconUrl,
+            favIconUrl,
             status: tab.status === 'loading' ? 'loading' : 'complete',
             isPinned: tab.pinned || false,
             // Task 6.2: windowIdを含める（複数ウィンドウ対応）
             windowId: tab.windowId,
+            // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
+            discarded: tab.discarded || false,
           };
         }
       }
@@ -347,8 +364,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     const messageListener = (message: { type: string }) => {
       if (message.type === 'STATE_UPDATED') {
         // ストレージから最新の状態を再読み込み（未読タブも含む）
+        // Task 12.3 (tab-tree-bugfix): タブ情報も再読み込みして新しいタブをUIに反映
+        // Task 12.3 (tab-tree-bugfix): グループも再読み込みして新しいグループをUIに反映
         loadTreeState();
         loadUnreadTabs();
+        loadTabInfoMap();
+        loadGroups();
       }
     };
 
@@ -357,7 +378,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
     };
-  }, [loadTreeState]);
+  }, [loadTreeState, loadUnreadTabs, loadTabInfoMap, loadGroups]);
 
   // Task 8.5.4: タブのアクティブ化イベントをリッスン
   useEffect(() => {
@@ -372,16 +393,65 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, []);
 
-  // Task 1.1: chrome.tabs.onUpdatedでタブ情報を更新
-  // Task 6.2: windowIdを含める（複数ウィンドウ対応）
+  // Task 12.3 (tab-tree-bugfix): chrome.tabs.onCreatedで新しいタブをtabInfoMapに追加
+  // これにより、新しく作成されたタブが即座にUIに反映される
   useEffect(() => {
-    const handleTabUpdated = (
+    const handleTabCreated = (tab: chrome.tabs.Tab) => {
+      if (tab.id !== undefined) {
+        setTabInfoMap(prev => ({
+          ...prev,
+          [tab.id as number]: {
+            id: tab.id as number,
+            title: tab.title || '',
+            url: tab.url || '',
+            favIconUrl: tab.favIconUrl,
+            status: tab.status === 'loading' ? 'loading' : 'complete',
+            isPinned: tab.pinned || false,
+            windowId: tab.windowId,
+            discarded: tab.discarded || false,
+          },
+        }));
+      }
+    };
+
+    chrome.tabs.onCreated.addListener(handleTabCreated);
+
+    return () => {
+      chrome.tabs.onCreated.removeListener(handleTabCreated);
+    };
+  }, []);
+
+  // Task 12.3 (tab-tree-bugfix): chrome.tabs.onRemovedでタブをtabInfoMapから削除
+  useEffect(() => {
+    const handleTabRemoved = (tabId: number) => {
+      setTabInfoMap(prev => {
+        const newMap = { ...prev };
+        delete newMap[tabId];
+        return newMap;
+      });
+    };
+
+    chrome.tabs.onRemoved.addListener(handleTabRemoved);
+
+    return () => {
+      chrome.tabs.onRemoved.removeListener(handleTabRemoved);
+    };
+  }, []);
+
+  // Task 1.1: chrome.tabs.onUpdatedでタブ情報を更新
+  // Task 2.1 (tab-tree-bugfix): ファビコン変更時に永続化
+  // Task 6.2: windowIdを含める（複数ウィンドウ対応）
+  // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
+  useEffect(() => {
+    const handleTabUpdated = async (
       tabId: number,
       changeInfo: chrome.tabs.TabChangeInfo,
       tab: chrome.tabs.Tab
     ) => {
-      // タイトル、ファビコン、ピン状態のいずれかが変更された場合のみ更新
-      if (changeInfo.title !== undefined || changeInfo.favIconUrl !== undefined || changeInfo.pinned !== undefined) {
+      // タイトル、ファビコン、ピン状態、discarded状態のいずれかが変更された場合のみ更新
+      // Task 4.1 (tab-tree-bugfix): discardedの変更も監視（休止タブがアクティブ化された場合にグレーアウト解除）
+      // Note: status単体の変更では新規エントリを作成しない（余分なLoadingタブ防止）
+      if (changeInfo.title !== undefined || changeInfo.favIconUrl !== undefined || changeInfo.pinned !== undefined || changeInfo.discarded !== undefined) {
         setTabInfoMap(prev => ({
           ...prev,
           [tabId]: {
@@ -393,8 +463,36 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             isPinned: tab.pinned ?? prev[tabId]?.isPinned ?? false,
             // Task 6.2: windowIdを含める（複数ウィンドウ対応）
             windowId: tab.windowId,
+            // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
+            discarded: tab.discarded ?? prev[tabId]?.discarded ?? false,
           },
         }));
+
+        // Task 2.1 (tab-tree-bugfix): ファビコンが変更された場合、永続化データを更新
+        // undefinedの場合は既存の永続化データを維持する
+        if (changeInfo.favIconUrl !== undefined && changeInfo.favIconUrl !== null && changeInfo.favIconUrl !== '') {
+          try {
+            const storedResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_FAVICONS);
+            const persistedFavicons: Record<number, string> = storedResult[STORAGE_KEYS.TAB_FAVICONS] || {};
+            persistedFavicons[tabId] = changeInfo.favIconUrl;
+            await chrome.storage.local.set({ [STORAGE_KEYS.TAB_FAVICONS]: persistedFavicons });
+          } catch (_err) {
+            // Failed to persist favicon silently
+          }
+        }
+
+        // Task 2.2 (tab-tree-bugfix): タイトルが変更された場合、永続化データを更新
+        // undefined/空文字列の場合は既存の永続化データを維持する
+        if (changeInfo.title !== undefined && changeInfo.title !== null && changeInfo.title !== '') {
+          try {
+            const storedResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_TITLES);
+            const persistedTitles: Record<number, string> = storedResult[STORAGE_KEYS.TAB_TITLES] || {};
+            persistedTitles[tabId] = changeInfo.title;
+            await chrome.storage.local.set({ [STORAGE_KEYS.TAB_TITLES]: persistedTitles });
+          } catch (_err) {
+            // Failed to persist title silently
+          }
+        }
       }
     };
 
@@ -645,11 +743,13 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   /**
    * Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
    * Requirements: 8.1, 8.2, 8.3, 8.4
+   * Task 8.1 (tab-tree-bugfix): ドロップ位置への正確な挿入
+   * Requirements: 7.1, 7.2 - insertIndexを使用して正しい位置にタブを挿入し、ブラウザタブの順序を同期
    * タブを兄弟として指定位置に挿入する
    */
   const handleSiblingDrop = useCallback(
     async (info: SiblingDropInfo) => {
-      const { activeNodeId, aboveNodeId, belowNodeId } = info;
+      const { activeNodeId, insertIndex, aboveNodeId, belowNodeId } = info;
 
       if (!treeState) {
         return;
@@ -747,6 +847,15 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       };
 
       await updateTreeState(newTreeState);
+
+      // Task 8.1 (tab-tree-bugfix): ブラウザタブの順序をツリー構造と同期
+      // Requirements: 7.2 - ドロップ後のツリー構造がブラウザタブの順序と同期
+      try {
+        await chrome.tabs.move(activeNode.tabId, { index: insertIndex });
+      } catch (_err) {
+        // タブ移動に失敗してもツリー状態の更新は維持する
+        // タブが既に存在しない場合などに発生する可能性がある
+      }
     },
     [treeState, updateTreeState]
   );
@@ -918,6 +1027,24 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       })
       .map(tabInfo => tabInfo.id);
   }, [tabInfoMap, currentWindowId]);
+
+  /**
+   * Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え
+   * ドラッグ＆ドロップでピン留めタブの順序を変更し、ブラウザタブと同期する
+   * Requirements: 10.1, 10.2, 10.3, 10.4
+   */
+  const handlePinnedTabReorder = useCallback(async (tabId: number, newIndex: number): Promise<void> => {
+    if (!currentWindowId) return;
+
+    try {
+      // ピン留めタブの新しい位置を計算
+      // chrome.tabs.move()はピン留めタブに対しても使用可能
+      // newIndexはピン留めタブセクション内でのインデックス
+      await chrome.tabs.move(tabId, { index: newIndex });
+    } catch (error) {
+      console.error('Failed to reorder pinned tab:', error);
+    }
+  }, [currentWindowId]);
 
   /**
    * Task 1.3: ノードを選択
@@ -1112,6 +1239,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         getTabInfo,
         // Task 1.2: ピン留めタブ専用リスト
         pinnedTabIds,
+        // Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え
+        handlePinnedTabReorder,
         // Task 1.3: 複数選択状態管理
         selectedNodeIds,
         lastSelectedNodeId,

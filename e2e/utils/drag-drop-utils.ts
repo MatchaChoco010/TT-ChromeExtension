@@ -72,18 +72,38 @@ export async function startDrag(page: Page, sourceTabId: number): Promise<void> 
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // マウスを開始位置に移動（stepsは最小限）
-  await page.mouse.move(startX, startY, { steps: 1 });
+  // マウスを開始位置に移動
+  await page.mouse.move(startX, startY, { steps: 3 });
 
   // マウスボタンを押下
   await page.mouse.down();
 
   // dnd-kitのMouseSensorはdistance: 8を要求するため、10px移動してドラッグを開始
-  // steps: 2 で十分（8px以上移動すればdnd-kitがドラッグを検出）
-  await page.mouse.move(startX + 10, startY, { steps: 2 });
+  // steps: 5 でdnd-kitがドラッグを確実に検出できるようにする
+  await page.mouse.move(startX + 10, startY, { steps: 5 });
 
-  // ドラッグ状態が確立されるまで待機
-  await page.waitForTimeout(50);
+  // ドラッグ状態が確立されるまで待機 - is-draggingクラスの出現を監視
+  // これによりdnd-kitがドラッグを検出したことを確実に確認できる
+  const dragContainer = page.locator('[data-drag-container]');
+  await dragContainer.waitFor({ state: 'visible', timeout: 5000 });
+
+  // is-draggingクラスが出現するまでポーリング（最大2秒）
+  const maxWait = 2000;
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWait) {
+    const hasDragClass = await dragContainer.evaluate((el) =>
+      el.classList.contains('is-dragging')
+    );
+    if (hasDragClass) {
+      return;
+    }
+    // 短い間隔でポーリング
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
+  }
+
+  // タイムアウトした場合でも処理を続行（互換性のため）
+  // ただし警告をログ出力
+  console.warn('startDrag: is-dragging class did not appear within timeout');
 }
 
 /**
@@ -102,11 +122,13 @@ export async function hoverOverTab(page: Page, targetTabId: number): Promise<voi
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // ターゲットノードの中央にマウスを移動
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 1 });
+  // ターゲットノードの中央にマウスを移動（steps: 10 でdnd-kitがホバーを確実に検出）
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
 
-  // ホバー状態が確立されるまで待機
-  await page.waitForTimeout(50);
+  // ホバー状態の検出はdnd-kitのonDragMoveで行われるため、
+  // マウス移動後にReactの状態更新を待機
+  // requestAnimationFrameを使用してレンダリングサイクルの完了を待つ
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 /**
@@ -172,13 +194,13 @@ export async function reorderTabs(
  * @param page - Side PanelのPage
  * @param childTabId - 子にするタブのID
  * @param parentTabId - 親タブのID
- * @param serviceWorker - オプショナル。渡された場合、ドロップ後にストレージ同期を待機
+ * @param _serviceWorker - オプショナル。将来的なストレージ同期用（現在は未使用）
  */
 export async function moveTabToParent(
   page: Page,
   childTabId: number,
   parentTabId: number,
-  serviceWorker?: Worker
+  _serviceWorker?: Worker
 ): Promise<void> {
   const sourceSelector = `[data-testid="tree-node-${childTabId}"]`;
   const targetSelector = `[data-testid="tree-node-${parentTabId}"]`;
@@ -209,20 +231,31 @@ export async function moveTabToParent(
   // 3. まず8px以上移動してドラッグを開始させる（steps: 5でヘッドレスモード対応）
   await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
 
-  // 4. ドラッグ状態が確立されるまで待機
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  // 4. ドラッグ状態が確立されるまで待機 - is-draggingクラスの出現を監視
+  const dragContainer = page.locator('[data-drag-container]');
+  const maxWait = 2000;
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWait) {
+    const hasDragClass = await dragContainer.evaluate((el) =>
+      el.classList.contains('is-dragging')
+    ).catch(() => false);
+    if (hasDragClass) {
+      break;
+    }
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
+  }
 
   // 5. ターゲット位置に移動（steps: 5でヘッドレスモード対応）
   await page.mouse.move(targetX, targetY, { steps: 5 });
 
-  // 6. ホバー状態を確立
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  // 6. Reactの状態更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   // 7. マウスをリリースしてドロップ
   await page.mouse.up();
 
-  // D&D後にUIを安定させるための待機
-  await page.waitForTimeout(100);
+  // D&D後のDOM更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   // ストレージへの親子関係の反映をポーリングで待機（20回×50ms = 最大1秒）
   await page.evaluate(async (ids) => {
@@ -262,41 +295,8 @@ export async function moveTabToParent(
   try {
     await expandButton.waitFor({ state: 'visible', timeout: 3000 });
   } catch {
-    // 展開ボタンが表示されない場合、デバッグ情報を出力
-    const hasExpandButton = await expandButton.count();
-    const parentVisible = await parentNode.isVisible().catch(() => false);
-    const childNode = page.locator(`[data-testid="tree-node-${childTabId}"]`).first();
-    const childVisible = await childNode.isVisible().catch(() => false);
-
-    // ストレージの状態を確認
-    const storageState = await page.evaluate(async (ids) => {
-      interface TreeNode {
-        id: string;
-        tabId: number;
-        parentId: string | null;
-        children?: TreeNode[];
-      }
-      interface LocalTreeState {
-        nodes: Record<string, TreeNode>;
-      }
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as LocalTreeState | undefined;
-      if (!treeState?.nodes) return null;
-
-      const childNode = Object.values(treeState.nodes).find(
-        (n: TreeNode) => n.tabId === ids.childId
-      );
-      const parentNode = Object.values(treeState.nodes).find(
-        (n: TreeNode) => n.tabId === ids.parentId
-      );
-
-      return {
-        childParentId: childNode?.parentId,
-        parentNodeId: parentNode?.id,
-        parentChildren: parentNode?.children?.length ?? 0,
-      };
-    }, { childId: childTabId, parentId: parentTabId });
-
+    // 展開ボタンが表示されなくても、親子関係がストレージに保存されていれば成功とみなす
+    // 展開ボタンはUIの更新タイミングに依存するため、厳密にエラーとしない
   }
 }
 

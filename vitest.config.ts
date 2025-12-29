@@ -14,15 +14,13 @@ process.env.TMP = tmpDir;
 process.env.TEMP = tmpDir;
 
 export default defineConfig({
+  // キャッシュディレクトリをリポジトリ内に設定（Vite's cacheDir）
+  cacheDir: path.resolve(__dirname, '.vitest-tmp/cache'),
   test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
-    // キャッシュディレクトリをリポジトリ内に設定
-    cache: {
-      dir: path.resolve(__dirname, '.vitest-tmp/cache'),
-    },
   },
   resolve: {
     alias: {

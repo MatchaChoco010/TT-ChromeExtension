@@ -57,6 +57,17 @@ export interface DropTarget {
 }
 
 /**
+ * Task 7.1: コンテナ境界情報
+ * プレースホルダー表示をコンテナ境界内に制限するために使用
+ */
+export interface ContainerBounds {
+  /** コンテナの最小Y座標（コンテナ相対） */
+  minY: number;
+  /** コンテナの最大Y座標（コンテナ相対） */
+  maxY: number;
+}
+
+/**
  * デフォルトの隙間判定領域比率
  * タブの高さに対して上下この割合の領域は隙間判定となる
  */
@@ -68,16 +79,26 @@ const DEFAULT_GAP_THRESHOLD_RATIO = 0.25;
  * @param mouseY - マウスのY座標（コンテナ相対）
  * @param tabPositions - タブノードの位置情報配列（上から順）
  * @param gapThresholdRatio - 隙間判定領域の比率（デフォルト: 0.25）
+ * @param containerBounds - Task 7.1: コンテナ境界情報（オプション）。指定された場合、境界外ではNoneを返す
  * @returns ドロップターゲット情報
  */
 export function calculateDropTarget(
   mouseY: number,
   tabPositions: TabPosition[],
-  gapThresholdRatio: number = DEFAULT_GAP_THRESHOLD_RATIO
+  gapThresholdRatio: number = DEFAULT_GAP_THRESHOLD_RATIO,
+  containerBounds?: ContainerBounds
 ): DropTarget {
   // タブリストが空の場合
   if (tabPositions.length === 0) {
     return { type: DropTargetType.None };
+  }
+
+  // Task 7.1: コンテナ境界チェック
+  // 境界が指定されている場合、マウスがコンテナ外にある場合はNoneを返す
+  if (containerBounds) {
+    if (mouseY < containerBounds.minY || mouseY > containerBounds.maxY) {
+      return { type: DropTargetType.None };
+    }
   }
 
   // Y座標が最初のタブより上の場合

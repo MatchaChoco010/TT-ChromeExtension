@@ -177,6 +177,69 @@ describe('Task 4.3: タブとタブ間の隙間ドロップ判定', () => {
         expect(result.gapIndex).toBe(tabPositions.length);
       });
     });
+
+    describe('コンテナ境界チェック (Task 7.1)', () => {
+      it('containerBoundsが指定され、マウスがコンテナ外上側にある場合、Noneを返す', () => {
+        // コンテナの境界: 0-120
+        const result = calculateDropTarget(-20, tabPositions, 0.25, {
+          minY: 0,
+          maxY: 120,
+        });
+
+        expect(result.type).toBe(DropTargetType.None);
+      });
+
+      it('containerBoundsが指定され、マウスがコンテナ外下側にある場合、Noneを返す', () => {
+        // コンテナの境界: 0-120
+        const result = calculateDropTarget(150, tabPositions, 0.25, {
+          minY: 0,
+          maxY: 120,
+        });
+
+        expect(result.type).toBe(DropTargetType.None);
+      });
+
+      it('containerBoundsが指定され、マウスがコンテナ内にある場合、通常通り判定される', () => {
+        // コンテナの境界: 0-120
+        const result = calculateDropTarget(60, tabPositions, 0.25, {
+          minY: 0,
+          maxY: 120,
+        });
+
+        expect(result.type).toBe(DropTargetType.Tab);
+        expect(result.targetNodeId).toBe('node-2');
+      });
+
+      it('containerBoundsが指定されていない場合、後方互換性のため従来通りの判定を行う', () => {
+        // コンテナ境界なしで負のY座標
+        const result = calculateDropTarget(-10, tabPositions, 0.25);
+
+        expect(result.type).toBe(DropTargetType.Gap);
+        expect(result.gapIndex).toBe(0);
+      });
+
+      it('containerBoundsが指定され、境界ちょうど（minY）の場合は有効として判定される', () => {
+        const result = calculateDropTarget(0, tabPositions, 0.25, {
+          minY: 0,
+          maxY: 120,
+        });
+
+        // 0は最初のタブの上部領域内
+        expect(result.type).toBe(DropTargetType.Gap);
+        expect(result.gapIndex).toBe(0);
+      });
+
+      it('containerBoundsが指定され、境界ちょうど（maxY）の場合は有効として判定される', () => {
+        const result = calculateDropTarget(120, tabPositions, 0.25, {
+          minY: 0,
+          maxY: 120,
+        });
+
+        // 120は最後のタブの下
+        expect(result.type).toBe(DropTargetType.Gap);
+        expect(result.gapIndex).toBe(tabPositions.length);
+      });
+    });
   });
 
   describe('DropTarget型の構造', () => {

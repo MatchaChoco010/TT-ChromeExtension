@@ -369,13 +369,22 @@ export const test = base.extend<ExtensionFixtures>({
   /**
    * sidePanelPage フィクスチャ
    * Side Panelページを開いて提供します
+   *
+   * Task 1.1 (tab-tree-bugfix): windowIdパラメータを含めてサイドパネルを開く
+   * これにより、サイドパネルは現在のウィンドウのタブのみを表示する
    */
   sidePanelPage: async ({ extensionContext, extensionId, serviceWorker }, use) => {
+    // Task 1.1: 現在のウィンドウIDを取得してURLパラメータとして渡す
+    const currentWindow = await serviceWorker.evaluate(() => {
+      return chrome.windows.getCurrent();
+    });
+    const windowId = currentWindow.id;
+
     // 新しいページを作成
     const page = await extensionContext.newPage();
 
-    // Side PanelのURLに移動
-    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    // Side PanelのURLに移動（windowIdパラメータ付き）
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
 
     // DOMContentLoadedイベントを待機
     await page.waitForLoadState('domcontentloaded');

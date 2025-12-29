@@ -22,9 +22,11 @@ export interface TabInfo {
 
 // Task 1.1: 拡張タブ情報（ピン状態を含む）
 // Task 6.2: windowIdを追加（複数ウィンドウ対応）
+// Task 4.1 (tab-tree-bugfix): discardedを追加（休止タブの視覚的区別）
 export interface ExtendedTabInfo extends TabInfo {
   isPinned: boolean;
   windowId: number;
+  discarded: boolean; // 休止状態のタブ（まだ読み込まれていない）
 }
 
 // Task 1.1: タブ情報マップ
@@ -77,6 +79,9 @@ export interface TreeState {
 /** タブタイトルマップ (tabId -> title) */
 export type TabTitlesMap = Record<number, string>;
 
+/** Task 2.1 (tab-tree-bugfix): ファビコンマップ (tabId -> favIconUrl) */
+export type TabFaviconsMap = Record<number, string>;
+
 export interface StorageSchema {
   tree_state: TreeState;
   user_settings: UserSettings;
@@ -84,6 +89,8 @@ export interface StorageSchema {
   groups: Record<string, Group>;
   /** Requirement 5.1-5.4: タブタイトル永続化 */
   tab_titles: TabTitlesMap;
+  /** Task 2.1 (tab-tree-bugfix): ファビコン永続化 */
+  tab_favicons: TabFaviconsMap;
 }
 
 export type StorageKey = keyof StorageSchema;
@@ -248,11 +255,16 @@ export interface TabTreeViewProps {
   // Task 6.1: グループ機能をツリー内に統合表示
   groups?: Record<string, Group>;
   onGroupToggle?: (groupId: string) => void;
+  // Task 12.2 (tab-tree-bugfix): タブをグループに追加するコールバック
+  onAddToGroup?: (groupId: string, tabIds: number[]) => void;
   // Task 7.2: ビュー移動サブメニュー用 (Requirements 18.1, 18.2, 18.3)
   views?: View[];
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
   // Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)
   onExternalDrop?: (tabId: number) => void;
+  // Task 10.1: ツリービュー外へのドロップ検知 (Requirements 9.1, 9.4)
+  // ドラッグ中にマウスがツリービュー外に移動したかどうかを通知するコールバック
+  onOutsideTreeChange?: (isOutside: boolean) => void;
 }
 
 // Context Menu types
@@ -285,6 +297,10 @@ export interface ContextMenuProps {
   currentViewId?: string;
   /** Task 7.2: タブをビューに移動するコールバック */
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
+  /** Task 12.2 (tab-tree-bugfix): グループ一覧（シングルタブのグループ追加用） */
+  groups?: Record<string, Group>;
+  /** Task 12.2 (tab-tree-bugfix): タブをグループに追加するコールバック */
+  onAddToGroup?: (groupId: string, tabIds: number[]) => void;
 }
 
 // SubMenu types (Task 7.1: Requirements 18.1, 18.2)

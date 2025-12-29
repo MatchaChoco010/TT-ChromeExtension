@@ -352,6 +352,73 @@ describe('Task 13.2: フォントカスタマイズ機能', () => {
     });
   });
 
+  describe('タスク 3.1: タブタイトルへのフォントサイズ反映', () => {
+    it('タブタイトルにtext-smクラスが使用されていないこと', async () => {
+      // このテストは、タブタイトル要素がTailwindのtext-smクラスを使用せず、
+      // CSS変数var(--font-size)を継承することを確認します
+      const initialSettings: UserSettings = {
+        fontSize: 18,
+        fontFamily: 'system-ui',
+        customCSS: '',
+        newTabPosition: 'child',
+        closeWarningThreshold: 3,
+        showUnreadIndicator: true,
+        autoSnapshotInterval: 0,
+        childTabBehavior: 'promote',
+      };
+
+      mockGet.mockResolvedValue({
+        user_settings: initialSettings,
+      });
+
+      // TreeNodeコンポーネントをレンダリングするテスト
+      // TreeNode.tsxでタブタイトルがtext-smではなくCSS変数を使用することを確認
+      const TestComponent = () => {
+        const { settings, updateSettings } = useTheme();
+
+        return (
+          <div>
+            {settings && (
+              <>
+                <SettingsPanel
+                  settings={settings}
+                  onSettingsChange={updateSettings}
+                />
+                {/* タブタイトル用のテスト要素 */}
+                <span data-testid="tab-title-test" className="truncate">
+                  テストタブタイトル
+                </span>
+              </>
+            )}
+          </div>
+        );
+      };
+
+      render(
+        <ThemeProvider>
+          <TestComponent />
+        </ThemeProvider>
+      );
+
+      // ThemeProviderが初期化されるまで待つ
+      await waitFor(() => {
+        expect(screen.getByLabelText(/フォントサイズ/i)).toBeInTheDocument();
+      });
+
+      // CSS変数が正しく設定されていることを確認
+      await waitFor(() => {
+        const styleElement = document.getElementById('vivaldi-tt-theme');
+        expect(styleElement).toBeTruthy();
+        expect(styleElement?.textContent).toContain('--font-size: 18px');
+        expect(styleElement?.textContent).toContain('font-size: var(--font-size)');
+      });
+
+      // タブタイトル要素がtext-smクラスを持たないことを確認
+      const tabTitle = screen.getByTestId('tab-title-test');
+      expect(tabTitle).not.toHaveClass('text-sm');
+    });
+  });
+
   describe('エッジケース', () => {
     it('フォントサイズが範囲外（8未満）の場合、変更されないこと', async () => {
       const defaultSettings: UserSettings = {

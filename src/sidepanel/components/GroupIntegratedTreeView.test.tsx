@@ -42,6 +42,7 @@ const createMockTabInfo = (tabId: number): ExtendedTabInfo => ({
   status: 'complete' as const,
   isPinned: false,
   windowId: 1,
+  discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
 });
 
 describe('Task 11.1: タブグループをツリービュー内に表示', () => {

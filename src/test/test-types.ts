@@ -54,6 +54,7 @@ export interface MockTabs {
  */
 export interface MockWindows {
   get: Mock<(windowId: number, getInfo?: { populate?: boolean; windowTypes?: string[] }) => Promise<chrome.windows.Window>>;
+  getCurrent: Mock<() => Promise<chrome.windows.Window>>;
   create: Mock<(createData?: chrome.windows.CreateData) => Promise<chrome.windows.Window>>;
   onCreated: MockTabsEvents;
   onRemoved: MockTabsEvents;

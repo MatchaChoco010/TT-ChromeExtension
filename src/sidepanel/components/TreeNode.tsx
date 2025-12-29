@@ -12,6 +12,7 @@ interface TreeNodeProps {
   isActive: boolean;
   isPinned?: boolean; // Task 15.2: ピン留め状態
   isGrouped?: boolean; // Task 15.2: グループ化状態
+  isDiscarded?: boolean; // Task 4.1 (tab-tree-bugfix): 休止タブ状態（グレーアウト表示）
   showUnreadIndicator?: boolean;
   closeWarningThreshold?: number; // Task 11.3: Requirement 8.5 - 警告閾値
   onActivate: (tabId: number) => void;
@@ -21,28 +22,42 @@ interface TreeNodeProps {
 }
 
 /**
- * Task 4.2 (Requirement 4.3): 内部URLを判定するヘルパー関数
- * Vivaldi/Chromeの内部URL、新規タブURL、about:blankなどを検出
+ * Task 4.2 (Requirement 4.3): スタートページURLを判定するヘルパー関数
+ * Vivaldi/Chromeのスタートページ関連のURLを検出
  */
-const isInternalOrNewTabUrl = (url: string): boolean => {
+const isStartPageUrl = (url: string): boolean => {
   if (!url) return false;
 
-  const internalUrlPatterns = [
-    /^chrome:\/\/vivaldi-webui\//,
+  const startPageUrlPatterns = [
+    /^chrome:\/\/vivaldi-webui\/startpage/,
+    /^vivaldi:\/\/startpage/,
+  ];
+
+  return startPageUrlPatterns.some(pattern => pattern.test(url));
+};
+
+/**
+ * Task 4.2 (Requirement 4.3): 新しいタブURLを判定するヘルパー関数
+ * Vivaldi/Chromeの新しいタブ関連のURLを検出（スタートページ以外）
+ */
+const isNewTabUrl = (url: string): boolean => {
+  if (!url) return false;
+
+  const newTabUrlPatterns = [
     /^chrome:\/\/newtab/,
     /^chrome-extension:\/\//,
     /^vivaldi:\/\/newtab/,
-    /^vivaldi:\/\/startpage/,
     /^about:blank$/,
   ];
 
-  return internalUrlPatterns.some(pattern => pattern.test(url));
+  return newTabUrlPatterns.some(pattern => pattern.test(url));
 };
 
 /**
  * Task 4.2 (Requirement 4.1, 4.2, 4.3, 4.4): 表示するタブタイトルを決定するヘルパー関数
  * - Loading状態の場合: 「Loading...」
- * - 内部URLの場合: 「新しいタブ」
+ * - スタートページURLの場合: 「スタートページ」
+ * - 新しいタブURLの場合: 「新しいタブ」
  * - それ以外: 元のタイトル
  */
 const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 'complete' }): string => {
@@ -51,8 +66,13 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
     return 'Loading...';
   }
 
-  // Requirement 4.3: 内部URLの場合
-  if (isInternalOrNewTabUrl(tab.url)) {
+  // Requirement 2.2: スタートページURLの場合
+  if (isStartPageUrl(tab.url)) {
+    return 'スタートページ';
+  }
+
+  // Requirement 4.3: 新しいタブURLの場合
+  if (isNewTabUrl(tab.url)) {
     return '新しいタブ';
   }
 
@@ -66,6 +86,7 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
  *
  * Requirements: 8.3, 8.4 (タブ閉じ時の確認ダイアログ), 8.5 (警告閾値のカスタマイズ), 12.1 (コンテキストメニュー)
  * Task 4.2: 4.1, 4.2, 4.3, 4.4 (タブタイトル表示改善)
+ * Task 4.1 (tab-tree-bugfix): 3.1, 3.2 (休止タブのグレーアウト表示)
  */
 const TreeNode: React.FC<TreeNodeProps> = ({
   node,
@@ -74,6 +95,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   isActive,
   isPinned = false,
   isGrouped = false,
+  isDiscarded = false, // Task 4.1 (tab-tree-bugfix): 休止タブのグレーアウト表示
   showUnreadIndicator = true,
   closeWarningThreshold = 3, // Task 11.3: デフォルト閾値は3
   onActivate,
@@ -209,8 +231,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           className="flex-1 flex items-center justify-between min-w-0"
         >
           {/* タブタイトルエリア - Task 4.2: タイトル表示改善 */}
+          {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
           <div className="flex items-center min-w-0 flex-1">
-            <span className="text-sm truncate">{getDisplayTitle(tab)}</span>
+            <span
+              className={`truncate ${isDiscarded ? 'text-gray-400' : ''}`}
+              data-testid={isDiscarded ? 'discarded-tab-title' : 'tab-title'}
+            >
+              {getDisplayTitle(tab)}
+            </span>
 
             {/* ローディングインジケータ - Loading...テキスト表示時も回転アイコンを表示 */}
             {tab.status === 'loading' && (

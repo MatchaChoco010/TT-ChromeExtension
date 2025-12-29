@@ -21,6 +21,15 @@ const mockTabsOnUpdated = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
+// Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
+const mockTabsOnCreated = {
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+};
+const mockTabsOnRemoved = {
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+};
 
 // Mock chrome.runtime for tests
 const mockRuntimeSendMessage = vi.fn();
@@ -44,6 +53,13 @@ beforeEach(() => {
       update: mockTabsUpdate,
       onActivated: mockTabsOnActivated,
       onUpdated: mockTabsOnUpdated,
+      // Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
+      onCreated: mockTabsOnCreated,
+      onRemoved: mockTabsOnRemoved,
+    },
+    // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
+    windows: {
+      getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
     },
     runtime: {
       sendMessage: mockRuntimeSendMessage,

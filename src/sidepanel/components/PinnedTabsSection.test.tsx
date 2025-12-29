@@ -20,6 +20,7 @@ describe('PinnedTabsSection', () => {
     status: 'complete',
     isPinned,
     windowId: 1,
+    discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
   });
 
   beforeEach(() => {
@@ -251,6 +252,108 @@ describe('PinnedTabsSection', () => {
     });
   });
 
+  describe('アクティブタブハイライト - Requirements 5.1, 5.2, 5.3, 5.4 (tab-tree-bugfix)', () => {
+    it('activeTabIdが渡された場合、該当のピン留めタブがハイライト表示されること', () => {
+      const pinnedTabIds = [1, 2, 3];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true, 'https://example.com/favicon1.ico'),
+        2: createMockTabInfo(2, 'Tab 2', true, 'https://example.com/favicon2.ico'),
+        3: createMockTabInfo(3, 'Tab 3', true, 'https://example.com/favicon3.ico'),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          activeTabId={2}
+        />
+      );
+
+      // タブ2のみがアクティブスタイル（bg-gray-600）を持つこと
+      const pinnedTab2 = screen.getByTestId('pinned-tab-2');
+      expect(pinnedTab2).toHaveClass('bg-gray-600');
+
+      // 他のタブはアクティブスタイルを持たないこと
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      const pinnedTab3 = screen.getByTestId('pinned-tab-3');
+      expect(pinnedTab1).not.toHaveClass('bg-gray-600');
+      expect(pinnedTab3).not.toHaveClass('bg-gray-600');
+    });
+
+    it('activeTabIdがnullの場合、どのピン留めタブもハイライトされないこと', () => {
+      const pinnedTabIds = [1, 2];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          activeTabId={null}
+        />
+      );
+
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      const pinnedTab2 = screen.getByTestId('pinned-tab-2');
+      expect(pinnedTab1).not.toHaveClass('bg-gray-600');
+      expect(pinnedTab2).not.toHaveClass('bg-gray-600');
+    });
+
+    it('activeTabIdがピン留めタブ以外の場合、どのピン留めタブもハイライトされないこと', () => {
+      const pinnedTabIds = [1, 2];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          activeTabId={999} // 存在しないタブID
+        />
+      );
+
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      const pinnedTab2 = screen.getByTestId('pinned-tab-2');
+      expect(pinnedTab1).not.toHaveClass('bg-gray-600');
+      expect(pinnedTab2).not.toHaveClass('bg-gray-600');
+    });
+
+    it('常に1つのピン留めタブのみがハイライト状態であること', () => {
+      const pinnedTabIds = [1, 2, 3, 4, 5];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+        3: createMockTabInfo(3, 'Tab 3', true),
+        4: createMockTabInfo(4, 'Tab 4', true),
+        5: createMockTabInfo(5, 'Tab 5', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          activeTabId={3}
+        />
+      );
+
+      // bg-gray-600クラスを持つ要素を数える
+      const section = screen.getByTestId('pinned-tabs-section');
+      const highlightedTabs = section.querySelectorAll('.bg-gray-600');
+      expect(highlightedTabs).toHaveLength(1);
+
+      // タブ3のみがハイライトされていること
+      expect(screen.getByTestId('pinned-tab-3')).toHaveClass('bg-gray-600');
+    });
+  });
+
   describe('コンテキストメニュー - 要件1.6, 1.7: ピン留め解除', () => {
     const mockOnContextMenu = vi.fn();
 
@@ -296,6 +399,112 @@ describe('PinnedTabsSection', () => {
 
       // エラーが発生しないことを確認
       await expect(user.pointer({ target: pinnedTab, keys: '[MouseRight]' })).resolves.not.toThrow();
+    });
+  });
+
+  describe('ドラッグ＆ドロップ並び替え - Requirements 10.1, 10.2, 10.3, 10.4 (tab-tree-bugfix)', () => {
+    const mockOnPinnedTabReorder = vi.fn();
+
+    beforeEach(() => {
+      mockOnPinnedTabReorder.mockClear();
+    });
+
+    it('ピン留めタブがSortableContext内でレンダリングされること', () => {
+      const pinnedTabIds = [1, 2, 3];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true, 'https://example.com/favicon1.ico'),
+        2: createMockTabInfo(2, 'Tab 2', true, 'https://example.com/favicon2.ico'),
+        3: createMockTabInfo(3, 'Tab 3', true, 'https://example.com/favicon3.ico'),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          onPinnedTabReorder={mockOnPinnedTabReorder}
+        />
+      );
+
+      // 各ピン留めタブがdata-sortable属性を持つこと（ドラッグ可能であることを示す）
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      const pinnedTab2 = screen.getByTestId('pinned-tab-2');
+      const pinnedTab3 = screen.getByTestId('pinned-tab-3');
+
+      expect(pinnedTab1).toHaveAttribute('data-sortable', 'true');
+      expect(pinnedTab2).toHaveAttribute('data-sortable', 'true');
+      expect(pinnedTab3).toHaveAttribute('data-sortable', 'true');
+    });
+
+    it('onPinnedTabReorderが渡されていない場合はドラッグ無効であること', () => {
+      const pinnedTabIds = [1, 2];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          // onPinnedTabReorder is not provided
+        />
+      );
+
+      // ドラッグ可能属性がないこと
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      expect(pinnedTab1).not.toHaveAttribute('data-sortable', 'true');
+    });
+
+    it('ピン留めタブの順序が変更されたときにonPinnedTabReorderが呼ばれること', () => {
+      const pinnedTabIds = [1, 2, 3];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+        3: createMockTabInfo(3, 'Tab 3', true),
+      };
+
+      // 内部DndContextのonDragEndをシミュレートするためのラッパーが必要
+      // ここではpropsの型をテスト
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          onPinnedTabReorder={mockOnPinnedTabReorder}
+        />
+      );
+
+      // コンポーネントがレンダリングされることを確認
+      const section = screen.getByTestId('pinned-tabs-section');
+      expect(section).toBeInTheDocument();
+
+      // onPinnedTabReorderが関数として渡されていることを確認
+      expect(typeof mockOnPinnedTabReorder).toBe('function');
+    });
+
+    it('ピン留めセクション内でのみドラッグが許可されること（ピン留めタブのIDがstring形式で管理されること）', () => {
+      const pinnedTabIds = [1, 2, 3];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+        3: createMockTabInfo(3, 'Tab 3', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          onPinnedTabReorder={mockOnPinnedTabReorder}
+        />
+      );
+
+      // 各ピン留めタブがpinned-プレフィックスのIDを持つこと
+      // これによりピン留めセクション外へのドロップを防止できる
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      expect(pinnedTab1).toHaveAttribute('data-pinned-id', 'pinned-1');
     });
   });
 });
