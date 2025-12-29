@@ -1,11 +1,16 @@
 import { useCallback } from 'react';
 import type { MenuAction } from '@/types';
 
+export interface MenuActionOptions {
+  url?: string;
+  onSnapshot?: () => Promise<void>;
+}
+
 /**
  * useMenuActions
  *
  * コンテキストメニューのアクションを実行するカスタムフック
- * Requirements: 3.11, 12.2, 12.3, 12.4
+ * Requirements: 3.11, 12.2, 12.3, 12.4, 4.2
  */
 export const useMenuActions = () => {
   /**
@@ -14,7 +19,7 @@ export const useMenuActions = () => {
    * @param tabIds - 対象のタブID配列
    * @param options - オプション（URLなど）
    */
-  const executeAction = useCallback(async (action: MenuAction, tabIds: number[], options?: { url?: string }) => {
+  const executeAction = useCallback(async (action: MenuAction, tabIds: number[], options?: MenuActionOptions) => {
     try {
       switch (action) {
         case 'close':
@@ -104,6 +109,13 @@ export const useMenuActions = () => {
             if (tab.url) {
               await navigator.clipboard.writeText(tab.url);
             }
+          }
+          break;
+
+        case 'snapshot':
+          // スナップショットを取得
+          if (options?.onSnapshot) {
+            await options.onSnapshot();
           }
           break;
 

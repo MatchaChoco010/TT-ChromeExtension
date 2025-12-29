@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import type { TreeState, TabNode, View, Group } from '@/types';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap } from '@/types';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
@@ -30,6 +30,19 @@ interface TreeStateContextType {
   getUnreadChildCount: (nodeId: string) => number;
   // Task 8.5.4: アクティブタブID
   activeTabId: number | null;
+  // Task 1.1: タブ情報マップ管理
+  tabInfoMap: TabInfoMap;
+  getTabInfo: (tabId: number) => ExtendedTabInfo | undefined;
+  // Task 1.2: ピン留めタブ専用リスト
+  pinnedTabIds: number[];
+  // Task 1.3: 複数選択状態管理
+  selectedNodeIds: Set<string>;
+  lastSelectedNodeId: string | null;
+  selectNode: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
+  clearSelection: () => void;
+  isNodeSelected: (nodeId: string) => boolean;
+  // Task 12.2: 選択されたすべてのタブIDを取得
+  getSelectedTabIds: () => number[];
 }
 
 const TreeStateContext = createContext<TreeStateContextType | undefined>(
@@ -133,6 +146,11 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   // Task 10.2.1: ローカル更新中フラグ（storage.onChangedからの更新をスキップするため）
   const isLocalUpdateRef = useRef<boolean>(false);
+  // Task 1.1: タブ情報マップ
+  const [tabInfoMap, setTabInfoMap] = useState<TabInfoMap>({});
+  // Task 1.3: 複数選択状態
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+  const [lastSelectedNodeId, setLastSelectedNodeId] = useState<string | null>(null);
 
   // Task 4.9: ストレージからグループを読み込む
   const loadGroups = React.useCallback(async () => {
@@ -169,6 +187,34 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       // Failed to load active tab silently
     }
   }, []);
+
+  // Task 1.1: 全タブ情報を読み込む
+  const loadTabInfoMap = React.useCallback(async () => {
+    try {
+      const tabs = await chrome.tabs.query({});
+      const newTabInfoMap: TabInfoMap = {};
+      for (const tab of tabs) {
+        if (tab.id !== undefined) {
+          newTabInfoMap[tab.id] = {
+            id: tab.id,
+            title: tab.title || '',
+            url: tab.url || '',
+            favIconUrl: tab.favIconUrl,
+            status: tab.status === 'loading' ? 'loading' : 'complete',
+            isPinned: tab.pinned || false,
+          };
+        }
+      }
+      setTabInfoMap(newTabInfoMap);
+    } catch (_err) {
+      // Failed to load tab info silently
+    }
+  }, []);
+
+  // Task 1.1: タブ情報を取得するヘルパー
+  const getTabInfo = useCallback((tabId: number): ExtendedTabInfo | undefined => {
+    return tabInfoMap[tabId];
+  }, [tabInfoMap]);
 
   // Task 4.9: グループをストレージに保存
   const saveGroups = React.useCallback(async (newGroups: Record<string, Group>) => {
@@ -241,15 +287,15 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   useEffect(() => {
-    // 初期化時にストレージからツリー状態とグループと未読タブとアクティブタブをロード
+    // 初期化時にストレージからツリー状態とグループと未読タブとアクティブタブとタブ情報をロード
     const initializeTreeState = async () => {
       setIsLoading(true);
-      await Promise.all([loadTreeState(), loadGroups(), loadUnreadTabs(), loadActiveTab()]);
+      await Promise.all([loadTreeState(), loadGroups(), loadUnreadTabs(), loadActiveTab(), loadTabInfoMap()]);
       setIsLoading(false);
     };
 
     initializeTreeState();
-  }, [loadTreeState, loadGroups, loadUnreadTabs, loadActiveTab]);
+  }, [loadTreeState, loadGroups, loadUnreadTabs, loadActiveTab, loadTabInfoMap]);
 
   useEffect(() => {
     // STATE_UPDATED メッセージをリッスン
@@ -278,6 +324,36 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
     return () => {
       chrome.tabs.onActivated.removeListener(handleTabActivated);
+    };
+  }, []);
+
+  // Task 1.1: chrome.tabs.onUpdatedでタブ情報を更新
+  useEffect(() => {
+    const handleTabUpdated = (
+      tabId: number,
+      changeInfo: chrome.tabs.TabChangeInfo,
+      tab: chrome.tabs.Tab
+    ) => {
+      // タイトル、ファビコン、ピン状態のいずれかが変更された場合のみ更新
+      if (changeInfo.title !== undefined || changeInfo.favIconUrl !== undefined || changeInfo.pinned !== undefined) {
+        setTabInfoMap(prev => ({
+          ...prev,
+          [tabId]: {
+            id: tabId,
+            title: tab.title || prev[tabId]?.title || '',
+            url: tab.url || prev[tabId]?.url || '',
+            favIconUrl: tab.favIconUrl ?? prev[tabId]?.favIconUrl,
+            status: tab.status === 'loading' ? 'loading' : 'complete',
+            isPinned: tab.pinned ?? prev[tabId]?.isPinned ?? false,
+          },
+        }));
+      }
+    };
+
+    chrome.tabs.onUpdated.addListener(handleTabUpdated);
+
+    return () => {
+      chrome.tabs.onUpdated.removeListener(handleTabUpdated);
     };
   }, []);
 
@@ -668,6 +744,99 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return countUnreadInSubtree(node);
   }, [treeState, unreadTabIds]);
 
+  /**
+   * Task 1.2: ピン留めタブIDの配列を算出
+   * tabInfoMapからピン留め状態のタブIDをフィルタリングして配列を返す
+   * Requirements: 12.1
+   */
+  const pinnedTabIds = useMemo((): number[] => {
+    return Object.values(tabInfoMap)
+      .filter(tabInfo => tabInfo.isPinned)
+      .map(tabInfo => tabInfo.id);
+  }, [tabInfoMap]);
+
+  /**
+   * Task 1.3: ノードを選択
+   * Shift/Ctrlキーに応じた選択ロジックを提供する
+   * Requirements: 9.1, 9.2
+   */
+  const selectNode = useCallback((nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => {
+    if (!treeState) return;
+
+    // ノードが存在しない場合は何もしない
+    if (!treeState.nodes[nodeId]) return;
+
+    if (modifiers.ctrl) {
+      // Ctrlキー押下時: トグル追加/削除
+      setSelectedNodeIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(nodeId)) {
+          newSet.delete(nodeId);
+        } else {
+          newSet.add(nodeId);
+        }
+        return newSet;
+      });
+      setLastSelectedNodeId(nodeId);
+    } else if (modifiers.shift && lastSelectedNodeId) {
+      // Shiftキー押下時: 範囲選択
+      // ノードの表示順序を取得
+      const nodeIds = Object.keys(treeState.nodes);
+      const lastIndex = nodeIds.indexOf(lastSelectedNodeId);
+      const currentIndex = nodeIds.indexOf(nodeId);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const startIndex = Math.min(lastIndex, currentIndex);
+        const endIndex = Math.max(lastIndex, currentIndex);
+        const rangeNodeIds = nodeIds.slice(startIndex, endIndex + 1);
+        setSelectedNodeIds(new Set(rangeNodeIds));
+      } else {
+        // インデックスが見つからない場合は単一選択
+        setSelectedNodeIds(new Set([nodeId]));
+        setLastSelectedNodeId(nodeId);
+      }
+    } else {
+      // 通常クリック: 既存の選択をクリアして新しいノードを選択
+      setSelectedNodeIds(new Set([nodeId]));
+      setLastSelectedNodeId(nodeId);
+    }
+  }, [treeState, lastSelectedNodeId]);
+
+  /**
+   * Task 1.3: 選択をすべてクリア
+   * Requirements: 9.1, 9.2
+   */
+  const clearSelection = useCallback(() => {
+    setSelectedNodeIds(new Set());
+    setLastSelectedNodeId(null);
+  }, []);
+
+  /**
+   * Task 1.3: ノードが選択されているかを確認
+   * Requirements: 9.1, 9.2
+   */
+  const isNodeSelected = useCallback((nodeId: string): boolean => {
+    return selectedNodeIds.has(nodeId);
+  }, [selectedNodeIds]);
+
+  /**
+   * Task 12.2: 選択されたすべてのタブIDを取得
+   * 複数選択時にコンテキストメニューで使用
+   * Requirements: 9.3, 9.4, 9.5
+   */
+  const getSelectedTabIds = useCallback((): number[] => {
+    if (!treeState) return [];
+
+    const tabIds: number[] = [];
+    for (const nodeId of selectedNodeIds) {
+      const node = treeState.nodes[nodeId];
+      if (node) {
+        tabIds.push(node.tabId);
+      }
+    }
+    return tabIds;
+  }, [treeState, selectedNodeIds]);
+
   return (
     <TreeStateContext.Provider
       value={{
@@ -697,6 +866,19 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         getUnreadChildCount,
         // Task 8.5.4: アクティブタブID
         activeTabId,
+        // Task 1.1: タブ情報マップ管理
+        tabInfoMap,
+        getTabInfo,
+        // Task 1.2: ピン留めタブ専用リスト
+        pinnedTabIds,
+        // Task 1.3: 複数選択状態管理
+        selectedNodeIds,
+        lastSelectedNodeId,
+        selectNode,
+        clearSelection,
+        isNodeSelected,
+        // Task 12.2: 選択されたすべてのタブIDを取得
+        getSelectedTabIds,
       }}
     >
       {children}

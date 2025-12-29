@@ -159,6 +159,7 @@ test.describe('chrome.storage API統合', () => {
   test.describe('chrome.storage.onChanged イベントハンドリング', () => {
     test('chrome.storage.onChangedイベントが発火した場合、UIが最新の設定で更新される', async ({
       sidePanelPage,
+      extensionContext,
       serviceWorker,
     }) => {
       // Arrange: Side Panelが表示されていることを確認
@@ -166,16 +167,16 @@ test.describe('chrome.storage API統合', () => {
         timeout: 10000,
       });
 
-      // 設定パネルを開く
-      const settingsButton = sidePanelPage.locator('[data-testid="settings-button"]');
-      await expect(settingsButton).toBeVisible({ timeout: 5000 });
-      await settingsButton.click();
+      // Task 8.2: 設定ページを新規タブで開く
+      const [settingsPage] = await Promise.all([
+        extensionContext.waitForEvent('page', { timeout: 5000 }),
+        sidePanelPage.locator('[data-testid="open-settings-button"]').click(),
+      ]);
 
-      await expect(sidePanelPage.locator('[data-testid="settings-panel"]')).toBeVisible({
-        timeout: 3000,
-      });
+      await settingsPage.waitForLoadState('domcontentloaded');
+      await settingsPage.waitForSelector('.settings-page-container', { timeout: 5000 });
 
-      const fontSizeInput = sidePanelPage.locator('input#fontSize');
+      const fontSizeInput = settingsPage.locator('input#fontSize');
 
       // Act: Service Workerからchrome.storageを更新
       // Note: ThemeProviderは 'user_settings' キーを使用している
@@ -206,10 +207,14 @@ test.describe('chrome.storage API統合', () => {
         const currentValue = await fontSizeInput.inputValue();
         expect(currentValue).toBe('22');
       }).toPass({ timeout: 5000 });
+
+      // クリーンアップ
+      await settingsPage.close();
     });
 
     test('複数の設定変更が同時に行われた場合、すべてがUIに反映される', async ({
       sidePanelPage,
+      extensionContext,
       serviceWorker,
     }) => {
       // Arrange: Side Panelが表示されていることを確認
@@ -217,14 +222,14 @@ test.describe('chrome.storage API統合', () => {
         timeout: 10000,
       });
 
-      // 設定パネルを開く
-      const settingsButton = sidePanelPage.locator('[data-testid="settings-button"]');
-      await expect(settingsButton).toBeVisible({ timeout: 5000 });
-      await settingsButton.click();
+      // Task 8.2: 設定ページを新規タブで開く
+      const [settingsPage] = await Promise.all([
+        extensionContext.waitForEvent('page', { timeout: 5000 }),
+        sidePanelPage.locator('[data-testid="open-settings-button"]').click(),
+      ]);
 
-      await expect(sidePanelPage.locator('[data-testid="settings-panel"]')).toBeVisible({
-        timeout: 3000,
-      });
+      await settingsPage.waitForLoadState('domcontentloaded');
+      await settingsPage.waitForSelector('.settings-page-container', { timeout: 5000 });
 
       // Act: 複数の設定を同時に更新
       // Note: ThemeProviderは 'user_settings' キーを使用している
@@ -249,11 +254,14 @@ test.describe('chrome.storage API統合', () => {
 
       // Assert: すべての設定がUIに反映される（両方を同時にチェック）
       await expect(async () => {
-        const fontSizeValue = await sidePanelPage.locator('input#fontSize').inputValue();
-        const fontFamilyValue = await sidePanelPage.locator('input#fontFamily').inputValue();
+        const fontSizeValue = await settingsPage.locator('input#fontSize').inputValue();
+        const fontFamilyValue = await settingsPage.locator('input#fontFamily').inputValue();
         expect(fontSizeValue).toBe('18');
         expect(fontFamilyValue).toContain('Consolas');
       }).toPass({ timeout: 5000 });
+
+      // クリーンアップ
+      await settingsPage.close();
     });
   });
 

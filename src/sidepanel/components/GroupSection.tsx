@@ -49,14 +49,14 @@ const GroupSection: React.FC<GroupSectionProps> = ({
   const groupList = Object.values(groups);
 
   return (
-    <div data-testid="groups-section" className="border-b border-gray-200 mb-2">
+    <div data-testid="groups-section" className="border-b border-gray-700 mb-2">
       {/* グループヘッダー */}
-      <div className="flex items-center justify-between px-2 py-1 bg-gray-100">
-        <span className="text-sm font-medium text-gray-700">Groups</span>
+      <div className="flex items-center justify-between px-2 py-1 bg-gray-800">
+        <span className="text-sm font-medium text-gray-200">Groups</span>
         <button
           aria-label="Create new group"
           onClick={() => setShowCreateForm(true)}
-          className="text-blue-500 hover:text-blue-700 text-sm"
+          className="text-blue-400 hover:text-blue-300 text-sm"
         >
           + New
         </button>
@@ -64,7 +64,7 @@ const GroupSection: React.FC<GroupSectionProps> = ({
 
       {/* グループ作成フォーム */}
       {showCreateForm && (
-        <div data-testid="group-create-form" className="p-2 bg-gray-50 border-b">
+        <div data-testid="group-create-form" className="p-2 bg-gray-800 border-b border-gray-700">
           <form onSubmit={handleCreateSubmit}>
             <div className="flex items-center gap-2 mb-2">
               <input
@@ -73,7 +73,7 @@ const GroupSection: React.FC<GroupSectionProps> = ({
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder="Group name"
-                className="flex-1 px-2 py-1 text-sm border rounded"
+                className="flex-1 px-2 py-1 text-sm border border-gray-600 rounded bg-gray-700 text-gray-100"
                 autoFocus
               />
               <input
@@ -89,14 +89,14 @@ const GroupSection: React.FC<GroupSectionProps> = ({
                 type="button"
                 aria-label="Cancel"
                 onClick={handleCancelCreate}
-                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800"
+                className="px-2 py-1 text-sm text-gray-400 hover:text-gray-200"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 aria-label="Create group"
-                className="px-2 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-500"
               >
                 Create
               </button>
@@ -107,7 +107,7 @@ const GroupSection: React.FC<GroupSectionProps> = ({
 
       {/* グループ一覧 */}
       {groupList.length === 0 && !showCreateForm && (
-        <div className="p-2 text-sm text-gray-500 text-center">
+        <div className="p-2 text-sm text-gray-400 text-center">
           No groups yet
         </div>
       )}

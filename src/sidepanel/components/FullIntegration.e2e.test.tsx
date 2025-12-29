@@ -131,9 +131,9 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       expect(screen.queryByText(/Loading.../i)).not.toBeInTheDocument();
     });
 
-    // 3. サイドパネルのタイトルが表示されることを確認
+    // 3. Task 10.2: ヘッダーが削除されたことを確認（Vivaldi-TTタイトルは表示されない）
     await waitFor(() => {
-      expect(screen.getByText('Vivaldi-TT')).toBeInTheDocument();
+      expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
     });
 
     // 統合テスト成功: サイドパネルが正常に表示された
@@ -222,12 +222,14 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       />
     );
 
-    // 1. ビューが表示されることを確認
-    expect(screen.getByText('Work')).toBeInTheDocument();
-    expect(screen.getByText('Personal')).toBeInTheDocument();
+    // Task 7.1: ビューがファビコンサイズアイコンボタンとして表示されることを確認
+    // ビュー名はaria-labelで確認（テキスト表示はなくなった）
+    const workView = screen.getByRole('button', { name: /Switch to Work view/i });
+    const personalView = screen.getByRole('button', { name: /Switch to Personal view/i });
+    expect(workView).toBeInTheDocument();
+    expect(personalView).toBeInTheDocument();
 
     // 2. ビューを切り替え
-    const personalView = screen.getByText('Personal');
     await user.click(personalView);
 
     // 3. ビュー切り替えハンドラが呼ばれたことを確認
@@ -320,13 +322,14 @@ describe('Task 16.1: 全機能の統合テスト', () => {
       expect(screen.queryByText(/Loading.../i)).not.toBeInTheDocument();
     });
 
-    // 2. サイドパネルのタイトルが表示されることを確認
+    // 2. Task 10.2: ヘッダーが削除されたことを確認（Vivaldi-TTタイトルは表示されない）
     await waitFor(() => {
-      expect(screen.getByText('Vivaldi-TT')).toBeInTheDocument();
+      expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
     });
 
     // すべての主要コンポーネントが正常にレンダリングされることを確認
-    expect(screen.getByText('Vivaldi-TT')).toBeInTheDocument();
+    // Task 10.2: Vivaldi-TTヘッダーは削除されたが、サイドパネルルートは表示される
+    expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
   });
 
   it('シナリオ7: エラーハンドリングとリカバリ', async () => {

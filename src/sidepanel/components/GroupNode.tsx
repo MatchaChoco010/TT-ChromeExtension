@@ -66,7 +66,7 @@ const GroupNode: React.FC<GroupNodeProps> = ({
     <div>
       <div
         data-testid={`group-node-${group.id}`}
-        className="flex items-center p-2 hover:bg-gray-100 cursor-pointer bg-gray-50"
+        className="flex items-center p-2 hover:bg-gray-700 cursor-pointer bg-gray-800"
         style={{ paddingLeft: `${indentSize}px` }}
         onClick={handleNodeClick}
         onMouseEnter={() => setIsHovered(true)}
@@ -76,7 +76,7 @@ const GroupNode: React.FC<GroupNodeProps> = ({
       <button
         data-testid={`toggle-expand-${group.id}`}
         onClick={handleToggleClick}
-        className="mr-2 w-4 h-4 flex items-center justify-center text-gray-600"
+        className="mr-2 w-4 h-4 flex items-center justify-center text-gray-300"
         aria-label={group.isExpanded ? 'Collapse' : 'Expand'}
       >
         {group.isExpanded ? '▼' : '▶'}
@@ -99,7 +99,7 @@ const GroupNode: React.FC<GroupNodeProps> = ({
 
       {/* グループ名 */}
       <div className="flex-1 flex items-center min-w-0">
-        <span className="text-sm font-medium truncate">{group.name}</span>
+        <span className="text-sm font-medium truncate text-gray-100">{group.name}</span>
       </div>
 
       {/* 閉じるボタン（ホバー時のみ表示） */}
@@ -107,7 +107,7 @@ const GroupNode: React.FC<GroupNodeProps> = ({
         <button
           data-testid={`close-button-${group.id}`}
           onClick={handleCloseClick}
-          className="ml-2 w-4 h-4 flex items-center justify-center text-gray-500 hover:text-red-600 flex-shrink-0"
+          className="ml-2 w-4 h-4 flex items-center justify-center text-gray-400 hover:text-red-400 flex-shrink-0"
           aria-label="Close group"
         >
           ×

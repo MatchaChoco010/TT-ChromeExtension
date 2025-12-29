@@ -287,4 +287,136 @@ describe('SnapshotManager - Auto Snapshot', () => {
       await expect(alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() })).resolves.not.toThrow();
     });
   });
+
+  /**
+   * Task 9.2: スナップショット自動保存バックグラウンド処理の追加テスト
+   * - maxSnapshots超過時の古いスナップショット自動削除
+   * - 設定変更時のアラーム再設定
+   */
+  describe('startAutoSnapshot with maxSnapshots', () => {
+    it('should delete old snapshots when maxSnapshots is exceeded after auto-snapshot', async () => {
+      // Requirement 6.5: 最大保持数を超えた古いスナップショットを自動削除する
+      const intervalMinutes = 10;
+      const maxSnapshots = 5;
+
+      snapshotManager.startAutoSnapshot(intervalMinutes, maxSnapshots);
+
+      // アラームリスナーを取得
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
+
+      // アラームを発火
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
+
+      // スナップショット作成後に古いスナップショットが削除されることを確認
+      expect(mockIndexedDBService.deleteOldSnapshots).toHaveBeenCalledWith(maxSnapshots);
+    });
+
+    it('should not delete old snapshots when maxSnapshots is 0 (unlimited)', async () => {
+      const intervalMinutes = 10;
+      const maxSnapshots = 0; // 無制限
+
+      snapshotManager.startAutoSnapshot(intervalMinutes, maxSnapshots);
+
+      // アラームリスナーを取得
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
+
+      // アラームを発火
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
+
+      // maxSnapshotsが0の場合、deleteOldSnapshotsは呼ばれない
+      expect(mockIndexedDBService.deleteOldSnapshots).not.toHaveBeenCalled();
+    });
+
+    it('should use default maxSnapshots when not provided', async () => {
+      const intervalMinutes = 10;
+
+      // maxSnapshotsを指定しない
+      snapshotManager.startAutoSnapshot(intervalMinutes);
+
+      // アラームリスナーを取得
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
+
+      // アラームを発火
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
+
+      // maxSnapshotsが指定されていない場合はdeleteOldSnapshotsを呼ばない
+      expect(mockIndexedDBService.deleteOldSnapshots).not.toHaveBeenCalled();
+    });
+
+    it('should handle deleteOldSnapshots error gracefully', async () => {
+      // deleteOldSnapshotsがエラーをスローするようにモック
+      mockIndexedDBService.deleteOldSnapshots = vi
+        .fn()
+        .mockRejectedValue(new Error('Delete failed'));
+
+      const intervalMinutes = 10;
+      const maxSnapshots = 5;
+
+      snapshotManager.startAutoSnapshot(intervalMinutes, maxSnapshots);
+
+      // アラームリスナーを取得
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[0][0];
+
+      // アラームを発火 - エラーがスローされないことを確認
+      await expect(alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() })).resolves.not.toThrow();
+    });
+  });
+
+  describe('updateAutoSnapshotSettings', () => {
+    it('should restart auto-snapshot with new interval', () => {
+      // Requirement 6.4: 設定変更時にアラームを再設定する
+      snapshotManager.startAutoSnapshot(10);
+
+      // 設定を変更
+      snapshotManager.updateAutoSnapshotSettings(30, 10);
+
+      // 新しいアラームが作成されることを確認
+      expect(chromeMock.alarms.create).toHaveBeenLastCalledWith(
+        'auto-snapshot',
+        {
+          periodInMinutes: 30,
+        },
+      );
+    });
+
+    it('should stop auto-snapshot when interval is 0', () => {
+      snapshotManager.startAutoSnapshot(10);
+
+      // 自動保存を無効化
+      snapshotManager.updateAutoSnapshotSettings(0, 10);
+
+      // アラームがクリアされ、新しいアラームが作成されないことを確認
+      expect(chromeMock.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
+      // 最後のcreate呼び出しはinterval: 10のもの（0では呼ばれない）
+      const createCalls = chromeMock.alarms.create.mock.calls;
+      const lastCallPeriod = createCalls[createCalls.length - 1]?.[1]?.periodInMinutes;
+      expect(lastCallPeriod).toBe(10);
+    });
+
+    it('should update maxSnapshots setting', async () => {
+      snapshotManager.startAutoSnapshot(10, 5);
+
+      // maxSnapshotsを変更
+      snapshotManager.updateAutoSnapshotSettings(10, 20);
+
+      // アラームリスナーを取得（最後に登録されたもの）
+      type AlarmListener = (alarm: chrome.alarms.Alarm) => void;
+      const addListenerCalls = chromeMock.alarms.onAlarm.addListener.mock.calls as Array<[AlarmListener]>;
+      const alarmListener = addListenerCalls[addListenerCalls.length - 1][0];
+
+      // アラームを発火
+      await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
+
+      // 新しいmaxSnapshotsが適用されることを確認
+      expect(mockIndexedDBService.deleteOldSnapshots).toHaveBeenCalledWith(20);
+    });
+  });
 });

@@ -39,6 +39,14 @@ describe('SidePanelRoot', () => {
     });
   });
 
+  it('Task 10.2: Vivaldi-TTヘッダーが削除されていること', async () => {
+    await act(async () => {
+      render(<SidePanelRoot />);
+    });
+    // ヘッダーテキスト「Vivaldi-TT」が表示されないことを確認
+    expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
+  });
+
   it('エラー境界が設定されていること', async () => {
     // エラーをスローするコンポーネント
     const ErrorComponent = () => {

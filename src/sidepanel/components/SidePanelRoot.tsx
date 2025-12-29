@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useCallback } from 'react';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
-import { ThemeProvider, useTheme } from '../providers/ThemeProvider';
+import { ThemeProvider } from '../providers/ThemeProvider';
 import ErrorBoundary from './ErrorBoundary';
 import TabTreeView from './TabTreeView';
 import ViewSwitcher from './ViewSwitcher';
 import GroupSection from './GroupSection';
-import SnapshotSection from './SnapshotSection';
-import SettingsPanel from './SettingsPanel';
+import PinnedTabsSection from './PinnedTabsSection';
+import ExternalDropZone from './ExternalDropZone';
+import { OpenSettingsButton } from './OpenSettingsButton';
+import { useExternalDrop } from '../hooks/useExternalDrop';
 import { indexedDBService } from '@/storage/IndexedDBService';
 import { storageService } from '@/storage/StorageService';
+import { SnapshotManager } from '@/services/SnapshotManager';
 import type { TabNode } from '@/types';
+import type { DragStartEvent } from '@dnd-kit/core';
 
 interface SidePanelRootProps {
   children?: React.ReactNode;
@@ -36,10 +40,40 @@ const TreeViewContent: React.FC = () => {
     getUnreadChildCount,
     // Task 8.5.4: アクティブタブID
     activeTabId,
+    // Task 3.1: ピン留めタブ機能
+    pinnedTabIds,
+    tabInfoMap,
+    // Task 1.1: タブ情報取得関数
+    getTabInfo,
+    // Task 1.3: 複数選択状態管理
+    isNodeSelected,
+    selectNode,
+    // Task 12.2: 選択されたすべてのタブIDを取得
+    getSelectedTabIds,
   } = useTreeState();
 
-  const { settings, updateSettings } = useTheme();
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Task 8.2: 設定画面はサイドパネル内ではなく、新規タブで開くように変更
+  // const [isSettingsOpen, setIsSettingsOpen] = useState(false); // 削除
+
+  // Task 5.2: 外部ドロップ（新規ウィンドウ作成）機能
+  const {
+    isDragging: isExternalDragActive,
+    setIsDragging: setExternalDragActive,
+    setActiveTabId: setDraggedTabId,
+    onExternalDrop,
+  } = useExternalDrop();
+
+  // Task 6.2: スナップショット取得ハンドラ
+  const handleSnapshot = useCallback(async () => {
+    try {
+      const snapshotManager = new SnapshotManager(indexedDBService, storageService);
+      const timestamp = new Date().toISOString().split('T')[0];
+      const name = `Manual Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
+      await snapshotManager.createSnapshot(name, false);
+    } catch (error) {
+      console.error('Failed to create snapshot:', error);
+    }
+  }, []);
 
   const handleNodeClick = (tabId: number) => {
     // タブをアクティブ化
@@ -97,72 +131,49 @@ const TreeViewContent: React.FC = () => {
     toggleGroupExpanded(groupId);
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* ヘッダー: 設定ボタン */}
-      <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700">
-        <span className="text-sm font-medium">Vivaldi-TT</span>
-        <button
-          data-testid="settings-button"
-          onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-          className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-          aria-label="設定"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-5 h-5"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-        </button>
-      </div>
+  // Task 3.1: ピン留めタブのクリックハンドラ
+  const handlePinnedTabClick = (tabId: number) => {
+    chrome.tabs.update(tabId, { active: true });
+  };
 
-      {/* Task 4.12: 設定パネル */}
-      {isSettingsOpen && settings && (
-        <div
-          data-testid="settings-panel"
-          className="absolute inset-0 bg-white dark:bg-gray-800 z-50 overflow-auto"
-        >
-          <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700">
-            <span className="text-sm font-medium">設定</span>
-            <button
-              data-testid="settings-close-button"
-              onClick={() => setIsSettingsOpen(false)}
-              className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-              aria-label="閉じる"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-5 h-5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-          <SettingsPanel settings={settings} onSettingsChange={updateSettings} />
-        </div>
-      )}
+  // Task 3.1: ピン留めタブの閉じるハンドラ
+  const handlePinnedTabClose = (tabId: number) => {
+    chrome.tabs.remove(tabId);
+  };
+
+  // Task 5.2: ドラッグ開始時のハンドラ（外部ドロップ連携）
+  const handleTreeDragStart = useCallback((event: DragStartEvent) => {
+    const nodeId = event.active.id as string;
+    // ノードIDからタブIDを取得
+    if (treeState?.nodes[nodeId]) {
+      const tabId = treeState.nodes[nodeId].tabId;
+      setDraggedTabId(tabId);
+      setExternalDragActive(true);
+    }
+  }, [treeState?.nodes, setDraggedTabId, setExternalDragActive]);
+
+  // Task 5.2: ドラッグキャンセル時のハンドラ（外部ドロップ連携）
+  const handleTreeDragCancel = useCallback(() => {
+    setDraggedTabId(null);
+    setExternalDragActive(false);
+  }, [setDraggedTabId, setExternalDragActive]);
+
+  // Task 5.2: ドラッグ終了時のハンドラをラップ（外部ドロップ連携）
+  const handleTreeDragEnd = useCallback(async (event: Parameters<typeof handleDragEnd>[0]) => {
+    // 元のドラッグ終了処理を呼び出す
+    await handleDragEnd(event);
+    // 外部ドロップ状態をリセット
+    setDraggedTabId(null);
+    setExternalDragActive(false);
+  }, [handleDragEnd, setDraggedTabId, setExternalDragActive]);
+
+  return (
+    <div className="flex flex-col h-full bg-gray-900">
+      {/* Task 10.2: ヘッダー「Vivaldi-TT」を削除し、設定ボタンのみ表示。タブツリーの表示領域を最大化 */}
+      <div className="flex items-center justify-end p-1 border-b border-gray-700">
+        {/* Task 8.2: 設定画面を新規タブで開くボタン */}
+        <OpenSettingsButton />
+      </div>
 
       {/* Task 4.8: ビュースイッチャー */}
       {treeState && (
@@ -184,10 +195,13 @@ const TreeViewContent: React.FC = () => {
         onGroupClick={handleGroupClick}
         getGroupTabCount={getGroupTabCount}
       />
-      {/* Task 4.10: スナップショットセクション */}
-      <SnapshotSection
-        indexedDBService={indexedDBService}
-        storageService={storageService}
+      {/* Task 6.2: スナップショットセクションを削除し、コンテキストメニューからスナップショットを取得可能に */}
+      {/* Task 3.1: ピン留めタブセクション */}
+      <PinnedTabsSection
+        pinnedTabIds={pinnedTabIds}
+        tabInfoMap={tabInfoMap}
+        onTabClick={handlePinnedTabClick}
+        onTabClose={handlePinnedTabClose}
       />
       {/* タブツリービュー */}
       <div className="flex-1 overflow-auto" data-testid="tab-tree-root">
@@ -196,10 +210,22 @@ const TreeViewContent: React.FC = () => {
           currentViewId={treeState?.currentViewId || 'default'}
           onNodeClick={handleNodeClick}
           onToggleExpand={handleToggleExpand}
-          onDragEnd={handleDragEnd}
+          onDragEnd={handleTreeDragEnd}
+          onDragStart={handleTreeDragStart}
+          onDragCancel={handleTreeDragCancel}
           isTabUnread={isTabUnread}
           getUnreadChildCount={getUnreadChildCount}
           activeTabId={activeTabId ?? undefined}
+          getTabInfo={getTabInfo}
+          isNodeSelected={isNodeSelected}
+          onSelect={selectNode}
+          getSelectedTabIds={getSelectedTabIds}
+          onSnapshot={handleSnapshot}
+        />
+        {/* Task 5.2: 外部ドロップゾーン（新規ウィンドウ作成） */}
+        <ExternalDropZone
+          isDragging={isExternalDragActive}
+          onDrop={onExternalDrop}
         />
       </div>
     </div>
@@ -214,10 +240,10 @@ const LoadingWrapper: React.FC<{ children: React.ReactNode }> = ({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-red-50">
+      <div className="flex items-center justify-center h-screen bg-gray-900">
         <div className="text-center p-8">
-          <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
-          <p className="text-gray-700">{error.message}</p>
+          <h2 className="text-xl font-bold text-red-400 mb-2">Error</h2>
+          <p className="text-gray-300">{error.message}</p>
         </div>
       </div>
     );
@@ -225,10 +251,10 @@ const LoadingWrapper: React.FC<{ children: React.ReactNode }> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-gray-900">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mb-2"></div>
+          <p className="text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -242,7 +268,7 @@ const SidePanelRoot: React.FC<SidePanelRootProps> = ({ children }) => {
     <ErrorBoundary>
       <ThemeProvider>
         <TreeStateProvider>
-          <div data-testid="side-panel-root" className="h-screen w-full overflow-auto">
+          <div data-testid="side-panel-root" className="h-screen w-full overflow-auto bg-gray-900 text-gray-100">
             <LoadingWrapper>
               {children || <TreeViewContent />}
             </LoadingWrapper>

@@ -22,6 +22,7 @@ export class SnapshotManager {
   private static readonly AUTO_SNAPSHOT_ALARM_NAME = 'auto-snapshot';
 
   private alarmListener: ((alarm: chrome.alarms.Alarm) => void) | null = null;
+  private currentMaxSnapshots: number | undefined = undefined;
 
   constructor(
     private indexedDBService: IIndexedDBService,
@@ -250,10 +251,12 @@ export class SnapshotManager {
   /**
    * 自動スナップショット機能を開始
    * Requirement 11.4, 11.5: 定期的な自動スナップショット機能を提供する
+   * Task 9.2: 最大保持数を超えた古いスナップショットを自動削除する
    *
    * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
+   * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
    */
-  startAutoSnapshot(intervalMinutes: number): void {
+  startAutoSnapshot(intervalMinutes: number, maxSnapshots?: number): void {
     try {
       // 既存のアラームとリスナーをクリア
       chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
@@ -261,6 +264,9 @@ export class SnapshotManager {
         chrome.alarms.onAlarm.removeListener(this.alarmListener);
         this.alarmListener = null;
       }
+
+      // maxSnapshotsを保存
+      this.currentMaxSnapshots = maxSnapshots;
 
       // intervalが0の場合は無効化（アラームを作成しない）
       if (intervalMinutes === 0) {
@@ -275,6 +281,15 @@ export class SnapshotManager {
             const timestamp = new Date().toISOString().split('T')[0];
             const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
             await this.createSnapshot(name, true);
+
+            // Requirement 6.5: 最大保持数を超えた古いスナップショットを自動削除
+            if (this.currentMaxSnapshots && this.currentMaxSnapshots > 0) {
+              try {
+                await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
+              } catch (_deleteError) {
+                // Failed to delete old snapshots silently
+              }
+            }
           } catch (_error) {
             // Auto-snapshot failed silently
           }
@@ -291,6 +306,18 @@ export class SnapshotManager {
     } catch (error) {
       throw error;
     }
+  }
+
+  /**
+   * 自動スナップショット設定を更新
+   * Requirement 6.4: 設定変更時にアラームを再設定する
+   *
+   * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
+   * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
+   */
+  updateAutoSnapshotSettings(intervalMinutes: number, maxSnapshots?: number): void {
+    // startAutoSnapshotを呼び出して設定を再適用
+    this.startAutoSnapshot(intervalMinutes, maxSnapshots);
   }
 
   /**

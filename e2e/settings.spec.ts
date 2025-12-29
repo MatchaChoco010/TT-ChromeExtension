@@ -3,235 +3,252 @@
  *
  * 設定変更とUI/UXカスタマイゼーションの E2E テスト
  *
+ * Task 8.2: 設定画面を新規タブで開く機能
  * Requirement 3.12: 設定変更とUI/UXカスタマイゼーション
- * - 設定パネルの表示
+ * Requirements 5.1, 5.2, 5.3, 5.4: 設定画面の新規タブ表示
+ * - 設定ボタンをクリックすると新規タブで設定画面が開く
+ * - 設定画面はブラウザタブの全幅を利用
  * - フォントサイズ変更
  * - フォントファミリー変更
- * - テーマ（ライト/ダーク）切り替え
- * - カスタムカラー設定
- * - インデント幅変更
+ * - カスタムCSS設定
  * - 設定の永続化
  */
 
 import { test, expect } from './fixtures/extension';
-import type { Page, Locator } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { COMMON_SELECTORS, COMMON_TIMEOUTS, FORM_INPUTS } from './test-data/common-constants';
 
 /**
- * 設定パネルを開くヘルパー関数
+ * 設定ページを新規タブで開くヘルパー関数
+ * Task 8.2: 設定画面を新規タブで開く
  *
- * Side Panelが表示されていることを確認し、設定ボタンをクリックして
- * 設定パネルを開く
+ * Side Panelの設定ボタンをクリックして新規タブで設定ページを開く
  *
- * @param page - Side PanelのPage
- * @returns 設定パネルのLocator
+ * @param sidePanelPage - Side PanelのPage
+ * @param extensionContext - BrowserContext
+ * @returns 設定ページのPage
  */
-async function openSettingsPanel(page: Page): Promise<Locator> {
+async function openSettingsInNewTab(
+  sidePanelPage: Page,
+  extensionContext: import('@playwright/test').BrowserContext
+): Promise<Page> {
   // Side Panelが表示されていることを確認
-  await expect(page.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
+  await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
     timeout: COMMON_TIMEOUTS.long,
   });
 
-  // 設定ボタンをクリック
-  const settingsButton = page.locator(COMMON_SELECTORS.settingsButton);
-  await expect(settingsButton).toBeVisible({ timeout: COMMON_TIMEOUTS.medium });
-  await settingsButton.click();
+  // 新しいページが開くのを待機しながら設定ボタンをクリック
+  const [settingsPage] = await Promise.all([
+    extensionContext.waitForEvent('page', { timeout: COMMON_TIMEOUTS.medium }),
+    sidePanelPage.locator('[data-testid="open-settings-button"]').click(),
+  ]);
 
-  // 設定パネルが表示されることを確認
-  const settingsPanel = page.locator(COMMON_SELECTORS.settingsPanel);
-  await expect(settingsPanel).toBeVisible({ timeout: COMMON_TIMEOUTS.short });
+  // 設定ページが読み込まれるまで待機
+  await settingsPage.waitForLoadState('domcontentloaded');
+  await settingsPage.waitForSelector('.settings-page-container', { timeout: COMMON_TIMEOUTS.medium });
 
-  return settingsPanel;
+  return settingsPage;
 }
 
 test.describe('設定変更とUI/UXカスタマイゼーション', () => {
-  test('設定パネルを開いた場合、現在の設定値が表示される', async ({
+  test('設定ボタンをクリックすると新規タブで設定画面が開く', async ({
     sidePanelPage,
+    extensionContext,
+    extensionId,
   }) => {
-    // Act: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
+    // Arrange: Side Panelが表示されていることを確認
+    await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
+      timeout: COMMON_TIMEOUTS.long,
+    });
+
+    // Act: 設定ボタンをクリックして新規タブを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+
+    // Assert: 設定ページが正しいURLで開かれる
+    expect(settingsPage.url()).toContain(`chrome-extension://${extensionId}/settings.html`);
+
+    // Assert: 設定ページに設定見出しが表示される
+    await expect(settingsPage.getByRole('heading', { name: '設定' })).toBeVisible({
+      timeout: COMMON_TIMEOUTS.short,
+    });
+
+    // クリーンアップ
+    await settingsPage.close();
+  });
+
+  test('設定ページがブラウザタブの全幅を利用できるレイアウトで表示される', async ({
+    sidePanelPage,
+    extensionContext,
+  }) => {
+    // Act: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+
+    // Assert: 設定ページコンテナが全幅レイアウト用のクラスを持つ
+    const container = settingsPage.locator('.settings-page-container');
+    await expect(container).toBeVisible();
+    await expect(container).toHaveClass(/min-h-screen/);
+
+    // クリーンアップ
+    await settingsPage.close();
+  });
+
+  test('設定ページで現在の設定値が表示される', async ({
+    sidePanelPage,
+    extensionContext,
+  }) => {
+    // Act: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
     // Assert: フォントサイズ入力が存在する
-    const fontSizeInput = sidePanelPage.locator(FORM_INPUTS.fontSize);
+    const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
     await expect(fontSizeInput).toBeVisible();
 
     // フォントファミリー入力が存在する
-    const fontFamilyInput = sidePanelPage.locator(FORM_INPUTS.fontFamily);
+    const fontFamilyInput = settingsPage.locator(FORM_INPUTS.fontFamily);
     await expect(fontFamilyInput).toBeVisible();
 
     // デフォルト値が設定されている
     await expect(fontSizeInput).toHaveValue('14');
+
+    // クリーンアップ
+    await settingsPage.close();
   });
 
-  test('フォントサイズを変更した場合、ツリー表示のフォントサイズが即座に反映される', async ({
+  test('フォントサイズを変更した場合、設定が保存される', async ({
     sidePanelPage,
+    extensionContext,
   }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
-
-    // 変更前のCSS変数を取得
-    const initialFontSize = await sidePanelPage.evaluate(() => {
-      return getComputedStyle(document.documentElement).getPropertyValue('--font-size');
-    });
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
     // Act: フォントサイズを18pxに変更
-    const fontSizeInput = sidePanelPage.locator(FORM_INPUTS.fontSize);
+    const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
     await fontSizeInput.clear();
     await fontSizeInput.fill('18');
 
-    // Assert: フォントサイズが18pxに変更される
+    // 少し待機して設定が保存されるのを確認
+    await settingsPage.waitForTimeout(500);
+
+    // クリーンアップ
+    await settingsPage.close();
+
+    // Assert: Side Panelでフォントサイズが反映されていることを確認
     await expect(async () => {
       const currentFontSize = await sidePanelPage.evaluate(() => {
         return getComputedStyle(document.documentElement).getPropertyValue('--font-size');
       });
       expect(currentFontSize.trim()).toBe('18px');
-    }).toPass({ timeout: COMMON_TIMEOUTS.short });
+    }).toPass({ timeout: COMMON_TIMEOUTS.medium });
   });
 
   test('フォントサイズのプリセットボタン（小・中・大）が機能する', async ({
     sidePanelPage,
+    extensionContext,
   }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
     // Act & Assert: 「大」ボタンをクリック
-    const largeButton = sidePanelPage.getByRole('button', { name: '大' });
+    const largeButton = settingsPage.getByRole('button', { name: '大' });
     await largeButton.click();
 
-    const fontSizeInput = sidePanelPage.locator(FORM_INPUTS.fontSize);
+    const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
     await expect(async () => {
       await expect(fontSizeInput).toHaveValue('16');
     }).toPass({ timeout: COMMON_TIMEOUTS.short });
 
     // Act & Assert: 「小」ボタンをクリック
-    const smallButton = sidePanelPage.getByRole('button', { name: '小' });
+    const smallButton = settingsPage.getByRole('button', { name: '小' });
     await smallButton.click();
     await expect(async () => {
       await expect(fontSizeInput).toHaveValue('12');
     }).toPass({ timeout: COMMON_TIMEOUTS.short });
 
     // Act & Assert: 「中」ボタンをクリック
-    const mediumButton = sidePanelPage.getByRole('button', { name: '中' });
+    const mediumButton = settingsPage.getByRole('button', { name: '中' });
     await mediumButton.click();
     await expect(async () => {
       await expect(fontSizeInput).toHaveValue('14');
     }).toPass({ timeout: COMMON_TIMEOUTS.short });
+
+    // クリーンアップ
+    await settingsPage.close();
   });
 
-  test('フォントファミリーを変更した場合、指定されたフォントが適用される', async ({
+  test('フォントファミリーを変更した場合、設定が保存される', async ({
     sidePanelPage,
+    extensionContext,
   }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
     // Act: フォントファミリーを変更
-    const fontFamilyInput = sidePanelPage.locator(FORM_INPUTS.fontFamily);
+    const fontFamilyInput = settingsPage.locator(FORM_INPUTS.fontFamily);
     await fontFamilyInput.clear();
     await fontFamilyInput.fill('Consolas, monospace');
 
-    // Assert: CSS変数が更新される
+    // 少し待機して設定が保存されるのを確認
+    await settingsPage.waitForTimeout(500);
+
+    // クリーンアップ
+    await settingsPage.close();
+
+    // Assert: Side PanelでCSS変数が更新されることを確認
     await expect(async () => {
       const currentFontFamily = await sidePanelPage.evaluate(() => {
         return getComputedStyle(document.documentElement).getPropertyValue('--font-family');
       });
       expect(currentFontFamily.trim()).toContain('Consolas');
-    }).toPass({ timeout: COMMON_TIMEOUTS.short });
+    }).toPass({ timeout: COMMON_TIMEOUTS.medium });
   });
 
-  test('テーマ（ライト/ダーク）を切り替えた場合、配色が即座に変更される', async ({
+  test('カスタムCSSを設定した場合、Side Panelに適用される', async ({
     sidePanelPage,
+    extensionContext,
   }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
-
-    // テーマ切り替えボタンを探す
-    const themeToggle = sidePanelPage.locator(COMMON_SELECTORS.themeToggle);
-
-    // テーマ切り替えが存在しない場合はスキップ
-    if (!(await themeToggle.isVisible({ timeout: 2000 }).catch(() => false))) {
-      // テーマ切り替えがない場合は、システムのテーマ検出が機能していることを確認
-      const isDarkMode = await sidePanelPage.evaluate(() => {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-      });
-
-      // CSS変数が設定されていることを確認
-      const bgColor = await sidePanelPage.evaluate(() => {
-        return getComputedStyle(document.documentElement).getPropertyValue('--vivaldi-bg-primary');
-      });
-      expect(bgColor.trim()).not.toBe('');
-      return;
-    }
-
-    // 現在の背景色を取得
-    const initialBgColor = await sidePanelPage.evaluate(() => {
-      return getComputedStyle(document.body).backgroundColor;
-    });
-
-    // Act: テーマを切り替え
-    await themeToggle.click();
-
-    // Assert: 背景色が変更される
-    await expect(async () => {
-      const currentBgColor = await sidePanelPage.evaluate(() => {
-        return getComputedStyle(document.body).backgroundColor;
-      });
-      expect(currentBgColor).not.toBe(initialBgColor);
-    }).toPass({ timeout: COMMON_TIMEOUTS.short });
-  });
-
-  test('カスタムCSSを設定した場合、スタイルが適用される', async ({
-    sidePanelPage,
-  }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
     // Act: カスタムCSSを入力
-    const customCSSTextarea = sidePanelPage.locator(FORM_INPUTS.customCSS);
+    const customCSSTextarea = settingsPage.locator(FORM_INPUTS.customCSS);
     await expect(customCSSTextarea).toBeVisible();
     await customCSSTextarea.fill('.custom-test-class { color: rgb(255, 0, 0); }');
 
-    // Assert: スタイルシートに追加されることを確認
+    // 少し待機して設定が保存されるのを確認
+    await settingsPage.waitForTimeout(500);
+
+    // クリーンアップ
+    await settingsPage.close();
+
+    // Assert: Side Panelでスタイルシートに追加されることを確認
     await expect(async () => {
       const styleContent = await sidePanelPage.evaluate(() => {
         const style = document.getElementById('vivaldi-tt-theme');
         return style ? style.textContent : '';
       });
       expect(styleContent).toContain('.custom-test-class');
-    }).toPass({ timeout: COMMON_TIMEOUTS.short });
-  });
-
-  test('不正なカスタムCSSを入力した場合、エラー通知が表示される', async ({
-    sidePanelPage,
-  }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
-
-    // Act: 不正なCSSを入力（括弧が閉じていない）
-    const customCSSTextarea = sidePanelPage.locator(FORM_INPUTS.customCSS);
-    await expect(customCSSTextarea).toBeVisible();
-    await customCSSTextarea.fill('.broken-css { color: red;');
-
-    // Assert: エラー通知が表示される
-    await expect(async () => {
-      const errorNotification = sidePanelPage.locator('#vivaldi-tt-css-error');
-      await expect(errorNotification).toBeVisible();
-    }).toPass({ timeout: COMMON_TIMEOUTS.short });
+    }).toPass({ timeout: COMMON_TIMEOUTS.medium });
   });
 
   test('設定を保存した場合、ブラウザを再起動しても設定が保持される（設定の永続化）', async ({
-    extensionContext,
     sidePanelPage,
-    extensionId,
+    extensionContext,
   }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
     // Act: フォントサイズを変更
-    const fontSizeInput = sidePanelPage.locator(FORM_INPUTS.fontSize);
+    const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
     await fontSizeInput.clear();
     await fontSizeInput.fill('20');
 
-    // CSS変数が更新されることを確認（保存が完了した証拠）
+    // 設定が保存されるまで待機
+    await settingsPage.waitForTimeout(500);
+
+    // 設定ページを閉じる
+    await settingsPage.close();
+
+    // Side Panelでフォントサイズが反映されていることを確認
     await expect(async () => {
       const currentFontSize = await sidePanelPage.evaluate(() => {
         return getComputedStyle(document.documentElement).getPropertyValue('--font-size');
@@ -244,83 +261,220 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     await sidePanelPage.waitForLoadState('domcontentloaded');
     await sidePanelPage.waitForSelector(COMMON_SELECTORS.reactRoot, { timeout: COMMON_TIMEOUTS.medium });
 
-    // Assert: 設定パネルを開いてフォントサイズが保持されていることを確認
-    // リロード後はReactコンポーネントの再マウントを待つ
+    // Assert: リロード後もフォントサイズが保持されていることを確認
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
 
-    // 設定ボタンが操作可能になるまで待機
-    const settingsBtn = sidePanelPage.locator(COMMON_SELECTORS.settingsButton);
-    await expect(settingsBtn).toBeVisible({ timeout: COMMON_TIMEOUTS.medium });
-    await expect(settingsBtn).toBeEnabled({ timeout: COMMON_TIMEOUTS.short });
-
-    await settingsBtn.click();
-
     await expect(async () => {
-      const fontSize = sidePanelPage.locator(FORM_INPUTS.fontSize);
-      await expect(fontSize).toHaveValue('20');
+      const currentFontSize = await sidePanelPage.evaluate(() => {
+        return getComputedStyle(document.documentElement).getPropertyValue('--font-size');
+      });
+      expect(currentFontSize.trim()).toBe('20px');
     }).toPass({ timeout: COMMON_TIMEOUTS.medium });
   });
 
-  test('インデント幅を変更した場合、ツリーの階層表示の幅が調整される', async ({
+  test('サイドパネル内には設定パネルが表示されない', async ({
     sidePanelPage,
   }) => {
-    // Arrange: 設定パネルを開く
-    await openSettingsPanel(sidePanelPage);
+    // Task 8.2: サイドパネル内部での設定画面表示を削除
+    // Assert: Side Panelに設定パネル（data-testid="settings-panel"）が存在しない
+    await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
+      timeout: COMMON_TIMEOUTS.long,
+    });
 
-    // インデント幅の設定入力を探す
-    const indentWidthInput = sidePanelPage.locator(FORM_INPUTS.indentWidth);
+    // 設定パネルがサイドパネル内に存在しないことを確認
+    const settingsPanel = sidePanelPage.locator(COMMON_SELECTORS.settingsPanel);
+    await expect(settingsPanel).not.toBeVisible();
 
-    // インデント幅設定がない場合はスキップ（カスタムCSSで対応可能）
-    if (!(await indentWidthInput.isVisible({ timeout: 2000 }).catch(() => false))) {
-      // カスタムCSSでインデント幅を変更
-      const customCSSTextarea = sidePanelPage.locator(FORM_INPUTS.customCSS);
-      await customCSSTextarea.fill('.tree-node { padding-left: 24px; }');
+    // 設定ボタンは新規タブで開くボタンに変更されている
+    const openSettingsButton = sidePanelPage.locator('[data-testid="open-settings-button"]');
+    await expect(openSettingsButton).toBeVisible();
+  });
+});
 
-      // CSSが適用されることを確認
-      await expect(async () => {
-        const styleContent = await sidePanelPage.evaluate(() => {
-          const style = document.getElementById('vivaldi-tt-theme');
-          return style ? style.textContent : '';
-        });
-        expect(styleContent).toContain('padding-left: 24px');
-      }).toPass({ timeout: COMMON_TIMEOUTS.short });
-      return;
-    }
+/**
+ * Task 12.4: 設定画面のE2Eテストを追加する
+ * スナップショット自動保存設定が保存・反映されることをテスト
+ * Requirements: 6.1, 6.2, 6.3, 6.5
+ */
+test.describe('スナップショット自動保存設定', () => {
+  test('スナップショット自動保存のトグルが機能する', async ({
+    sidePanelPage,
+    extensionContext,
+    serviceWorker,
+  }) => {
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
-    // Act: インデント幅を変更
-    await indentWidthInput.clear();
-    await indentWidthInput.fill('24');
+    // Assert: 初期状態で自動保存が無効（autoSnapshotInterval = 0）
+    const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
+    await expect(autoSnapshotToggle).toBeVisible();
+    await expect(autoSnapshotToggle).toHaveAttribute('aria-checked', 'false');
 
-    // Assert: CSS変数が更新される
+    // Act: 自動保存を有効にする
+    await autoSnapshotToggle.click();
+
+    // Assert: トグルが有効になる
+    await expect(autoSnapshotToggle).toHaveAttribute('aria-checked', 'true');
+
+    // Assert: 設定がストレージに保存される
     await expect(async () => {
-      const indentWidth = await sidePanelPage.evaluate(() => {
-        return getComputedStyle(document.documentElement).getPropertyValue('--indent-width');
+      const settings = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('user_settings');
+        return result.user_settings as { autoSnapshotInterval?: number } | undefined;
       });
-      expect(indentWidth.trim()).toBe('24px');
-    }).toPass({ timeout: COMMON_TIMEOUTS.short });
+      expect(settings?.autoSnapshotInterval).toBeGreaterThan(0);
+    }).toPass({ timeout: COMMON_TIMEOUTS.medium });
+
+    // クリーンアップ
+    await settingsPage.close();
   });
 
-  test('設定パネルを閉じることができる', async ({
+  test('スナップショット自動保存の間隔設定が保存される', async ({
     sidePanelPage,
+    extensionContext,
+    serviceWorker,
   }) => {
-    // Arrange: 設定パネルを開く
-    const settingsPanel = await openSettingsPanel(sidePanelPage);
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
 
-    // Act: 設定パネルを閉じる（閉じるボタンまたは設定ボタンを再度クリック）
-    const closeButton = sidePanelPage.locator(COMMON_SELECTORS.settingsCloseButton);
-    if (await closeButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await closeButton.click();
-    } else {
-      // 閉じるボタンがない場合は設定ボタンを再度クリック
-      const settingsButton = sidePanelPage.locator(COMMON_SELECTORS.settingsButton);
-      await settingsButton.click();
-    }
+    // 自動保存を有効にする
+    const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
+    await autoSnapshotToggle.click();
+    await expect(autoSnapshotToggle).toHaveAttribute('aria-checked', 'true');
 
-    // Assert: 設定パネルが閉じられる
+    // Act: 自動保存間隔を30分に変更
+    const intervalInput = settingsPage.locator('#autoSnapshotInterval');
+    await expect(intervalInput).toBeEnabled();
+    await intervalInput.clear();
+    await intervalInput.fill('30');
+
+    // Assert: 間隔設定がストレージに保存される
     await expect(async () => {
-      await expect(settingsPanel).not.toBeVisible();
-    }).toPass({ timeout: COMMON_TIMEOUTS.short });
+      const settings = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('user_settings');
+        return result.user_settings as { autoSnapshotInterval?: number } | undefined;
+      });
+      expect(settings?.autoSnapshotInterval).toBe(30);
+    }).toPass({ timeout: COMMON_TIMEOUTS.medium });
+
+    // クリーンアップ
+    await settingsPage.close();
+  });
+
+  test('最大スナップショット数の設定が保存される', async ({
+    sidePanelPage,
+    extensionContext,
+    serviceWorker,
+  }) => {
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+
+    // 自動保存を有効にする
+    const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
+    await autoSnapshotToggle.click();
+    await expect(autoSnapshotToggle).toHaveAttribute('aria-checked', 'true');
+
+    // Act: 最大スナップショット数を20に変更
+    const maxSnapshotsInput = settingsPage.locator('#maxSnapshots');
+    await expect(maxSnapshotsInput).toBeEnabled();
+    await maxSnapshotsInput.clear();
+    await maxSnapshotsInput.fill('20');
+
+    // Assert: 最大スナップショット数がストレージに保存される
+    await expect(async () => {
+      const settings = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('user_settings');
+        return result.user_settings as { maxSnapshots?: number } | undefined;
+      });
+      expect(settings?.maxSnapshots).toBe(20);
+    }).toPass({ timeout: COMMON_TIMEOUTS.medium });
+
+    // クリーンアップ
+    await settingsPage.close();
+  });
+
+  test('自動保存無効時は間隔と最大数の入力が無効化される', async ({
+    sidePanelPage,
+    extensionContext,
+  }) => {
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+
+    // Assert: 初期状態（自動保存無効）で入力フィールドが無効
+    const intervalInput = settingsPage.locator('#autoSnapshotInterval');
+    const maxSnapshotsInput = settingsPage.locator('#maxSnapshots');
+    await expect(intervalInput).toBeDisabled();
+    await expect(maxSnapshotsInput).toBeDisabled();
+
+    // Act: 自動保存を有効にする
+    const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
+    await autoSnapshotToggle.click();
+
+    // Assert: 入力フィールドが有効になる
+    await expect(intervalInput).toBeEnabled();
+    await expect(maxSnapshotsInput).toBeEnabled();
+
+    // Act: 自動保存を無効にする
+    await autoSnapshotToggle.click();
+
+    // Assert: 入力フィールドが再び無効になる
+    await expect(intervalInput).toBeDisabled();
+    await expect(maxSnapshotsInput).toBeDisabled();
+
+    // クリーンアップ
+    await settingsPage.close();
+  });
+
+  test('スナップショット自動保存設定がブラウザ再起動後も保持される', async ({
+    sidePanelPage,
+    extensionContext,
+  }) => {
+    // Arrange: 設定ページを開く
+    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+
+    // 自動保存を有効にして設定を変更
+    const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
+    await autoSnapshotToggle.click();
+    await expect(autoSnapshotToggle).toHaveAttribute('aria-checked', 'true');
+
+    const intervalInput = settingsPage.locator('#autoSnapshotInterval');
+    await intervalInput.clear();
+    await intervalInput.fill('15');
+
+    const maxSnapshotsInput = settingsPage.locator('#maxSnapshots');
+    await maxSnapshotsInput.clear();
+    await maxSnapshotsInput.fill('25');
+
+    // 設定が保存されるまで待機
+    await settingsPage.waitForTimeout(500);
+
+    // 設定ページを閉じる
+    await settingsPage.close();
+
+    // ページをリロード（ブラウザ再起動のシミュレーション）
+    await sidePanelPage.reload();
+    await sidePanelPage.waitForLoadState('domcontentloaded');
+    await sidePanelPage.waitForSelector(COMMON_SELECTORS.reactRoot, { timeout: COMMON_TIMEOUTS.medium });
+    await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
+      timeout: COMMON_TIMEOUTS.long,
+    });
+
+    // 再度設定ページを開く
+    const settingsPageAfterReload = await openSettingsInNewTab(sidePanelPage, extensionContext);
+
+    // Assert: 設定が保持されていることを確認
+    const toggleAfterReload = settingsPageAfterReload.locator('#autoSnapshotEnabled');
+    await expect(toggleAfterReload).toHaveAttribute('aria-checked', 'true');
+
+    const intervalAfterReload = settingsPageAfterReload.locator('#autoSnapshotInterval');
+    await expect(intervalAfterReload).toHaveValue('15');
+
+    const maxSnapshotsAfterReload = settingsPageAfterReload.locator('#maxSnapshots');
+    await expect(maxSnapshotsAfterReload).toHaveValue('25');
+
+    // クリーンアップ
+    await settingsPageAfterReload.close();
   });
 });

@@ -154,6 +154,7 @@ test.describe('ビュー切り替え機能', () => {
   });
 
   test.describe('カスタムビュー編集', () => {
+    // Task 7.3: ビュー編集は右クリックコンテキストメニュー経由で行うようになりました
     test('ビュー名や色を変更した場合、UI上の表示が即座に反映される', async ({
       sidePanelPage,
     }) => {
@@ -164,29 +165,40 @@ test.describe('ビュー切り替え機能', () => {
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
 
-      // 編集ボタンが表示されるまで待機
-      const editButton = sidePanelPage.locator(
-        '[aria-label="Edit view New View"]'
+      // 新しいビューボタンが表示されるまで待機
+      const newViewButton = sidePanelPage.locator(
+        '[aria-label="Switch to New View view"]'
       );
-      await expect(editButton).toBeVisible({ timeout: 5000 });
-      await editButton.click();
+      await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
-      // 編集フォームが表示される
-      const editForm = sidePanelPage.locator('[data-testid="view-edit-form"]');
-      await expect(editForm).toBeVisible({ timeout: 5000 });
+      // Task 7.3: 右クリックしてコンテキストメニューを開く
+      await newViewButton.click({ button: 'right' });
+
+      // コンテキストメニューが表示される
+      const contextMenu = sidePanelPage.locator('[data-testid="view-context-menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      // 「ビューを編集」をクリック
+      const editMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを編集' });
+      await expect(editMenuItem).toBeVisible({ timeout: 5000 });
+      await editMenuItem.click();
+
+      // 編集モーダルが表示される
+      const editModal = sidePanelPage.locator('[data-testid="view-edit-modal"]');
+      await expect(editModal).toBeVisible({ timeout: 5000 });
 
       // 名前を変更
-      const nameInput = sidePanelPage.locator('[aria-label="View Name"]');
+      const nameInput = sidePanelPage.locator('#view-name');
       await nameInput.clear();
       await nameInput.fill('My Custom View');
 
       // 色を変更（カラーピッカーをシミュレート）
-      const colorInput = sidePanelPage.locator('[aria-label="View Color"]');
+      const colorInput = sidePanelPage.locator('#view-color');
       // fill() を使って値を設定し、input イベントを発火させる
       await colorInput.fill('#ff0000');
 
       // 保存
-      const saveButton = sidePanelPage.locator('[aria-label="Save"]');
+      const saveButton = sidePanelPage.locator('button', { hasText: 'Save' });
       await saveButton.click();
 
       // 名前が変更されたことを確認（ボタンが表示されるまで待機）
@@ -204,38 +216,45 @@ test.describe('ビュー切り替え機能', () => {
     }) => {
       await waitForViewSwitcher(sidePanelPage);
 
-      // デフォルトビューの編集ボタンをクリック
-      const editButton = sidePanelPage.locator(
-        '[aria-label="Edit view Default"]'
+      // デフォルトビューを右クリックしてコンテキストメニューを開く
+      const defaultViewButton = sidePanelPage.locator(
+        '[aria-label="Switch to Default view"]'
       );
-      await expect(editButton).toBeVisible({ timeout: 5000 });
-      await editButton.click();
+      await expect(defaultViewButton).toBeVisible({ timeout: 5000 });
+      await defaultViewButton.click({ button: 'right' });
 
-      // 編集フォームが表示される
-      const editForm = sidePanelPage.locator('[data-testid="view-edit-form"]');
-      await expect(editForm).toBeVisible({ timeout: 5000 });
+      // コンテキストメニューが表示される
+      const contextMenu = sidePanelPage.locator('[data-testid="view-context-menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      // 「ビューを編集」をクリック
+      const editMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを編集' });
+      await expect(editMenuItem).toBeVisible({ timeout: 5000 });
+      await editMenuItem.click();
+
+      // 編集モーダルが表示される
+      const editModal = sidePanelPage.locator('[data-testid="view-edit-modal"]');
+      await expect(editModal).toBeVisible({ timeout: 5000 });
 
       // 名前を変更
-      const nameInput = sidePanelPage.locator('[aria-label="View Name"]');
+      const nameInput = sidePanelPage.locator('#view-name');
       await nameInput.clear();
       await nameInput.fill('Changed Name');
 
       // キャンセル
-      const cancelButton = sidePanelPage.locator('[aria-label="Cancel"]');
+      const cancelButton = sidePanelPage.locator('button', { hasText: 'Cancel' });
       await cancelButton.click();
 
-      // 編集フォームが閉じるのを待機
-      await expect(editForm).not.toBeVisible({ timeout: 5000 });
+      // 編集モーダルが閉じるのを待機
+      await expect(editModal).not.toBeVisible({ timeout: 5000 });
 
       // 元の名前のままであることを確認
-      const defaultViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to Default view"]'
-      );
       await expect(defaultViewButton).toBeVisible({ timeout: 5000 });
     });
   });
 
   test.describe('ビュー削除', () => {
+    // Task 7.3: ビュー削除は右クリックコンテキストメニュー経由で行うようになりました
     test('ビューを削除した場合、デフォルトビューに自動的に切り替わる', async ({
       sidePanelPage,
     }) => {
@@ -258,17 +277,17 @@ test.describe('ビュー切り替え機能', () => {
       // 新しいビューがアクティブになるまで待機
       await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
-      // 編集モードに入る
-      const editButton = sidePanelPage.locator(
-        '[aria-label="Edit view New View"]'
-      );
-      await expect(editButton).toBeVisible({ timeout: 5000 });
-      await editButton.click();
+      // Task 7.3: 右クリックしてコンテキストメニューを開く
+      await newViewButton.click({ button: 'right' });
 
-      // 削除ボタンが表示されるまで待機してクリック
-      const deleteButton = sidePanelPage.locator('[aria-label="Delete view"]');
-      await expect(deleteButton).toBeVisible({ timeout: 5000 });
-      await deleteButton.click();
+      // コンテキストメニューが表示される
+      const contextMenu = sidePanelPage.locator('[data-testid="view-context-menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      // 「ビューを削除」をクリック
+      const deleteMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを削除' });
+      await expect(deleteMenuItem).toBeVisible({ timeout: 5000 });
+      await deleteMenuItem.click();
 
       // 新しいビューが削除されたことを確認
       await expect(newViewButton).not.toBeVisible({ timeout: 5000 });
@@ -283,20 +302,20 @@ test.describe('ビュー切り替え機能', () => {
     test('デフォルトビューは削除できない', async ({ sidePanelPage }) => {
       await waitForViewSwitcher(sidePanelPage);
 
-      // デフォルトビューの編集ボタンをクリック
-      const editButton = sidePanelPage.locator(
-        '[aria-label="Edit view Default"]'
+      // デフォルトビューを右クリックしてコンテキストメニューを開く
+      const defaultViewButton = sidePanelPage.locator(
+        '[aria-label="Switch to Default view"]'
       );
-      await expect(editButton).toBeVisible({ timeout: 5000 });
-      await editButton.click();
+      await expect(defaultViewButton).toBeVisible({ timeout: 5000 });
+      await defaultViewButton.click({ button: 'right' });
 
-      // 編集フォームが表示される
-      const editForm = sidePanelPage.locator('[data-testid="view-edit-form"]');
-      await expect(editForm).toBeVisible({ timeout: 5000 });
+      // コンテキストメニューが表示される
+      const contextMenu = sidePanelPage.locator('[data-testid="view-context-menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
-      // 削除ボタンが存在しないことを確認（デフォルトビューでは表示されない）
-      const deleteButton = sidePanelPage.locator('[aria-label="Delete view"]');
-      await expect(deleteButton).not.toBeVisible({ timeout: 3000 });
+      // 「ビューを削除」が無効化されていることを確認（最後のビュー）
+      const deleteMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを削除' });
+      await expect(deleteMenuItem).toBeDisabled({ timeout: 5000 });
     });
   });
 });

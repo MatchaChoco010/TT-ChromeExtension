@@ -84,7 +84,8 @@ test.describe('TabTestUtils', () => {
 
     // 特定のタブ（tabId2）がハイライトされることを確認
     // ポーリングでUI更新を待機
-    const activeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"].bg-blue-100`);
+    // Task 10.1: ダークテーマ対応により、アクティブタブのハイライトクラスはbg-gray-600に変更
+    const activeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"].bg-gray-600`);
     await expect(activeNode).toBeVisible({ timeout: 10000 });
   });
 

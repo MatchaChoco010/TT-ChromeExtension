@@ -80,17 +80,17 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
   // スナップショットが空の場合
   if (snapshots.length === 0) {
     return (
-      <div className="snapshot-list p-4">
+      <div className="snapshot-list p-4 bg-gray-900">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">スナップショット履歴</h2>
+          <h2 className="text-lg font-semibold text-gray-100">スナップショット履歴</h2>
           <button
             onClick={handleImportClick}
-            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm"
           >
             インポート
           </button>
         </div>
-        <p className="text-gray-500 text-center py-8">
+        <p className="text-gray-400 text-center py-8">
           スナップショットがありません
         </p>
         <input
@@ -106,12 +106,12 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
   }
 
   return (
-    <div className="snapshot-list p-4">
+    <div className="snapshot-list p-4 bg-gray-900">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">スナップショット履歴</h2>
+        <h2 className="text-lg font-semibold text-gray-100">スナップショット履歴</h2>
         <button
           onClick={handleImportClick}
-          className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+          className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm"
         >
           インポート
         </button>
@@ -124,21 +124,21 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
           return (
             <li
               key={snapshot.id}
-              className="border border-gray-300 rounded-md p-3 bg-white"
+              className="border border-gray-700 rounded-md p-3 bg-gray-800"
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-gray-900">
+                    <h3 className="font-medium text-gray-100">
                       {snapshot.name}
                     </h3>
                     {snapshot.isAutoSave && (
-                      <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">
+                      <span className="px-2 py-0.5 bg-green-900 text-green-300 text-xs rounded">
                         自動保存
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-400 mt-1">
                     {formatDate(snapshot.createdAt)}
                   </p>
                 </div>
@@ -150,8 +150,8 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
                   disabled={isProcessing}
                   className={`px-3 py-1 rounded text-sm ${
                     isProcessing
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-500 hover:bg-green-600 text-white'
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-500 text-white'
                   }`}
                 >
                   復元
@@ -161,8 +161,8 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
                   disabled={isProcessing}
                   className={`px-3 py-1 rounded text-sm ${
                     isProcessing
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white'
                   }`}
                 >
                   エクスポート
@@ -172,8 +172,8 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
                   disabled={isProcessing}
                   className={`px-3 py-1 rounded text-sm ${
                     isProcessing
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-red-500 hover:bg-red-600 text-white'
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-red-600 hover:bg-red-500 text-white'
                   }`}
                 >
                   削除

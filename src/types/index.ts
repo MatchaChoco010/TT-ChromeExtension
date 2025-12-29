@@ -20,6 +20,16 @@ export interface TabInfo {
   status: 'loading' | 'complete';
 }
 
+// Task 1.1: 拡張タブ情報（ピン状態を含む）
+export interface ExtendedTabInfo extends TabInfo {
+  isPinned: boolean;
+}
+
+// Task 1.1: タブ情報マップ
+export interface TabInfoMap {
+  [tabId: number]: ExtendedTabInfo;
+}
+
 export interface View {
   id: string;
   name: string;
@@ -46,6 +56,8 @@ export interface UserSettings {
   // Task 12.2 (Requirements 9.2, 9.3, 9.4): タブ開き方別の位置ルール
   newTabPositionFromLink?: 'child' | 'sibling' | 'end'; // リンククリックから開かれたタブ
   newTabPositionManual?: 'child' | 'sibling' | 'end'; // 手動で開かれたタブ(アドレスバー、新規タブボタンなど)
+  // Task 9.1 (Requirement 6.5): スナップショット最大保持数
+  maxSnapshots?: number; // デフォルト: 10
 }
 
 // Storage types
@@ -183,11 +195,23 @@ export interface TabTreeViewProps {
   onToggleExpand: (nodeId: string) => void;
   onDragEnd?: (event: DragEndEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
+  // Task 5.2: ドラッグ開始/終了コールバック（外部ドロップ連携用）
+  onDragStart?: (event: DragStartEvent) => void;
+  onDragCancel?: () => void;
   // Task 4.13: 未読状態管理
   isTabUnread?: (tabId: number) => boolean;
   getUnreadChildCount?: (nodeId: string) => number;
   // Task 8.5.4: アクティブタブID
   activeTabId?: number;
+  // Task 2.1: タブ情報取得関数
+  getTabInfo?: (tabId: number) => ExtendedTabInfo | undefined;
+  // Task 2.3: 選択状態管理（複数選択対応）
+  isNodeSelected?: (nodeId: string) => boolean;
+  onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
+  // Task 12.2: 選択されたすべてのタブIDを取得する関数
+  getSelectedTabIds?: () => number[];
+  // Task 6.2: スナップショット取得コールバック
+  onSnapshot?: () => Promise<void>;
 }
 
 // Context Menu types
@@ -202,7 +226,8 @@ export type MenuAction =
   | 'group'
   | 'ungroup'
   | 'reload'
-  | 'copyUrl';
+  | 'copyUrl'
+  | 'snapshot';
 
 export interface ContextMenuProps {
   targetTabIds: number[];

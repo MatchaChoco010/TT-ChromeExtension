@@ -1,24 +1,38 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import { useSortable, SortableContext } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
   DndContext,
   closestCenter,
   DragOverEvent,
+  DragMoveEvent,
+  DragStartEvent,
   MouseSensor,
   TouchSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
+  useDndMonitor,
 } from '@dnd-kit/core';
-import type { TabNode, TabTreeViewProps, MenuAction } from '@/types';
+import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo } from '@/types';
 import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
 import UnreadBadge from './UnreadBadge';
+import CloseButton from './CloseButton';
+import DropIndicator from './DropIndicator';
+import {
+  calculateDropTarget,
+  DropTargetType,
+  type DropTarget,
+  type TabPosition,
+} from './GapDropDetection';
 
 // Task 6.4: ドラッグホバー時のブランチ自動展開の閾値（ミリ秒）
 // Requirement 3.4: ホバー時間が1秒を超えたら展開
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
+
+// Task 4.3: インデント幅（ピクセル）
+const INDENT_WIDTH = 20;
 
 interface TreeNodeItemProps {
   node: TabNode;
@@ -31,12 +45,28 @@ interface TreeNodeItemProps {
   getUnreadChildCount?: (nodeId: string) => number;
   // Task 8.5.4: アクティブタブID
   activeTabId?: number;
+  // Task 2.1: タブ情報取得関数
+  getTabInfo?: (tabId: number) => ExtendedTabInfo | undefined;
+  // Task 2.3: 選択状態管理
+  isNodeSelected?: (nodeId: string) => boolean;
+  onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
+  // Task 12.2: 選択されたすべてのタブIDを取得するヘルパー
+  getSelectedTabIds?: () => number[];
+  // Task 4.3: ドラッグホバーハイライト状態
+  isDragHighlighted?: boolean;
+  // Task 4.4: グローバルドラッグ中フラグ（他のノードのtransformを無効化するため）
+  globalIsDragging?: boolean;
+  // Task 4.4: ドラッグ中のアクティブノードID
+  activeNodeId?: string | null;
+  // Task 6.2: スナップショット取得コールバック
+  onSnapshot?: () => Promise<void>;
 }
 
 /**
  * ドラッグ可能なツリーノード項目コンポーネント
  * Task 4.11: コンテキストメニュー機能を追加
  * Task 4.13: 未読バッジ表示を追加
+ * Task 2.1: タブ情報（タイトル、ファビコン）表示を追加
  */
 const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   node,
@@ -46,10 +76,20 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   isTabUnread,
   getUnreadChildCount,
   activeTabId,
+  getTabInfo,
+  isNodeSelected,
+  onSelect,
+  getSelectedTabIds,
+  isDragHighlighted,
+  globalIsDragging,
+  activeNodeId,
+  onSnapshot,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  // Task 2.2: ホバー状態管理
+  const [isHovered, setIsHovered] = useState(false);
   const { executeAction } = useMenuActions();
 
   // Task 4.13: 未読状態とカウントを計算
@@ -57,6 +97,24 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
   // Task 8.5.4: アクティブ状態を計算
   const isActive = activeTabId === node.tabId;
+  // Task 2.1: タブ情報を取得
+  const tabInfo = getTabInfo ? getTabInfo(node.tabId) : undefined;
+  // Task 2.3: 選択状態を計算
+  const isSelected = isNodeSelected ? isNodeSelected(node.id) : false;
+
+  // Task 2.2: ホバー時のイベントハンドラ
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  // Task 2.2: 閉じるボタンクリック時にchrome.tabs.removeを呼び出す
+  const handleCloseClick = () => {
+    chrome.tabs.remove(node.tabId);
+  };
 
   const {
     attributes,
@@ -70,9 +128,15 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     disabled: !isDraggable,
   });
 
+  // Task 4.4: ドラッグ中は他のノードのtransformを無効化してタブ位置を固定
+  // ドラッグ中のアイテム自体のみtransformを適用
+  const isActiveItem = activeNodeId === node.id;
+  const shouldApplyTransform = isDragging || (isActiveItem && globalIsDragging);
+
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    // Task 4.4: ドラッグ中のアイテム以外はtransformを適用しない（リアルタイム並べ替え無効化）
+    transform: shouldApplyTransform ? CSS.Transform.toString(transform) : undefined,
+    transition: shouldApplyTransform ? transition : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
 
@@ -85,8 +149,24 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   };
 
   // Task 4.11: コンテキストメニューのアクション実行
+  // Task 6.2: snapshotアクションにはonSnapshotコールバックを渡す
+  // Task 12.2: 複数選択時は選択されたすべてのタブIDを使用
   const handleContextMenuAction = (action: MenuAction) => {
-    executeAction(action, [node.tabId], { url: `about:blank` });
+    const targetTabIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
+    executeAction(action, targetTabIds, { url: tabInfo?.url || 'about:blank', onSnapshot });
+  };
+
+  // Task 2.3: クリック時に選択状態を処理
+  const handleNodeClick = (e: React.MouseEvent) => {
+    // 選択機能が有効な場合は選択処理を行う
+    if (onSelect) {
+      onSelect(node.id, {
+        shift: e.shiftKey,
+        ctrl: e.ctrlKey || e.metaKey,
+      });
+    }
+    // タブをアクティブにする
+    onNodeClick(node.tabId);
   };
 
   return (
@@ -98,10 +178,12 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-sortable-item={`sortable-item-${node.id}`}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${isDragging ? 'bg-blue-100 border-2 border-blue-500' : ''} ${isActive && !isDragging ? 'bg-blue-100' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isDragging ? 'bg-gray-600 border-2 border-gray-500' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 border-2 border-gray-400' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
-        onClick={() => onNodeClick(node.tabId)}
+        onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         {...attributes}
         {...listeners}
       >
@@ -122,9 +204,38 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           </button>
         )}
 
+        {/* Task 2.1: ファビコン表示 */}
+        {getTabInfo && tabInfo ? (
+          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+            {tabInfo.favIconUrl ? (
+              <img
+                src={tabInfo.favIconUrl}
+                alt="Favicon"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div
+                data-testid="default-icon"
+                className="w-full h-full bg-gray-300 rounded-sm"
+              />
+            )}
+          </div>
+        ) : getTabInfo && !tabInfo ? (
+          /* タブ情報ロード中のプレースホルダー */
+          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+            <div
+              data-testid="default-icon"
+              className="w-full h-full bg-gray-300 rounded-sm animate-pulse"
+            />
+          </div>
+        ) : null}
+
         {/* タブの内容 */}
-        <div className="flex-1 flex items-center">
-          <span className="text-sm">Tab {node.tabId}</span>
+        <div className="flex-1 flex items-center min-w-0">
+          {/* Task 2.1: タブタイトル表示 */}
+          <span className="text-sm truncate">
+            {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
+          </span>
           {/* Task 4.13: 未読バッジ */}
           <UnreadBadge isUnread={isUnread} showIndicator={true} />
           {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
@@ -138,18 +249,21 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               </span>
             </div>
           )}
+          {/* Task 2.2: 閉じるボタン（ホバー時のみ表示） */}
+          {isHovered && <CloseButton onClose={handleCloseClick} />}
         </div>
       </div>
 
       {/* Task 4.11: コンテキストメニュー */}
+      {/* Task 12.2: 複数選択時は選択されたすべてのタブIDを使用 */}
       {contextMenuOpen && (
         <ContextMenu
-          targetTabIds={[node.tabId]}
+          targetTabIds={isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId]}
           position={contextMenuPosition}
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
-          tabUrl="about:blank"
+          tabUrl={tabInfo?.url || 'about:blank'}
         />
       )}
 
@@ -166,6 +280,13 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               isTabUnread={isTabUnread}
               getUnreadChildCount={getUnreadChildCount}
               activeTabId={activeTabId}
+              getTabInfo={getTabInfo}
+              isNodeSelected={isNodeSelected}
+              onSelect={onSelect}
+              getSelectedTabIds={getSelectedTabIds}
+              globalIsDragging={globalIsDragging}
+              activeNodeId={activeNodeId}
+              onSnapshot={onSnapshot}
             />
           ))}
         </div>
@@ -178,6 +299,8 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
  * 非ドラッグ可能なツリーノード項目コンポーネント
  * Task 4.11: コンテキストメニュー機能を追加
  * Task 4.13: 未読バッジ表示を追加
+ * Task 2.1: タブ情報（タイトル、ファビコン）表示を追加
+ * Task 2.3: 選択状態管理を追加
  */
 const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   node,
@@ -186,10 +309,17 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   isTabUnread,
   getUnreadChildCount,
   activeTabId,
+  getTabInfo,
+  isNodeSelected,
+  onSelect,
+  getSelectedTabIds,
+  onSnapshot,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  // Task 2.2: ホバー状態管理
+  const [isHovered, setIsHovered] = useState(false);
   const { executeAction } = useMenuActions();
 
   // Task 4.13: 未読状態とカウントを計算
@@ -197,6 +327,24 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
   // Task 8.5.4: アクティブ状態を計算
   const isActive = activeTabId === node.tabId;
+  // Task 2.1: タブ情報を取得
+  const tabInfo = getTabInfo ? getTabInfo(node.tabId) : undefined;
+  // Task 2.3: 選択状態を計算
+  const isSelected = isNodeSelected ? isNodeSelected(node.id) : false;
+
+  // Task 2.2: ホバー時のイベントハンドラ
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  // Task 2.2: 閉じるボタンクリック時にchrome.tabs.removeを呼び出す
+  const handleCloseClick = () => {
+    chrome.tabs.remove(node.tabId);
+  };
 
   // Task 4.11: 右クリック時のコンテキストメニュー表示
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -207,8 +355,24 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   };
 
   // Task 4.11: コンテキストメニューのアクション実行
+  // Task 6.2: snapshotアクションにはonSnapshotコールバックを渡す
+  // Task 12.2: 複数選択時は選択されたすべてのタブIDを使用
   const handleContextMenuAction = (action: MenuAction) => {
-    executeAction(action, [node.tabId], { url: `about:blank` });
+    const targetTabIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
+    executeAction(action, targetTabIds, { url: tabInfo?.url || 'about:blank', onSnapshot });
+  };
+
+  // Task 2.3: クリック時に選択状態を処理
+  const handleNodeClick = (e: React.MouseEvent) => {
+    // 選択機能が有効な場合は選択処理を行う
+    if (onSelect) {
+      onSelect(node.id, {
+        shift: e.shiftKey,
+        ctrl: e.ctrlKey || e.metaKey,
+      });
+    }
+    // タブをアクティブにする
+    onNodeClick(node.tabId);
   };
 
   return (
@@ -219,10 +383,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-node-id={node.id}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${isActive ? 'bg-blue-100' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'ring-2 ring-blue-400' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
-        onClick={() => onNodeClick(node.tabId)}
+        onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
@@ -241,9 +407,38 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           </button>
         )}
 
+        {/* Task 2.1: ファビコン表示 */}
+        {getTabInfo && tabInfo ? (
+          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+            {tabInfo.favIconUrl ? (
+              <img
+                src={tabInfo.favIconUrl}
+                alt="Favicon"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div
+                data-testid="default-icon"
+                className="w-full h-full bg-gray-300 rounded-sm"
+              />
+            )}
+          </div>
+        ) : getTabInfo && !tabInfo ? (
+          /* タブ情報ロード中のプレースホルダー */
+          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+            <div
+              data-testid="default-icon"
+              className="w-full h-full bg-gray-300 rounded-sm animate-pulse"
+            />
+          </div>
+        ) : null}
+
         {/* タブの内容 */}
-        <div className="flex-1 flex items-center">
-          <span className="text-sm">Tab {node.tabId}</span>
+        <div className="flex-1 flex items-center min-w-0">
+          {/* Task 2.1: タブタイトル表示 */}
+          <span className="text-sm truncate">
+            {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
+          </span>
           {/* Task 4.13: 未読バッジ */}
           <UnreadBadge isUnread={isUnread} showIndicator={true} />
           {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
@@ -257,18 +452,21 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               </span>
             </div>
           )}
+          {/* Task 2.2: 閉じるボタン（ホバー時のみ表示） */}
+          {isHovered && <CloseButton onClose={handleCloseClick} />}
         </div>
       </div>
 
       {/* Task 4.11: コンテキストメニュー */}
+      {/* Task 12.2: 複数選択時は選択されたすべてのタブIDを使用 */}
       {contextMenuOpen && (
         <ContextMenu
-          targetTabIds={[node.tabId]}
+          targetTabIds={isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId]}
           position={contextMenuPosition}
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
-          tabUrl="about:blank"
+          tabUrl={tabInfo?.url || 'about:blank'}
         />
       )}
 
@@ -285,6 +483,11 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               isTabUnread={isTabUnread}
               getUnreadChildCount={getUnreadChildCount}
               activeTabId={activeTabId}
+              getTabInfo={getTabInfo}
+              isNodeSelected={isNodeSelected}
+              onSelect={onSelect}
+              getSelectedTabIds={getSelectedTabIds}
+              onSnapshot={onSnapshot}
             />
           ))}
         </div>
@@ -309,10 +512,82 @@ const collectAllNodeIds = (nodes: TabNode[]): string[] => {
 };
 
 /**
+ * Task 4.3: ドラッグ中のドロップターゲット状態を監視するコンポーネント
+ * useDndMonitorはDndContext内で使用する必要があるため、別コンポーネントに分離
+ */
+interface DragMonitorProps {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  onDropTargetChange: (target: DropTarget | null) => void;
+}
+
+const DragMonitor: React.FC<DragMonitorProps> = ({
+  containerRef,
+  onDropTargetChange,
+}) => {
+  useDndMonitor({
+    onDragStart: () => {
+      // ドラッグ開始時は初期化
+      onDropTargetChange(null);
+    },
+    onDragMove: (event: DragMoveEvent) => {
+      // マウス位置からドロップターゲットを計算
+      const container = containerRef.current;
+      if (!container) {
+        onDropTargetChange(null);
+        return;
+      }
+
+      // コンテナ内のタブ要素の位置を取得
+      const containerRect = container.getBoundingClientRect();
+      const mouseY = event.activatorEvent instanceof MouseEvent
+        ? event.activatorEvent.clientY + event.delta.y - containerRect.top
+        : 0;
+
+      // 各タブノードの位置情報を構築
+      const tabPositions: TabPosition[] = [];
+      const nodeElements = container.querySelectorAll('[data-node-id]');
+
+      nodeElements.forEach((element) => {
+        const nodeId = element.getAttribute('data-node-id');
+        const depth = parseInt(element.getAttribute('data-depth') || '0', 10);
+        const rect = element.getBoundingClientRect();
+
+        if (nodeId) {
+          tabPositions.push({
+            nodeId,
+            top: rect.top - containerRect.top,
+            bottom: rect.bottom - containerRect.top,
+            depth,
+          });
+        }
+      });
+
+      // ドロップターゲットを計算
+      const target = calculateDropTarget(mouseY, tabPositions);
+      onDropTargetChange(target);
+    },
+    onDragEnd: () => {
+      // ドラッグ終了時にリセット
+      onDropTargetChange(null);
+    },
+    onDragCancel: () => {
+      // ドラッグキャンセル時にリセット
+      onDropTargetChange(null);
+    },
+  });
+
+  return null;
+};
+
+/**
  * タブツリービューコンポーネント
  * タブのツリー構造を表示し、現在のビューに基づいてフィルタリングする
  * onDragEndが提供されている場合、ドラッグ&ドロップ機能を有効化
  * Task 4.13: 未読状態表示機能を追加
+ * Task 2.1: タブ情報（タイトル、ファビコン）表示機能を追加
+ * Task 2.3: 選択状態管理機能を追加
+ * Task 4.3: 隙間ドロップ判定とビジュアルフィードバック
+ * Task 6.2: スナップショット取得機能を追加
  */
 const TabTreeView: React.FC<TabTreeViewProps> = ({
   nodes,
@@ -321,10 +596,24 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onToggleExpand,
   onDragEnd,
   onDragOver,
+  onDragStart: onDragStartProp,
+  onDragCancel: onDragCancelProp,
   isTabUnread,
   getUnreadChildCount,
   activeTabId,
+  getTabInfo,
+  isNodeSelected,
+  onSelect,
+  getSelectedTabIds,
+  onSnapshot,
 }) => {
+  // Task 4.3: ドロップターゲット状態とコンテナ参照
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Task 4.4: ドラッグ中のグローバル状態とアクティブノードID
+  const [globalIsDragging, setGlobalIsDragging] = useState(false);
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+
   // dnd-kit sensors: MouseSensor + TouchSensor + KeyboardSensor
   // PointerSensorはPlaywrightなどのE2Eテストツールでヘッドレスモードで問題が発生するため使用しない
   // activationConstraint: { distance: 8 } で誤操作を防止
@@ -356,6 +645,11 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     [filteredNodes]
   );
 
+  // Task 4.3: ドロップターゲット変更ハンドラ
+  const handleDropTargetChange = useCallback((target: DropTarget | null) => {
+    setDropTarget(target);
+  }, []);
+
   // Task 6.4: ドラッグホバー時のブランチ自動展開
   // ホバー中のノードIDとタイマーを管理
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -371,11 +665,33 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   }, []);
 
   /**
+   * Task 4.4: ドラッグ開始イベントハンドラ
+   * ドラッグ開始時にisDraggingフラグを立て、アクティブノードIDを設定
+   * Task 5.2: 外部ドロップ連携のため、propsのonDragStartも呼び出す
+   */
+  const handleDragStart = React.useCallback(
+    (event: DragStartEvent) => {
+      setGlobalIsDragging(true);
+      setActiveNodeId(event.active.id as string);
+      // Task 5.2: 外部ドロップ連携のため、propsのonDragStartを呼び出す
+      if (onDragStartProp) {
+        onDragStartProp(event);
+      }
+    },
+    [onDragStartProp]
+  );
+
+  /**
    * ドラッグ終了イベントハンドラ
    * ホバータイマーをクリアしてから元のonDragEndを呼び出す
+   * Task 4.4: ドラッグ終了時にisDraggingをfalseにする
    */
   const handleDragEnd = React.useCallback(
     (event: Parameters<NonNullable<typeof onDragEnd>>[0]) => {
+      // Task 4.4: ドラッグ終了時にフラグをリセット
+      setGlobalIsDragging(false);
+      setActiveNodeId(null);
+
       // ドラッグ終了時にホバータイマーをクリア
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
@@ -394,14 +710,25 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   /**
    * ドラッグキャンセルイベントハンドラ
    * Escapeキー等でドラッグがキャンセルされた場合にホバータイマーをクリア
+   * Task 4.4: ドラッグキャンセル時にisDraggingをfalseにする
+   * Task 5.2: 外部ドロップ連携のため、propsのonDragCancelも呼び出す
    */
   const handleDragCancel = React.useCallback(() => {
+    // Task 4.4: ドラッグキャンセル時にフラグをリセット
+    setGlobalIsDragging(false);
+    setActiveNodeId(null);
+
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
     lastHoverNodeIdRef.current = null;
-  }, []);
+
+    // Task 5.2: 外部ドロップ連携のため、propsのonDragCancelを呼び出す
+    if (onDragCancelProp) {
+      onDragCancelProp();
+    }
+  }, [onDragCancelProp]);
 
   /**
    * ドラッグオーバーイベントハンドラ
@@ -475,8 +802,30 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     [nodes, onToggleExpand, onDragOver]
   );
 
+  // Task 4.3: ドロップインジケーターの位置を計算
+  const dropIndicatorPosition = useMemo(() => {
+    if (!dropTarget || dropTarget.type !== DropTargetType.Gap) {
+      return null;
+    }
+    // gapIndexからY位置を計算（フラット化されたノードのインデックスに対応）
+    return {
+      index: dropTarget.gapIndex ?? 0,
+      depth: dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0,
+    };
+  }, [dropTarget]);
+
+  // Task 4.5: ドラッグ中の横スクロール防止
+  // isDraggingがtrueの間はoverflow-x: hiddenを適用
+  const containerClassName = useMemo(() => {
+    const baseClass = 'relative';
+    if (globalIsDragging) {
+      return `${baseClass} overflow-x-hidden is-dragging`;
+    }
+    return baseClass;
+  }, [globalIsDragging]);
+
   const content = (
-    <div>
+    <div ref={containerRef} className={containerClassName} data-drag-container>
       {filteredNodes.map((node) =>
         isDraggable ? (
           <SortableTreeNodeItem
@@ -488,6 +837,17 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
             isTabUnread={isTabUnread}
             getUnreadChildCount={getUnreadChildCount}
             activeTabId={activeTabId}
+            getTabInfo={getTabInfo}
+            isNodeSelected={isNodeSelected}
+            onSelect={onSelect}
+            getSelectedTabIds={getSelectedTabIds}
+            isDragHighlighted={
+              dropTarget?.type === DropTargetType.Tab &&
+              dropTarget.targetNodeId === node.id
+            }
+            globalIsDragging={globalIsDragging}
+            activeNodeId={activeNodeId}
+            onSnapshot={onSnapshot}
           />
         ) : (
           <TreeNodeItem
@@ -499,8 +859,22 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
             isTabUnread={isTabUnread}
             getUnreadChildCount={getUnreadChildCount}
             activeTabId={activeTabId}
+            getTabInfo={getTabInfo}
+            isNodeSelected={isNodeSelected}
+            onSelect={onSelect}
+            getSelectedTabIds={getSelectedTabIds}
+            onSnapshot={onSnapshot}
           />
         )
+      )}
+      {/* Task 4.3: ドロップインジケーター表示 */}
+      {dropIndicatorPosition && (
+        <DropIndicator
+          targetIndex={dropIndicatorPosition.index}
+          targetDepth={dropIndicatorPosition.depth}
+          indentWidth={INDENT_WIDTH}
+          isVisible={true}
+        />
       )}
     </div>
   );
@@ -508,18 +882,25 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   return (
     <div data-testid="tab-tree-view" className="w-full">
       {filteredNodes.length === 0 ? (
-        <div className="p-4 text-gray-500 text-sm">No tabs in this view</div>
+        <div className="p-4 text-gray-400 text-sm">No tabs in this view</div>
       ) : isDraggable ? (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
           onDragCancel={handleDragCancel}
         >
+          {/* Task 4.3: ドラッグ中のドロップターゲット監視 */}
+          <DragMonitor
+            containerRef={containerRef}
+            onDropTargetChange={handleDropTargetChange}
+          />
+          {/* Task 4.4: strategyをundefinedにしてリアルタイム並べ替えを無効化 */}
           <SortableContext
             items={allNodeIds}
-            strategy={verticalListSortingStrategy}
+            strategy={undefined}
           >
             {content}
           </SortableContext>

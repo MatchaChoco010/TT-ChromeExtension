@@ -11,3 +11,7 @@ export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as SettingsPanel } from './SettingsPanel';
 export { ContextMenu } from './ContextMenu';
 export type { MenuAction } from './ContextMenu';
+export { default as ExternalDropZone } from './ExternalDropZone';
+export type { ExternalDropZoneProps } from './ExternalDropZone';
+export { OpenSettingsButton, openSettingsInNewTab } from './OpenSettingsButton';
+export { TabTreeViewWithGroups } from './TabTreeViewWithGroups';

@@ -308,6 +308,155 @@ describe('ContextMenu', () => {
     });
   });
 
+  describe('Requirement 6.1: 複数選択対応操作オプション', () => {
+    it('複数タブ選択時に選択されたタブ数が表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2, 3]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      // 選択されたタブ数が表示されることを確認
+      expect(screen.getByText(/3件/)).toBeInTheDocument();
+    });
+
+    it('選択されたタブを一括で閉じるオプションが表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      // 選択されたタブを閉じるオプションが表示されることを確認
+      expect(screen.getByRole('menuitem', { name: /選択されたタブを閉じる \(2件\)/i })).toBeInTheDocument();
+    });
+
+    it('選択されたタブをグループにまとめるオプションが表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2, 3]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      // グループ化オプションが表示されることを確認
+      expect(screen.getByRole('menuitem', { name: /選択されたタブをグループ化/i })).toBeInTheDocument();
+    });
+
+    it('グループ化メニューをクリックするとgroupアクションが実行される', async () => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2, 3]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      const groupItem = screen.getByRole('menuitem', { name: /選択されたタブをグループ化/i });
+      await user.click(groupItem);
+
+      expect(onAction).toHaveBeenCalledWith('group');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('単一タブ選択時にはグループに追加メニューが表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      // 単一タブの場合は「グループに追加」が表示される
+      expect(screen.getByRole('menuitem', { name: /グループに追加/i })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /選択されたタブをグループ化/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Requirement 4.2: スナップショット取得オプション', () => {
+    it('ツリービュー右クリックメニューに「スナップショットを取得」オプションが表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      // スナップショット取得オプションが表示されることを確認
+      expect(screen.getByRole('menuitem', { name: /スナップショットを取得/i })).toBeInTheDocument();
+    });
+
+    it('スナップショット取得メニューをクリックするとsnapshotアクションが実行される', async () => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      const snapshotItem = screen.getByRole('menuitem', { name: /スナップショットを取得/i });
+      await user.click(snapshotItem);
+
+      expect(onAction).toHaveBeenCalledWith('snapshot');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('複数タブ選択時でもスナップショット取得オプションが表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2, 3]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      // 複数選択時でもスナップショット取得オプションが表示されることを確認
+      expect(screen.getByRole('menuitem', { name: /スナップショットを取得/i })).toBeInTheDocument();
+    });
+  });
+
   describe('画面端での位置調整', () => {
     it('メニューが画面右端を超える場合は左側に表示する', () => {
       // ウィンドウサイズをモック

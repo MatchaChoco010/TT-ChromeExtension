@@ -67,19 +67,24 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
       // SidePanelRootをレンダリング
       render(<SidePanelRoot />);
 
-      // ローディングが終わるまで待機
+      // サイドパネルのルート要素が表示されるまで待機
       await waitFor(
         () => {
-          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+          expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
         },
         { timeout: 3000 }
       );
 
-      // サイドパネルのルート要素が存在することを確認
-      expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
+      // タブツリービューが表示されるまで待機（ローディング完了の確認）
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
 
-      // Vivaldi-TTのタイトルが表示されることを確認
-      expect(screen.getByText('Vivaldi-TT')).toBeInTheDocument();
+      // Task 10.2: ヘッダーが削除されたことを確認（Vivaldi-TTタイトルは表示されない）
+      expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
     });
 
     it('現在のウィンドウの全タブをツリー構造で表示すること (AC 1.2)', async () => {
@@ -329,17 +334,24 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
       // SidePanelRootをレンダリング
       render(<SidePanelRoot />);
 
-      // ローディングが終わるまで待機
+      // サイドパネルのルート要素が表示されるまで待機
       await waitFor(
         () => {
-          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+          expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
         },
         { timeout: 3000 }
       );
 
-      // サイドパネルが正しく開かれたことを確認
-      expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
-      expect(screen.getByText('Vivaldi-TT')).toBeInTheDocument();
+      // タブツリービューが表示されるまで待機（ローディング完了の確認）
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+
+      // Task 10.2: ヘッダーが削除されたことを確認
+      expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
 
       // この時点でストレージから状態がロードされていることを確認
       expect(global.chrome.storage.local.get).toHaveBeenCalledWith(

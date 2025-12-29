@@ -45,25 +45,25 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   return (
     <div
       data-testid="dialog-overlay"
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50"
       onClick={handleOverlayClick}
     >
       <div
         data-testid="confirm-dialog"
-        className="bg-white rounded-lg p-6 shadow-xl max-w-md w-full mx-4"
+        className="bg-gray-800 rounded-lg p-6 shadow-xl max-w-md w-full mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* タイトル */}
-        <h2 className="text-lg font-semibold mb-4 text-gray-900">{title}</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-100">{title}</h2>
 
         {/* メッセージ */}
-        <p className="text-sm text-gray-700 mb-4">{message}</p>
+        <p className="text-sm text-gray-300 mb-4">{message}</p>
 
         {/* タブ数表示 (Requirement 8.3: 配下のタブ数を表示) */}
         {tabCount !== undefined && (
           <div
             data-testid="tab-count-display"
-            className="text-sm text-gray-600 mb-6 bg-gray-50 p-3 rounded"
+            className="text-sm text-gray-400 mb-6 bg-gray-700 p-3 rounded"
           >
             {tabCount === 1
               ? `1個のタブが閉じられます`
@@ -76,7 +76,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <button
             data-testid="cancel-button"
             onClick={handleCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
           >
             キャンセル
           </button>

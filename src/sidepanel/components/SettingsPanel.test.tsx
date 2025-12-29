@@ -251,7 +251,7 @@ describe('SettingsPanel', () => {
         />
       );
 
-      expect(screen.getByText(/設定/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('設定');
     });
 
     it('should have sections for different setting categories', () => {
@@ -464,6 +464,295 @@ describe('SettingsPanel', () => {
       );
 
       expect(screen.getByText(/外観のカスタマイズ/i)).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Task 9.1: スナップショット自動保存設定セクション
+   * Requirements: 6.1, 6.2, 6.3, 6.5
+   */
+  describe('Requirements 6.1, 6.2, 6.3, 6.5: スナップショット自動保存設定', () => {
+    it('should display snapshot settings section', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      expect(screen.getByText(/スナップショットの自動保存/i)).toBeInTheDocument();
+    });
+
+    it('should display auto-save toggle switch', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      expect(screen.getByLabelText(/自動保存を有効にする/i)).toBeInTheDocument();
+    });
+
+    it('should toggle auto-save enabled state when clicked', () => {
+      // autoSnapshotInterval が 0 の場合は無効
+      const settingsWithDisabled = {
+        ...defaultSettings,
+        autoSnapshotInterval: 0,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithDisabled}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const toggle = screen.getByLabelText(/自動保存を有効にする/i);
+      fireEvent.click(toggle);
+
+      // 有効にするとデフォルトの間隔（10分）が設定される
+      expect(onSettingsChange).toHaveBeenCalledWith({
+        ...settingsWithDisabled,
+        autoSnapshotInterval: 10,
+      });
+    });
+
+    it('should disable auto-save when toggle is turned off', () => {
+      const settingsWithEnabled = {
+        ...defaultSettings,
+        autoSnapshotInterval: 10,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithEnabled}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const toggle = screen.getByLabelText(/自動保存を有効にする/i);
+      fireEvent.click(toggle);
+
+      // 無効にするとintervalが0になる
+      expect(onSettingsChange).toHaveBeenCalledWith({
+        ...settingsWithEnabled,
+        autoSnapshotInterval: 0,
+      });
+    });
+
+    it('should display interval input field', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      expect(screen.getByLabelText(/自動保存の間隔/i)).toBeInTheDocument();
+    });
+
+    it('should display current interval value', () => {
+      const settingsWithInterval = {
+        ...defaultSettings,
+        autoSnapshotInterval: 15,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithInterval}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/自動保存の間隔/i) as HTMLInputElement;
+      expect(input.value).toBe('15');
+    });
+
+    it('should allow user to change interval', () => {
+      const settingsWithInterval = {
+        ...defaultSettings,
+        autoSnapshotInterval: 10,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithInterval}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/自動保存の間隔/i);
+      fireEvent.change(input, { target: { value: '30' } });
+
+      expect(onSettingsChange).toHaveBeenCalledWith({
+        ...settingsWithInterval,
+        autoSnapshotInterval: 30,
+      });
+    });
+
+    it('should not accept interval less than 1', () => {
+      const settingsWithInterval = {
+        ...defaultSettings,
+        autoSnapshotInterval: 10,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithInterval}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/自動保存の間隔/i);
+      fireEvent.change(input, { target: { value: '0' } });
+
+      // 0以下は受け付けない
+      expect(onSettingsChange).not.toHaveBeenCalledWith({
+        ...settingsWithInterval,
+        autoSnapshotInterval: 0,
+      });
+    });
+
+    it('should display max snapshots input field', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      expect(screen.getByLabelText(/最大スナップショット数/i)).toBeInTheDocument();
+    });
+
+    it('should display current max snapshots value', () => {
+      const settingsWithMaxSnapshots = {
+        ...defaultSettings,
+        maxSnapshots: 20,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithMaxSnapshots}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
+      expect(input.value).toBe('20');
+    });
+
+    it('should use default value of 10 when maxSnapshots is not set', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
+      expect(input.value).toBe('10');
+    });
+
+    it('should allow user to change max snapshots', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/最大スナップショット数/i);
+      fireEvent.change(input, { target: { value: '25' } });
+
+      expect(onSettingsChange).toHaveBeenCalledWith({
+        ...defaultSettings,
+        maxSnapshots: 25,
+      });
+    });
+
+    it('should not accept max snapshots less than 1', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/最大スナップショット数/i);
+      fireEvent.change(input, { target: { value: '0' } });
+
+      // 0以下は受け付けない
+      expect(onSettingsChange).not.toHaveBeenCalledWith({
+        ...defaultSettings,
+        maxSnapshots: 0,
+      });
+    });
+
+    it('should disable interval and max snapshots inputs when auto-save is disabled', () => {
+      const settingsWithDisabled = {
+        ...defaultSettings,
+        autoSnapshotInterval: 0,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithDisabled}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const intervalInput = screen.getByLabelText(/自動保存の間隔/i) as HTMLInputElement;
+      const maxSnapshotsInput = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
+
+      expect(intervalInput).toBeDisabled();
+      expect(maxSnapshotsInput).toBeDisabled();
+    });
+
+    it('should enable interval and max snapshots inputs when auto-save is enabled', () => {
+      const settingsWithEnabled = {
+        ...defaultSettings,
+        autoSnapshotInterval: 10,
+      };
+
+      render(
+        <SettingsPanel
+          settings={settingsWithEnabled}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const intervalInput = screen.getByLabelText(/自動保存の間隔/i) as HTMLInputElement;
+      const maxSnapshotsInput = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
+
+      expect(intervalInput).not.toBeDisabled();
+      expect(maxSnapshotsInput).not.toBeDisabled();
+    });
+
+    it('should display description for interval setting', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      expect(
+        screen.getByText(/スナップショットを自動的に保存する間隔/i)
+      ).toBeInTheDocument();
+    });
+
+    it('should display description for max snapshots setting', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      expect(
+        screen.getByText(/保持するスナップショットの最大数/i)
+      ).toBeInTheDocument();
     });
   });
 });

@@ -18,14 +18,16 @@ export const COMMON_SELECTORS = {
   tabTreeView: '[data-testid="tab-tree-view"]',
 
   // 設定関連
-  /** 設定ボタン */
-  settingsButton: '[data-testid="settings-button"]',
-  /** 設定パネル */
+  /** 設定ボタン (Task 8.2: 新規タブで開く) */
+  settingsButton: '[data-testid="open-settings-button"]',
+  /** 設定パネル (Task 8.2: サイドパネル内では非表示) */
   settingsPanel: '[data-testid="settings-panel"]',
   /** 設定閉じるボタン */
   settingsCloseButton: '[data-testid="settings-close-button"]',
   /** テーマ切り替えトグル */
   themeToggle: '[data-testid="theme-toggle"]',
+  /** 新規タブで設定を開くボタン */
+  openSettingsButton: '[data-testid="open-settings-button"]',
 
   // グループ関連
   /** グループセクション */

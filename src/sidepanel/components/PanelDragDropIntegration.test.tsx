@@ -140,6 +140,10 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
+        onUpdated: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
       },
     } as unknown as typeof chrome;
   });

@@ -84,7 +84,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     <div
       ref={menuRef}
       role="menu"
-      className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg py-2 min-w-[200px]"
+      className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[200px]"
       style={{
         left: `${adjustedPosition.x}px`,
         top: `${adjustedPosition.y}px`,
@@ -93,7 +93,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       {/* 閉じる */}
       <button
         role="menuitem"
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('close')}
       >
         {isMultipleSelection
@@ -105,7 +105,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       {hasChildren && (
         <button
           role="menuitem"
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('closeSubtree')}
         >
           サブツリーを閉じる
@@ -116,19 +116,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       {isMultipleSelection && (
         <button
           role="menuitem"
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('closeOthers')}
         >
           他のタブを閉じる
         </button>
       )}
 
-      <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+      <div className="border-t border-gray-700 my-1" />
 
       {/* 複製 */}
       <button
         role="menuitem"
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('duplicate')}
       >
         タブを複製
@@ -137,19 +137,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       {/* 再読み込み */}
       <button
         role="menuitem"
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('reload')}
       >
         タブを再読み込み
       </button>
 
-      <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+      <div className="border-t border-gray-700 my-1" />
 
       {/* ピン留め/ピン留め解除 */}
       {isPinned ? (
         <button
           role="menuitem"
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('unpin')}
         >
           ピン留めを解除
@@ -157,31 +157,31 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ) : (
         <button
           role="menuitem"
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('pin')}
         >
           タブをピン留め
         </button>
       )}
 
-      <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+      <div className="border-t border-gray-700 my-1" />
 
       {/* 新しいウィンドウで開く */}
       <button
         role="menuitem"
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('newWindow')}
       >
         新しいウィンドウで開く
       </button>
 
-      <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+      <div className="border-t border-gray-700 my-1" />
 
       {/* グループ化/グループ解除 */}
       {isGrouped ? (
         <button
           role="menuitem"
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('ungroup')}
         >
           グループを解除
@@ -189,26 +189,36 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ) : (
         <button
           role="menuitem"
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('group')}
         >
-          {isMultipleSelection ? 'タブをグループ化' : 'グループに追加'}
+          {isMultipleSelection ? '選択されたタブをグループ化' : 'グループに追加'}
         </button>
       )}
 
       {/* URLをコピー（単一選択時のみ） */}
       {!isMultipleSelection && tabUrl && (
         <>
-          <div className="border-t border-gray-200 dark:border-gray-600 my-1" />
+          <div className="border-t border-gray-700 my-1" />
           <button
             role="menuitem"
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
             onClick={() => handleMenuItemClick('copyUrl')}
           >
             URLをコピー
           </button>
         </>
       )}
+
+      {/* スナップショットを取得 */}
+      <div className="border-t border-gray-700 my-1" />
+      <button
+        role="menuitem"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
+        onClick={() => handleMenuItemClick('snapshot')}
+      >
+        スナップショットを取得
+      </button>
     </div>
   );
 };

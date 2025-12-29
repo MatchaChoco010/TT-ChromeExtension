@@ -125,8 +125,9 @@ describe('Task 8.5: ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('1');
       });
 
-      // ビューが表示されることを確認
-      expect(screen.getByText(/New View 1/i)).toBeInTheDocument();
+      // Task 7.1: ビューがファビコンサイズアイコンボタンとして表示されることを確認
+      // ビュー名はaria-labelで確認（テキスト表示はなくなった）
+      expect(screen.getByRole('button', { name: /Switch to New View 1/i })).toBeInTheDocument();
     });
 
     it('複数の新しいビューを作成できる', async () => {
@@ -146,10 +147,11 @@ describe('Task 8.5: ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('3');
       });
 
-      // すべてのビューが表示されることを確認
-      expect(screen.getByText(/New View 1/i)).toBeInTheDocument();
-      expect(screen.getByText(/New View 2/i)).toBeInTheDocument();
-      expect(screen.getByText(/New View 3/i)).toBeInTheDocument();
+      // Task 7.1: すべてのビューがファビコンサイズアイコンボタンとして表示されることを確認
+      // ビュー名はaria-labelで確認（テキスト表示はなくなった）
+      expect(screen.getByRole('button', { name: /Switch to New View 1/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Switch to New View 2/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Switch to New View 3/i })).toBeInTheDocument();
     });
 
     it('作成されたビューには一意のIDが割り当てられる', async () => {
@@ -268,7 +270,9 @@ describe('Task 8.5: ビュー切り替えの統合テスト', () => {
     });
   });
 
-  describe('Acceptance Criteria 6.4: ビュー名と色を設定できることを確認', () => {
+  // Task 7.1: インライン編集機能が削除されたため、このテストをスキップ
+  // Task 7.2 (ViewEditModal) と Task 7.3 (コンテキストメニュー) で編集機能が再実装される予定
+  describe.skip('Acceptance Criteria 6.4: ビュー名と色を設定できることを確認 (Task 7.2/7.3で再実装予定)', () => {
     it('ビューの名前を編集できる', async () => {
       render(<ViewSwitchingTestHarness />);
 
@@ -415,7 +419,9 @@ describe('Task 8.5: ビュー切り替えの統合テスト', () => {
     });
   });
 
-  describe('統合シナリオ: ビュー作成、切り替え、編集の一連の流れ', () => {
+  // Task 7.1: インライン編集機能が削除されたため、このテストをスキップ
+  // Task 7.2 (ViewEditModal) と Task 7.3 (コンテキストメニュー) で編集機能が再実装される予定
+  describe.skip('統合シナリオ: ビュー作成、切り替え、編集の一連の流れ (Task 7.2/7.3で再実装予定)', () => {
     it('新しいビューを作成し、切り替え、名前と色を編集できる', async () => {
       render(<ViewSwitchingTestHarness />);
 

@@ -11,13 +11,20 @@
 **Example**: `service-worker.ts`, `event-handlers.ts`, `tree-sync.test.ts`
 
 ### Side Panel UI (`/src/sidepanel/`)
-**Purpose**: Reactベースのユーザーインターフェース
+**Purpose**: Reactベースのユーザーインターフェース（メインのサイドパネル）
 **Subdirectories**:
 - `components/`: UIコンポーネント（TreeNode, TabTreeView, SettingsPanel等）
 - `providers/`: Reactコンテキストプロバイダー（TreeStateProvider, ThemeProvider）
 - `hooks/`: カスタムフック（useMenuActions等）
+- `utils/`: UI固有のユーティリティ関数
 
 **Example**: `components/TreeNode.tsx`, `providers/TreeStateProvider.tsx`
+
+### Settings Page (`/src/settings/`)
+**Purpose**: 独立した設定画面（chrome.runtime.openOptionsPage()で開く）
+**Scope**: フォントカスタマイズ、テーマ設定、新規タブ位置設定などのユーザー設定UI
+
+**Example**: `SettingsPage.tsx`, `index.tsx`
 
 ### Services (`/src/services/`)
 **Purpose**: ビジネスロジック層（スナップショット管理等）
@@ -41,6 +48,8 @@
 - `fixtures/`: カスタムフィクスチャ（拡張機能ロード等）
 - `utils/`: テストユーティリティ（tab-utils, drag-drop-utils, polling-utils等）
 - `test-data/`: テストデータとフィクスチャ
+- `types/`: E2Eテスト用の型定義
+- `scripts/`: E2Eテスト用のヘルパースクリプト
 
 **Example**: `tab-lifecycle.spec.ts`, `drag-drop-reorder.spec.ts`, `utils/polling-utils.ts`
 

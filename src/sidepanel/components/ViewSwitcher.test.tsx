@@ -39,10 +39,11 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // すべてのビューが表示されることを確認
-      expect(screen.getByText('Work')).toBeInTheDocument();
-      expect(screen.getByText('Personal')).toBeInTheDocument();
-      expect(screen.getByText('Research')).toBeInTheDocument();
+      // Task 7.1: ファビコンサイズのアイコンボタンになったため、ビュー名はtitle属性/aria-labelで確認
+      // すべてのビューのボタンが表示されることを確認
+      expect(screen.getByRole('button', { name: 'Switch to Work view' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Switch to Personal view' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Switch to Research view' })).toBeInTheDocument();
     });
 
     it('新しいビュー追加ボタンを表示する', () => {
@@ -262,9 +263,12 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // すべてのビューが表示されることを確認
+      // Task 7.1: ファビコンサイズのアイコンボタンになったため、ビュー名はtitle属性で確認
+      // すべてのビューのボタンが表示されることを確認
       manyViews.forEach((view) => {
-        expect(screen.getByText(view.name)).toBeInTheDocument();
+        const button = screen.getByRole('button', { name: `Switch to ${view.name} view` });
+        expect(button).toBeInTheDocument();
+        expect(button).toHaveAttribute('title', view.name);
       });
     });
   });
@@ -331,9 +335,9 @@ describe('ViewSwitcher', () => {
     });
   });
 
-  describe('Task 8.3: ビューのカスタマイズ機能', () => {
-    describe('Requirement 6.4: ビュー名と色の編集', () => {
-      it('ビューの編集ボタンをクリックすると編集モードになる', () => {
+  describe('Task 7.1: ファビコンサイズアイコンボタンへの改修', () => {
+    describe('Requirement 3.1: ファビコンサイズのボタンでビュー切り替え', () => {
+      it('各ビューがファビコンサイズのアイコンボタンとして表示される', () => {
         render(
           <ViewSwitcher
             views={mockViews}
@@ -345,49 +349,18 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集ボタンを探す
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        expect(editButtons.length).toBeGreaterThan(0);
+        // ファビコンサイズ(約16px-24px)のアイコンボタンが表示されることを確認
+        // ビュー名テキストは表示されない（アイコンのみ）
+        const viewButtons = screen.getAllByRole('button', { name: /switch to .* view/i });
+        expect(viewButtons.length).toBe(mockViews.length);
 
-        // 最初のビューの編集ボタンをクリック
-        fireEvent.click(editButtons[0]);
-
-        // 編集フォームが表示されることを確認
-        expect(screen.getByLabelText(/view name/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/view color/i)).toBeInTheDocument();
-      });
-
-      it('ビュー名を編集して保存すると onViewUpdate が呼ばれる', () => {
-        render(
-          <ViewSwitcher
-            views={mockViews}
-            currentViewId={mockCurrentViewId}
-            onViewSwitch={mockOnViewSwitch}
-            onViewCreate={mockOnViewCreate}
-            onViewDelete={mockOnViewDelete}
-            onViewUpdate={mockOnViewUpdate}
-          />
-        );
-
-        // 編集ボタンをクリック
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        fireEvent.click(editButtons[0]);
-
-        // ビュー名を変更
-        const nameInput = screen.getByLabelText(/view name/i);
-        fireEvent.change(nameInput, { target: { value: 'Updated Work' } });
-
-        // 保存ボタンをクリック
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        fireEvent.click(saveButton);
-
-        // onViewUpdate が正しいパラメータで呼ばれることを確認
-        expect(mockOnViewUpdate).toHaveBeenCalledWith('view-1', {
-          name: 'Updated Work',
+        // 各ボタンにはファビコンサイズのスタイルが適用されている
+        viewButtons.forEach((button) => {
+          expect(button).toHaveClass('w-8', 'h-8');
         });
       });
 
-      it('ビューの色を編集して保存すると onViewUpdate が呼ばれる', () => {
+      it('アイコンが設定されていないビューはカラーサークルを表示する', () => {
         render(
           <ViewSwitcher
             views={mockViews}
@@ -399,127 +372,15 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集ボタンをクリック
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        fireEvent.click(editButtons[0]);
-
-        // 色を変更
-        const colorInput = screen.getByLabelText(/view color/i);
-        fireEvent.change(colorInput, { target: { value: '#ff6600' } });
-
-        // 保存ボタンをクリック
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        fireEvent.click(saveButton);
-
-        // onViewUpdate が正しいパラメータで呼ばれることを確認
-        expect(mockOnViewUpdate).toHaveBeenCalledWith('view-1', {
-          color: '#ff6600',
-        });
+        // カラーサークル要素が存在することを確認
+        const colorCircles = document.querySelectorAll('[data-testid="view-color-circle"]');
+        expect(colorCircles.length).toBe(mockViews.length);
       });
 
-      it('ビュー名と色の両方を編集して保存すると onViewUpdate が呼ばれる', () => {
-        render(
-          <ViewSwitcher
-            views={mockViews}
-            currentViewId={mockCurrentViewId}
-            onViewSwitch={mockOnViewSwitch}
-            onViewCreate={mockOnViewCreate}
-            onViewDelete={mockOnViewDelete}
-            onViewUpdate={mockOnViewUpdate}
-          />
-        );
-
-        // 編集ボタンをクリック
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        fireEvent.click(editButtons[0]);
-
-        // ビュー名と色を変更
-        const nameInput = screen.getByLabelText(/view name/i);
-        const colorInput = screen.getByLabelText(/view color/i);
-        fireEvent.change(nameInput, { target: { value: 'New Work' } });
-        fireEvent.change(colorInput, { target: { value: '#00ff00' } });
-
-        // 保存ボタンをクリック
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        fireEvent.click(saveButton);
-
-        // onViewUpdate が正しいパラメータで呼ばれることを確認
-        expect(mockOnViewUpdate).toHaveBeenCalledWith('view-1', {
-          name: 'New Work',
-          color: '#00ff00',
-        });
-      });
-
-      it('編集をキャンセルすると onViewUpdate は呼ばれない', () => {
-        render(
-          <ViewSwitcher
-            views={mockViews}
-            currentViewId={mockCurrentViewId}
-            onViewSwitch={mockOnViewSwitch}
-            onViewCreate={mockOnViewCreate}
-            onViewDelete={mockOnViewDelete}
-            onViewUpdate={mockOnViewUpdate}
-          />
-        );
-
-        // 編集ボタンをクリック
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        fireEvent.click(editButtons[0]);
-
-        // ビュー名を変更
-        const nameInput = screen.getByLabelText(/view name/i);
-        fireEvent.change(nameInput, { target: { value: 'Changed' } });
-
-        // キャンセルボタンをクリック
-        const cancelButton = screen.getByRole('button', { name: /cancel/i });
-        fireEvent.click(cancelButton);
-
-        // onViewUpdate が呼ばれないことを確認
-        expect(mockOnViewUpdate).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('カスタムアイコンURL設定（オプション）', () => {
-      it('カスタムアイコンURLを設定できる', () => {
-        render(
-          <ViewSwitcher
-            views={mockViews}
-            currentViewId={mockCurrentViewId}
-            onViewSwitch={mockOnViewSwitch}
-            onViewCreate={mockOnViewCreate}
-            onViewDelete={mockOnViewDelete}
-            onViewUpdate={mockOnViewUpdate}
-          />
-        );
-
-        // 編集ボタンをクリック
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        fireEvent.click(editButtons[0]);
-
-        // アイコンURLを設定
-        const iconInput = screen.getByLabelText(/icon url/i);
-        fireEvent.change(iconInput, {
-          target: { value: 'https://example.com/icon.png' },
-        });
-
-        // 保存ボタンをクリック
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        fireEvent.click(saveButton);
-
-        // onViewUpdate が正しいパラメータで呼ばれることを確認
-        expect(mockOnViewUpdate).toHaveBeenCalledWith('view-1', {
-          icon: 'https://example.com/icon.png',
-        });
-      });
-
-      it('カスタムアイコンURLを空にすると icon プロパティが削除される', () => {
+      it('アイコンURLが設定されているビューはアイコン画像を表示する', () => {
         const viewsWithIcon: View[] = [
-          {
-            id: 'view-1',
-            name: 'Work',
-            color: '#ef4444',
-            icon: 'https://example.com/icon.png',
-          },
+          { id: 'view-1', name: 'Work', color: '#ef4444', icon: 'https://example.com/icon.png' },
+          { id: 'view-2', name: 'Personal', color: '#3b82f6' },
         ];
 
         render(
@@ -533,27 +394,55 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集ボタンをクリック
-        const editButton = screen.getByLabelText(/edit view/i);
-        fireEvent.click(editButton);
+        // アイコン画像が表示されることを確認
+        const iconImage = screen.getByRole('img', { name: /work/i });
+        expect(iconImage).toBeInTheDocument();
+        expect(iconImage).toHaveAttribute('src', 'https://example.com/icon.png');
 
-        // アイコンURLを空にする
-        const iconInput = screen.getByLabelText(/icon url/i);
-        fireEvent.change(iconInput, { target: { value: '' } });
-
-        // 保存ボタンをクリック
-        const saveButton = screen.getByRole('button', { name: /save/i });
-        fireEvent.click(saveButton);
-
-        // onViewUpdate が呼ばれ、icon が undefined であることを確認
-        expect(mockOnViewUpdate).toHaveBeenCalledWith('view-1', {
-          icon: undefined,
-        });
+        // アイコンがあるビューはカラーサークルが非表示（hiddenクラス付き）
+        // アイコンがないビューはカラーサークルが表示（hiddenクラスなし）
+        const allColorCircles = document.querySelectorAll('[data-testid="view-color-circle"]');
+        const visibleColorCircles = Array.from(allColorCircles).filter(
+          (circle) => !circle.classList.contains('hidden')
+        );
+        expect(visibleColorCircles.length).toBe(1);
       });
     });
 
-    describe('編集UI の表示/非表示', () => {
-      it('初期状態では編集フォームは表示されない', () => {
+    describe('Requirement 3.2: ビューごとにファビコンサイズのアイコンを設定可能', () => {
+      it('アイコン付きビューとアイコンなしビューが混在する場合、それぞれ適切に表示される', () => {
+        const mixedViews: View[] = [
+          { id: 'view-1', name: 'With Icon', color: '#ef4444', icon: 'https://example.com/icon1.png' },
+          { id: 'view-2', name: 'No Icon', color: '#3b82f6' },
+          { id: 'view-3', name: 'Another Icon', color: '#10b981', icon: 'https://example.com/icon2.png' },
+        ];
+
+        render(
+          <ViewSwitcher
+            views={mixedViews}
+            currentViewId="view-1"
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // アイコン画像が2つ表示される
+        const iconImages = screen.getAllByRole('img');
+        expect(iconImages.length).toBe(2);
+
+        // カラーサークルは全ビュー分存在するが、アイコンがあるビューは非表示
+        const allColorCircles = document.querySelectorAll('[data-testid="view-color-circle"]');
+        const visibleColorCircles = Array.from(allColorCircles).filter(
+          (circle) => !circle.classList.contains('hidden')
+        );
+        expect(visibleColorCircles.length).toBe(1);
+      });
+    });
+
+    describe('Requirement 3.5: 鉛筆ボタンによる編集UIを削除', () => {
+      it('鉛筆ボタン(編集ボタン)が表示されない', () => {
         render(
           <ViewSwitcher
             views={mockViews}
@@ -565,12 +454,12 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集フォームが表示されていないことを確認
-        expect(screen.queryByLabelText(/view name/i)).not.toBeInTheDocument();
-        expect(screen.queryByLabelText(/view color/i)).not.toBeInTheDocument();
+        // 編集ボタンが存在しないことを確認
+        const editButtons = screen.queryAllByLabelText(/edit view/i);
+        expect(editButtons.length).toBe(0);
       });
 
-      it('保存後に編集フォームが閉じる', () => {
+      it('インライン編集フォームが表示されない', () => {
         render(
           <ViewSwitcher
             views={mockViews}
@@ -582,22 +471,159 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集ボタンをクリック
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        fireEvent.click(editButtons[0]);
+        // 編集フォームが存在しないことを確認
+        expect(screen.queryByTestId('view-edit-form')).not.toBeInTheDocument();
+      });
+    });
 
-        // 編集フォームが表示されることを確認
-        expect(screen.getByLabelText(/view name/i)).toBeInTheDocument();
+    describe('アクティブビューの視覚的フィードバック', () => {
+      it('アクティブなビューボタンには視覚的な区別がある', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
 
-        // 保存ボタンをクリック
+        const activeButton = screen.getByRole('button', { name: /switch to work view/i });
+        expect(activeButton).toHaveAttribute('data-active', 'true');
+        // アクティブボタンにはリング表示がある
+        expect(activeButton).toHaveClass('ring-2');
+      });
+    });
+
+    describe('ツールチップ表示', () => {
+      it('各ビューボタンにはビュー名を示すtitle属性がある', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        expect(workButton).toHaveAttribute('title', 'Work');
+      });
+    });
+  });
+
+  describe('Task 7.3: ビューボタンの右クリックコンテキストメニュー', () => {
+    describe('Requirement 3.3: 右クリックでコンテキストメニュー表示', () => {
+      it('ビューボタンを右クリックするとコンテキストメニューが表示される', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        // コンテキストメニューが表示されることを確認
+        expect(screen.getByTestId('view-context-menu')).toBeInTheDocument();
+      });
+
+      it('コンテキストメニューに「ビューの編集」オプションが表示される', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        expect(screen.getByRole('menuitem', { name: /ビューを編集/i })).toBeInTheDocument();
+      });
+
+      it('コンテキストメニューに「ビューの削除」オプションが表示される', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        expect(screen.getByRole('menuitem', { name: /ビューを削除/i })).toBeInTheDocument();
+      });
+    });
+
+    describe('Requirement 3.4: ビューの編集モーダルを開く', () => {
+      it('「ビューの編集」をクリックするとモーダルが表示される', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        const editMenuItem = screen.getByRole('menuitem', { name: /ビューを編集/i });
+        fireEvent.click(editMenuItem);
+
+        // ViewEditModal が表示されることを確認
+        expect(screen.getByTestId('view-edit-modal')).toBeInTheDocument();
+      });
+
+      it('モーダルで保存すると onViewUpdate が呼ばれる', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        const editMenuItem = screen.getByRole('menuitem', { name: /ビューを編集/i });
+        fireEvent.click(editMenuItem);
+
+        // モーダル内で保存ボタンをクリック
         const saveButton = screen.getByRole('button', { name: /save/i });
         fireEvent.click(saveButton);
 
-        // 編集フォームが閉じることを確認
-        expect(screen.queryByLabelText(/view name/i)).not.toBeInTheDocument();
+        expect(mockOnViewUpdate).toHaveBeenCalled();
       });
+    });
 
-      it('キャンセル後に編集フォームが閉じる', () => {
+    describe('ビューの削除', () => {
+      it('「ビューの削除」をクリックすると onViewDelete が呼ばれる', () => {
         render(
           <ViewSwitcher
             views={mockViews}
@@ -609,19 +635,87 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集ボタンをクリック
-        const editButtons = screen.getAllByLabelText(/edit view/i);
-        fireEvent.click(editButtons[0]);
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
 
-        // 編集フォームが表示されることを確認
-        expect(screen.getByLabelText(/view name/i)).toBeInTheDocument();
+        const deleteMenuItem = screen.getByRole('menuitem', { name: /ビューを削除/i });
+        fireEvent.click(deleteMenuItem);
 
-        // キャンセルボタンをクリック
-        const cancelButton = screen.getByRole('button', { name: /cancel/i });
-        fireEvent.click(cancelButton);
+        expect(mockOnViewDelete).toHaveBeenCalledWith('view-1');
+      });
 
-        // 編集フォームが閉じることを確認
-        expect(screen.queryByLabelText(/view name/i)).not.toBeInTheDocument();
+      it('ビューが1つだけの場合、削除オプションは無効になる', () => {
+        const singleView: View[] = [{ id: 'view-1', name: 'Work', color: '#ef4444' }];
+
+        render(
+          <ViewSwitcher
+            views={singleView}
+            currentViewId="view-1"
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        const deleteMenuItem = screen.getByRole('menuitem', { name: /ビューを削除/i });
+        expect(deleteMenuItem).toBeDisabled();
+      });
+    });
+
+    describe('コンテキストメニューのクローズ動作', () => {
+      it('メニュー外をクリックするとコンテキストメニューが閉じる', async () => {
+        const { container } = render(
+          <div>
+            <div data-testid="outside">Outside</div>
+            <ViewSwitcher
+              views={mockViews}
+              currentViewId={mockCurrentViewId}
+              onViewSwitch={mockOnViewSwitch}
+              onViewCreate={mockOnViewCreate}
+              onViewDelete={mockOnViewDelete}
+              onViewUpdate={mockOnViewUpdate}
+            />
+          </div>
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        expect(screen.getByTestId('view-context-menu')).toBeInTheDocument();
+
+        // 非同期でイベントリスナーが登録されるのを待つ
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        const outsideElement = container.querySelector('[data-testid="outside"]');
+        fireEvent.mouseDown(outsideElement!);
+
+        expect(screen.queryByTestId('view-context-menu')).not.toBeInTheDocument();
+      });
+
+      it('Escapeキーを押すとコンテキストメニューが閉じる', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const workButton = screen.getByRole('button', { name: /switch to work view/i });
+        fireEvent.contextMenu(workButton);
+
+        expect(screen.getByTestId('view-context-menu')).toBeInTheDocument();
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+
+        expect(screen.queryByTestId('view-context-menu')).not.toBeInTheDocument();
       });
     });
   });

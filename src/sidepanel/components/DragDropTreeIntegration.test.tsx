@@ -82,6 +82,10 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
+        onUpdated: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
       },
     } as unknown as typeof chrome;
   });
