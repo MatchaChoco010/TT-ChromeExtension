@@ -253,6 +253,111 @@ test.describe('ビュー切り替え機能', () => {
     });
   });
 
+  test.describe('Task 3.1: ビュー切り替え動作の修正', () => {
+    test('Requirement 15.1: ビューを切り替えた後に新しいタブを開いた場合、現在アクティブなビューにタブを追加する', async ({
+      sidePanelPage,
+      context,
+    }) => {
+      await waitForViewSwitcher(sidePanelPage);
+
+      // 新しいビューを追加
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await expect(addButton).toBeVisible({ timeout: 5000 });
+      await addButton.click();
+
+      // 新しいビューボタンが表示されるまで待機
+      const newViewButton = sidePanelPage.locator(
+        '[aria-label="Switch to New View view"]'
+      );
+      await expect(newViewButton).toBeVisible({ timeout: 5000 });
+
+      // 新しいビューに切り替え
+      await newViewButton.click();
+
+      // 新しいビューがアクティブになるまで待機
+      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      // 新しいビューには「No tabs in this view」が表示されるはず
+      const emptyMessage = sidePanelPage.locator('text=No tabs in this view');
+      await expect(emptyMessage).toBeVisible({ timeout: 5000 });
+
+      // Chrome APIを使って新しいタブを開く（Service Workerを経由）
+      await sidePanelPage.evaluate(async () => {
+        await chrome.tabs.create({ url: 'about:blank' });
+      });
+
+      // 新しいタブがこのビューに表示されることを確認
+      // 空のメッセージが非表示になるか、tree-nodeが表示されるはず
+      await expect(async () => {
+        // data-testid="tree-node-<tabId>" 形式のセレクタを使用
+        const treeItems = sidePanelPage.locator('[data-testid^="tree-node-"]');
+        const count = await treeItems.count();
+        expect(count).toBeGreaterThan(0);
+      }).toPass({ timeout: 15000 });
+    });
+
+    test('Requirement 15.2: ビューを追加した場合、ページをリロードしてもビューが永続化されている', async ({
+      sidePanelPage,
+    }) => {
+      await waitForViewSwitcher(sidePanelPage);
+
+      // 新しいビューを追加
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await expect(addButton).toBeVisible({ timeout: 5000 });
+      await addButton.click();
+
+      // 新しいビューボタンが表示されるまで待機
+      const newViewButton = sidePanelPage.locator(
+        '[aria-label="Switch to New View view"]'
+      );
+      await expect(newViewButton).toBeVisible({ timeout: 5000 });
+
+      // サイドパネルをリロード
+      await sidePanelPage.reload();
+
+      // ビュースイッチャーが再表示されるまで待機
+      await waitForViewSwitcher(sidePanelPage);
+
+      // 新しいビューが永続化されていることを確認
+      const persistedViewButton = sidePanelPage.locator(
+        '[aria-label="Switch to New View view"]'
+      );
+      await expect(persistedViewButton).toBeVisible({ timeout: 5000 });
+    });
+
+    test('Requirement 15.3: ビューの切り替え状態が正しく管理され、意図せず消えない', async ({
+      sidePanelPage,
+    }) => {
+      await waitForViewSwitcher(sidePanelPage);
+
+      // 複数のビューを追加
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await expect(addButton).toBeVisible({ timeout: 5000 });
+      await addButton.click();
+      await addButton.click();
+
+      // 2つ目のビューボタンが表示されるまで待機（2つ目のビューは "New View" ではなく "New View" となる）
+      const viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
+      await expect(async () => {
+        const count = await viewButtons.count();
+        expect(count).toBeGreaterThanOrEqual(3); // Default + 2 new views
+      }).toPass({ timeout: 5000 });
+
+      // ビュー間を何度か切り替え
+      const defaultViewButton = sidePanelPage.locator(
+        '[aria-label="Switch to Default view"]'
+      );
+      await defaultViewButton.click();
+      await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      // すべてのビューがまだ存在していることを確認
+      await expect(async () => {
+        const count = await viewButtons.count();
+        expect(count).toBeGreaterThanOrEqual(3);
+      }).toPass({ timeout: 5000 });
+    });
+  });
+
   test.describe('ビュー削除', () => {
     // Task 7.3: ビュー削除は右クリックコンテキストメニュー経由で行うようになりました
     test('ビューを削除した場合、デフォルトビューに自動的に切り替わる', async ({

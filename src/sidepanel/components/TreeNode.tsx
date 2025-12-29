@@ -21,10 +21,51 @@ interface TreeNodeProps {
 }
 
 /**
+ * Task 4.2 (Requirement 4.3): 内部URLを判定するヘルパー関数
+ * Vivaldi/Chromeの内部URL、新規タブURL、about:blankなどを検出
+ */
+const isInternalOrNewTabUrl = (url: string): boolean => {
+  if (!url) return false;
+
+  const internalUrlPatterns = [
+    /^chrome:\/\/vivaldi-webui\//,
+    /^chrome:\/\/newtab/,
+    /^chrome-extension:\/\//,
+    /^vivaldi:\/\/newtab/,
+    /^vivaldi:\/\/startpage/,
+    /^about:blank$/,
+  ];
+
+  return internalUrlPatterns.some(pattern => pattern.test(url));
+};
+
+/**
+ * Task 4.2 (Requirement 4.1, 4.2, 4.3, 4.4): 表示するタブタイトルを決定するヘルパー関数
+ * - Loading状態の場合: 「Loading...」
+ * - 内部URLの場合: 「新しいタブ」
+ * - それ以外: 元のタイトル
+ */
+const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 'complete' }): string => {
+  // Requirement 4.4: Loading状態の場合
+  if (tab.status === 'loading') {
+    return 'Loading...';
+  }
+
+  // Requirement 4.3: 内部URLの場合
+  if (isInternalOrNewTabUrl(tab.url)) {
+    return '新しいタブ';
+  }
+
+  // Requirement 4.1, 4.2: 通常のタイトル
+  return tab.title;
+};
+
+/**
  * 個別タブノードのUIコンポーネント
  * ファビコン、タイトル、インデント、展開/折りたたみトグルを表示
  *
  * Requirements: 8.3, 8.4 (タブ閉じ時の確認ダイアログ), 8.5 (警告閾値のカスタマイズ), 12.1 (コンテキストメニュー)
+ * Task 4.2: 4.1, 4.2, 4.3, 4.4 (タブタイトル表示改善)
  */
 const TreeNode: React.FC<TreeNodeProps> = ({
   node,
@@ -125,7 +166,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
         data-parent-group={node.groupId || ''}
-        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${
+        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer select-none ${
           isActive ? 'bg-blue-100' : ''
         }`}
         style={{ paddingLeft: `${indentSize}px` }}
@@ -162,24 +203,30 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           )}
         </div>
 
-        {/* タブタイトル */}
-        <div className="flex-1 flex items-center min-w-0">
-          <span className="text-sm truncate">{tab.title}</span>
+        {/* タブコンテンツ - タイトルエリアと閉じるボタンを左右に分離 */}
+        <div
+          data-testid="tab-content"
+          className="flex-1 flex items-center justify-between min-w-0"
+        >
+          {/* タブタイトルエリア - Task 4.2: タイトル表示改善 */}
+          <div className="flex items-center min-w-0 flex-1">
+            <span className="text-sm truncate">{getDisplayTitle(tab)}</span>
 
-          {/* ローディングインジケータ */}
-          {tab.status === 'loading' && (
-            <span
-              data-testid="loading-indicator"
-              className="ml-2 text-xs text-gray-500"
-            >
-              ⟳
-            </span>
-          )}
+            {/* ローディングインジケータ - Loading...テキスト表示時も回転アイコンを表示 */}
+            {tab.status === 'loading' && (
+              <span
+                data-testid="loading-indicator"
+                className="ml-2 text-xs text-gray-500 flex-shrink-0"
+              >
+                ⟳
+              </span>
+            )}
 
-          {/* 未読インジケータ */}
-          <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} />
+            {/* 未読インジケータ */}
+            <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} />
+          </div>
 
-          {/* 閉じるボタン (ホバー時のみ表示) */}
+          {/* 閉じるボタン (ホバー時のみ表示) - 常に右端に固定 */}
           {isHovered && <CloseButton onClose={handleCloseClick} />}
         </div>
       </div>

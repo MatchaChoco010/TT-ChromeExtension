@@ -29,11 +29,8 @@ export const COMMON_SELECTORS = {
   /** 新規タブで設定を開くボタン */
   openSettingsButton: '[data-testid="open-settings-button"]',
 
-  // グループ関連
-  /** グループセクション */
-  groupsSection: '[data-testid="groups-section"]',
-  /** グループ作成フォーム */
-  groupCreateForm: '[data-testid="group-create-form"]',
+  // グループ関連（タスク6.1: Groupsセクションは廃止されたが、
+  // グループ機能はツリー内の親タブとして統合されるため一部残す）
   /** グループカラーインジケータ */
   groupColorIndicator: '[data-testid="group-color-indicator"]',
   /** グループアイコン */
@@ -107,14 +104,6 @@ export const ARIA_LABELS = {
   // ビュー関連
   /** 新しいビュー追加ボタン */
   addNewView: '[aria-label="Add new view"]',
-  /** グループ作成ボタン */
-  createNewGroup: '[aria-label="Create new group"]',
-  /** グループ作成確定ボタン */
-  createGroup: '[aria-label="Create group"]',
-  /** グループ名入力 */
-  groupName: '[aria-label="Group Name"]',
-  /** グループカラー入力 */
-  groupColor: '[aria-label="Group Color"]',
   /** ビュー名入力 */
   viewName: '[aria-label="View Name"]',
   /** ビューカラー入力 */

@@ -309,6 +309,55 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
     });
   });
 
+  describe('Task 5.1: ExternalDropZone削除の確認', () => {
+    it('ツリービュー表示後もExternalDropZone（新規ウィンドウドロップエリア）が存在しないこと', async () => {
+      // モックのストレージデータを設定
+      const mockTreeState = {
+        views: [
+          {
+            id: 'default',
+            name: 'Default',
+            color: '#3b82f6',
+          },
+        ],
+        currentViewId: 'default',
+        nodes: {
+          'node-1': {
+            id: 'node-1',
+            tabId: 1,
+            parentId: null,
+            children: [],
+            isExpanded: true,
+            depth: 0,
+            viewId: 'default',
+          } as TabNode,
+        },
+        tabToNode: {
+          1: 'node-1',
+        },
+      };
+
+      global.chrome.storage.local.get = vi
+        .fn()
+        .mockResolvedValue({ tree_state: mockTreeState });
+
+      // SidePanelRootをレンダリング
+      render(<SidePanelRoot />);
+
+      // タブツリービューが表示されるまで待機（ローディング完了の確認）
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+
+      // 要件6.1: ExternalDropZone（「ここにドロップして新しいウィンドウで開く」の専用領域）が存在しないことを確認
+      expect(screen.queryByTestId('external-drop-zone')).not.toBeInTheDocument();
+      expect(screen.queryByText(/新しいウィンドウで開く/)).not.toBeInTheDocument();
+    });
+  });
+
   describe('統合シナリオ: サイドパネルからタブツリー表示まで', () => {
     it('サイドパネルが開いてからタブをツリー表示し、クリックでアクティブ化できること', async () => {
       // モックのストレージデータを設定

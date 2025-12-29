@@ -2,20 +2,27 @@
 import type { MessageType, MessageResponse, TabNode } from '@/types';
 import { TreeStateManager } from '@/services/TreeStateManager';
 import { UnreadTracker } from '@/services/UnreadTracker';
+import { TitlePersistenceService } from '@/services/TitlePersistenceService';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
 
 // Global instances
 const storageService = new StorageService();
 const treeStateManager = new TreeStateManager(storageService);
 const unreadTracker = new UnreadTracker(storageService);
+const titlePersistence = new TitlePersistenceService(storageService);
 
 // Initialize unread tracker from storage
 unreadTracker.loadFromStorage().catch((_error) => {
   // Failed to load unread tracker silently
 });
 
+// Initialize title persistence from storage (Requirement 5.2)
+titlePersistence.loadFromStorage().catch((_error) => {
+  // Failed to load title persistence silently
+});
+
 // Export for testing
-export { storageService as testStorageService, treeStateManager as testTreeStateManager, unreadTracker as testUnreadTracker };
+export { storageService as testStorageService, treeStateManager as testTreeStateManager, unreadTracker as testUnreadTracker, titlePersistence as testTitlePersistence };
 
 // Global drag state for cross-window drag & drop
 let dragState: { tabId: number; treeData: TabNode[]; sourceWindowId: number } | null =
@@ -23,6 +30,23 @@ let dragState: { tabId: number; treeData: TabNode[]; sourceWindowId: number } | 
 
 // Default view ID - must match TreeStateProvider's default currentViewId
 const DEFAULT_VIEW_ID = 'default';
+
+/**
+ * Requirement 15.1: 現在アクティブなビューIDを取得する
+ * ストレージからtree_stateを読み込み、currentViewIdを返す
+ * 存在しない場合はデフォルトビューIDを返す
+ */
+async function getCurrentViewId(): Promise<string> {
+  try {
+    const treeState = await storageService.get(STORAGE_KEYS.TREE_STATE);
+    if (treeState && treeState.currentViewId) {
+      return treeState.currentViewId;
+    }
+    return DEFAULT_VIEW_ID;
+  } catch (_error) {
+    return DEFAULT_VIEW_ID;
+  }
+}
 
 // Track pending parent relationships for tabs being created
 // Map<tabId, openerTabId>
@@ -111,8 +135,11 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       pendingTabParents.delete(tab.id);
     }
 
+    // Requirement 15.1: 現在アクティブなビューIDを取得し、新しいタブをそのビューに追加
+    const currentViewId = await getCurrentViewId();
+
     // Add tab to tree
-    await treeStateManager.addTab(tab, parentId, DEFAULT_VIEW_ID);
+    await treeStateManager.addTab(tab, parentId, currentViewId);
 
     // Task 4.13: Requirement 3.13.1 - バックグラウンドで作成されたタブを未読としてマーク
     // タブがアクティブでない場合（バックグラウンドで読み込まれた場合）、未読としてマーク
@@ -148,6 +175,9 @@ export async function handleTabRemoved(
       await unreadTracker.markAsRead(tabId);
     }
 
+    // Requirement 5.4: タブが閉じられた際に該当タブのタイトルデータを削除
+    titlePersistence.removeTitle(tabId);
+
     // Notify UI about state update
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((_error) => {
       // Ignore errors when no listeners are available
@@ -180,10 +210,12 @@ export async function handleTabUpdated(
   changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab,
 ): Promise<void> {
-  void tabId; // unused parameter
-  void tab; // unused parameter
-
   try {
+    // Requirement 5.1, 5.3: タイトルが変更された場合、永続化する
+    if (changeInfo.title !== undefined && tab.title) {
+      titlePersistence.saveTitle(tabId, tab.title);
+    }
+
     // Only notify UI for meaningful changes (title, url, status, favIconUrl)
     if (
       changeInfo.title !== undefined ||
@@ -319,6 +351,15 @@ function handleMessage(
 
       case 'SYNC_TABS':
         handleSyncTabs(sendResponse);
+        break;
+
+      // Task 6.2: グループ化機能
+      case 'CREATE_GROUP':
+        handleCreateGroup(message.payload.tabIds, sendResponse);
+        break;
+
+      case 'DISSOLVE_GROUP':
+        handleDissolveGroup(message.payload.tabIds, sendResponse);
         break;
 
       default:
@@ -636,6 +677,77 @@ async function handleSyncTabs(
 ): Promise<void> {
   try {
     await treeStateManager.syncWithChromeTabs();
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Task 6.2: グループ作成
+ * Requirement 12.1, 12.2, 12.3: 複数タブが選択されている状態でグループ化を実行
+ * - 新しいグループ親タブを作成
+ * - 選択されたすべてのタブを新しいグループの子要素として移動
+ * - グループ化後に親子関係を正しくツリーに反映
+ */
+async function handleCreateGroup(
+  tabIds: number[],
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    if (tabIds.length === 0) {
+      sendResponse({
+        success: false,
+        error: 'No tabs specified for grouping',
+      });
+      return;
+    }
+
+    // グループを作成
+    const groupId = await treeStateManager.createGroupFromTabs(tabIds);
+
+    // UIに状態更新を通知
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((_error) => {
+      // Ignore errors when no listeners are available
+    });
+
+    sendResponse({ success: true, data: { groupId } });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Task 6.2: グループ解除
+ * Requirement 12: グループを解除し、子タブをルートレベルに移動
+ */
+async function handleDissolveGroup(
+  tabIds: number[],
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    if (tabIds.length === 0) {
+      sendResponse({
+        success: false,
+        error: 'No tabs specified for ungrouping',
+      });
+      return;
+    }
+
+    // 最初のtabIdに対応するノードを見つけ、それがグループノードなら解除
+    await treeStateManager.dissolveGroup(tabIds[0]);
+
+    // UIに状態更新を通知
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((_error) => {
+      // Ignore errors when no listeners are available
+    });
+
     sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({

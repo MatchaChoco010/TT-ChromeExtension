@@ -3,10 +3,10 @@
  *
  * 設定変更とUI/UXカスタマイゼーションの E2E テスト
  *
- * Task 8.2: 設定画面を新規タブで開く機能
+ * Task 9.1: サイドパネルから設定ボタンを削除（要件20.1）
+ * 設定ページへのアクセスは直接URLまたはポップアップメニュー（Task 9.2）から行う
+ *
  * Requirement 3.12: 設定変更とUI/UXカスタマイゼーション
- * Requirements 5.1, 5.2, 5.3, 5.4: 設定画面の新規タブ表示
- * - 設定ボタンをクリックすると新規タブで設定画面が開く
  * - 設定画面はブラウザタブの全幅を利用
  * - フォントサイズ変更
  * - フォントファミリー変更
@@ -20,28 +20,22 @@ import { COMMON_SELECTORS, COMMON_TIMEOUTS, FORM_INPUTS } from './test-data/comm
 
 /**
  * 設定ページを新規タブで開くヘルパー関数
- * Task 8.2: 設定画面を新規タブで開く
+ * Task 9.1: サイドパネルから設定ボタンを削除
  *
- * Side Panelの設定ボタンをクリックして新規タブで設定ページを開く
+ * 設定ページのURLに直接アクセスして開く
+ * （ポップアップメニュー実装後はそちらからもアクセス可能になる予定）
  *
- * @param sidePanelPage - Side PanelのPage
  * @param extensionContext - BrowserContext
+ * @param extensionId - 拡張機能のID
  * @returns 設定ページのPage
  */
 async function openSettingsInNewTab(
-  sidePanelPage: Page,
-  extensionContext: import('@playwright/test').BrowserContext
+  extensionContext: import('@playwright/test').BrowserContext,
+  extensionId: string
 ): Promise<Page> {
-  // Side Panelが表示されていることを確認
-  await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
-    timeout: COMMON_TIMEOUTS.long,
-  });
-
-  // 新しいページが開くのを待機しながら設定ボタンをクリック
-  const [settingsPage] = await Promise.all([
-    extensionContext.waitForEvent('page', { timeout: COMMON_TIMEOUTS.medium }),
-    sidePanelPage.locator('[data-testid="open-settings-button"]').click(),
-  ]);
+  // 設定ページを新規タブで直接開く
+  const settingsPage = await extensionContext.newPage();
+  await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
 
   // 設定ページが読み込まれるまで待機
   await settingsPage.waitForLoadState('domcontentloaded');
@@ -51,18 +45,26 @@ async function openSettingsInNewTab(
 }
 
 test.describe('設定変更とUI/UXカスタマイゼーション', () => {
-  test('設定ボタンをクリックすると新規タブで設定画面が開く', async ({
+  test('サイドパネルに設定ボタンが存在しない（要件20.1）', async ({
     sidePanelPage,
-    extensionContext,
-    extensionId,
   }) => {
+    // Task 9.1: サイドパネルから設定ボタンを削除
     // Arrange: Side Panelが表示されていることを確認
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
 
-    // Act: 設定ボタンをクリックして新規タブを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    // Assert: 設定ボタンがサイドパネルに存在しないことを確認
+    const openSettingsButton = sidePanelPage.locator('[data-testid="open-settings-button"]');
+    await expect(openSettingsButton).not.toBeVisible();
+  });
+
+  test('設定ページが直接URLでアクセスできる', async ({
+    extensionContext,
+    extensionId,
+  }) => {
+    // Act: 設定ページを直接URLで開く
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Assert: 設定ページが正しいURLで開かれる
     expect(settingsPage.url()).toContain(`chrome-extension://${extensionId}/settings.html`);
@@ -77,11 +79,11 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('設定ページがブラウザタブの全幅を利用できるレイアウトで表示される', async ({
-    sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Act: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Assert: 設定ページコンテナが全幅レイアウト用のクラスを持つ
     const container = settingsPage.locator('.settings-page-container');
@@ -93,11 +95,11 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('設定ページで現在の設定値が表示される', async ({
-    sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Act: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Assert: フォントサイズ入力が存在する
     const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
@@ -117,9 +119,10 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   test('フォントサイズを変更した場合、設定が保存される', async ({
     sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Act: フォントサイズを18pxに変更
     const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
@@ -142,11 +145,11 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('フォントサイズのプリセットボタン（小・中・大）が機能する', async ({
-    sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Act & Assert: 「大」ボタンをクリック
     const largeButton = settingsPage.getByRole('button', { name: '大' });
@@ -178,9 +181,10 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   test('フォントファミリーを変更した場合、設定が保存される', async ({
     sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Act: フォントファミリーを変更
     const fontFamilyInput = settingsPage.locator(FORM_INPUTS.fontFamily);
@@ -205,9 +209,10 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   test('カスタムCSSを設定した場合、Side Panelに適用される', async ({
     sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Act: カスタムCSSを入力
     const customCSSTextarea = settingsPage.locator(FORM_INPUTS.customCSS);
@@ -233,9 +238,10 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   test('設定を保存した場合、ブラウザを再起動しても設定が保持される（設定の永続化）', async ({
     sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Act: フォントサイズを変更
     const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
@@ -278,6 +284,7 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     sidePanelPage,
   }) => {
     // Task 8.2: サイドパネル内部での設定画面表示を削除
+    // Task 9.1: サイドパネルから設定ボタンも削除（要件20.1）
     // Assert: Side Panelに設定パネル（data-testid="settings-panel"）が存在しない
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
@@ -287,9 +294,9 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     const settingsPanel = sidePanelPage.locator(COMMON_SELECTORS.settingsPanel);
     await expect(settingsPanel).not.toBeVisible();
 
-    // 設定ボタンは新規タブで開くボタンに変更されている
+    // Task 9.1: 設定ボタンはサイドパネルから削除された（ポップアップメニューからアクセス）
     const openSettingsButton = sidePanelPage.locator('[data-testid="open-settings-button"]');
-    await expect(openSettingsButton).toBeVisible();
+    await expect(openSettingsButton).not.toBeVisible();
   });
 });
 
@@ -300,12 +307,12 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
  */
 test.describe('スナップショット自動保存設定', () => {
   test('スナップショット自動保存のトグルが機能する', async ({
-    sidePanelPage,
     extensionContext,
+    extensionId,
     serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Assert: 初期状態で自動保存が無効（autoSnapshotInterval = 0）
     const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
@@ -332,12 +339,12 @@ test.describe('スナップショット自動保存設定', () => {
   });
 
   test('スナップショット自動保存の間隔設定が保存される', async ({
-    sidePanelPage,
     extensionContext,
+    extensionId,
     serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // 自動保存を有効にする
     const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
@@ -364,12 +371,12 @@ test.describe('スナップショット自動保存設定', () => {
   });
 
   test('最大スナップショット数の設定が保存される', async ({
-    sidePanelPage,
     extensionContext,
+    extensionId,
     serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // 自動保存を有効にする
     const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
@@ -396,11 +403,11 @@ test.describe('スナップショット自動保存設定', () => {
   });
 
   test('自動保存無効時は間隔と最大数の入力が無効化される', async ({
-    sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Assert: 初期状態（自動保存無効）で入力フィールドが無効
     const intervalInput = settingsPage.locator('#autoSnapshotInterval');
@@ -430,9 +437,10 @@ test.describe('スナップショット自動保存設定', () => {
   test('スナップショット自動保存設定がブラウザ再起動後も保持される', async ({
     sidePanelPage,
     extensionContext,
+    extensionId,
   }) => {
     // Arrange: 設定ページを開く
-    const settingsPage = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     // 自動保存を有効にして設定を変更
     const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
@@ -462,7 +470,7 @@ test.describe('スナップショット自動保存設定', () => {
     });
 
     // 再度設定ページを開く
-    const settingsPageAfterReload = await openSettingsInNewTab(sidePanelPage, extensionContext);
+    const settingsPageAfterReload = await openSettingsInNewTab(extensionContext, extensionId);
 
     // Assert: 設定が保持されていることを確認
     const toggleAfterReload = settingsPageAfterReload.locator('#autoSnapshotEnabled');

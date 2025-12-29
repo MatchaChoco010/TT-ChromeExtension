@@ -18,6 +18,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Toggle Tree Tabs"
+    "default_title": "Vivaldi-TT",
+    "default_popup": "popup.html"
   }
 }

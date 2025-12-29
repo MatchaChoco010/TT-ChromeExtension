@@ -13,6 +13,8 @@ export const STORAGE_KEYS = {
   USER_SETTINGS: 'user_settings' as const,
   UNREAD_TABS: 'unread_tabs' as const,
   GROUPS: 'groups' as const,
+  /** Requirement 5.1-5.4: タブタイトル永続化 */
+  TAB_TITLES: 'tab_titles' as const,
 } satisfies Record<string, StorageKey>;
 
 /**
@@ -45,11 +47,7 @@ export class StorageService implements IStorageService {
     key: K,
     value: StorageSchema[K],
   ): Promise<void> {
-    try {
-      await chrome.storage.local.set({ [key]: value });
-    } catch (error) {
-      throw error;
-    }
+    await chrome.storage.local.set({ [key]: value });
   }
 
   /**
@@ -57,11 +55,7 @@ export class StorageService implements IStorageService {
    * @param key - ストレージキー
    */
   async remove(key: StorageKey): Promise<void> {
-    try {
-      await chrome.storage.local.remove(key);
-    } catch (error) {
-      throw error;
-    }
+    await chrome.storage.local.remove(key);
   }
 
   /**

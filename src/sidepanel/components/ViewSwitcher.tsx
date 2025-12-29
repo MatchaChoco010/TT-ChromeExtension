@@ -3,10 +3,12 @@
  * Task 8.2: ViewSwitcher UI コンポーネントの実装
  * Task 7.1: ファビコンサイズアイコンボタンへの改修
  * Task 7.3: ビューボタンの右クリックコンテキストメニューの実装
- * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 6.3
+ * Task 3.2: ビューのスクロール切り替え機能を追加
+ * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 6.3, 16.1, 16.2, 16.3
  *
  * サイドパネル上部で複数のビューをファビコンサイズのアイコンボタンで切り替えるUIを提供します。
  * ビューボタンを右クリックするとコンテキストメニューが表示され、編集・削除が可能です。
+ * マウスホイールでビューを切り替えることができます。
  */
 
 import React, { useState, useCallback } from 'react';
@@ -19,6 +21,8 @@ export interface ViewSwitcherProps {
   views: View[];
   /** 現在アクティブなビューのID */
   currentViewId: string;
+  /** 各ビューのタブ数 (Task 3.3: Requirements 17.1, 17.2, 17.3) */
+  tabCounts?: Record<string, number>;
   /** ビュー切り替え時のコールバック */
   onViewSwitch: (viewId: string) => void;
   /** 新しいビュー作成時のコールバック */
@@ -56,6 +60,7 @@ interface ContextMenuState {
 export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   views,
   currentViewId,
+  tabCounts,
   onViewSwitch,
   onViewCreate,
   onViewDelete,
@@ -111,16 +116,47 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
     [onViewUpdate]
   );
 
+  // Task 3.2: マウスホイールでビュー切り替え
+  const handleWheel = useCallback(
+    (event: React.WheelEvent) => {
+      // deltaYが0の場合は何もしない
+      if (event.deltaY === 0) {
+        return;
+      }
+
+      // 現在のビューのインデックスを取得
+      const currentIndex = views.findIndex((v) => v.id === currentViewId);
+      if (currentIndex === -1) {
+        return;
+      }
+
+      if (event.deltaY < 0) {
+        // 上スクロール: 前のビューに切り替え
+        if (currentIndex > 0) {
+          onViewSwitch(views[currentIndex - 1].id);
+        }
+      } else {
+        // 下スクロール: 次のビューに切り替え
+        if (currentIndex < views.length - 1) {
+          onViewSwitch(views[currentIndex + 1].id);
+        }
+      }
+    },
+    [views, currentViewId, onViewSwitch]
+  );
+
   return (
     <>
     <div
       className="flex items-center gap-1 p-2 border-b border-gray-700 bg-gray-900"
       data-testid="view-switcher-container"
+      onWheel={handleWheel}
     >
       {/* ビューリスト（横スクロール可能） */}
       <div className="flex items-center gap-1 overflow-x-auto flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {views.map((view) => {
           const isActive = view.id === currentViewId;
+          const tabCount = tabCounts?.[view.id] ?? 0;
 
           return (
             <button
@@ -128,7 +164,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
               onClick={() => onViewSwitch(view.id)}
               onContextMenu={(e) => handleContextMenu(e, view)}
               className={`
-                flex items-center justify-center w-8 h-8 rounded-md flex-shrink-0
+                relative flex items-center justify-center w-8 h-8 rounded-md flex-shrink-0
                 transition-colors duration-150
                 ${
                   isActive
@@ -166,6 +202,15 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                 aria-hidden="true"
                 data-testid="view-color-circle"
               />
+              {/* Task 3.3: タブ数バッジ (Requirements 17.1, 17.2, 17.3) */}
+              {tabCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center"
+                  data-testid={`tab-count-badge-${view.id}`}
+                >
+                  {tabCount}
+                </span>
+              )}
             </button>
           );
         })}
@@ -209,7 +254,9 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
       )}
 
       {/* Task 7.3: 編集モーダル */}
+      {/* key を使用してviewが変わるたびにコンポーネントを再マウント */}
       <ViewEditModal
+        key={editingView?.id ?? 'closed'}
         view={editingView}
         isOpen={editingView !== null}
         onSave={handleSaveView}

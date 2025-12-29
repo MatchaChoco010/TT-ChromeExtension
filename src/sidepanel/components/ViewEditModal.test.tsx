@@ -4,7 +4,7 @@
  * Requirements: 3.4
  */
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { View } from '@/types';
 import { ViewEditModal } from './ViewEditModal';
@@ -115,7 +115,7 @@ describe('ViewEditModal', () => {
       expect(colorInput).toHaveValue('#ef4444');
     });
 
-    it('アイコンURL入力フィールドが表示される', () => {
+    it('アイコン選択ボタンが表示される', () => {
       render(
         <ViewEditModal
           view={mockView}
@@ -125,11 +125,11 @@ describe('ViewEditModal', () => {
         />
       );
 
-      const iconInput = screen.getByLabelText('Icon URL (optional)');
-      expect(iconInput).toBeInTheDocument();
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      expect(iconSelectButton).toBeInTheDocument();
     });
 
-    it('アイコンURLがある場合は入力フィールドに値が表示される', () => {
+    it('アイコンURLがある場合はプレビューが表示される', async () => {
       render(
         <ViewEditModal
           view={mockViewWithIcon}
@@ -139,8 +139,12 @@ describe('ViewEditModal', () => {
         />
       );
 
-      const iconInput = screen.getByLabelText('Icon URL (optional)');
-      expect(iconInput).toHaveValue('https://example.com/icon.png');
+      // queueMicrotaskによる状態更新を待つ
+      await waitFor(() => {
+        const iconPreview = screen.getByTestId('icon-preview');
+        expect(iconPreview).toBeInTheDocument();
+        expect(iconPreview).toHaveAttribute('src', 'https://example.com/icon.png');
+      });
     });
   });
 
@@ -177,7 +181,7 @@ describe('ViewEditModal', () => {
       expect(colorInput).toHaveValue('#10b981');
     });
 
-    it('アイコンURLを変更できる', () => {
+    it('IconPickerでアイコンを選択して変更できる', () => {
       render(
         <ViewEditModal
           view={mockView}
@@ -187,10 +191,27 @@ describe('ViewEditModal', () => {
         />
       );
 
-      const iconInput = screen.getByLabelText('Icon URL (optional)');
-      fireEvent.change(iconInput, { target: { value: 'https://new-icon.com/icon.png' } });
+      // IconPickerを開く
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      fireEvent.click(iconSelectButton);
 
-      expect(iconInput).toHaveValue('https://new-icon.com/icon.png');
+      // アイコンを選択
+      const briefcaseButton = screen.getByTestId('icon-button-briefcase');
+      fireEvent.click(briefcaseButton);
+
+      // Selectボタンをクリック（正確なテキストで検索）
+      const selectButton = screen.getByRole('button', { name: 'Select' });
+      fireEvent.click(selectButton);
+
+      // 保存して確認
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      fireEvent.click(saveButton);
+
+      expect(mockOnSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          icon: 'briefcase',
+        })
+      );
     });
   });
 
@@ -228,8 +249,17 @@ describe('ViewEditModal', () => {
       const colorInput = screen.getByLabelText('Color');
       fireEvent.change(colorInput, { target: { value: '#22c55e' } });
 
-      const iconInput = screen.getByLabelText('Icon URL (optional)');
-      fireEvent.change(iconInput, { target: { value: 'https://new-icon.com/icon.png' } });
+      // IconPickerを開いてアイコンを選択
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      fireEvent.click(iconSelectButton);
+
+      // briefcaseアイコンを選択
+      const briefcaseButton = screen.getByTestId('icon-button-briefcase');
+      fireEvent.click(briefcaseButton);
+
+      // Selectボタンをクリック（正確なテキストで検索）
+      const selectButton = screen.getByRole('button', { name: 'Select' });
+      fireEvent.click(selectButton);
 
       // 保存
       const saveButton = screen.getByRole('button', { name: /save/i });
@@ -239,11 +269,11 @@ describe('ViewEditModal', () => {
         id: 'view-1',
         name: 'Updated Name',
         color: '#22c55e',
-        icon: 'https://new-icon.com/icon.png',
+        icon: 'briefcase',
       });
     });
 
-    it('アイコンURLが空の場合はiconプロパティがundefinedになる', () => {
+    it('アイコンをクリアした場合はiconプロパティがundefinedになる', async () => {
       render(
         <ViewEditModal
           view={mockViewWithIcon}
@@ -253,9 +283,14 @@ describe('ViewEditModal', () => {
         />
       );
 
-      // アイコンURLをクリア
-      const iconInput = screen.getByLabelText('Icon URL (optional)');
-      fireEvent.change(iconInput, { target: { value: '' } });
+      // queueMicrotaskによる状態更新を待つ
+      await waitFor(() => {
+        expect(screen.getByTestId('icon-clear-button')).toBeInTheDocument();
+      });
+
+      // アイコンクリアボタンをクリック
+      const clearButton = screen.getByTestId('icon-clear-button');
+      fireEvent.click(clearButton);
 
       // 保存
       const saveButton = screen.getByRole('button', { name: /save/i });
@@ -439,7 +474,7 @@ describe('ViewEditModal', () => {
   });
 
   describe('アイコンプレビュー', () => {
-    it('有効なアイコンURLが入力されるとプレビューが表示される', () => {
+    it('有効なアイコンURLが入力されるとプレビューが表示される', async () => {
       render(
         <ViewEditModal
           view={mockViewWithIcon}
@@ -449,9 +484,12 @@ describe('ViewEditModal', () => {
         />
       );
 
-      const iconPreview = screen.getByTestId('icon-preview');
-      expect(iconPreview).toBeInTheDocument();
-      expect(iconPreview).toHaveAttribute('src', 'https://example.com/icon.png');
+      // queueMicrotaskによる状態更新を待つ
+      await waitFor(() => {
+        const iconPreview = screen.getByTestId('icon-preview');
+        expect(iconPreview).toBeInTheDocument();
+        expect(iconPreview).toHaveAttribute('src', 'https://example.com/icon.png');
+      });
     });
 
     it('アイコンURLが空の場合はプレビューが表示されない', () => {
@@ -511,6 +549,200 @@ describe('ViewEditModal', () => {
     });
   });
 
+  describe('Task 8.2: IconPicker統合', () => {
+    it('アイコン選択ボタンが表示される', () => {
+      render(
+        <ViewEditModal
+          view={mockView}
+          isOpen={true}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      // アイコン選択ボタン（Icon URL入力の代わりにIconPickerを開くボタン）
+      expect(screen.getByTestId('icon-select-button')).toBeInTheDocument();
+    });
+
+    it('アイコン選択ボタンをクリックするとIconPickerが表示される', () => {
+      render(
+        <ViewEditModal
+          view={mockView}
+          isOpen={true}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      fireEvent.click(iconSelectButton);
+
+      // IconPickerが表示される
+      expect(screen.getByTestId('icon-picker')).toBeInTheDocument();
+    });
+
+    it('IconPickerでアイコンを選択すると選択が反映される', () => {
+      render(
+        <ViewEditModal
+          view={mockView}
+          isOpen={true}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      // IconPickerを開く
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      fireEvent.click(iconSelectButton);
+
+      // アイコンを選択
+      const iconGrid = screen.getByTestId('icon-grid');
+      const firstIconButton = iconGrid.querySelector('[data-testid^="icon-button-"]');
+      expect(firstIconButton).toBeInTheDocument();
+      fireEvent.click(firstIconButton!);
+
+      // Selectボタンをクリック（正確なテキストで検索）
+      const selectButton = screen.getByRole('button', { name: 'Select' });
+      fireEvent.click(selectButton);
+
+      // IconPickerが閉じる
+      expect(screen.queryByTestId('icon-picker')).not.toBeInTheDocument();
+    });
+
+    it('IconPickerで選択したアイコンが保存時に反映される', () => {
+      render(
+        <ViewEditModal
+          view={mockView}
+          isOpen={true}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      // IconPickerを開く
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      fireEvent.click(iconSelectButton);
+
+      // briefcaseアイコンを選択（workカテゴリの最初のアイコン）
+      const briefcaseButton = screen.getByTestId('icon-button-briefcase');
+      fireEvent.click(briefcaseButton);
+
+      // Selectボタンをクリック（正確なテキストで検索）
+      const selectButton = screen.getByRole('button', { name: 'Select' });
+      fireEvent.click(selectButton);
+
+      // モーダルの保存ボタンをクリック
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      fireEvent.click(saveButton);
+
+      // onSaveが呼ばれ、iconがbriefcaseになっている
+      expect(mockOnSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          icon: 'briefcase',
+        })
+      );
+    });
+
+    it('IconPickerをキャンセルしても元のアイコン設定は維持される', async () => {
+      render(
+        <ViewEditModal
+          view={mockViewWithIcon}
+          isOpen={true}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      // queueMicrotaskによる状態更新を待つ
+      await waitFor(() => {
+        expect(screen.getByTestId('icon-select-button')).toBeInTheDocument();
+      });
+
+      // IconPickerを開く
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      fireEvent.click(iconSelectButton);
+
+      // アイコンを選択
+      const briefcaseButton = screen.getByTestId('icon-button-briefcase');
+      fireEvent.click(briefcaseButton);
+
+      // IconPicker内のキャンセルボタンをクリック（正確なテキストで検索）
+      const iconPicker = screen.getByTestId('icon-picker');
+      // Cancelボタンはフッターの最初のボタン
+      const cancelButtons = Array.from(iconPicker.querySelectorAll('button')).filter(
+        (btn) => btn.textContent === 'Cancel'
+      );
+      expect(cancelButtons.length).toBe(1);
+      fireEvent.click(cancelButtons[0]);
+
+      // モーダルの保存ボタンをクリック
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      fireEvent.click(saveButton);
+
+      // onSaveが呼ばれ、iconは元のURL
+      expect(mockOnSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          icon: 'https://example.com/icon.png',
+        })
+      );
+    });
+
+    it('現在のアイコンがカスタムアイコン名の場合、プレビューに表示される', async () => {
+      const mockViewWithCustomIcon: View = {
+        id: 'view-3',
+        name: 'Dev',
+        color: '#22c55e',
+        icon: 'code',
+      };
+
+      render(
+        <ViewEditModal
+          view={mockViewWithCustomIcon}
+          isOpen={true}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      // queueMicrotaskによる状態更新を待つ
+      await waitFor(() => {
+        // カスタムアイコンのプレビューが表示される
+        expect(screen.getByTestId('custom-icon-preview')).toBeInTheDocument();
+      });
+    });
+
+    it('アイコンをクリアできる', async () => {
+      render(
+        <ViewEditModal
+          view={mockViewWithIcon}
+          isOpen={true}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      // queueMicrotaskによる状態更新を待つ
+      await waitFor(() => {
+        expect(screen.getByTestId('icon-clear-button')).toBeInTheDocument();
+      });
+
+      // アイコンクリアボタンをクリック
+      const clearButton = screen.getByTestId('icon-clear-button');
+      fireEvent.click(clearButton);
+
+      // モーダルの保存ボタンをクリック
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      fireEvent.click(saveButton);
+
+      // onSaveが呼ばれ、iconがundefined
+      expect(mockOnSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          icon: undefined,
+        })
+      );
+    });
+  });
+
   describe('Requirement 3.4: ビュー編集用のモーダルダイアログ', () => {
     it('ビュー編集モーダルでビュー名・色・アイコンを編集できる', () => {
       render(
@@ -530,9 +762,19 @@ describe('ViewEditModal', () => {
       const colorInput = screen.getByLabelText('Color');
       fireEvent.change(colorInput, { target: { value: '#8b5cf6' } });
 
-      // アイコンURLを編集
-      const iconInput = screen.getByLabelText('Icon URL (optional)');
-      fireEvent.change(iconInput, { target: { value: 'https://example.com/new-icon.png' } });
+      // IconPickerを開いてアイコンを選択
+      const iconSelectButton = screen.getByTestId('icon-select-button');
+      fireEvent.click(iconSelectButton);
+
+      // codeアイコンを選択
+      const devTab = screen.getByRole('tab', { name: /dev/i });
+      fireEvent.click(devTab);
+      const codeButton = screen.getByTestId('icon-button-code');
+      fireEvent.click(codeButton);
+
+      // Selectボタンをクリック（正確なテキストで検索）
+      const selectButton = screen.getByRole('button', { name: 'Select' });
+      fireEvent.click(selectButton);
 
       // 保存
       const saveButton = screen.getByRole('button', { name: /save/i });
@@ -542,7 +784,7 @@ describe('ViewEditModal', () => {
         id: 'view-1',
         name: 'New View Name',
         color: '#8b5cf6',
-        icon: 'https://example.com/new-icon.png',
+        icon: 'code',
       });
     });
 

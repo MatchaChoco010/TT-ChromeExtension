@@ -42,48 +42,44 @@ export class SnapshotManager {
     name: string,
     isAutoSave: boolean = false,
   ): Promise<Snapshot> {
-    try {
-      // 現在の状態を取得
-      const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-      const groupsRecord = await this.storageService.get(STORAGE_KEYS.GROUPS);
+    // 現在の状態を取得
+    const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+    const groupsRecord = await this.storageService.get(STORAGE_KEYS.GROUPS);
 
-      if (!treeState) {
-        throw new Error('Tree state not found');
-      }
-
-      // ビューを取得
-      const views: View[] = treeState.views || [];
-
-      // グループを取得
-      const groups: Group[] = groupsRecord
-        ? Object.values(groupsRecord)
-        : [];
-
-      // タブスナップショットを作成
-      const tabs: TabSnapshot[] = await this.createTabSnapshots(
-        treeState.nodes,
-      );
-
-      // スナップショットオブジェクトを作成
-      const snapshot: Snapshot = {
-        id: this.generateSnapshotId(),
-        createdAt: new Date(),
-        name,
-        isAutoSave,
-        data: {
-          views,
-          tabs,
-          groups,
-        },
-      };
-
-      // IndexedDBに保存
-      await this.indexedDBService.saveSnapshot(snapshot);
-
-      return snapshot;
-    } catch (error) {
-      throw error;
+    if (!treeState) {
+      throw new Error('Tree state not found');
     }
+
+    // ビューを取得
+    const views: View[] = treeState.views || [];
+
+    // グループを取得
+    const groups: Group[] = groupsRecord
+      ? Object.values(groupsRecord)
+      : [];
+
+    // タブスナップショットを作成
+    const tabs: TabSnapshot[] = await this.createTabSnapshots(
+      treeState.nodes,
+    );
+
+    // スナップショットオブジェクトを作成
+    const snapshot: Snapshot = {
+      id: this.generateSnapshotId(),
+      createdAt: new Date(),
+      name,
+      isAutoSave,
+      data: {
+        views,
+        tabs,
+        groups,
+      },
+    };
+
+    // IndexedDBに保存
+    await this.indexedDBService.saveSnapshot(snapshot);
+
+    return snapshot;
   }
 
   /**
@@ -93,22 +89,18 @@ export class SnapshotManager {
    * @param snapshotId - 復元するスナップショットのID
    */
   async restoreSnapshot(snapshotId: string): Promise<void> {
-    try {
-      // スナップショットを取得
-      const snapshot = await this.indexedDBService.getSnapshot(snapshotId);
+    // スナップショットを取得
+    const snapshot = await this.indexedDBService.getSnapshot(snapshotId);
 
-      if (!snapshot) {
-        throw new Error('Snapshot not found');
-      }
-
-      // タブを復元
-      await this.restoreTabsFromSnapshot(snapshot.data.tabs);
-
-      // ビューを復元（将来実装）
-      // グループを復元（将来実装）
-    } catch (error) {
-      throw error;
+    if (!snapshot) {
+      throw new Error('Snapshot not found');
     }
+
+    // タブを復元
+    await this.restoreTabsFromSnapshot(snapshot.data.tabs);
+
+    // ビューを復元（将来実装）
+    // グループを復元（将来実装）
   }
 
   /**
@@ -117,11 +109,7 @@ export class SnapshotManager {
    * @param snapshotId - 削除するスナップショットのID
    */
   async deleteSnapshot(snapshotId: string): Promise<void> {
-    try {
-      await this.indexedDBService.deleteSnapshot(snapshotId);
-    } catch (error) {
-      throw error;
-    }
+    await this.indexedDBService.deleteSnapshot(snapshotId);
   }
 
   /**
@@ -130,11 +118,7 @@ export class SnapshotManager {
    * @returns スナップショット配列
    */
   async getSnapshots(): Promise<Snapshot[]> {
-    try {
-      return await this.indexedDBService.getAllSnapshots();
-    } catch (error) {
-      throw error;
-    }
+    return await this.indexedDBService.getAllSnapshots();
   }
 
   /**
@@ -144,23 +128,19 @@ export class SnapshotManager {
    * @returns JSON文字列
    */
   async exportSnapshot(snapshotId: string): Promise<string> {
-    try {
-      const snapshot = await this.indexedDBService.getSnapshot(snapshotId);
+    const snapshot = await this.indexedDBService.getSnapshot(snapshotId);
 
-      if (!snapshot) {
-        throw new Error('Snapshot not found');
-      }
-
-      // Date を ISO文字列に変換してシリアライズ可能にする
-      const exportData = {
-        ...snapshot,
-        createdAt: snapshot.createdAt.toISOString(),
-      };
-
-      return JSON.stringify(exportData, null, 2);
-    } catch (error) {
-      throw error;
+    if (!snapshot) {
+      throw new Error('Snapshot not found');
     }
+
+    // Date を ISO文字列に変換してシリアライズ可能にする
+    const exportData = {
+      ...snapshot,
+      createdAt: snapshot.createdAt.toISOString(),
+    };
+
+    return JSON.stringify(exportData, null, 2);
   }
 
   /**
@@ -170,22 +150,18 @@ export class SnapshotManager {
    * @returns インポートされたスナップショット
    */
   async importSnapshot(jsonData: string): Promise<Snapshot> {
-    try {
-      const parsed = JSON.parse(jsonData);
+    const parsed = JSON.parse(jsonData);
 
-      // Date オブジェクトに変換
-      const snapshot: Snapshot = {
-        ...parsed,
-        createdAt: new Date(parsed.createdAt),
-      };
+    // Date オブジェクトに変換
+    const snapshot: Snapshot = {
+      ...parsed,
+      createdAt: new Date(parsed.createdAt),
+    };
 
-      // IndexedDBに保存
-      await this.indexedDBService.saveSnapshot(snapshot);
+    // IndexedDBに保存
+    await this.indexedDBService.saveSnapshot(snapshot);
 
-      return snapshot;
-    } catch (error) {
-      throw error;
-    }
+    return snapshot;
   }
 
   /**
@@ -257,55 +233,51 @@ export class SnapshotManager {
    * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
    */
   startAutoSnapshot(intervalMinutes: number, maxSnapshots?: number): void {
-    try {
-      // 既存のアラームとリスナーをクリア
-      chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
-      if (this.alarmListener) {
-        chrome.alarms.onAlarm.removeListener(this.alarmListener);
-        this.alarmListener = null;
-      }
-
-      // maxSnapshotsを保存
-      this.currentMaxSnapshots = maxSnapshots;
-
-      // intervalが0の場合は無効化（アラームを作成しない）
-      if (intervalMinutes === 0) {
-        return;
-      }
-
-      // アラームリスナーを作成
-      this.alarmListener = async (alarm: chrome.alarms.Alarm) => {
-        if (alarm.name === SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME) {
-          try {
-            // 自動スナップショットを作成
-            const timestamp = new Date().toISOString().split('T')[0];
-            const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
-            await this.createSnapshot(name, true);
-
-            // Requirement 6.5: 最大保持数を超えた古いスナップショットを自動削除
-            if (this.currentMaxSnapshots && this.currentMaxSnapshots > 0) {
-              try {
-                await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
-              } catch (_deleteError) {
-                // Failed to delete old snapshots silently
-              }
-            }
-          } catch (_error) {
-            // Auto-snapshot failed silently
-          }
-        }
-      };
-
-      // アラームリスナーを登録
-      chrome.alarms.onAlarm.addListener(this.alarmListener);
-
-      // アラームを作成
-      chrome.alarms.create(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME, {
-        periodInMinutes: intervalMinutes,
-      });
-    } catch (error) {
-      throw error;
+    // 既存のアラームとリスナーをクリア
+    chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
+    if (this.alarmListener) {
+      chrome.alarms.onAlarm.removeListener(this.alarmListener);
+      this.alarmListener = null;
     }
+
+    // maxSnapshotsを保存
+    this.currentMaxSnapshots = maxSnapshots;
+
+    // intervalが0の場合は無効化（アラームを作成しない）
+    if (intervalMinutes === 0) {
+      return;
+    }
+
+    // アラームリスナーを作成
+    this.alarmListener = async (alarm: chrome.alarms.Alarm) => {
+      if (alarm.name === SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME) {
+        try {
+          // 自動スナップショットを作成
+          const timestamp = new Date().toISOString().split('T')[0];
+          const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
+          await this.createSnapshot(name, true);
+
+          // Requirement 6.5: 最大保持数を超えた古いスナップショットを自動削除
+          if (this.currentMaxSnapshots && this.currentMaxSnapshots > 0) {
+            try {
+              await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
+            } catch (_deleteError) {
+              // Failed to delete old snapshots silently
+            }
+          }
+        } catch (_error) {
+          // Auto-snapshot failed silently
+        }
+      }
+    };
+
+    // アラームリスナーを登録
+    chrome.alarms.onAlarm.addListener(this.alarmListener);
+
+    // アラームを作成
+    chrome.alarms.create(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME, {
+      periodInMinutes: intervalMinutes,
+    });
   }
 
   /**
@@ -324,17 +296,13 @@ export class SnapshotManager {
    * 自動スナップショット機能を停止
    */
   async stopAutoSnapshot(): Promise<void> {
-    try {
-      // アラームをクリア
-      await chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
+    // アラームをクリア
+    await chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
 
-      // リスナーを削除
-      if (this.alarmListener) {
-        chrome.alarms.onAlarm.removeListener(this.alarmListener);
-        this.alarmListener = null;
-      }
-    } catch (error) {
-      throw error;
+    // リスナーを削除
+    if (this.alarmListener) {
+      chrome.alarms.onAlarm.removeListener(this.alarmListener);
+      this.alarmListener = null;
     }
   }
 }

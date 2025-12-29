@@ -14,7 +14,7 @@ import {
   useSensors,
   useDndMonitor,
 } from '@dnd-kit/core';
-import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo } from '@/types';
+import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, Group, View } from '@/types';
 import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
 import UnreadBadge from './UnreadBadge';
@@ -33,6 +33,20 @@ const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 
 // Task 4.3: インデント幅（ピクセル）
 const INDENT_WIDTH = 20;
+
+// Task 5.2: autoScroll設定
+// 要件7.1, 7.2: スクロール可能範囲を実際のコンテンツ範囲内に制限
+const AUTO_SCROLL_CONFIG = {
+  // スクロール開始のしきい値（上下それぞれ15%の領域で自動スクロール開始）
+  threshold: {
+    x: 0.1,
+    y: 0.15,
+  },
+  // 加速度を抑えて過度なスクロールを防止
+  acceleration: 5,
+  // スクロール間隔を長めに設定して過度なスクロールを防止
+  interval: 10,
+} as const;
 
 interface TreeNodeItemProps {
   node: TabNode;
@@ -60,6 +74,10 @@ interface TreeNodeItemProps {
   activeNodeId?: string | null;
   // Task 6.2: スナップショット取得コールバック
   onSnapshot?: () => Promise<void>;
+  // Task 7.2: ビュー移動サブメニュー用
+  views?: View[];
+  currentViewId?: string;
+  onMoveToView?: (viewId: string, tabIds: number[]) => void;
 }
 
 /**
@@ -84,6 +102,9 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   globalIsDragging,
   activeNodeId,
   onSnapshot,
+  views,
+  currentViewId,
+  onMoveToView,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -264,6 +285,9 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
           tabUrl={tabInfo?.url || 'about:blank'}
+          views={views}
+          currentViewId={currentViewId}
+          onMoveToView={onMoveToView}
         />
       )}
 
@@ -287,6 +311,9 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               globalIsDragging={globalIsDragging}
               activeNodeId={activeNodeId}
               onSnapshot={onSnapshot}
+              views={views}
+              currentViewId={currentViewId}
+              onMoveToView={onMoveToView}
             />
           ))}
         </div>
@@ -314,6 +341,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   onSelect,
   getSelectedTabIds,
   onSnapshot,
+  views,
+  currentViewId,
+  onMoveToView,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -467,6 +497,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
           tabUrl={tabInfo?.url || 'about:blank'}
+          views={views}
+          currentViewId={currentViewId}
+          onMoveToView={onMoveToView}
         />
       )}
 
@@ -488,6 +521,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               onSelect={onSelect}
               getSelectedTabIds={getSelectedTabIds}
               onSnapshot={onSnapshot}
+              views={views}
+              currentViewId={currentViewId}
+              onMoveToView={onMoveToView}
             />
           ))}
         </div>
@@ -514,10 +550,11 @@ const collectAllNodeIds = (nodes: TabNode[]): string[] => {
 /**
  * Task 4.3: ドラッグ中のドロップターゲット状態を監視するコンポーネント
  * useDndMonitorはDndContext内で使用する必要があるため、別コンポーネントに分離
+ * Task 5.3: tabPositionsも提供（Gapドロップ時のノードID特定用）
  */
 interface DragMonitorProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  onDropTargetChange: (target: DropTarget | null) => void;
+  onDropTargetChange: (target: DropTarget | null, tabPositions?: TabPosition[]) => void;
 }
 
 const DragMonitor: React.FC<DragMonitorProps> = ({
@@ -563,11 +600,13 @@ const DragMonitor: React.FC<DragMonitorProps> = ({
       });
 
       // ドロップターゲットを計算
+      // Task 5.3: tabPositionsも提供（Gapドロップ時のノードID特定用）
       const target = calculateDropTarget(mouseY, tabPositions);
-      onDropTargetChange(target);
+      onDropTargetChange(target, tabPositions);
     },
     onDragEnd: () => {
       // ドラッグ終了時にリセット
+      // Note: リセット前にhandleDragEndが呼ばれるため、dropTargetRefには最新の値が残っている
       onDropTargetChange(null);
     },
     onDragCancel: () => {
@@ -580,6 +619,50 @@ const DragMonitor: React.FC<DragMonitorProps> = ({
 };
 
 /**
+ * Task 6.1: グループノードヘッダーコンポーネント
+ * グループをツリー内に統合表示するためのヘッダー
+ */
+interface GroupNodeHeaderProps {
+  group: Group;
+  onToggle: (groupId: string) => void;
+}
+
+const GroupNodeHeader: React.FC<GroupNodeHeaderProps> = ({ group, onToggle }) => {
+  const handleToggleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggle(group.id);
+  };
+
+  return (
+    <div
+      data-testid={`group-tree-node-${group.id}`}
+      className="flex items-center p-2 bg-gray-800 hover:bg-gray-700 cursor-pointer"
+      style={{ paddingLeft: '8px' }}
+    >
+      {/* 展開/折りたたみボタン */}
+      <button
+        data-testid={`toggle-expand-${group.id}`}
+        onClick={handleToggleClick}
+        className="mr-2 w-4 h-4 flex items-center justify-center text-gray-300"
+        aria-label={group.isExpanded ? 'Collapse' : 'Expand'}
+      >
+        {group.isExpanded ? '▼' : '▶'}
+      </button>
+
+      {/* グループカラーインジケータ */}
+      <div
+        data-testid={`group-color-indicator-${group.id}`}
+        className="mr-2 w-3 h-3 rounded-full flex-shrink-0"
+        style={{ backgroundColor: group.color }}
+      />
+
+      {/* グループ名 */}
+      <span className="text-sm font-medium truncate text-gray-100">{group.name}</span>
+    </div>
+  );
+};
+
+/**
  * タブツリービューコンポーネント
  * タブのツリー構造を表示し、現在のビューに基づいてフィルタリングする
  * onDragEndが提供されている場合、ドラッグ&ドロップ機能を有効化
@@ -588,6 +671,7 @@ const DragMonitor: React.FC<DragMonitorProps> = ({
  * Task 2.3: 選択状態管理機能を追加
  * Task 4.3: 隙間ドロップ判定とビジュアルフィードバック
  * Task 6.2: スナップショット取得機能を追加
+ * Task 6.1: グループ機能をツリー内に統合表示
  */
 const TabTreeView: React.FC<TabTreeViewProps> = ({
   nodes,
@@ -598,6 +682,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onDragOver,
   onDragStart: onDragStartProp,
   onDragCancel: onDragCancelProp,
+  // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のコールバック
+  onSiblingDrop,
   isTabUnread,
   getUnreadChildCount,
   activeTabId,
@@ -606,9 +692,19 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onSelect,
   getSelectedTabIds,
   onSnapshot,
+  // Task 6.1: グループ機能をツリー内に統合表示
+  groups,
+  onGroupToggle,
+  // Task 7.2: ビュー移動サブメニュー用
+  views,
+  onMoveToView,
 }) => {
   // Task 4.3: ドロップターゲット状態とコンテナ参照
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  // Task 5.3: dropTargetをrefでも追跡（handleDragEnd内で最新値を参照するため）
+  const dropTargetRef = useRef<DropTarget | null>(null);
+  // Task 5.3: tabPositionsもrefで追跡（Gapドロップ時のノードID特定用）
+  const tabPositionsRef = useRef<TabPosition[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   // Task 4.4: ドラッグ中のグローバル状態とアクティブノードID
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
@@ -637,6 +733,29 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     [nodes, currentViewId]
   );
 
+  // Task 6.1: グループ別にタブをグループ化
+  const { groupedNodes, ungroupedNodes } = useMemo(() => {
+    if (!groups) {
+      return { groupedNodes: {}, ungroupedNodes: filteredNodes };
+    }
+
+    const grouped: Record<string, TabNode[]> = {};
+    const ungrouped: TabNode[] = [];
+
+    filteredNodes.forEach((node) => {
+      if (node.groupId && groups[node.groupId]) {
+        if (!grouped[node.groupId]) {
+          grouped[node.groupId] = [];
+        }
+        grouped[node.groupId].push(node);
+      } else {
+        ungrouped.push(node);
+      }
+    });
+
+    return { groupedNodes: grouped, ungroupedNodes: ungrouped };
+  }, [filteredNodes, groups]);
+
   const isDraggable = !!onDragEnd;
 
   // すべてのノードIDを収集（SortableContext用）
@@ -646,8 +765,13 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   );
 
   // Task 4.3: ドロップターゲット変更ハンドラ
-  const handleDropTargetChange = useCallback((target: DropTarget | null) => {
+  // Task 5.3: refも更新してhandleDragEnd内で最新値を参照可能に
+  const handleDropTargetChange = useCallback((target: DropTarget | null, tabPositions?: TabPosition[]) => {
     setDropTarget(target);
+    dropTargetRef.current = target;
+    if (tabPositions) {
+      tabPositionsRef.current = tabPositions;
+    }
   }, []);
 
   // Task 6.4: ドラッグホバー時のブランチ自動展開
@@ -685,11 +809,13 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
    * ドラッグ終了イベントハンドラ
    * ホバータイマーをクリアしてから元のonDragEndを呼び出す
    * Task 4.4: ドラッグ終了時にisDraggingをfalseにする
+   * Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
    */
   const handleDragEnd = React.useCallback(
     (event: Parameters<NonNullable<typeof onDragEnd>>[0]) => {
       // Task 4.4: ドラッグ終了時にフラグをリセット
       setGlobalIsDragging(false);
+      const currentActiveNodeId = activeNodeId;
       setActiveNodeId(null);
 
       // ドラッグ終了時にホバータイマーをクリア
@@ -699,12 +825,39 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       }
       lastHoverNodeIdRef.current = null;
 
-      // 元のonDragEndを呼び出す
+      // Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
+      const currentDropTarget = dropTargetRef.current;
+      if (currentDropTarget && currentDropTarget.type === DropTargetType.Gap && onSiblingDrop && currentActiveNodeId) {
+        const tabPositions = tabPositionsRef.current;
+        const gapIndex = currentDropTarget.gapIndex ?? 0;
+
+        // gapIndexから上下のノードIDを取得
+        let aboveNodeId: string | undefined;
+        let belowNodeId: string | undefined;
+
+        if (gapIndex > 0 && gapIndex - 1 < tabPositions.length) {
+          aboveNodeId = tabPositions[gapIndex - 1]?.nodeId;
+        }
+        if (gapIndex < tabPositions.length) {
+          belowNodeId = tabPositions[gapIndex]?.nodeId;
+        }
+
+        // 兄弟として挿入
+        onSiblingDrop({
+          activeNodeId: currentActiveNodeId,
+          insertIndex: gapIndex,
+          aboveNodeId,
+          belowNodeId,
+        });
+        return;
+      }
+
+      // Tab判定の場合は元のonDragEndを呼び出す（子として配置）
       if (onDragEnd) {
         onDragEnd(event);
       }
     },
-    [onDragEnd]
+    [onDragEnd, onSiblingDrop, activeNodeId]
   );
 
   /**
@@ -824,49 +977,74 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     return baseClass;
   }, [globalIsDragging]);
 
+  // タブノードをレンダリングするヘルパー関数
+  const renderTabNode = (node: TabNode) => {
+    if (isDraggable) {
+      return (
+        <SortableTreeNodeItem
+          key={node.id}
+          node={node}
+          onNodeClick={onNodeClick}
+          onToggleExpand={onToggleExpand}
+          isDraggable={isDraggable}
+          isTabUnread={isTabUnread}
+          getUnreadChildCount={getUnreadChildCount}
+          activeTabId={activeTabId}
+          getTabInfo={getTabInfo}
+          isNodeSelected={isNodeSelected}
+          onSelect={onSelect}
+          getSelectedTabIds={getSelectedTabIds}
+          isDragHighlighted={
+            dropTarget?.type === DropTargetType.Tab &&
+            dropTarget.targetNodeId === node.id
+          }
+          globalIsDragging={globalIsDragging}
+          activeNodeId={activeNodeId}
+          onSnapshot={onSnapshot}
+          views={views}
+          currentViewId={currentViewId}
+          onMoveToView={onMoveToView}
+        />
+      );
+    }
+    return (
+      <TreeNodeItem
+        key={node.id}
+        node={node}
+        onNodeClick={onNodeClick}
+        onToggleExpand={onToggleExpand}
+        isDraggable={false}
+        isTabUnread={isTabUnread}
+        getUnreadChildCount={getUnreadChildCount}
+        activeTabId={activeTabId}
+        getTabInfo={getTabInfo}
+        isNodeSelected={isNodeSelected}
+        onSelect={onSelect}
+        getSelectedTabIds={getSelectedTabIds}
+        onSnapshot={onSnapshot}
+        views={views}
+        currentViewId={currentViewId}
+        onMoveToView={onMoveToView}
+      />
+    );
+  };
+
   const content = (
     <div ref={containerRef} className={containerClassName} data-drag-container>
-      {filteredNodes.map((node) =>
-        isDraggable ? (
-          <SortableTreeNodeItem
-            key={node.id}
-            node={node}
-            onNodeClick={onNodeClick}
-            onToggleExpand={onToggleExpand}
-            isDraggable={isDraggable}
-            isTabUnread={isTabUnread}
-            getUnreadChildCount={getUnreadChildCount}
-            activeTabId={activeTabId}
-            getTabInfo={getTabInfo}
-            isNodeSelected={isNodeSelected}
-            onSelect={onSelect}
-            getSelectedTabIds={getSelectedTabIds}
-            isDragHighlighted={
-              dropTarget?.type === DropTargetType.Tab &&
-              dropTarget.targetNodeId === node.id
-            }
-            globalIsDragging={globalIsDragging}
-            activeNodeId={activeNodeId}
-            onSnapshot={onSnapshot}
-          />
-        ) : (
-          <TreeNodeItem
-            key={node.id}
-            node={node}
-            onNodeClick={onNodeClick}
-            onToggleExpand={onToggleExpand}
-            isDraggable={false}
-            isTabUnread={isTabUnread}
-            getUnreadChildCount={getUnreadChildCount}
-            activeTabId={activeTabId}
-            getTabInfo={getTabInfo}
-            isNodeSelected={isNodeSelected}
-            onSelect={onSelect}
-            getSelectedTabIds={getSelectedTabIds}
-            onSnapshot={onSnapshot}
-          />
-        )
-      )}
+      {/* Task 6.1: グループとそのタブを表示 */}
+      {groups && onGroupToggle && Object.entries(groups).map(([groupId, group]) => {
+        const childNodes = groupedNodes[groupId] || [];
+        return (
+          <div key={groupId}>
+            <GroupNodeHeader group={group} onToggle={onGroupToggle} />
+            {/* グループ内のタブ（展開時のみ表示） */}
+            {group.isExpanded && childNodes.map((node) => renderTabNode(node))}
+          </div>
+        );
+      })}
+
+      {/* グループに属さないタブを表示 */}
+      {ungroupedNodes.map((node) => renderTabNode(node))}
       {/* Task 4.3: ドロップインジケーター表示 */}
       {dropIndicatorPosition && (
         <DropIndicator
@@ -891,6 +1069,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
           onDragCancel={handleDragCancel}
+          autoScroll={AUTO_SCROLL_CONFIG}
         >
           {/* Task 4.3: ドラッグ中のドロップターゲット監視 */}
           <DragMonitor

@@ -6,7 +6,7 @@ import {
 } from './event-handlers';
 
 // Get TreeStateManager instance for initialization
-import { testTreeStateManager } from './event-handlers';
+import { testTreeStateManager, testTitlePersistence, testUnreadTracker } from './event-handlers';
 
 // Import services and storage for auto-snapshot
 import { SnapshotManager } from '@/services';
@@ -15,6 +15,28 @@ import type { UserSettings } from '@/types';
 
 // Task 9.2: SnapshotManagerインスタンスを作成
 const snapshotManager = new SnapshotManager(indexedDBService, storageService);
+
+/**
+ * Task 1.1: 古いタブデータをクリーンアップ
+ * Requirement 2.1, 2.2, 2.3: ブラウザ起動時に存在しないタブをツリーから削除
+ */
+async function cleanupStaleTabData(): Promise<void> {
+  try {
+    // 現在開いているタブ一覧を取得
+    const tabs = await chrome.tabs.query({});
+    const existingTabIds = tabs
+      .filter((tab) => tab.id !== undefined)
+      .map((tab) => tab.id!);
+
+    // 存在しないタブをクリーンアップ
+    await testTreeStateManager.cleanupStaleNodes(existingTabIds);
+
+    // Requirement 5.4: 存在しないタブのタイトルデータもクリーンアップ
+    testTitlePersistence.cleanup(existingTabIds);
+  } catch (_error) {
+    // Failed to cleanup stale tab data silently
+  }
+}
 
 /**
  * Task 9.2: 自動スナップショット機能を初期化
@@ -58,11 +80,19 @@ chrome.runtime.onInstalled.addListener(async () => {
   // Load state from storage
   await testTreeStateManager.loadState();
 
+  // Task 1.1: 古いタブデータをクリーンアップ（ストレージロード後、同期前）
+  await cleanupStaleTabData();
+
   // Sync with existing Chrome tabs
   await testTreeStateManager.syncWithChromeTabs();
 
   // Task 9.2: 自動スナップショットを初期化
   await initializeAutoSnapshot();
+
+  // Task 1.3 (Requirements 13.1, 13.2, 13.3): 起動完了をマーク
+  // ブラウザ起動時の既存タブには未読バッジを表示しない
+  // 以降に作成されるタブにのみ未読バッジを表示する
+  testUnreadTracker.setInitialLoadComplete();
 });
 
 // Initialize on service worker startup
@@ -71,11 +101,19 @@ chrome.runtime.onInstalled.addListener(async () => {
     // Load existing state
     await testTreeStateManager.loadState();
 
+    // Task 1.1: 古いタブデータをクリーンアップ（ストレージロード後、同期前）
+    await cleanupStaleTabData();
+
     // Sync with current Chrome tabs
     await testTreeStateManager.syncWithChromeTabs();
 
     // Task 9.2: 自動スナップショットを初期化
     await initializeAutoSnapshot();
+
+    // Task 1.3 (Requirements 13.1, 13.2, 13.3): 起動完了をマーク
+    // ブラウザ起動時の既存タブには未読バッジを表示しない
+    // 以降に作成されるタブにのみ未読バッジを表示する
+    testUnreadTracker.setInitialLoadComplete();
   } catch (_error) {
     // Failed to initialize TreeStateManager silently
   }
@@ -97,5 +135,28 @@ chrome.action.onClicked.addListener(async () => {
     await chrome.tabs.create({ url: settingsUrl });
   } catch (_error) {
     // Failed to open settings page silently
+  }
+});
+
+/**
+ * Task 9.3: ポップアップからスナップショット取得
+ * Requirement 21.1, 21.2, 21.3: ポップアップメニューからスナップショットを取得
+ */
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'CREATE_SNAPSHOT') {
+    (async () => {
+      try {
+        const timestamp = new Date().toLocaleString();
+        const name = `Manual Snapshot - ${timestamp}`;
+        await snapshotManager.createSnapshot(name, false);
+        sendResponse({ success: true });
+      } catch (error) {
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    })();
+    return true; // 非同期応答を示す
   }
 });

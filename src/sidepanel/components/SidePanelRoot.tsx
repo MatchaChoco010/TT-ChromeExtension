@@ -1,19 +1,18 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { ThemeProvider } from '../providers/ThemeProvider';
 import ErrorBoundary from './ErrorBoundary';
 import TabTreeView from './TabTreeView';
 import ViewSwitcher from './ViewSwitcher';
-import GroupSection from './GroupSection';
 import PinnedTabsSection from './PinnedTabsSection';
-import ExternalDropZone from './ExternalDropZone';
-import { OpenSettingsButton } from './OpenSettingsButton';
-import { useExternalDrop } from '../hooks/useExternalDrop';
+// Task 9.1: OpenSettingsButton をサイドパネルから削除（要件20.1）
+// 設定へのアクセスはポップアップメニュー（Task 9.2）から行う
+import { ContextMenu } from './ContextMenu';
+import { useMenuActions } from '../hooks/useMenuActions';
 import { indexedDBService } from '@/storage/IndexedDBService';
 import { storageService } from '@/storage/StorageService';
 import { SnapshotManager } from '@/services/SnapshotManager';
-import type { TabNode } from '@/types';
-import type { DragStartEvent } from '@dnd-kit/core';
+import type { TabNode, MenuAction } from '@/types';
 
 interface SidePanelRootProps {
   children?: React.ReactNode;
@@ -25,16 +24,15 @@ const TreeViewContent: React.FC = () => {
     treeState,
     updateTreeState,
     handleDragEnd,
+    // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
+    handleSiblingDrop,
     switchView,
     createView,
     deleteView,
     updateView,
     // Task 4.9: グループ機能
     groups,
-    createGroup,
-    deleteGroup,
     toggleGroupExpanded,
-    getGroupTabCount,
     // Task 4.13: 未読状態管理
     isTabUnread,
     getUnreadChildCount,
@@ -50,18 +48,17 @@ const TreeViewContent: React.FC = () => {
     selectNode,
     // Task 12.2: 選択されたすべてのタブIDを取得
     getSelectedTabIds,
+    // Task 3.3: ビューごとのタブ数
+    viewTabCounts,
+    // Task 12.1: ビュー移動機能 (Requirements 18.1, 18.2, 18.3)
+    moveTabsToView,
   } = useTreeState();
 
   // Task 8.2: 設定画面はサイドパネル内ではなく、新規タブで開くように変更
   // const [isSettingsOpen, setIsSettingsOpen] = useState(false); // 削除
 
-  // Task 5.2: 外部ドロップ（新規ウィンドウ作成）機能
-  const {
-    isDragging: isExternalDragActive,
-    setIsDragging: setExternalDragActive,
-    setActiveTabId: setDraggedTabId,
-    onExternalDrop,
-  } = useExternalDrop();
+  // Task 5.1: ExternalDropZone（新規ウィンドウドロップエリア）を削除
+  // useExternalDropフックの使用を削除（要件6.1: 専用領域を表示しない）
 
   // Task 6.2: スナップショット取得ハンドラ
   const handleSnapshot = useCallback(async () => {
@@ -126,93 +123,94 @@ const TreeViewContent: React.FC = () => {
 
   const nodes = buildTree();
 
-  const handleGroupClick = (groupId: string) => {
-    // グループをクリックしたときの処理（現在は展開/折りたたみのみ）
-    toggleGroupExpanded(groupId);
-  };
-
   // Task 3.1: ピン留めタブのクリックハンドラ
   const handlePinnedTabClick = (tabId: number) => {
     chrome.tabs.update(tabId, { active: true });
   };
 
-  // Task 3.1: ピン留めタブの閉じるハンドラ
-  const handlePinnedTabClose = (tabId: number) => {
-    chrome.tabs.remove(tabId);
-  };
+  // 要件1.1: ピン留めタブには閉じるボタンを表示しない
+  // handlePinnedTabCloseは削除（閉じる操作は無効化）
 
-  // Task 5.2: ドラッグ開始時のハンドラ（外部ドロップ連携）
-  const handleTreeDragStart = useCallback((event: DragStartEvent) => {
-    const nodeId = event.active.id as string;
-    // ノードIDからタブIDを取得
-    if (treeState?.nodes[nodeId]) {
-      const tabId = treeState.nodes[nodeId].tabId;
-      setDraggedTabId(tabId);
-      setExternalDragActive(true);
+  // Task 2.2: ピン留めタブのコンテキストメニュー機能（要件1.6, 1.7）
+  const [pinnedContextMenu, setPinnedContextMenu] = useState<{
+    tabId: number;
+    position: { x: number; y: number };
+  } | null>(null);
+  const { executeAction } = useMenuActions();
+
+  const handlePinnedTabContextMenu = useCallback((tabId: number, position: { x: number; y: number }) => {
+    setPinnedContextMenu({ tabId, position });
+  }, []);
+
+  const handlePinnedContextMenuClose = useCallback(() => {
+    setPinnedContextMenu(null);
+  }, []);
+
+  const handlePinnedContextMenuAction = useCallback((action: MenuAction) => {
+    if (pinnedContextMenu) {
+      const tabInfo = tabInfoMap[pinnedContextMenu.tabId];
+      executeAction(action, [pinnedContextMenu.tabId], {
+        url: tabInfo?.url,
+        onSnapshot: handleSnapshot,
+      });
     }
-  }, [treeState?.nodes, setDraggedTabId, setExternalDragActive]);
+  }, [pinnedContextMenu, tabInfoMap, executeAction, handleSnapshot]);
 
-  // Task 5.2: ドラッグキャンセル時のハンドラ（外部ドロップ連携）
-  const handleTreeDragCancel = useCallback(() => {
-    setDraggedTabId(null);
-    setExternalDragActive(false);
-  }, [setDraggedTabId, setExternalDragActive]);
-
-  // Task 5.2: ドラッグ終了時のハンドラをラップ（外部ドロップ連携）
-  const handleTreeDragEnd = useCallback(async (event: Parameters<typeof handleDragEnd>[0]) => {
-    // 元のドラッグ終了処理を呼び出す
-    await handleDragEnd(event);
-    // 外部ドロップ状態をリセット
-    setDraggedTabId(null);
-    setExternalDragActive(false);
-  }, [handleDragEnd, setDraggedTabId, setExternalDragActive]);
+  // Task 5.1: ExternalDropZone関連のドラッグハンドラを削除
+  // handleTreeDragStart, handleTreeDragCancel, handleTreeDragEndのラッパーを削除
+  // 要件6.1: 専用領域を表示しないため、外部ドロップ連携は不要
 
   return (
     <div className="flex flex-col h-full bg-gray-900">
-      {/* Task 10.2: ヘッダー「Vivaldi-TT」を削除し、設定ボタンのみ表示。タブツリーの表示領域を最大化 */}
-      <div className="flex items-center justify-end p-1 border-b border-gray-700">
-        {/* Task 8.2: 設定画面を新規タブで開くボタン */}
-        <OpenSettingsButton />
-      </div>
+      {/* Task 9.1: サイドパネルから設定ボタンを削除（要件20.1） */}
+      {/* 設定へのアクセスはポップアップメニュー（Task 9.2）から行う */}
 
       {/* Task 4.8: ビュースイッチャー */}
+      {/* Task 3.3: ビューごとのタブ数を表示 */}
       {treeState && (
         <ViewSwitcher
           views={treeState.views}
           currentViewId={treeState.currentViewId}
+          tabCounts={viewTabCounts}
           onViewSwitch={switchView}
           onViewCreate={createView}
           onViewDelete={deleteView}
           onViewUpdate={updateView}
         />
       )}
-      {/* Task 4.9: グループセクション */}
-      <GroupSection
-        groups={groups}
-        onCreateGroup={createGroup}
-        onDeleteGroup={deleteGroup}
-        onToggleGroup={toggleGroupExpanded}
-        onGroupClick={handleGroupClick}
-        getGroupTabCount={getGroupTabCount}
-      />
+      {/* Task 6.1: 独立したGroupSectionを削除 - グループはTabTreeView内に統合表示される */}
       {/* Task 6.2: スナップショットセクションを削除し、コンテキストメニューからスナップショットを取得可能に */}
-      {/* Task 3.1: ピン留めタブセクション */}
+      {/* Task 3.1: ピン留めタブセクション（要件1.1: 閉じるボタンなし） */}
+      {/* Task 2.2: 右クリックでコンテキストメニュー表示（要件1.6, 1.7） */}
       <PinnedTabsSection
         pinnedTabIds={pinnedTabIds}
         tabInfoMap={tabInfoMap}
         onTabClick={handlePinnedTabClick}
-        onTabClose={handlePinnedTabClose}
+        onContextMenu={handlePinnedTabContextMenu}
       />
+      {/* Task 2.2: ピン留めタブのコンテキストメニュー（要件1.6, 1.7） */}
+      {pinnedContextMenu && (
+        <ContextMenu
+          targetTabIds={[pinnedContextMenu.tabId]}
+          position={pinnedContextMenu.position}
+          onAction={handlePinnedContextMenuAction}
+          onClose={handlePinnedContextMenuClose}
+          isPinned={true}
+          tabUrl={tabInfoMap[pinnedContextMenu.tabId]?.url}
+        />
+      )}
       {/* タブツリービュー */}
-      <div className="flex-1 overflow-auto" data-testid="tab-tree-root">
+      {/* Task 4.3: カスタムスクロールバースタイルを適用 */}
+      {/* Task 5.1: ExternalDropZone（新規ウィンドウドロップエリア）を削除（要件6.1） */}
+      <div className="flex-1 overflow-auto custom-scrollbar" data-testid="tab-tree-root">
         <TabTreeView
           nodes={nodes}
           currentViewId={treeState?.currentViewId || 'default'}
           onNodeClick={handleNodeClick}
           onToggleExpand={handleToggleExpand}
-          onDragEnd={handleTreeDragEnd}
-          onDragStart={handleTreeDragStart}
-          onDragCancel={handleTreeDragCancel}
+          onDragEnd={handleDragEnd}
+          // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
+          onSiblingDrop={handleSiblingDrop}
           isTabUnread={isTabUnread}
           getUnreadChildCount={getUnreadChildCount}
           activeTabId={activeTabId ?? undefined}
@@ -221,11 +219,12 @@ const TreeViewContent: React.FC = () => {
           onSelect={selectNode}
           getSelectedTabIds={getSelectedTabIds}
           onSnapshot={handleSnapshot}
-        />
-        {/* Task 5.2: 外部ドロップゾーン（新規ウィンドウ作成） */}
-        <ExternalDropZone
-          isDragging={isExternalDragActive}
-          onDrop={onExternalDrop}
+          // Task 6.1: グループ機能をツリー内に統合表示
+          groups={groups}
+          onGroupToggle={toggleGroupExpanded}
+          // Task 12.1: ビュー移動サブメニュー用 (Requirements 18.1, 18.2, 18.3)
+          views={treeState?.views}
+          onMoveToView={moveTabsToView}
         />
       </div>
     </div>
@@ -268,7 +267,8 @@ const SidePanelRoot: React.FC<SidePanelRootProps> = ({ children }) => {
     <ErrorBoundary>
       <ThemeProvider>
         <TreeStateProvider>
-          <div data-testid="side-panel-root" className="h-screen w-full overflow-auto bg-gray-900 text-gray-100">
+          {/* Task 4.3: カスタムスクロールバースタイルを適用 */}
+          <div data-testid="side-panel-root" className="h-screen w-full overflow-auto bg-gray-900 text-gray-100 custom-scrollbar">
             <LoadingWrapper>
               {children || <TreeViewContent />}
             </LoadingWrapper>

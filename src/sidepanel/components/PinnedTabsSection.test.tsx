@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PinnedTabsSection from './PinnedTabsSection';
 import type { TabInfoMap, ExtendedTabInfo } from '@/types';
 
 describe('PinnedTabsSection', () => {
   const mockOnTabClick = vi.fn();
-  const mockOnTabClose = vi.fn();
 
   const createMockTabInfo = (
     id: number,
@@ -40,7 +39,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -68,7 +66,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -88,7 +85,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -109,7 +105,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -130,7 +125,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -154,7 +148,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -165,8 +158,8 @@ describe('PinnedTabsSection', () => {
     });
   });
 
-  describe('閉じるボタン', () => {
-    it('ホバー時に閉じるボタンが表示されること', async () => {
+  describe('閉じるボタン - 要件1.1: ピン留めタブには閉じるボタンを表示しない', () => {
+    it('ピン留めタブにホバーしても閉じるボタンが表示されないこと', async () => {
       const user = userEvent.setup();
       const pinnedTabIds = [1];
       const tabInfoMap: TabInfoMap = {
@@ -178,7 +171,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -187,16 +179,16 @@ describe('PinnedTabsSection', () => {
       // 初期状態では閉じるボタンは表示されない
       expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
 
-      // ホバーすると閉じるボタンが表示される
+      // ホバーしても閉じるボタンは表示されない（要件1.1）
       await user.hover(pinnedTab);
-      expect(screen.getByTestId('pinned-tab-1-close-button')).toBeInTheDocument();
+      expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
 
-      // ホバーを外すと閉じるボタンが非表示になる
+      // ホバーを外しても閉じるボタンは表示されない
       await user.unhover(pinnedTab);
       expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
     });
 
-    it('閉じるボタンをクリックするとonTabCloseが呼ばれること', () => {
+    it('ピン留めタブに閉じる操作が存在しないこと（onTabClose propなし）', () => {
       const pinnedTabIds = [1];
       const tabInfoMap: TabInfoMap = {
         1: createMockTabInfo(1, 'Tab 1', true),
@@ -207,22 +199,11 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
-      const pinnedTab = screen.getByTestId('pinned-tab-1');
-
-      // ホバーして閉じるボタンを表示
-      fireEvent.mouseEnter(pinnedTab);
-      const closeButton = screen.getByTestId('pinned-tab-1-close-button');
-
-      // 閉じるボタンをクリック
-      fireEvent.click(closeButton);
-
-      expect(mockOnTabClose).toHaveBeenCalledWith(1);
-      // タブ自体はクリックされない
-      expect(mockOnTabClick).not.toHaveBeenCalled();
+      // 閉じるボタンが存在しないことを確認
+      expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument();
     });
   });
 
@@ -238,7 +219,6 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
@@ -261,13 +241,60 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          onTabClose={mockOnTabClose}
         />
       );
 
       expect(screen.getByTestId('pinned-tab-1')).toBeInTheDocument();
       expect(screen.queryByTestId('pinned-tab-2')).not.toBeInTheDocument();
       expect(screen.getByTestId('pinned-tab-3')).toBeInTheDocument();
+    });
+  });
+
+  describe('コンテキストメニュー - 要件1.6, 1.7: ピン留め解除', () => {
+    const mockOnContextMenu = vi.fn();
+
+    it('ピン留めタブを右クリックするとonContextMenuが呼ばれること', async () => {
+      const user = userEvent.setup();
+      const pinnedTabIds = [1];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true, 'https://example.com/favicon.ico'),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          onContextMenu={mockOnContextMenu}
+        />
+      );
+
+      const pinnedTab = screen.getByTestId('pinned-tab-1');
+      await user.pointer({ target: pinnedTab, keys: '[MouseRight]' });
+
+      expect(mockOnContextMenu).toHaveBeenCalledTimes(1);
+      expect(mockOnContextMenu).toHaveBeenCalledWith(1, expect.any(Object));
+    });
+
+    it('onContextMenuが渡されていない場合でも右クリックでエラーにならないこと', async () => {
+      const user = userEvent.setup();
+      const pinnedTabIds = [1];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+        />
+      );
+
+      const pinnedTab = screen.getByTestId('pinned-tab-1');
+
+      // エラーが発生しないことを確認
+      await expect(user.pointer({ target: pinnedTab, keys: '[MouseRight]' })).resolves.not.toThrow();
     });
   });
 });

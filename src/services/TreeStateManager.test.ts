@@ -431,4 +431,149 @@ describe('TreeStateManager', () => {
       });
     });
   });
+
+  describe('cleanupStaleNodes (Requirement 2.1, 2.2, 2.3)', () => {
+    it('ブラウザに存在しないタブをツリーから削除する', async () => {
+      const viewId = 'default';
+      // ツリーにタブを追加
+      const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1' } as chrome.tabs.Tab;
+      const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2' } as chrome.tabs.Tab;
+      const tab3 = { id: 3, url: 'https://example.com/3', title: 'Tab3' } as chrome.tabs.Tab;
+
+      await manager.addTab(tab1, null, viewId);
+      await manager.addTab(tab2, null, viewId);
+      await manager.addTab(tab3, null, viewId);
+
+      // ブラウザには tab1 と tab3 のみが存在する（tab2 は閉じられた）
+      const existingTabIds = [1, 3];
+
+      // クリーンアップを実行
+      const removedCount = await manager.cleanupStaleNodes(existingTabIds);
+
+      // 削除されたノード数を確認
+      expect(removedCount).toBe(1);
+
+      // tab1 と tab3 は残っている
+      expect(manager.getNodeByTabId(1)).toBeDefined();
+      expect(manager.getNodeByTabId(3)).toBeDefined();
+
+      // tab2 は削除されている
+      expect(manager.getNodeByTabId(2)).toBeNull();
+    });
+
+    it('子タブが存在しない場合、子タブのみをクリーンアップする', async () => {
+      const viewId = 'default';
+      // 親→子の階層を作成
+      const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
+      const childTab = { id: 2, url: 'https://example.com/child', title: 'Child' } as chrome.tabs.Tab;
+
+      await manager.addTab(parentTab, null, viewId);
+      const parentNode = manager.getNodeByTabId(parentTab.id!);
+      await manager.addTab(childTab, parentNode!.id, viewId);
+
+      // ブラウザには親タブのみが存在する（子タブは閉じられた）
+      const existingTabIds = [1];
+
+      // クリーンアップを実行
+      const removedCount = await manager.cleanupStaleNodes(existingTabIds);
+
+      // 削除されたノード数を確認
+      expect(removedCount).toBe(1);
+
+      // 親タブは残っている
+      expect(manager.getNodeByTabId(1)).toBeDefined();
+
+      // 子タブは削除されている
+      expect(manager.getNodeByTabId(2)).toBeNull();
+    });
+
+    it('すべてのタブが存在する場合は何も削除しない', async () => {
+      const viewId = 'default';
+      const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1' } as chrome.tabs.Tab;
+      const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2' } as chrome.tabs.Tab;
+
+      await manager.addTab(tab1, null, viewId);
+      await manager.addTab(tab2, null, viewId);
+
+      // すべてのタブが存在する
+      const existingTabIds = [1, 2];
+
+      // クリーンアップを実行
+      const removedCount = await manager.cleanupStaleNodes(existingTabIds);
+
+      // 削除されたノード数は0
+      expect(removedCount).toBe(0);
+
+      // 両方のタブが残っている
+      expect(manager.getNodeByTabId(1)).toBeDefined();
+      expect(manager.getNodeByTabId(2)).toBeDefined();
+    });
+
+    it('空のツリーに対してクリーンアップを実行しても問題ない', async () => {
+      const existingTabIds = [1, 2, 3];
+
+      // 空のツリーに対してクリーンアップを実行
+      const removedCount = await manager.cleanupStaleNodes(existingTabIds);
+
+      // 削除されたノード数は0
+      expect(removedCount).toBe(0);
+    });
+
+    it('クリーンアップ後にストレージに永続化される', async () => {
+      const viewId = 'default';
+      const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1' } as chrome.tabs.Tab;
+      const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2' } as chrome.tabs.Tab;
+
+      await manager.addTab(tab1, null, viewId);
+      await manager.addTab(tab2, null, viewId);
+
+      // ストレージの呼び出し回数をリセット
+      vi.clearAllMocks();
+
+      // tab2 が存在しないとしてクリーンアップ
+      await manager.cleanupStaleNodes([1]);
+
+      // ストレージに永続化されていることを確認
+      expect(mockStorageService.set).toHaveBeenCalledWith(
+        'tree_state',
+        expect.objectContaining({
+          nodes: expect.any(Object),
+          tabToNode: expect.any(Object),
+        }),
+      );
+    });
+
+    it('階層構造のあるツリーで、存在しない複数のタブをクリーンアップする', async () => {
+      const viewId = 'default';
+      // ツリー構造を作成: parent -> child1, child2 -> grandchild
+      const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
+      const child1Tab = { id: 2, url: 'https://example.com/child1', title: 'Child1' } as chrome.tabs.Tab;
+      const child2Tab = { id: 3, url: 'https://example.com/child2', title: 'Child2' } as chrome.tabs.Tab;
+      const grandchildTab = { id: 4, url: 'https://example.com/grandchild', title: 'Grandchild' } as chrome.tabs.Tab;
+
+      await manager.addTab(parentTab, null, viewId);
+      const parentNode = manager.getNodeByTabId(parentTab.id!);
+      await manager.addTab(child1Tab, parentNode!.id, viewId);
+      await manager.addTab(child2Tab, parentNode!.id, viewId);
+      const child1Node = manager.getNodeByTabId(child1Tab.id!);
+      await manager.addTab(grandchildTab, child1Node!.id, viewId);
+
+      // ブラウザには parent と child2 のみが存在する
+      const existingTabIds = [1, 3];
+
+      // クリーンアップを実行
+      const removedCount = await manager.cleanupStaleNodes(existingTabIds);
+
+      // 削除されたノード数を確認 (child1 と grandchild)
+      expect(removedCount).toBe(2);
+
+      // parent と child2 は残っている
+      expect(manager.getNodeByTabId(1)).toBeDefined();
+      expect(manager.getNodeByTabId(3)).toBeDefined();
+
+      // child1 と grandchild は削除されている
+      expect(manager.getNodeByTabId(2)).toBeNull();
+      expect(manager.getNodeByTabId(4)).toBeNull();
+    });
+  });
 });

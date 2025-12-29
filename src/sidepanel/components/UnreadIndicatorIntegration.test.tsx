@@ -26,6 +26,8 @@ describe('UnreadIndicator 統合テスト', () => {
     };
 
     unreadTracker = new UnreadTracker(mockStorageService);
+    // Requirement 13.1, 13.2, 13.3: 起動完了フラグを設定（テストでは起動後の挙動をシミュレート）
+    unreadTracker.setInitialLoadComplete();
   });
 
   const createMockNode = (

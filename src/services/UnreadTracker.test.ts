@@ -22,6 +22,8 @@ describe('UnreadTracker', () => {
   describe('markAsUnread', () => {
     it('新しいタブを未読としてマークできる', async () => {
       const tabId = 1;
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
 
       await unreadTracker.markAsUnread(tabId);
 
@@ -30,6 +32,8 @@ describe('UnreadTracker', () => {
 
     it('未読タブをストレージに永続化する', async () => {
       const tabId = 1;
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
 
       await unreadTracker.markAsUnread(tabId);
 
@@ -40,6 +44,9 @@ describe('UnreadTracker', () => {
     });
 
     it('複数のタブを未読としてマークできる', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       await unreadTracker.markAsUnread(1);
       await unreadTracker.markAsUnread(2);
       await unreadTracker.markAsUnread(3);
@@ -51,6 +58,9 @@ describe('UnreadTracker', () => {
     });
 
     it('既に未読のタブを再度マークしても重複しない', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       await unreadTracker.markAsUnread(1);
       await unreadTracker.markAsUnread(1);
 
@@ -60,6 +70,9 @@ describe('UnreadTracker', () => {
 
   describe('markAsRead', () => {
     it('未読タブを既読としてマークできる', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       await unreadTracker.markAsUnread(1);
       expect(unreadTracker.isUnread(1)).toBe(true);
 
@@ -69,6 +82,9 @@ describe('UnreadTracker', () => {
     });
 
     it('既読マーク後にストレージを更新する', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       await unreadTracker.markAsUnread(1);
       await unreadTracker.markAsUnread(2);
       vi.clearAllMocks();
@@ -88,6 +104,9 @@ describe('UnreadTracker', () => {
 
   describe('isUnread', () => {
     it('未読タブに対してtrueを返す', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       await unreadTracker.markAsUnread(1);
 
       expect(unreadTracker.isUnread(1)).toBe(true);
@@ -100,6 +119,9 @@ describe('UnreadTracker', () => {
 
   describe('getUnreadCount', () => {
     it('未読タブ数を返す', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       expect(unreadTracker.getUnreadCount()).toBe(0);
 
       await unreadTracker.markAsUnread(1);
@@ -137,6 +159,9 @@ describe('UnreadTracker', () => {
 
   describe('clear', () => {
     it('すべての未読状態をクリアできる', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       await unreadTracker.markAsUnread(1);
       await unreadTracker.markAsUnread(2);
       expect(unreadTracker.getUnreadCount()).toBe(2);
@@ -149,6 +174,9 @@ describe('UnreadTracker', () => {
     });
 
     it('クリア後にストレージを更新する', async () => {
+      // 起動完了を設定
+      unreadTracker.setInitialLoadComplete();
+
       await unreadTracker.markAsUnread(1);
       vi.clearAllMocks();
 
@@ -157,6 +185,63 @@ describe('UnreadTracker', () => {
       expect(mockStorageService.set).toHaveBeenCalledWith(
         STORAGE_KEYS.UNREAD_TABS,
         [],
+      );
+    });
+  });
+
+  // Requirements 13.1, 13.2, 13.3: 起動時の未読バッジ制御
+  describe('initialLoadComplete', () => {
+    it('初期状態ではisInitialLoadCompleteがfalseを返す', () => {
+      expect(unreadTracker.isInitialLoadComplete()).toBe(false);
+    });
+
+    it('setInitialLoadCompleteを呼び出すとisInitialLoadCompleteがtrueを返す', () => {
+      unreadTracker.setInitialLoadComplete();
+
+      expect(unreadTracker.isInitialLoadComplete()).toBe(true);
+    });
+
+    it('起動完了前はmarkAsUnreadを呼び出しても未読状態にならない', async () => {
+      // 起動完了前（初期状態）
+      expect(unreadTracker.isInitialLoadComplete()).toBe(false);
+
+      await unreadTracker.markAsUnread(1);
+
+      // 起動完了前なので未読にならない
+      expect(unreadTracker.isUnread(1)).toBe(false);
+      expect(unreadTracker.getUnreadCount()).toBe(0);
+    });
+
+    it('起動完了後はmarkAsUnreadで正常に未読状態になる', async () => {
+      // 起動完了をマーク
+      unreadTracker.setInitialLoadComplete();
+      expect(unreadTracker.isInitialLoadComplete()).toBe(true);
+
+      await unreadTracker.markAsUnread(1);
+
+      // 起動完了後なので未読になる
+      expect(unreadTracker.isUnread(1)).toBe(true);
+      expect(unreadTracker.getUnreadCount()).toBe(1);
+    });
+
+    it('起動完了前のタブは永続化されない', async () => {
+      // 起動完了前
+      await unreadTracker.markAsUnread(1);
+
+      // persistStateが呼ばれない
+      expect(mockStorageService.set).not.toHaveBeenCalled();
+    });
+
+    it('起動完了後のタブは永続化される', async () => {
+      // 起動完了をマーク
+      unreadTracker.setInitialLoadComplete();
+
+      await unreadTracker.markAsUnread(1);
+
+      // persistStateが呼ばれる
+      expect(mockStorageService.set).toHaveBeenCalledWith(
+        STORAGE_KEYS.UNREAD_TABS,
+        [1],
       );
     });
   });

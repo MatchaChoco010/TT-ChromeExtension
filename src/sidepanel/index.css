@@ -10,3 +10,50 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/**
+ * Task 4.3: カスタムスクロールバースタイル
+ * 要件9.1: スクロールバーの表示/非表示でレイアウトがシフトしない
+ * 要件9.2: スクロールバーのスタイルをダークモードに対応させる
+ * 要件9.3: スクロールバーにオーバーレイスタイルを適用し、コンテンツ幅に影響を与えない
+ */
+.custom-scrollbar {
+  /* スクロールバーをオーバーレイスタイルにして、コンテンツ幅に影響を与えない */
+  overflow: overlay;
+  /* フォールバック: overlayをサポートしないブラウザ向け */
+  overflow: auto;
+  /* scrollbar-gutterでスクロールバーの幅を確保し、レイアウトシフトを防止 */
+  scrollbar-gutter: stable;
+}
+
+/* WebKit系ブラウザ（Chrome, Safari, Vivaldi等）向けのスクロールバースタイル */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  /* ダークモード対応: 暗い背景に適した色 */
+  background-color: rgba(107, 114, 128, 0.5);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.8);
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox向けのスクロールバースタイル */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107, 114, 128, 0.5) transparent;
+}

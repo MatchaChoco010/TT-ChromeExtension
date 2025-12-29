@@ -294,8 +294,10 @@ test.describe('ピン留めタブセクション', () => {
     });
   });
 
-  test.describe('ピン留めタブとツリービューの統合', () => {
-    test('ピン留めタブはピン留めセクションと通常ツリービューの両方に表示される', async ({
+  test.describe('ピン留めタブとツリービューの統合 (Requirement 1.2)', () => {
+    // TODO: 要件1.2の実装完了後にこのテストを有効化する
+    // 現在の実装ではピン留めタブがツリービューにも表示されるため、このテストはスキップ
+    test.skip('ピン留めタブはピン留めセクションにのみ表示され、ツリービューには表示されない', async ({
       extensionContext,
       serviceWorker,
       sidePanelPage,
@@ -321,10 +323,115 @@ test.describe('ピン留めタブセクション', () => {
       const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
       await expect(pinnedTab).toBeVisible();
 
-      // 通常のツリービューにも表示されていることを確認
-      // （現在の実装では両方に表示される）
+      // 通常のツリービューには表示されないことを確認（要件1.2）
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(treeNode).toBeVisible();
+      await expect(treeNode).not.toBeVisible();
+
+      // クリーンアップ
+      await closeTab(extensionContext, tabId);
+    });
+  });
+
+  test.describe('コンテキストメニュー - ピン留め解除 (Requirements 1.6, 1.7)', () => {
+    test('ピン留めタブを右クリックするとコンテキストメニューが表示される', async ({
+      extensionContext,
+      serviceWorker,
+      sidePanelPage,
+    }) => {
+      // Side Panelが表示されることを確認
+      const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
+      await expect(sidePanelRoot).toBeVisible();
+
+      // タブを作成してピン留め
+      const tabId = await createTab(extensionContext, 'https://example.com');
+
+      await serviceWorker.evaluate(async (tabId) => {
+        await chrome.tabs.update(tabId, { pinned: true });
+      }, tabId);
+
+      // ピン留めタブが表示されるまで待機
+      await expect(async () => {
+        const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+        await expect(pinnedTab).toBeVisible();
+      }).toPass({ timeout: 10000 });
+
+      // ピン留めタブを右クリック
+      const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+      await pinnedTab.click({ button: 'right' });
+
+      // コンテキストメニューが表示されることを確認
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible();
+
+      // 「ピン留めを解除」オプションが表示されることを確認
+      const unpinMenuItem = sidePanelPage.locator('[role="menuitem"]').filter({ hasText: 'ピン留めを解除' });
+      await expect(unpinMenuItem).toBeVisible();
+
+      // クリーンアップ
+      await closeTab(extensionContext, tabId);
+    });
+
+    test('コンテキストメニューから「ピン留めを解除」を選択するとピン留めが解除される', async ({
+      extensionContext,
+      serviceWorker,
+      sidePanelPage,
+    }) => {
+      // Side Panelが表示されることを確認
+      const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
+      await expect(sidePanelRoot).toBeVisible();
+
+      // タブを作成してピン留め
+      const tabId = await createTab(extensionContext, 'https://example.com');
+
+      await serviceWorker.evaluate(async (tabId) => {
+        await chrome.tabs.update(tabId, { pinned: true });
+      }, tabId);
+
+      // ピン留めタブが表示されるまで待機
+      await expect(async () => {
+        const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+        await expect(pinnedTab).toBeVisible();
+      }).toPass({ timeout: 10000 });
+
+      // ピン留めタブを右クリック
+      const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+      await pinnedTab.click({ button: 'right' });
+
+      // コンテキストメニューが表示されることを確認
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible();
+
+      // 「ピン留めを解除」をクリック
+      const unpinMenuItem = sidePanelPage.locator('[role="menuitem"]').filter({ hasText: 'ピン留めを解除' });
+      await unpinMenuItem.click();
+
+      // ピン留めが解除されるまで待機
+      await serviceWorker.evaluate(async (tabId: number) => {
+        for (let i = 0; i < 50; i++) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (!tab.pinned) {
+              return;
+            }
+          } catch {
+            // タブが存在しない場合は無視
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }, tabId);
+
+      // ピン留めタブセクションから削除されることを確認
+      await expect(async () => {
+        const pinnedTabAfter = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+        await expect(pinnedTabAfter).not.toBeVisible();
+      }).toPass({ timeout: 10000 });
+
+      // タブがピン留め解除されたことをAPIで確認
+      const isPinned = await serviceWorker.evaluate(async (tabId: number) => {
+        const tab = await chrome.tabs.get(tabId);
+        return tab.pinned;
+      }, tabId);
+      expect(isPinned).toBe(false);
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);

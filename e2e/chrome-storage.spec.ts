@@ -158,20 +158,13 @@ test.describe('chrome.storage API統合', () => {
 
   test.describe('chrome.storage.onChanged イベントハンドリング', () => {
     test('chrome.storage.onChangedイベントが発火した場合、UIが最新の設定で更新される', async ({
-      sidePanelPage,
       extensionContext,
+      extensionId,
       serviceWorker,
     }) => {
-      // Arrange: Side Panelが表示されていることを確認
-      await expect(sidePanelPage.locator('[data-testid="side-panel-root"]')).toBeVisible({
-        timeout: 10000,
-      });
-
-      // Task 8.2: 設定ページを新規タブで開く
-      const [settingsPage] = await Promise.all([
-        extensionContext.waitForEvent('page', { timeout: 5000 }),
-        sidePanelPage.locator('[data-testid="open-settings-button"]').click(),
-      ]);
+      // Task 9.1: 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
+      const settingsPage = await extensionContext.newPage();
+      await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
 
       await settingsPage.waitForLoadState('domcontentloaded');
       await settingsPage.waitForSelector('.settings-page-container', { timeout: 5000 });
@@ -213,20 +206,13 @@ test.describe('chrome.storage API統合', () => {
     });
 
     test('複数の設定変更が同時に行われた場合、すべてがUIに反映される', async ({
-      sidePanelPage,
       extensionContext,
+      extensionId,
       serviceWorker,
     }) => {
-      // Arrange: Side Panelが表示されていることを確認
-      await expect(sidePanelPage.locator('[data-testid="side-panel-root"]')).toBeVisible({
-        timeout: 10000,
-      });
-
-      // Task 8.2: 設定ページを新規タブで開く
-      const [settingsPage] = await Promise.all([
-        extensionContext.waitForEvent('page', { timeout: 5000 }),
-        sidePanelPage.locator('[data-testid="open-settings-button"]').click(),
-      ]);
+      // Task 9.1: 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
+      const settingsPage = await extensionContext.newPage();
+      await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
 
       await settingsPage.waitForLoadState('domcontentloaded');
       await settingsPage.waitForSelector('.settings-page-container', { timeout: 5000 });

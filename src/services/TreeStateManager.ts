@@ -221,6 +221,77 @@ export class TreeStateManager {
   }
 
   /**
+   * 存在しないタブをクリーンアップ (Requirement 2.1, 2.2, 2.3)
+   *
+   * ブラウザ起動時に、ツリー状態に保存されているが実際には存在しないタブを
+   * 自動的に削除します。
+   *
+   * @param existingTabIds - 現在ブラウザに存在するタブIDの配列
+   * @returns 削除されたノード数
+   */
+  async cleanupStaleNodes(existingTabIds: number[]): Promise<number> {
+    const existingTabIdSet = new Set(existingTabIds);
+    const staleTabIds: number[] = [];
+
+    // ツリー内の全タブIDを取得し、存在しないものを特定
+    this.tabToNode.forEach((_, tabId) => {
+      if (!existingTabIdSet.has(tabId)) {
+        staleTabIds.push(tabId);
+      }
+    });
+
+    // 存在しないタブがなければ早期リターン
+    if (staleTabIds.length === 0) {
+      return 0;
+    }
+
+    // 各存在しないタブを削除（子タブは昇格させる）
+    for (const tabId of staleTabIds) {
+      await this.removeStaleNode(tabId);
+    }
+
+    // ストレージに永続化
+    await this.persistState();
+
+    return staleTabIds.length;
+  }
+
+  /**
+   * 存在しないタブノードを削除（内部用、子タブを昇格させる）
+   * @param tabId - 削除するタブのID
+   */
+  private async removeStaleNode(tabId: number): Promise<void> {
+    const nodeId = this.tabToNode.get(tabId);
+    if (!nodeId) return;
+
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+
+    // 子タブを昇格させる
+    this.promoteChildren(node);
+
+    // 親ノードから削除
+    if (node.parentId) {
+      const parentNode = this.nodes.get(node.parentId);
+      if (parentNode) {
+        parentNode.children = parentNode.children.filter((child) => child.id !== nodeId);
+      }
+    }
+
+    // ビューから削除
+    const viewNodes = this.views.get(node.viewId) || [];
+    this.views.set(
+      node.viewId,
+      viewNodes.filter((id) => id !== nodeId),
+    );
+
+    // マッピングから削除
+    this.nodes.delete(nodeId);
+    this.tabToNode.delete(tabId);
+    this.expandedNodes.delete(nodeId);
+  }
+
+  /**
    * chrome.tabs APIと同期
    */
   async syncWithChromeTabs(): Promise<void> {
@@ -547,5 +618,137 @@ export class TreeStateManager {
     parentNode.children = [];
 
     return closedTabIds;
+  }
+
+  /**
+   * Task 6.2: 複数タブからグループを作成
+   * Requirement 12.1, 12.2, 12.3: 複数タブをグループ化
+   *
+   * 新しいグループ親ノードを作成し、選択されたタブをその子要素として移動します。
+   *
+   * @param tabIds - グループ化するタブIDの配列
+   * @returns 作成されたグループノードのID
+   */
+  async createGroupFromTabs(tabIds: number[]): Promise<string> {
+    if (tabIds.length === 0) {
+      throw new Error('No tabs specified for grouping');
+    }
+
+    // 最初のタブからviewIdを取得
+    const firstNode = this.getNodeByTabId(tabIds[0]);
+    if (!firstNode) {
+      throw new Error('First tab not found');
+    }
+    const viewId = firstNode.viewId;
+
+    // グループ用の仮想タブID（負の値を使用して実際のタブと区別）
+    const groupTabId = -(Date.now());
+    const groupNodeId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    // グループノードを作成
+    const groupNode: TabNode = {
+      id: groupNodeId,
+      tabId: groupTabId,
+      parentId: null,
+      children: [],
+      isExpanded: true,
+      depth: 0,
+      viewId,
+      groupId: groupNodeId, // グループノード自体にgroupIdを設定
+    };
+
+    // マッピングに追加
+    this.nodes.set(groupNodeId, groupNode);
+    this.tabToNode.set(groupTabId, groupNodeId);
+    this.expandedNodes.add(groupNodeId);
+
+    // ビューに追加
+    const viewNodes = this.views.get(viewId) || [];
+    viewNodes.push(groupNodeId);
+    this.views.set(viewId, viewNodes);
+
+    // 選択されたタブをグループの子として移動
+    for (const tabId of tabIds) {
+      const node = this.getNodeByTabId(tabId);
+      if (!node) continue;
+
+      // 既存の親から削除
+      if (node.parentId) {
+        const oldParent = this.nodes.get(node.parentId);
+        if (oldParent) {
+          oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
+        }
+      }
+
+      // グループの子として追加
+      node.parentId = groupNodeId;
+      node.depth = 1;
+      node.groupId = groupNodeId;
+      groupNode.children.push(node);
+
+      // 子ノードの深さを再帰的に更新
+      this.updateChildrenDepth(node);
+    }
+
+    // ストレージに永続化
+    await this.persistState();
+
+    return groupNodeId;
+  }
+
+  /**
+   * Task 6.2: グループを解除
+   * Requirement 12: グループを解除し、子タブをルートレベルに移動
+   *
+   * グループノードを削除し、その子タブをルートレベルに昇格させます。
+   *
+   * @param tabId - グループノードのタブID（または解除したいグループ内のタブID）
+   */
+  async dissolveGroup(tabId: number): Promise<void> {
+    // タブIDからノードを取得
+    let node = this.getNodeByTabId(tabId);
+    if (!node) {
+      throw new Error('Tab not found');
+    }
+
+    // グループノードを特定（ノード自体がグループか、親がグループの場合）
+    let groupNode: TabNode | null = null;
+
+    if (node.id.startsWith('group-')) {
+      // ノード自体がグループノード
+      groupNode = node;
+    } else if (node.groupId) {
+      // ノードがグループに属している場合、そのグループノードを取得
+      groupNode = this.nodes.get(node.groupId) || null;
+    }
+
+    if (!groupNode) {
+      throw new Error('Group not found');
+    }
+
+    // 子タブをルートレベルに昇格
+    for (const child of [...groupNode.children]) {
+      child.parentId = null;
+      child.depth = 0;
+      child.groupId = undefined;
+
+      // 子ノードの深さを再帰的に更新
+      this.updateChildrenDepth(child);
+    }
+
+    // グループノードをビューから削除
+    const viewNodes = this.views.get(groupNode.viewId) || [];
+    this.views.set(
+      groupNode.viewId,
+      viewNodes.filter((id) => id !== groupNode.id),
+    );
+
+    // グループノードをマッピングから削除
+    this.nodes.delete(groupNode.id);
+    this.tabToNode.delete(groupNode.tabId);
+    this.expandedNodes.delete(groupNode.id);
+
+    // ストレージに永続化
+    await this.persistState();
   }
 }

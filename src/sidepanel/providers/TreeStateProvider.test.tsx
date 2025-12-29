@@ -2,10 +2,11 @@
  * Task 5.4: TreeStateProvider のリアルタイム更新テスト
  * Requirements: 1.4, 2.1
  */
+import React from 'react';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { TreeStateProvider, useTreeState } from './TreeStateProvider';
-import type { TreeState, StorageChanges } from '@/types';
+import type { TreeState, StorageChanges, SiblingDropInfo } from '@/types';
 import type { MockChrome, MessageListener } from '@/test/test-types';
 
 // テストコンポーネント
@@ -1202,6 +1203,341 @@ describe('TreeStateProvider 複数選択状態管理', () => {
     await waitFor(() => {
       expect(screen.getByTestId('selected-count')).toHaveTextContent('1');
       expect(screen.getByTestId('node-3-selected')).toHaveTextContent('true');
+    });
+  });
+});
+
+/**
+ * Task 5.3: handleSiblingDropのテスト
+ * Requirements: 8.1, 8.2, 8.3, 8.4
+ * 兄弟としてドロップ（Gapドロップ）時のハンドラのテスト
+ */
+describe('TreeStateProvider handleSiblingDrop', () => {
+  let mockMessageListeners: MessageListener[] = [];
+  let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
+  let mockChrome: MockChrome;
+
+  // handleSiblingDropを呼び出すテストコンポーネント
+  function SiblingDropTestComponent({ onReady }: { onReady?: (handleSiblingDrop: (info: SiblingDropInfo) => Promise<void>) => void }) {
+    const { treeState, isLoading, handleSiblingDrop } = useTreeState();
+
+    React.useEffect(() => {
+      if (!isLoading && treeState && onReady) {
+        onReady(handleSiblingDrop);
+      }
+    }, [isLoading, treeState, handleSiblingDrop, onReady]);
+
+    if (isLoading) return <div>Loading...</div>;
+    if (!treeState) return <div>No state</div>;
+
+    // ノードの親子関係を表示
+    const nodeInfos = Object.values(treeState.nodes).map((node) => ({
+      id: node.id,
+      parentId: node.parentId,
+      depth: node.depth,
+    }));
+
+    return (
+      <div>
+        <div data-testid="node-count">{Object.keys(treeState.nodes).length}</div>
+        <div data-testid="node-infos">{JSON.stringify(nodeInfos)}</div>
+        {Object.values(treeState.nodes).map((node) => (
+          <div key={node.id} data-testid={`node-${node.id}-parent`}>{node.parentId || 'null'}</div>
+        ))}
+      </div>
+    );
+  }
+
+
+  beforeEach(() => {
+    mockMessageListeners = [];
+    mockStorageListeners = [];
+
+    // 3つのノードを持つツリー状態
+    const treeStateWithNodes: TreeState = {
+      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 1,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 2,
+          parentId: 'node-1', // node-1の子
+          children: [],
+          isExpanded: true,
+          depth: 1,
+          viewId: 'default',
+        },
+        'node-3': {
+          id: 'node-3',
+          tabId: 3,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+      },
+      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3' },
+    };
+
+    mockChrome = {
+      storage: {
+        local: {
+          get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
+            tree_state: treeStateWithNodes,
+          }),
+          set: vi.fn<(items: Record<string, unknown>) => Promise<void>>().mockResolvedValue(undefined),
+          remove: vi.fn<(keys: string | string[]) => Promise<void>>(),
+          clear: vi.fn<() => Promise<void>>(),
+        },
+        onChanged: {
+          addListener: vi.fn((listener) => {
+            mockStorageListeners.push(listener);
+          }),
+          removeListener: vi.fn((listener) => {
+            mockStorageListeners = mockStorageListeners.filter((l) => l !== listener);
+          }),
+        },
+      },
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener) => {
+            mockMessageListeners.push(listener as MessageListener);
+          }),
+          removeListener: vi.fn((listener) => {
+            mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
+          }),
+        },
+        sendMessage: vi.fn().mockResolvedValue(undefined),
+        getURL: vi.fn(),
+      },
+      tabs: {
+        get: vi.fn(),
+        query: vi.fn().mockResolvedValue([
+          { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true },
+          { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false },
+          { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false },
+        ]),
+        update: vi.fn(),
+        move: vi.fn(),
+        remove: vi.fn(),
+        create: vi.fn(),
+        duplicate: vi.fn(),
+        reload: vi.fn(),
+        onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+      windows: {
+        get: vi.fn(),
+        create: vi.fn(),
+        onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+      sidePanel: {
+        open: vi.fn(),
+        getOptions: vi.fn(),
+        setOptions: vi.fn(),
+      },
+    };
+    global.chrome = mockChrome as unknown as typeof chrome;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('handleSiblingDrop関数が提供される', async () => {
+    let receivedHandleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              receivedHandleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    await waitFor(() => {
+      expect(receivedHandleSiblingDrop).not.toBeNull();
+    });
+  });
+
+  it('兄弟としてドロップした場合、上のノードと同じ親を持つようになる', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態: node-2はnode-1の子
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-2-parent')).toHaveTextContent('node-1');
+    });
+
+    // node-2をnode-3の上（兄弟として）にドロップ
+    // aboveNodeId=node-1, belowNodeId=node-3 → node-1の親(null)と同じ親を持つ
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-2',
+          insertIndex: 1,
+          aboveNodeId: 'node-1',
+          belowNodeId: 'node-3',
+        });
+      }
+    });
+
+    // node-2の親がnullになる（ルートレベルに移動）
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-2-parent')).toHaveTextContent('null');
+    });
+  });
+
+  it('下のノードしかない場合（先頭にドロップ）、下のノードの親と同じ親を持つ', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態: node-2はnode-1の子
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-2-parent')).toHaveTextContent('node-1');
+    });
+
+    // node-2をリストの最初にドロップ（node-1の上）
+    // aboveNodeId=undefined, belowNodeId=node-1 → node-1の親(null)と同じ親を持つ
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-2',
+          insertIndex: 0,
+          aboveNodeId: undefined,
+          belowNodeId: 'node-1',
+        });
+      }
+    });
+
+    // node-2の親がnullになる（ルートレベルに移動）
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-2-parent')).toHaveTextContent('null');
+    });
+  });
+
+  it('自分自身の子孫への移動は無視される', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    // node-1 → node-2 (子) → node-4 (孫) の構造を持つツリー状態
+    const treeStateWithGrandchild: TreeState = {
+      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 1,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 2,
+          parentId: 'node-1',
+          children: [],
+          isExpanded: true,
+          depth: 1,
+          viewId: 'default',
+        },
+        'node-4': {
+          id: 'node-4',
+          tabId: 4,
+          parentId: 'node-2',
+          children: [],
+          isExpanded: true,
+          depth: 2,
+          viewId: 'default',
+        },
+      },
+      tabToNode: { '1': 'node-1', '2': 'node-2', '4': 'node-4' },
+    };
+
+    mockChrome.storage.local.get = vi.fn().mockResolvedValue({
+      tree_state: treeStateWithGrandchild,
+    });
+    mockChrome.tabs.query = vi.fn().mockResolvedValue([
+      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true },
+      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false },
+      { id: 4, title: 'Tab 4', url: 'https://tab4.com', pinned: false, active: false },
+    ]);
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態: node-1はルート、node-2はnode-1の子
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-1-parent')).toHaveTextContent('null');
+      expect(screen.getByTestId('node-node-2-parent')).toHaveTextContent('node-1');
+    });
+
+    // node-1をnode-4の隣に移動しようとする（自分の孫の隣 = 無効な操作）
+    // 現在の実装では、aboveNodeId/belowNodeIdの親が自分の子孫かどうかをチェック
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-1',
+          insertIndex: 2,
+          aboveNodeId: 'node-4',
+          belowNodeId: undefined,
+        });
+      }
+    });
+
+    // node-1の親は変更されない（まだnull）
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-1-parent')).toHaveTextContent('null');
     });
   });
 });

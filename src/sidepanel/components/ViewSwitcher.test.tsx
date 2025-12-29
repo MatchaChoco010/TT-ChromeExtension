@@ -4,7 +4,7 @@
  * Requirements: 6.3
  */
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { View } from '@/types';
 import { ViewSwitcher } from './ViewSwitcher';
@@ -596,7 +596,7 @@ describe('ViewSwitcher', () => {
         expect(screen.getByTestId('view-edit-modal')).toBeInTheDocument();
       });
 
-      it('モーダルで保存すると onViewUpdate が呼ばれる', () => {
+      it('モーダルで保存すると onViewUpdate が呼ばれる', async () => {
         render(
           <ViewSwitcher
             views={mockViews}
@@ -613,6 +613,11 @@ describe('ViewSwitcher', () => {
 
         const editMenuItem = screen.getByRole('menuitem', { name: /ビューを編集/i });
         fireEvent.click(editMenuItem);
+
+        // queueMicrotaskによる状態更新を待つ
+        await waitFor(() => {
+          expect(screen.getByLabelText('View Name')).toHaveValue('Work');
+        });
 
         // モーダル内で保存ボタンをクリック
         const saveButton = screen.getByRole('button', { name: /save/i });
@@ -716,6 +721,358 @@ describe('ViewSwitcher', () => {
         fireEvent.keyDown(document, { key: 'Escape' });
 
         expect(screen.queryByTestId('view-context-menu')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Task 3.3: ビューのタブ数表示機能', () => {
+    describe('Requirement 17.1: 各ビューのファビコン上にタブ数を小さく表示', () => {
+      it('タブ数バッジが各ビューに表示される', () => {
+        const tabCounts = {
+          'view-1': 5,
+          'view-2': 3,
+          'view-3': 10,
+        };
+
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={tabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // 各ビューのタブ数バッジが表示されることを確認
+        expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('5');
+        expect(screen.getByTestId('tab-count-badge-view-2')).toHaveTextContent('3');
+        expect(screen.getByTestId('tab-count-badge-view-3')).toHaveTextContent('10');
+      });
+
+      it('タブ数が0の場合はバッジを表示しない', () => {
+        const tabCounts = {
+          'view-1': 0,
+          'view-2': 5,
+          'view-3': 0,
+        };
+
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={tabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // タブ数が0のビューにはバッジが表示されない
+        expect(screen.queryByTestId('tab-count-badge-view-1')).not.toBeInTheDocument();
+        expect(screen.getByTestId('tab-count-badge-view-2')).toHaveTextContent('5');
+        expect(screen.queryByTestId('tab-count-badge-view-3')).not.toBeInTheDocument();
+      });
+    });
+
+    describe('Requirement 17.2: ファビコンのサイズを維持したままタブ数を表示', () => {
+      it('ビューボタンのサイズは変わらない (w-8, h-8)', () => {
+        const tabCounts = {
+          'view-1': 100,
+          'view-2': 999,
+          'view-3': 1,
+        };
+
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={tabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // ビューボタンのサイズは維持される
+        const viewButtons = screen.getAllByRole('button', { name: /switch to .* view/i });
+        viewButtons.forEach((button) => {
+          expect(button).toHaveClass('w-8', 'h-8');
+        });
+      });
+
+      it('タブ数バッジは小さく表示される', () => {
+        const tabCounts = {
+          'view-1': 5,
+          'view-2': 3,
+          'view-3': 10,
+        };
+
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={tabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // バッジが小さいサイズで表示される
+        const badge = screen.getByTestId('tab-count-badge-view-1');
+        expect(badge).toHaveClass('text-xs');
+      });
+    });
+
+    describe('Requirement 17.3: ビュー内のタブ数が変化した場合、表示を即座に更新', () => {
+      it('タブ数プロップが変更されると表示が更新される', () => {
+        const initialTabCounts = {
+          'view-1': 5,
+          'view-2': 3,
+          'view-3': 10,
+        };
+
+        const { rerender } = render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={initialTabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // 初期値の確認
+        expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('5');
+
+        // タブ数が変化
+        const updatedTabCounts = {
+          'view-1': 8,
+          'view-2': 3,
+          'view-3': 10,
+        };
+
+        rerender(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={updatedTabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // 更新後の値の確認
+        expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('8');
+      });
+    });
+
+    describe('tabCountsが未定義の場合', () => {
+      it('tabCountsが未定義でもクラッシュしない', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // クラッシュせずにレンダリングされる
+        expect(screen.getByRole('button', { name: 'Switch to Work view' })).toBeInTheDocument();
+        // バッジは表示されない
+        expect(screen.queryByTestId('tab-count-badge-view-1')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Task 3.2: ビューのスクロール切り替え機能', () => {
+    describe('Requirement 16.1: マウスホイール上スクロールで前のビューに切り替え', () => {
+      it('ビューリスト上でマウスホイールを上にスクロールすると前のビューに切り替わる', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId="view-2" // Personal が現在アクティブ
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const container = screen.getByTestId('view-switcher-container');
+
+        // マウスホイールを上にスクロール (deltaY < 0)
+        fireEvent.wheel(container, { deltaY: -100 });
+
+        // 前のビュー (view-1: Work) に切り替わる
+        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-1');
+        expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Requirement 16.2: マウスホイール下スクロールで次のビューに切り替え', () => {
+      it('ビューリスト上でマウスホイールを下にスクロールすると次のビューに切り替わる', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId="view-2" // Personal が現在アクティブ
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const container = screen.getByTestId('view-switcher-container');
+
+        // マウスホイールを下にスクロール (deltaY > 0)
+        fireEvent.wheel(container, { deltaY: 100 });
+
+        // 次のビュー (view-3: Research) に切り替わる
+        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
+        expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Requirement 16.3: 最初/最後のビューでループせずに停止', () => {
+      it('最初のビューで上スクロールしても切り替わらない', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId="view-1" // Work が現在アクティブ (最初のビュー)
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const container = screen.getByTestId('view-switcher-container');
+
+        // マウスホイールを上にスクロール
+        fireEvent.wheel(container, { deltaY: -100 });
+
+        // 最初のビューなので切り替わらない
+        expect(mockOnViewSwitch).not.toHaveBeenCalled();
+      });
+
+      it('最後のビューで下スクロールしても切り替わらない', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId="view-3" // Research が現在アクティブ (最後のビュー)
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const container = screen.getByTestId('view-switcher-container');
+
+        // マウスホイールを下にスクロール
+        fireEvent.wheel(container, { deltaY: 100 });
+
+        // 最後のビューなので切り替わらない
+        expect(mockOnViewSwitch).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('スクロール切り替えの連続操作', () => {
+      it('連続したスクロール操作が正しく処理される', () => {
+        const { rerender } = render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId="view-1"
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const container = screen.getByTestId('view-switcher-container');
+
+        // 下スクロール: view-1 -> view-2
+        fireEvent.wheel(container, { deltaY: 100 });
+        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-2');
+
+        // 状態を更新してリレンダー
+        rerender(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId="view-2"
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // 下スクロール: view-2 -> view-3
+        fireEvent.wheel(container, { deltaY: 100 });
+        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
+      });
+    });
+
+    describe('ビューが1つだけの場合', () => {
+      it('ビューが1つだけの場合はスクロールしても切り替わらない', () => {
+        const singleView: View[] = [{ id: 'view-1', name: 'Work', color: '#ef4444' }];
+
+        render(
+          <ViewSwitcher
+            views={singleView}
+            currentViewId="view-1"
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const container = screen.getByTestId('view-switcher-container');
+
+        // 上スクロール
+        fireEvent.wheel(container, { deltaY: -100 });
+        expect(mockOnViewSwitch).not.toHaveBeenCalled();
+
+        // 下スクロール
+        fireEvent.wheel(container, { deltaY: 100 });
+        expect(mockOnViewSwitch).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('スクロール方向のdeltaYしきい値', () => {
+      it('deltaYが0の場合は切り替わらない', () => {
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId="view-2"
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        const container = screen.getByTestId('view-switcher-container');
+
+        // deltaY = 0
+        fireEvent.wheel(container, { deltaY: 0 });
+        expect(mockOnViewSwitch).not.toHaveBeenCalled();
       });
     });
   });

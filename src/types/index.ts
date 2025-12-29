@@ -72,11 +72,16 @@ export interface TreeState {
   tabToNode: Record<number, string>;
 }
 
+/** タブタイトルマップ (tabId -> title) */
+export type TabTitlesMap = Record<number, string>;
+
 export interface StorageSchema {
   tree_state: TreeState;
   user_settings: UserSettings;
   unread_tabs: number[];
   groups: Record<string, Group>;
+  /** Requirement 5.1-5.4: タブタイトル永続化 */
+  tab_titles: TabTitlesMap;
 }
 
 export type StorageKey = keyof StorageSchema;
@@ -126,6 +131,10 @@ export interface IUnreadTracker {
   getUnreadCount(): number;
   loadFromStorage(): Promise<void>;
   clear(): Promise<void>;
+  /** Requirement 13.2: 起動完了フラグを設定 */
+  setInitialLoadComplete(): void;
+  /** Requirement 13.3: 起動完了かどうかを取得 */
+  isInitialLoadComplete(): boolean;
 }
 
 // Service Worker Message Types
@@ -161,7 +170,12 @@ export type MessageType =
   | { type: 'GET_DRAG_STATE' }
   | { type: 'CLEAR_DRAG_STATE' }
   | { type: 'SYNC_TABS' }
-  | { type: 'STATE_UPDATED' };
+  | { type: 'STATE_UPDATED' }
+  // Task 6.2: グループ化機能
+  | { type: 'CREATE_GROUP'; payload: { tabIds: number[] } }
+  | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
+  // Task 9.3: ポップアップからスナップショット取得
+  | { type: 'CREATE_SNAPSHOT' };
 
 export type MessageResponse<T> =
   | { success: true; data: T }
@@ -188,6 +202,21 @@ export interface DragEndResult {
   newIndex: number;
 }
 
+/**
+ * Task 5.3: 兄弟ドロップ情報
+ * Requirements: 8.1, 8.2, 8.3, 8.4
+ */
+export interface SiblingDropInfo {
+  /** ドラッグ中のノードID */
+  activeNodeId: string;
+  /** 挿入先のインデックス（gapIndex） */
+  insertIndex: number;
+  /** 上のノードのID（存在しない場合はundefined） */
+  aboveNodeId?: string;
+  /** 下のノードのID（存在しない場合はundefined） */
+  belowNodeId?: string;
+}
+
 export interface TabTreeViewProps {
   nodes: TabNode[];
   currentViewId: string;
@@ -198,6 +227,8 @@ export interface TabTreeViewProps {
   // Task 5.2: ドラッグ開始/終了コールバック（外部ドロップ連携用）
   onDragStart?: (event: DragStartEvent) => void;
   onDragCancel?: () => void;
+  // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のコールバック
+  onSiblingDrop?: (info: SiblingDropInfo) => Promise<void>;
   // Task 4.13: 未読状態管理
   isTabUnread?: (tabId: number) => boolean;
   getUnreadChildCount?: (nodeId: string) => number;
@@ -212,6 +243,12 @@ export interface TabTreeViewProps {
   getSelectedTabIds?: () => number[];
   // Task 6.2: スナップショット取得コールバック
   onSnapshot?: () => Promise<void>;
+  // Task 6.1: グループ機能をツリー内に統合表示
+  groups?: Record<string, Group>;
+  onGroupToggle?: (groupId: string) => void;
+  // Task 7.2: ビュー移動サブメニュー用 (Requirements 18.1, 18.2, 18.3)
+  views?: View[];
+  onMoveToView?: (viewId: string, tabIds: number[]) => void;
 }
 
 // Context Menu types
@@ -238,4 +275,41 @@ export interface ContextMenuProps {
   isGrouped?: boolean;
   hasChildren?: boolean;
   tabUrl?: string;
+  /** Task 7.2: ビュー移動サブメニュー用 - 全ビューリスト */
+  views?: View[];
+  /** Task 7.2: 現在のビューID（サブメニューで除外する） */
+  currentViewId?: string;
+  /** Task 7.2: タブをビューに移動するコールバック */
+  onMoveToView?: (viewId: string, tabIds: number[]) => void;
+}
+
+// SubMenu types (Task 7.1: Requirements 18.1, 18.2)
+
+/**
+ * サブメニュー項目
+ */
+export interface SubMenuItem {
+  /** 項目のID */
+  id: string;
+  /** 表示ラベル */
+  label: string;
+  /** 無効化フラグ */
+  disabled?: boolean;
+}
+
+/**
+ * SubMenuコンポーネントのProps
+ * Task 7.1: 汎用サブメニューコンポーネント
+ */
+export interface SubMenuProps {
+  /** サブメニューのラベル */
+  label: string;
+  /** サブメニュー項目 */
+  items: SubMenuItem[];
+  /** 項目選択時のコールバック */
+  onSelect: (itemId: string) => void;
+  /** メニューを閉じるコールバック */
+  onClose: () => void;
+  /** 親メニューからの相対位置 */
+  parentRect: DOMRect;
 }

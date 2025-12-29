@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap } from '@/types';
+import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, SiblingDropInfo } from '@/types';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
@@ -9,6 +9,8 @@ interface TreeStateContextType {
   error: Error | null;
   updateTreeState: (state: TreeState) => void;
   handleDragEnd: (event: DragEndEvent) => Promise<void>;
+  // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
+  handleSiblingDrop: (info: SiblingDropInfo) => Promise<void>;
   // Task 4.8: ビュー管理機能
   switchView: (viewId: string) => void;
   createView: () => void;
@@ -43,6 +45,10 @@ interface TreeStateContextType {
   isNodeSelected: (nodeId: string) => boolean;
   // Task 12.2: 選択されたすべてのタブIDを取得
   getSelectedTabIds: () => number[];
+  // Task 3.3: ビューごとのタブ数 (Requirements 17.1, 17.2, 17.3)
+  viewTabCounts: Record<string, number>;
+  // Task 7.2: タブをビューに移動 (Requirements 18.1, 18.2, 18.3)
+  moveTabsToView: (viewId: string, tabIds: number[]) => void;
 }
 
 const TreeStateContext = createContext<TreeStateContextType | undefined>(
@@ -189,15 +195,25 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   // Task 1.1: 全タブ情報を読み込む
+  // Requirement 5.2: 永続化されたタイトルも復元して使用する
   const loadTabInfoMap = React.useCallback(async () => {
     try {
+      // 永続化されたタイトルを取得
+      const storedResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_TITLES);
+      const persistedTitles: Record<number, string> = storedResult[STORAGE_KEYS.TAB_TITLES] || {};
+
       const tabs = await chrome.tabs.query({});
       const newTabInfoMap: TabInfoMap = {};
       for (const tab of tabs) {
         if (tab.id !== undefined) {
+          // Requirement 5.2: 永続化されたタイトルがあればそれを使用
+          // タブがローディング中でChromeからのタイトルが空の場合に特に有効
+          const persistedTitle = persistedTitles[tab.id];
+          const title = tab.title || persistedTitle || '';
+
           newTabInfoMap[tab.id] = {
             id: tab.id,
-            title: tab.title || '',
+            title,
             url: tab.url || '',
             favIconUrl: tab.favIconUrl,
             status: tab.status === 'loading' ? 'loading' : 'complete',
@@ -595,6 +611,115 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   );
 
   /**
+   * Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
+   * Requirements: 8.1, 8.2, 8.3, 8.4
+   * タブを兄弟として指定位置に挿入する
+   */
+  const handleSiblingDrop = useCallback(
+    async (info: SiblingDropInfo) => {
+      const { activeNodeId, aboveNodeId, belowNodeId } = info;
+
+      if (!treeState) {
+        return;
+      }
+
+      const activeNode = treeState.nodes[activeNodeId];
+      if (!activeNode) {
+        return;
+      }
+
+      // 挿入先の親ノードと挿入位置を決定
+      // 上のノードがある場合はその親を使用、そうでなければ下のノードの親を使用
+      // どちらもない場合はルートレベルに挿入
+      let targetParentId: string | null = null;
+
+      if (aboveNodeId && treeState.nodes[aboveNodeId]) {
+        // 上のノードと同じ親を持つ兄弟として挿入
+        targetParentId = treeState.nodes[aboveNodeId].parentId;
+      } else if (belowNodeId && treeState.nodes[belowNodeId]) {
+        // 下のノードと同じ親を持つ兄弟として挿入
+        targetParentId = treeState.nodes[belowNodeId].parentId;
+      }
+
+      // 自分自身の子孫への移動をチェック
+      if (targetParentId) {
+        const isDescendant = (ancestorId: string, descendantId: string): boolean => {
+          const ancestor = treeState.nodes[ancestorId];
+          if (!ancestor) return false;
+
+          for (const child of ancestor.children) {
+            if (child.id === descendantId) return true;
+            if (isDescendant(child.id, descendantId)) return true;
+          }
+
+          return false;
+        };
+
+        if (isDescendant(activeNodeId, targetParentId)) {
+          return;
+        }
+      }
+
+      // 深いコピーを作成して変更を加える
+      const updatedNodes: Record<string, TabNode> = {};
+      Object.entries(treeState.nodes).forEach(([id, node]) => {
+        updatedNodes[id] = {
+          ...node,
+          children: [], // 子配列は後で再構築
+        };
+      });
+
+      // activeNodeの親を更新
+      const updatedActiveNode = updatedNodes[activeNodeId];
+      updatedActiveNode.parentId = targetParentId;
+
+      // 親子関係を再構築（更新後の parentId を基に）
+      Object.entries(updatedNodes).forEach(([id, node]) => {
+        if (node.parentId && updatedNodes[node.parentId]) {
+          const parent = updatedNodes[node.parentId];
+          const child = updatedNodes[id];
+          if (child && !parent.children.some(c => c.id === id)) {
+            parent.children.push(child);
+          }
+        }
+      });
+
+      // 深さを再計算
+      const calculateDepth = (nodeId: string, visited: Set<string> = new Set()): number => {
+        if (visited.has(nodeId)) {
+          return 0;
+        }
+        visited.add(nodeId);
+
+        const node = updatedNodes[nodeId];
+        if (!node) return 0;
+        if (!node.parentId) return 0;
+
+        const parentDepth = calculateDepth(node.parentId, visited);
+        return parentDepth + 1;
+      };
+
+      // すべてのノードの深さを再計算
+      Object.values(updatedNodes).forEach((node) => {
+        node.depth = calculateDepth(node.id);
+      });
+
+      // tabToNodeマッピングを更新
+      const updatedTabToNode = { ...treeState.tabToNode };
+
+      // 状態を更新
+      const newTreeState = {
+        ...treeState,
+        nodes: updatedNodes,
+        tabToNode: updatedTabToNode,
+      };
+
+      await updateTreeState(newTreeState);
+    },
+    [treeState, updateTreeState]
+  );
+
+  /**
    * Task 4.9: 新しいグループを作成
    * Requirements: 3.9
    * @returns 作成されたグループのID
@@ -837,6 +962,81 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return tabIds;
   }, [treeState, selectedNodeIds]);
 
+  /**
+   * Task 3.3: ビューごとのタブ数を計算（メモ化）
+   * Requirements: 17.1, 17.2, 17.3
+   */
+  const viewTabCounts = useMemo((): Record<string, number> => {
+    if (!treeState) return {};
+
+    const counts: Record<string, number> = {};
+
+    // 各ノードをビューIDでグループ化してカウント
+    Object.values(treeState.nodes).forEach((node) => {
+      const viewId = node.viewId;
+      counts[viewId] = (counts[viewId] || 0) + 1;
+    });
+
+    return counts;
+  }, [treeState]);
+
+  /**
+   * Task 7.2: タブを別のビューに移動
+   * Requirements: 18.1, 18.2, 18.3
+   */
+  const moveTabsToView = useCallback((viewId: string, tabIds: number[]) => {
+    if (!treeState) return;
+
+    // tabIdからnodeIdを取得し、対象ノードのviewIdを更新
+    const updatedNodes = { ...treeState.nodes };
+
+    tabIds.forEach(tabId => {
+      const nodeId = treeState.tabToNode[tabId];
+      if (nodeId && updatedNodes[nodeId]) {
+        updatedNodes[nodeId] = {
+          ...updatedNodes[nodeId],
+          viewId,
+          // 親子関係をルートに移動（異なるビューへの移動時）
+          parentId: null,
+        };
+      }
+    });
+
+    // 親子関係を再構築
+    Object.values(updatedNodes).forEach(node => {
+      node.children = [];
+    });
+    Object.entries(updatedNodes).forEach(([id, node]) => {
+      if (node.parentId && updatedNodes[node.parentId]) {
+        const parent = updatedNodes[node.parentId];
+        const child = updatedNodes[id];
+        if (child && !parent.children.some(c => c.id === id)) {
+          parent.children.push(child);
+        }
+      }
+    });
+
+    // 深さを再計算
+    const calculateDepth = (nodeId: string, visited: Set<string> = new Set()): number => {
+      if (visited.has(nodeId)) return 0;
+      visited.add(nodeId);
+      const node = updatedNodes[nodeId];
+      if (!node || !node.parentId) return 0;
+      return calculateDepth(node.parentId, visited) + 1;
+    };
+
+    Object.values(updatedNodes).forEach(node => {
+      node.depth = calculateDepth(node.id);
+    });
+
+    const newTreeState = {
+      ...treeState,
+      nodes: updatedNodes,
+    };
+
+    updateTreeState(newTreeState);
+  }, [treeState, updateTreeState]);
+
   return (
     <TreeStateContext.Provider
       value={{
@@ -845,6 +1045,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         error,
         updateTreeState,
         handleDragEnd,
+        // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
+        handleSiblingDrop,
         // Task 4.8: ビュー管理機能
         switchView,
         createView,
@@ -879,6 +1081,10 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         isNodeSelected,
         // Task 12.2: 選択されたすべてのタブIDを取得
         getSelectedTabIds,
+        // Task 3.3: ビューごとのタブ数
+        viewTabCounts,
+        // Task 7.2: タブをビューに移動
+        moveTabsToView,
       }}
     >
       {children}

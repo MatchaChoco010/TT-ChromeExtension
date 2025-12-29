@@ -513,4 +513,201 @@ describe('ContextMenu', () => {
       expect(menu).toBeInTheDocument();
     });
   });
+
+  describe('テキスト選択の無効化 (Task 4.4: Requirement 11.2)', () => {
+    it('コンテキストメニュー要素にuser-select: noneが適用されていること', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      const menu = screen.getByRole('menu');
+      expect(menu).toHaveClass('select-none');
+    });
+
+    it('コンテキストメニュー内のテキストが選択できないこと', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      const menu = screen.getByRole('menu');
+      // select-noneクラスが適用されていることを確認
+      expect(menu).toHaveClass('select-none');
+    });
+  });
+
+  describe('Requirement 18: 別のビューへ移動サブメニュー (Task 7.2)', () => {
+    const mockViews = [
+      { id: 'default', name: 'Default', color: '#3b82f6' },
+      { id: 'work', name: 'Work', color: '#10b981' },
+      { id: 'personal', name: 'Personal', color: '#f59e0b' },
+    ];
+
+    it('「別のビューへ移動」メニュー項目が表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+      const onMoveToView = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          views={mockViews}
+          currentViewId="default"
+          onMoveToView={onMoveToView}
+        />
+      );
+
+      // 「別のビューへ移動」メニュー項目が表示されることを確認
+      expect(screen.getByText('別のビューへ移動')).toBeInTheDocument();
+    });
+
+    it('ビューが1つしかない場合は「別のビューへ移動」が表示されない', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+      const onMoveToView = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          views={[{ id: 'default', name: 'Default', color: '#3b82f6' }]}
+          currentViewId="default"
+          onMoveToView={onMoveToView}
+        />
+      );
+
+      // ビューが1つしかないので「別のビューへ移動」は表示されない
+      expect(screen.queryByText('別のビューへ移動')).not.toBeInTheDocument();
+    });
+
+    it('「別のビューへ移動」にホバーするとサブメニューが表示される', async () => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+      const onMoveToView = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          views={mockViews}
+          currentViewId="default"
+          onMoveToView={onMoveToView}
+        />
+      );
+
+      // 「別のビューへ移動」にホバー
+      const moveToViewItem = screen.getByText('別のビューへ移動');
+      await user.hover(moveToViewItem);
+
+      // サブメニューが表示されることを確認（現在のビューは除外）
+      expect(screen.getByTestId('submenu')).toBeInTheDocument();
+      expect(screen.getByText('Work')).toBeInTheDocument();
+      expect(screen.getByText('Personal')).toBeInTheDocument();
+      // 現在のビュー(Default)は表示されない
+      expect(screen.queryByRole('menuitem', { name: 'Default' })).not.toBeInTheDocument();
+    });
+
+    it('サブメニューからビューを選択するとonMoveToViewが呼ばれる', async () => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+      const onMoveToView = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          views={mockViews}
+          currentViewId="default"
+          onMoveToView={onMoveToView}
+        />
+      );
+
+      // 「別のビューへ移動」にホバー
+      const moveToViewItem = screen.getByText('別のビューへ移動');
+      await user.hover(moveToViewItem);
+
+      // サブメニューからビューを選択
+      const workView = screen.getByText('Work');
+      await user.click(workView);
+
+      // onMoveToViewが選択したビューIDとタブIDで呼ばれることを確認
+      expect(onMoveToView).toHaveBeenCalledWith('work', [1, 2]);
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('複数タブ選択時もサブメニューが正しく動作する', async () => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+      const onMoveToView = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2, 3]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          views={mockViews}
+          currentViewId="work"
+          onMoveToView={onMoveToView}
+        />
+      );
+
+      // 「別のビューへ移動」にホバー
+      const moveToViewItem = screen.getByText('別のビューへ移動');
+      await user.hover(moveToViewItem);
+
+      // サブメニューが表示（現在のビューworkは除外）
+      expect(screen.getByText('Default')).toBeInTheDocument();
+      expect(screen.getByText('Personal')).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Work' })).not.toBeInTheDocument();
+
+      // ビューを選択
+      await user.click(screen.getByText('Personal'));
+
+      expect(onMoveToView).toHaveBeenCalledWith('personal', [1, 2, 3]);
+    });
+
+    it('viewsがundefinedの場合は「別のビューへ移動」が表示されない', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      expect(screen.queryByText('別のビューへ移動')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -682,6 +682,139 @@ describe('TreeNode', () => {
     });
   });
 
+  describe('閉じるボタンの位置 (Task 4.1: Requirement 3.1, 3.2, 3.3)', () => {
+    it('閉じるボタンがタブの右端に固定配置されていること', async () => {
+      const user = userEvent.setup();
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Very Long Tab Title That Should Not Push Close Button');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const treeNodeElement = screen.getByTestId('tree-node-1');
+      await user.hover(treeNodeElement);
+
+      // 閉じるボタンを含むコンテナの親要素がjustify-betweenを持つことを確認
+      // タイトルエリアとCloseButtonが左右に分かれる
+      const closeButton = screen.getByTestId('close-button');
+      const contentContainer = closeButton.closest('[data-testid="tab-content"]');
+      expect(contentContainer).toBeInTheDocument();
+      expect(contentContainer).toHaveClass('justify-between');
+    });
+
+    it('タブタイトルの長さに関係なく閉じるボタンが常に右端にあること', async () => {
+      const user = userEvent.setup();
+      // 短いタイトル
+      const nodeShort = createMockNode('node-short', 1);
+      const tabShort = createMockTab(1, 'Short');
+
+      const { rerender } = render(
+        <TreeNode
+          node={nodeShort}
+          tab={tabShort}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      let treeNodeElement = screen.getByTestId('tree-node-1');
+      await user.hover(treeNodeElement);
+
+      let closeButton = screen.getByTestId('close-button');
+      let contentContainer = closeButton.closest('[data-testid="tab-content"]');
+      expect(contentContainer).toHaveClass('justify-between');
+
+      // 長いタイトルに変更
+      const nodeLong = createMockNode('node-long', 2);
+      const tabLong = createMockTab(
+        2,
+        'This is a very very very long tab title that extends beyond normal width'
+      );
+
+      rerender(
+        <TreeNode
+          node={nodeLong}
+          tab={tabLong}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      treeNodeElement = screen.getByTestId('tree-node-2');
+      await user.hover(treeNodeElement);
+
+      closeButton = screen.getByTestId('close-button');
+      contentContainer = closeButton.closest('[data-testid="tab-content"]');
+      expect(contentContainer).toHaveClass('justify-between');
+    });
+
+    it('ホバーしていない場合は閉じるボタンが非表示であること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1);
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // ホバーしていない状態では閉じるボタンは表示されない
+      expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
+    });
+
+    it('ホバー時のみ閉じるボタンが表示されること', async () => {
+      const user = userEvent.setup();
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1);
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const treeNodeElement = screen.getByTestId('tree-node-1');
+
+      // ホバー前は閉じるボタンがない
+      expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
+
+      // ホバーすると閉じるボタンが表示される
+      await user.hover(treeNodeElement);
+      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+
+      // ホバーを外すと閉じるボタンが非表示になる
+      await user.unhover(treeNodeElement);
+      expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
+    });
+  });
+
   describe('警告閾値によるダイアログ制御 (Task 11.3: Requirement 8.5)', () => {
     it('サブツリーのタブ数が閾値未満の場合は確認ダイアログを表示しないこと', () => {
       // 閾値を5に設定、サブツリーは親+子1つ=2タブ
@@ -803,6 +936,349 @@ describe('TreeNode', () => {
       // デフォルト閾値3で、タブ数2 < 3なので確認ダイアログは表示されない
       expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
       expect(mockOnClose).toHaveBeenCalledWith(1, true);
+    });
+  });
+
+  describe('タブタイトルの表示改善 (Task 4.2: Requirement 4.1, 4.2, 4.3, 4.4)', () => {
+    it('Loading状態の場合「Loading...」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Some Title',
+        url: 'https://example.com',
+        favIconUrl: undefined,
+        status: 'loading',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // Loading状態では「Loading...」と表示される
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      // 元のタイトルは表示されない
+      expect(screen.queryByText('Some Title')).not.toBeInTheDocument();
+    });
+
+    it('ロード完了後はタイトルが正しく表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Loaded Page Title',
+        url: 'https://example.com',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('Loaded Page Title')).toBeInTheDocument();
+    });
+
+    it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) に対して「新しいタブ」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Start Page',
+        url: 'chrome://vivaldi-webui/startpage',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+      expect(screen.queryByText('Start Page')).not.toBeInTheDocument();
+    });
+
+    it('chrome-extension://内部URLに対して「新しいタブ」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'New Tab',
+        url: 'chrome-extension://abcdefg/newtab.html',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+    });
+
+    it('chrome://newtab URLに対して「新しいタブ」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'New Tab',
+        url: 'chrome://newtab/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+    });
+
+    it('vivaldi://newtab URLに対して「新しいタブ」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Speed Dial',
+        url: 'vivaldi://newtab/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+    });
+
+    it('通常のURLに対しては元のタイトルがそのまま表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Example Domain',
+        url: 'https://example.com',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('Example Domain')).toBeInTheDocument();
+    });
+
+    it('タイトルが変更された場合、再レンダリングで即座に更新されること', () => {
+      const node = createMockNode('node-1', 1);
+      const initialTab: TabInfo = {
+        id: 1,
+        title: 'Initial Title',
+        url: 'https://example.com',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      const { rerender } = render(
+        <TreeNode
+          node={node}
+          tab={initialTab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('Initial Title')).toBeInTheDocument();
+
+      // タイトルが変更された場合
+      const updatedTab: TabInfo = {
+        ...initialTab,
+        title: 'Updated Title',
+      };
+
+      rerender(
+        <TreeNode
+          node={node}
+          tab={updatedTab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('Updated Title')).toBeInTheDocument();
+      expect(screen.queryByText('Initial Title')).not.toBeInTheDocument();
+    });
+
+    it('Loadingから完了に状態が変わった場合、タイトルが更新されること', () => {
+      const node = createMockNode('node-1', 1);
+      const loadingTab: TabInfo = {
+        id: 1,
+        title: 'Page Title',
+        url: 'https://example.com',
+        favIconUrl: undefined,
+        status: 'loading',
+      };
+
+      const { rerender } = render(
+        <TreeNode
+          node={node}
+          tab={loadingTab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // Loading中は「Loading...」と表示される
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+
+      // ロード完了後
+      const completeTab: TabInfo = {
+        ...loadingTab,
+        status: 'complete',
+      };
+
+      rerender(
+        <TreeNode
+          node={node}
+          tab={completeTab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // 完了後は実際のタイトルが表示される
+      expect(screen.getByText('Page Title')).toBeInTheDocument();
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    });
+
+    it('about:blank URLに対して「新しいタブ」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'about:blank',
+        url: 'about:blank',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+    });
+  });
+
+  describe('テキスト選択の無効化 (Task 4.4: Requirement 11.1, 11.2, 11.3)', () => {
+    it('タブ要素にuser-select: noneが適用されていること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1);
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const treeNodeElement = screen.getByTestId('tree-node-1');
+      expect(treeNodeElement).toHaveClass('select-none');
+    });
+
+    it('タブ要素内のテキストがselect-noneクラスを持つこと', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Test Tab Title');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const treeNodeElement = screen.getByTestId('tree-node-1');
+      // select-noneクラスが適用されていることを確認
+      expect(treeNodeElement).toHaveClass('select-none');
     });
   });
 });
