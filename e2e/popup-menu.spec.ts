@@ -80,10 +80,7 @@ test.describe('ポップアップメニュー', () => {
     });
   });
 
-  // NOTE: 「設定を開く」ボタンはchrome.runtime.openOptionsPage()を使用していますが、
-  // manifest.jsonにoptions_pageが設定されていないため、現在の実装では動作しません。
-  // options_pageの設定が追加されたら、以下のテストのスキップを解除してください。
-  test.describe.skip('設定ページを開く機能 (Requirements 20.3, 20.4)', () => {
+  test.describe('設定ページを開く機能 (Requirements 20.3, 20.4)', () => {
     test('「設定を開く」ボタンをクリックすると設定ページが開く', async ({
       extensionContext,
       extensionId,

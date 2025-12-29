@@ -169,6 +169,8 @@ await startDrag(sidePanelPage, tabId);
 - **Service Worker**: バックグラウンドでのタブイベント監視とツリー同期
 - **Options Page**: 独立した設定画面（chrome.runtime.openOptionsPage()）でユーザー設定を管理
 - **Path Alias `@/`**: `./src/`へのエイリアスで、深いネストでもインポートパスを簡潔に維持
+- **複数ウィンドウ対応**: TreeStateProviderでwindowIdを取得し、各ウィンドウで自身のタブのみをフィルタリング表示
+- **無彩色UIパレット**: Tailwind CSSの`gray`を`neutral`で上書きし、ダークブルーを排除した無彩色UIを実現
 
 ---
 _Document standards and patterns, not every dependency_

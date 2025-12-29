@@ -80,6 +80,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   // Load state from storage
   await testTreeStateManager.loadState();
 
+  // Task 5.2 (Requirements 5.1, 5.2): 未読状態をクリア
+  // ブラウザ起動時に復元されたタブには未読インジケーターを付けない
+  await testUnreadTracker.clear();
+
   // Task 1.1: 古いタブデータをクリーンアップ（ストレージロード後、同期前）
   await cleanupStaleTabData();
 
@@ -100,6 +104,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   try {
     // Load existing state
     await testTreeStateManager.loadState();
+
+    // Task 5.2 (Requirements 5.1, 5.2): 未読状態をクリア
+    // ブラウザ起動時に復元されたタブには未読インジケーターを付けない
+    await testUnreadTracker.clear();
 
     // Task 1.1: 古いタブデータをクリーンアップ（ストレージロード後、同期前）
     await cleanupStaleTabData();

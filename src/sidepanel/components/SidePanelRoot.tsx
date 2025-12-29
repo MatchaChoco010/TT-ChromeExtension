@@ -52,6 +52,8 @@ const TreeViewContent: React.FC = () => {
     viewTabCounts,
     // Task 12.1: ビュー移動機能 (Requirements 18.1, 18.2, 18.3)
     moveTabsToView,
+    // Task 6.2: 現在のウィンドウID（複数ウィンドウ対応）
+    currentWindowId,
   } = useTreeState();
 
   // Task 8.2: 設定画面はサイドパネル内ではなく、新規タブで開くように変更
@@ -90,14 +92,43 @@ const TreeViewContent: React.FC = () => {
   };
 
   // ノードをツリー構造に変換
+  // Task 3.1: ピン留めタブはツリーから除外する（要件10.1）
+  // Task 6.2: 現在のウィンドウのタブのみを表示（要件14.1, 14.2, 14.3）
   const buildTree = (): TabNode[] => {
     if (!treeState) return [];
 
+    // Task 3.1: ピン留めタブのIDセットを作成（高速検索用）
+    const pinnedTabIdSet = new Set(pinnedTabIds);
+
+    // Task 6.2: 現在のウィンドウに属するタブのIDセットを作成
+    // currentWindowIdがnullの場合はフィルタリングをスキップ（全タブを表示）
+    const currentWindowTabIds = new Set<number>();
+    const shouldFilterByWindow = currentWindowId !== null;
+    if (shouldFilterByWindow) {
+      Object.values(tabInfoMap).forEach(tabInfo => {
+        if (tabInfo.windowId === currentWindowId) {
+          currentWindowTabIds.add(tabInfo.id);
+        }
+      });
+    }
+
     // 各ノードに対して children 配列を再構築
+    // Task 3.1: ピン留めタブを除外
+    // Task 6.2: 現在のウィンドウに属さないタブを除外
     const nodesWithChildren: Record<string, TabNode> = {};
 
     // まず、すべてのノードのコピーを作成（children は空配列で初期化）
+    // Task 3.1: ピン留めタブは除外
+    // Task 6.2: 現在のウィンドウに属さないタブを除外
     Object.entries(treeState.nodes).forEach(([id, node]) => {
+      // ピン留めタブは除外
+      if (pinnedTabIdSet.has(node.tabId)) {
+        return;
+      }
+      // Task 6.2: 現在のウィンドウに属さないタブを除外（フィルタリングが有効な場合のみ）
+      if (shouldFilterByWindow && !currentWindowTabIds.has(node.tabId)) {
+        return;
+      }
       nodesWithChildren[id] = {
         ...node,
         children: [],
@@ -106,6 +137,14 @@ const TreeViewContent: React.FC = () => {
 
     // 親子関係を構築
     Object.entries(treeState.nodes).forEach(([id, node]) => {
+      // 自分自身がピン留めタブの場合はスキップ
+      if (pinnedTabIdSet.has(node.tabId)) {
+        return;
+      }
+      // Task 6.2: 現在のウィンドウに属さないタブはスキップ（フィルタリングが有効な場合のみ）
+      if (shouldFilterByWindow && !currentWindowTabIds.has(node.tabId)) {
+        return;
+      }
       if (node.parentId && nodesWithChildren[node.parentId]) {
         nodesWithChildren[node.parentId].children.push(nodesWithChildren[id]);
       }
@@ -160,6 +199,15 @@ const TreeViewContent: React.FC = () => {
   // handleTreeDragStart, handleTreeDragCancel, handleTreeDragEndのラッパーを削除
   // 要件6.1: 専用領域を表示しないため、外部ドロップ連携は不要
 
+  // Task 4.3: ツリー外ドロップで新規ウィンドウ作成（要件13.1, 13.2）
+  const handleExternalDrop = useCallback((tabId: number) => {
+    // サブツリーごと新しいウィンドウに移動（子タブがある場合は一緒に移動）
+    chrome.runtime.sendMessage({
+      type: 'CREATE_WINDOW_WITH_SUBTREE',
+      payload: { tabId },
+    });
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-gray-900">
       {/* Task 9.1: サイドパネルから設定ボタンを削除（要件20.1） */}
@@ -202,7 +250,8 @@ const TreeViewContent: React.FC = () => {
       {/* タブツリービュー */}
       {/* Task 4.3: カスタムスクロールバースタイルを適用 */}
       {/* Task 5.1: ExternalDropZone（新規ウィンドウドロップエリア）を削除（要件6.1） */}
-      <div className="flex-1 overflow-auto custom-scrollbar" data-testid="tab-tree-root">
+      {/* Task 2.4: タブツリーの水平スクロール禁止（要件12.1, 12.2） */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
         <TabTreeView
           nodes={nodes}
           currentViewId={treeState?.currentViewId || 'default'}
@@ -225,6 +274,8 @@ const TreeViewContent: React.FC = () => {
           // Task 12.1: ビュー移動サブメニュー用 (Requirements 18.1, 18.2, 18.3)
           views={treeState?.views}
           onMoveToView={moveTabsToView}
+          // Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)
+          onExternalDrop={handleExternalDrop}
         />
       </div>
     </div>

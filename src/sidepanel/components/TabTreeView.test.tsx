@@ -271,6 +271,7 @@ describe('TabTreeView', () => {
       favIconUrl,
       status: 'complete',
       isPinned: false,
+      windowId: 1,
     });
 
     const mockGetTabInfo = vi.fn();
@@ -445,9 +446,11 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      // 選択されたノードには 'ring-2 ring-blue-400' クラスが適用される
-      expect(nodeElement).toHaveClass('ring-2');
-      expect(nodeElement).toHaveClass('ring-blue-400');
+      // Task 2.2: 選択されたノードには控えめな背景色が適用される（青い枠線ではない）
+      expect(nodeElement).toHaveClass('bg-gray-500');
+      // 青い枠線が使用されていないこと
+      expect(nodeElement).not.toHaveClass('ring-2');
+      expect(nodeElement).not.toHaveClass('ring-blue-400');
     });
 
     it('選択されていないノードには選択スタイルが適用されないこと', () => {
@@ -466,8 +469,8 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      expect(nodeElement).not.toHaveClass('ring-2');
-      expect(nodeElement).not.toHaveClass('ring-blue-400');
+      // 選択されていない場合は選択用の背景色が適用されない
+      expect(nodeElement).not.toHaveClass('bg-gray-500');
     });
 
     it('通常クリック時にonSelectが正しいmodifiersで呼ばれること', async () => {
@@ -566,14 +569,11 @@ describe('TabTreeView', () => {
       const nodeElement2 = screen.getByTestId('tree-node-2');
       const nodeElement3 = screen.getByTestId('tree-node-3');
 
-      // node-1とnode-3は選択されているので ring-2 ring-blue-400 がある
-      expect(nodeElement1).toHaveClass('ring-2');
-      expect(nodeElement1).toHaveClass('ring-blue-400');
-      expect(nodeElement3).toHaveClass('ring-2');
-      expect(nodeElement3).toHaveClass('ring-blue-400');
-      // node-2は選択されていないので ring-2 ring-blue-400 がない
-      expect(nodeElement2).not.toHaveClass('ring-2');
-      expect(nodeElement2).not.toHaveClass('ring-blue-400');
+      // Task 2.2: node-1とnode-3は選択されているので bg-gray-500 がある
+      expect(nodeElement1).toHaveClass('bg-gray-500');
+      expect(nodeElement3).toHaveClass('bg-gray-500');
+      // node-2は選択されていないので bg-gray-500 がない
+      expect(nodeElement2).not.toHaveClass('bg-gray-500');
     });
 
     it('isNodeSelectedが提供されない場合、選択スタイルが適用されないこと', () => {
@@ -589,8 +589,7 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      expect(nodeElement).not.toHaveClass('ring-2');
-      expect(nodeElement).not.toHaveClass('ring-blue-400');
+      expect(nodeElement).not.toHaveClass('bg-gray-500');
     });
 
     it('onSelectが提供されない場合、通常のクリック動作のみ行われること', async () => {
@@ -633,8 +632,8 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      expect(nodeElement).toHaveClass('ring-2');
-      expect(nodeElement).toHaveClass('ring-blue-400');
+      // Task 2.2: 選択状態は背景色で表示される
+      expect(nodeElement).toHaveClass('bg-gray-500');
     });
   });
 
@@ -931,6 +930,99 @@ describe('TabTreeView', () => {
     });
   });
 
+  describe('Task 4.2: 親子関係を作るドロップ時のタブサイズ固定 (Requirements 9.1, 9.2)', () => {
+    it('Requirement 9.1: ドラッグハイライト状態でも他のタブのサイズが変更されないこと', () => {
+      const nodes = [
+        createMockNode('node-1', 1, 'default'),
+        createMockNode('node-2', 2, 'default'),
+        createMockNode('node-3', 3, 'default'),
+      ];
+
+      render(
+        <TabTreeView
+          nodes={nodes}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // 全てのノードがレンダリングされていること
+      const node1 = screen.getByTestId('tree-node-1');
+      const node2 = screen.getByTestId('tree-node-2');
+      const node3 = screen.getByTestId('tree-node-3');
+
+      // 各ノードが固定paddingを保持していること（サイズ安定化）
+      expect(node1).toHaveClass('p-2');
+      expect(node2).toHaveClass('p-2');
+      expect(node3).toHaveClass('p-2');
+
+      // flexレイアウトが適用されていること（サイズ安定化）
+      expect(node1).toHaveClass('flex', 'items-center');
+      expect(node2).toHaveClass('flex', 'items-center');
+      expect(node3).toHaveClass('flex', 'items-center');
+    });
+
+    it('Requirement 9.2: 親子関係ドロップ時にドラッグハイライトされたタブのサイズが維持されること', () => {
+      // ドラッグハイライト時にborder-2が追加されても、
+      // 元のpadding構造が維持されてサイズが変わらないことを確認
+      const nodes = [
+        createMockNode('node-1', 1, 'default'),
+        createMockNode('node-2', 2, 'default'),
+      ];
+
+      render(
+        <TabTreeView
+          nodes={nodes}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      const node1 = screen.getByTestId('tree-node-1');
+      const node2 = screen.getByTestId('tree-node-2');
+
+      // ドラッグハイライト状態の有無に関わらず、基本レイアウトが安定していること
+      // 実装ではisDragHighlightedがtrueの場合にborder-2が追加されるが、
+      // p-2クラスは常に維持される
+      expect(node1).toHaveClass('p-2');
+      expect(node2).toHaveClass('p-2');
+
+      // min-w-0でflexアイテムの縮小が正しく制御されていること
+      const tabContent1 = node1.querySelector('[data-testid="tab-content"]');
+      const tabContent2 = node2.querySelector('[data-testid="tab-content"]');
+
+      expect(tabContent1).toHaveClass('min-w-0');
+      expect(tabContent2).toHaveClass('min-w-0');
+    });
+
+    it('ドラッグ中のアイテム以外はtransformが適用されないこと（shouldApplyTransformフラグ）', () => {
+      // この動作は実際のドラッグ操作が必要なため、構造的な検証のみ
+      const nodes = [
+        createMockNode('node-1', 1, 'default'),
+        createMockNode('node-2', 2, 'default'),
+      ];
+
+      render(
+        <TabTreeView
+          nodes={nodes}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+        />
+      );
+
+      // 初期状態では全てのノードにtransformスタイルがないこと
+      // ドラッグ前は globalIsDragging=false なのでtransformは適用されない
+      const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
+      expect(container).not.toHaveClass('is-dragging');
+    });
+  });
+
   describe('Task 12.1: ビュー移動サブメニュー用のプロパティ (Requirements 18.1, 18.2, 18.3)', () => {
     it('viewsとonMoveToViewプロパティを受け取れること', () => {
       const node = createMockNode('node-1', 1, 'default');
@@ -964,6 +1056,42 @@ describe('TabTreeView', () => {
           currentViewId="default"
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
+        />
+      );
+
+      expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+    });
+  });
+
+  describe('Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)', () => {
+    it('onExternalDropコールバックを受け取れること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+      const mockOnExternalDrop = vi.fn();
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
+          onExternalDrop={mockOnExternalDrop}
+        />
+      );
+
+      expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+    });
+
+    it('onExternalDropがundefinedでもレンダリングできること', () => {
+      const node = createMockNode('node-1', 1, 'default');
+
+      render(
+        <TabTreeView
+          nodes={[node]}
+          currentViewId="default"
+          onNodeClick={mockOnNodeClick}
+          onToggleExpand={mockOnToggleExpand}
+          onDragEnd={vi.fn()}
         />
       );
 

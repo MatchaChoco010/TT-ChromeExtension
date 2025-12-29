@@ -167,7 +167,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         data-depth={node.depth}
         data-parent-group={node.groupId || ''}
         className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer select-none ${
-          isActive ? 'bg-blue-100' : ''
+          isActive ? 'bg-gray-200' : ''
         }`}
         style={{ paddingLeft: `${indentSize}px` }}
         onClick={handleNodeClick}

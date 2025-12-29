@@ -16,6 +16,8 @@ export interface DropIndicatorProps {
   isVisible: boolean;
   /** コンテナの左パディング（デフォルト: 8px） */
   containerPadding?: number;
+  /** Y座標（コンテナ相対、ピクセル） */
+  topPosition?: number;
 }
 
 /**
@@ -30,6 +32,7 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
   indentWidth,
   isVisible,
   containerPadding = 8,
+  topPosition,
 }) => {
   if (!isVisible) {
     return null;
@@ -48,6 +51,7 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
         left: `${leftPosition}px`,
         right: '8px',
         height: '2px',
+        top: topPosition !== undefined ? `${topPosition}px` : undefined,
       }}
     />
   );

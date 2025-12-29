@@ -22,6 +22,7 @@ import CloseButton from './CloseButton';
 import DropIndicator from './DropIndicator';
 import {
   calculateDropTarget,
+  calculateIndicatorY,
   DropTargetType,
   type DropTarget,
   type TabPosition,
@@ -199,7 +200,7 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-sortable-item={`sortable-item-${node.id}`}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isDragging ? 'bg-gray-600 border-2 border-gray-500' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'ring-2 ring-blue-400' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 border-2 border-gray-400' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isDragging ? 'bg-gray-600 border-2 border-gray-500' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 border-2 border-gray-400' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
@@ -251,27 +252,38 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           </div>
         ) : null}
 
-        {/* タブの内容 */}
-        <div className="flex-1 flex items-center min-w-0">
-          {/* Task 2.1: タブタイトル表示 */}
-          <span className="text-sm truncate">
-            {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
-          </span>
-          {/* Task 4.13: 未読バッジ */}
-          <UnreadBadge isUnread={isUnread} showIndicator={true} />
-          {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
-          {hasChildren && unreadChildCount > 0 && (
-            <div
-              data-testid="unread-child-indicator"
-              className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
-            >
-              <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
-                {unreadChildCount > 99 ? '99+' : unreadChildCount}
-              </span>
-            </div>
-          )}
-          {/* Task 2.2: 閉じるボタン（ホバー時のみ表示） */}
-          {isHovered && <CloseButton onClose={handleCloseClick} />}
+        {/* タブの内容 - Task 2.3: justify-betweenで閉じるボタンを右端に固定 */}
+        <div
+          data-testid="tab-content"
+          className="flex-1 flex items-center justify-between min-w-0"
+        >
+          {/* タブタイトルエリア */}
+          <div className="flex items-center min-w-0 flex-1">
+            {/* Task 2.1: タブタイトル表示 */}
+            <span className="text-sm truncate">
+              {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
+            </span>
+            {/* Task 4.13: 未読バッジ */}
+            <UnreadBadge isUnread={isUnread} showIndicator={true} />
+            {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
+            {hasChildren && unreadChildCount > 0 && (
+              <div
+                data-testid="unread-child-indicator"
+                className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
+              >
+                <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
+                  {unreadChildCount > 99 ? '99+' : unreadChildCount}
+                </span>
+              </div>
+            )}
+          </div>
+          {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
+          <div
+            data-testid="close-button-wrapper"
+            className={`flex-shrink-0 ${isHovered ? 'visible' : 'invisible'}`}
+          >
+            <CloseButton onClose={handleCloseClick} />
+          </div>
         </div>
       </div>
 
@@ -413,7 +425,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-node-id={node.id}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'ring-2 ring-blue-400' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
@@ -463,27 +475,38 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           </div>
         ) : null}
 
-        {/* タブの内容 */}
-        <div className="flex-1 flex items-center min-w-0">
-          {/* Task 2.1: タブタイトル表示 */}
-          <span className="text-sm truncate">
-            {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
-          </span>
-          {/* Task 4.13: 未読バッジ */}
-          <UnreadBadge isUnread={isUnread} showIndicator={true} />
-          {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
-          {hasChildren && unreadChildCount > 0 && (
-            <div
-              data-testid="unread-child-indicator"
-              className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
-            >
-              <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
-                {unreadChildCount > 99 ? '99+' : unreadChildCount}
-              </span>
-            </div>
-          )}
-          {/* Task 2.2: 閉じるボタン（ホバー時のみ表示） */}
-          {isHovered && <CloseButton onClose={handleCloseClick} />}
+        {/* タブの内容 - Task 2.3: justify-betweenで閉じるボタンを右端に固定 */}
+        <div
+          data-testid="tab-content"
+          className="flex-1 flex items-center justify-between min-w-0"
+        >
+          {/* タブタイトルエリア */}
+          <div className="flex items-center min-w-0 flex-1">
+            {/* Task 2.1: タブタイトル表示 */}
+            <span className="text-sm truncate">
+              {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
+            </span>
+            {/* Task 4.13: 未読バッジ */}
+            <UnreadBadge isUnread={isUnread} showIndicator={true} />
+            {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
+            {hasChildren && unreadChildCount > 0 && (
+              <div
+                data-testid="unread-child-indicator"
+                className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
+              >
+                <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
+                  {unreadChildCount > 99 ? '99+' : unreadChildCount}
+                </span>
+              </div>
+            )}
+          </div>
+          {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
+          <div
+            data-testid="close-button-wrapper"
+            className={`flex-shrink-0 ${isHovered ? 'visible' : 'invisible'}`}
+          >
+            <CloseButton onClose={handleCloseClick} />
+          </div>
         </div>
       </div>
 
@@ -698,6 +721,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   // Task 7.2: ビュー移動サブメニュー用
   views,
   onMoveToView,
+  // Task 4.3: ツリー外ドロップで新規ウィンドウ作成
+  onExternalDrop,
 }) => {
   // Task 4.3: ドロップターゲット状態とコンテナ参照
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
@@ -810,6 +835,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
    * ホバータイマーをクリアしてから元のonDragEndを呼び出す
    * Task 4.4: ドラッグ終了時にisDraggingをfalseにする
    * Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
+   * Task 4.3: ツリー外ドロップの場合はonExternalDropを呼び出す
    */
   const handleDragEnd = React.useCallback(
     (event: Parameters<NonNullable<typeof onDragEnd>>[0]) => {
@@ -824,6 +850,39 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         hoverTimerRef.current = null;
       }
       lastHoverNodeIdRef.current = null;
+
+      // Task 4.3: ツリー外ドロップの検出
+      // event.overがnullの場合、ドロップ先がツリー外であることを意味する
+      if (!event.over && onExternalDrop && currentActiveNodeId) {
+        // ノードIDからタブIDを取得
+        const findTabIdByNodeId = (nodeId: string): number | null => {
+          for (const node of nodes) {
+            if (node.id === nodeId) {
+              return node.tabId;
+            }
+            // 再帰的に子ノードを検索
+            const findInChildren = (children: typeof nodes): number | null => {
+              for (const child of children) {
+                if (child.id === nodeId) {
+                  return child.tabId;
+                }
+                const found = findInChildren(child.children);
+                if (found !== null) return found;
+              }
+              return null;
+            };
+            const found = findInChildren(node.children);
+            if (found !== null) return found;
+          }
+          return null;
+        };
+
+        const tabId = findTabIdByNodeId(currentActiveNodeId);
+        if (tabId !== null) {
+          onExternalDrop(tabId);
+          return;
+        }
+      }
 
       // Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
       const currentDropTarget = dropTargetRef.current;
@@ -857,7 +916,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         onDragEnd(event);
       }
     },
-    [onDragEnd, onSiblingDrop, activeNodeId]
+    [onDragEnd, onSiblingDrop, onExternalDrop, activeNodeId, nodes]
   );
 
   /**
@@ -956,14 +1015,19 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   );
 
   // Task 4.3: ドロップインジケーターの位置を計算
+  // Task 4.1: Y座標（top）も計算してDropIndicatorに渡す
   const dropIndicatorPosition = useMemo(() => {
     if (!dropTarget || dropTarget.type !== DropTargetType.Gap) {
       return null;
     }
-    // gapIndexからY位置を計算（フラット化されたノードのインデックスに対応）
+    const gapIndex = dropTarget.gapIndex ?? 0;
+    const tabPositions = tabPositionsRef.current;
+    // gapIndexからY位置を計算
+    const topY = calculateIndicatorY(gapIndex, tabPositions);
     return {
-      index: dropTarget.gapIndex ?? 0,
+      index: gapIndex,
       depth: dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0,
+      topY,
     };
   }, [dropTarget]);
 
@@ -1046,12 +1110,14 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       {/* グループに属さないタブを表示 */}
       {ungroupedNodes.map((node) => renderTabNode(node))}
       {/* Task 4.3: ドロップインジケーター表示 */}
+      {/* Task 4.1: topPositionを渡して正しい位置にインジケーターを表示 */}
       {dropIndicatorPosition && (
         <DropIndicator
           targetIndex={dropIndicatorPosition.index}
           targetDepth={dropIndicatorPosition.depth}
           indentWidth={INDENT_WIDTH}
           isVisible={true}
+          topPosition={dropIndicatorPosition.topY}
         />
       )}
     </div>

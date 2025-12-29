@@ -21,8 +21,10 @@ export interface TabInfo {
 }
 
 // Task 1.1: 拡張タブ情報（ピン状態を含む）
+// Task 6.2: windowIdを追加（複数ウィンドウ対応）
 export interface ExtendedTabInfo extends TabInfo {
   isPinned: boolean;
+  windowId: number;
 }
 
 // Task 1.1: タブ情報マップ
@@ -249,6 +251,8 @@ export interface TabTreeViewProps {
   // Task 7.2: ビュー移動サブメニュー用 (Requirements 18.1, 18.2, 18.3)
   views?: View[];
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
+  // Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)
+  onExternalDrop?: (tabId: number) => void;
 }
 
 // Context Menu types

@@ -4,12 +4,16 @@ import TabTreeView from './TabTreeView';
 import type { TabNode, ExtendedTabInfo } from '@/types';
 
 /**
- * タスク 2.2: タブにホバー時の閉じるボタンを実装するテスト
+ * タスク 2.2, 2.3: タブにホバー時の閉じるボタンを実装するテスト
  *
  * Requirements:
  * - 10.1: タブにマウスカーソルをホバーした場合、タブの右側に閉じるボタンを表示する
  * - 10.2: 閉じるボタンをクリックした場合、そのタブを閉じる
  * - 10.3: タブにホバーしていない場合、閉じるボタンを非表示にする
+ *
+ * Task 2.3 Requirements:
+ * - 6.1, 6.2: 閉じるボタンは常にタブの右端に表示される（タイトルの長さに関わらず位置固定）
+ * - 7.1, 7.2: ホバー状態の変化でタブサイズが変わらない（visible/invisibleで制御）
  */
 describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', () => {
   let originalChrome: typeof chrome;
@@ -53,6 +57,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     favIconUrl: undefined,
     status: 'complete',
     isPinned: false,
+    windowId: 1,
   });
 
   const mockGetTabInfo = (nodes: TabNode[]): ((tabId: number) => ExtendedTabInfo | undefined) => {
@@ -80,14 +85,15 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
 
       const treeNode = screen.getByTestId('tree-node-1');
 
-      // 最初は閉じるボタンが表示されていない
-      expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
+      // 最初は閉じるボタンが非表示（invisible）
+      const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
+      expect(closeButtonWrapper).toHaveClass('invisible');
 
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
 
       // 閉じるボタンが表示される (Requirement 10.1)
-      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+      expect(closeButtonWrapper).toHaveClass('visible');
     });
 
     it('子ノードにホバーしても閉じるボタンが表示される', () => {
@@ -110,8 +116,11 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       // マウスをホバー
       fireEvent.mouseEnter(childTreeNode);
 
-      // 閉じるボタンが表示される
-      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+      // 閉じるボタンが表示される（visible）
+      const closeButtonWrappers = screen.getAllByTestId('close-button-wrapper');
+      // 子ノードは2番目のwrapper
+      const childCloseButtonWrapper = closeButtonWrappers[1];
+      expect(childCloseButtonWrapper).toHaveClass('visible');
     });
   });
 
@@ -192,16 +201,17 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       );
 
       const treeNode = screen.getByTestId('tree-node-1');
+      const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
 
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
-      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+      expect(closeButtonWrapper).toHaveClass('visible');
 
       // マウスを離す
       fireEvent.mouseLeave(treeNode);
 
       // 閉じるボタンが非表示になる (Requirement 10.3)
-      expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
+      expect(closeButtonWrapper).toHaveClass('invisible');
     });
 
     it('別のノードにホバーすると、元のノードの閉じるボタンが非表示になる', () => {
@@ -221,10 +231,14 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
 
       const treeNode1 = screen.getByTestId('tree-node-1');
       const treeNode2 = screen.getByTestId('tree-node-2');
+      const closeButtonWrappers = screen.getAllByTestId('close-button-wrapper');
+      const wrapper1 = closeButtonWrappers[0];
+      const wrapper2 = closeButtonWrappers[1];
 
       // ノード1にホバー
       fireEvent.mouseEnter(treeNode1);
-      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+      expect(wrapper1).toHaveClass('visible');
+      expect(wrapper2).toHaveClass('invisible');
 
       // ノード1から離れる
       fireEvent.mouseLeave(treeNode1);
@@ -232,9 +246,9 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       // ノード2にホバー
       fireEvent.mouseEnter(treeNode2);
 
-      // 閉じるボタンは1つだけ表示されている
-      const closeButtons = screen.getAllByTestId('close-button');
-      expect(closeButtons).toHaveLength(1);
+      // ノード1は非表示、ノード2は表示
+      expect(wrapper1).toHaveClass('invisible');
+      expect(wrapper2).toHaveClass('visible');
     });
   });
 
@@ -255,15 +269,118 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       );
 
       const treeNode = screen.getByTestId('tree-node-1');
+      const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
 
-      // 最初は閉じるボタンが表示されていない
-      expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
+      // 最初は閉じるボタンが非表示（invisible）
+      expect(closeButtonWrapper).toHaveClass('invisible');
 
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
 
-      // 閉じるボタンが表示される
-      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+      // 閉じるボタンが表示される（visible）
+      expect(closeButtonWrapper).toHaveClass('visible');
+    });
+  });
+
+  // Task 2.3: 閉じるボタンの右端固定とホバー時サイズ安定化のテスト
+  describe('Task 2.3: 閉じるボタンの右端固定とホバー時サイズ安定化', () => {
+    describe('Requirement 6.1, 6.2: 閉じるボタンはタブの右端に固定される', () => {
+      it('閉じるボタンのラッパーはflex-shrink-0クラスを持つ', () => {
+        const node = createMockNode('node-1', 1);
+        const getTabInfo = mockGetTabInfo([node]);
+
+        render(
+          <TabTreeView
+            nodes={[node]}
+            currentViewId="default"
+            onNodeClick={vi.fn()}
+            onToggleExpand={vi.fn()}
+            getTabInfo={getTabInfo}
+          />,
+        );
+
+        const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
+        // 閉じるボタンのラッパーがflex-shrink-0を持つことで、タイトルの長さに関わらず位置が固定される
+        expect(closeButtonWrapper).toHaveClass('flex-shrink-0');
+      });
+
+      it('タブコンテンツがjustify-betweenで配置されている', () => {
+        const node = createMockNode('node-1', 1);
+        const getTabInfo = mockGetTabInfo([node]);
+
+        render(
+          <TabTreeView
+            nodes={[node]}
+            currentViewId="default"
+            onNodeClick={vi.fn()}
+            onToggleExpand={vi.fn()}
+            getTabInfo={getTabInfo}
+          />,
+        );
+
+        const tabContent = screen.getByTestId('tab-content');
+        // justify-betweenで左右に配置
+        expect(tabContent).toHaveClass('justify-between');
+      });
+    });
+
+    describe('Requirement 7.1, 7.2: ホバー時にタブサイズが変わらない', () => {
+      it('閉じるボタンラッパーは常にDOMに存在し、visible/invisibleで制御される', () => {
+        const node = createMockNode('node-1', 1);
+        const getTabInfo = mockGetTabInfo([node]);
+
+        render(
+          <TabTreeView
+            nodes={[node]}
+            currentViewId="default"
+            onNodeClick={vi.fn()}
+            onToggleExpand={vi.fn()}
+            getTabInfo={getTabInfo}
+          />,
+        );
+
+        // 閉じるボタンラッパーは常にDOMに存在
+        const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
+        expect(closeButtonWrapper).toBeInTheDocument();
+
+        // 初期状態はinvisible
+        expect(closeButtonWrapper).toHaveClass('invisible');
+
+        const treeNode = screen.getByTestId('tree-node-1');
+
+        // ホバー後もDOMに存在し、visibleになる
+        fireEvent.mouseEnter(treeNode);
+        expect(closeButtonWrapper).toBeInTheDocument();
+        expect(closeButtonWrapper).toHaveClass('visible');
+
+        // ホバー解除後もDOMに存在し、invisibleになる
+        fireEvent.mouseLeave(treeNode);
+        expect(closeButtonWrapper).toBeInTheDocument();
+        expect(closeButtonWrapper).toHaveClass('invisible');
+      });
+
+      it('ドラッグ可能なノードでも閉じるボタンラッパーは常にDOMに存在する', () => {
+        const node = createMockNode('node-1', 1);
+        const getTabInfo = mockGetTabInfo([node]);
+
+        render(
+          <TabTreeView
+            nodes={[node]}
+            currentViewId="default"
+            onNodeClick={vi.fn()}
+            onToggleExpand={vi.fn()}
+            onDragEnd={vi.fn()}
+            getTabInfo={getTabInfo}
+          />,
+        );
+
+        // 閉じるボタンラッパーは常にDOMに存在
+        const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
+        expect(closeButtonWrapper).toBeInTheDocument();
+
+        // 初期状態はinvisible
+        expect(closeButtonWrapper).toHaveClass('invisible');
+      });
     });
   });
 });

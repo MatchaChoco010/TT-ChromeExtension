@@ -19,6 +19,7 @@ describe('PinnedTabsSection', () => {
     favIconUrl,
     status: 'complete',
     isPinned,
+    windowId: 1,
   });
 
   beforeEach(() => {

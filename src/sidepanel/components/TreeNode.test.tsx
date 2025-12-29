@@ -276,7 +276,7 @@ describe('TreeNode', () => {
       );
 
       const treeNodeElement = screen.getByTestId('tree-node-1');
-      expect(treeNodeElement).not.toHaveClass('bg-blue-100');
+      expect(treeNodeElement).not.toHaveClass('bg-gray-200');
 
       // アクティブ状態に変更
       rerender(
@@ -291,7 +291,11 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(treeNodeElement).toHaveClass('bg-blue-100');
+      // Requirement 3.1, 3.2: アクティブタブは青い枠線ではなく背景色で控えめに識別
+      expect(treeNodeElement).toHaveClass('bg-gray-200');
+      // 青い枠線が表示されないこと
+      expect(treeNodeElement).not.toHaveClass('ring-2');
+      expect(treeNodeElement).not.toHaveClass('ring-blue-400');
     });
   });
 

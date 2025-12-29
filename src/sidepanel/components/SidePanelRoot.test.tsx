@@ -139,6 +139,23 @@ describe('SidePanelRoot', () => {
     consoleError.mockRestore();
   });
 
+  describe('Task 2.4: タブツリーの水平スクロール禁止 (Requirements 12.1, 12.2)', () => {
+    it('タブツリーコンテナにoverflow-x-hiddenが適用されていること', async () => {
+      await act(async () => {
+        render(<SidePanelRoot />);
+      });
+
+      await waitFor(() => {
+        const tabTreeRoot = screen.getByTestId('tab-tree-root');
+        expect(tabTreeRoot).toBeInTheDocument();
+        // overflow-y-autoは垂直スクロールを許可
+        expect(tabTreeRoot).toHaveClass('overflow-y-auto');
+        // overflow-x-hiddenは水平スクロールを禁止
+        expect(tabTreeRoot).toHaveClass('overflow-x-hidden');
+      });
+    });
+  });
+
   describe('Task 12.1: ビュー情報のTabTreeViewへの受け渡し (Requirements 18.1, 18.2, 18.3)', () => {
     it('treeStateにビューがある場合、TabTreeViewにviewsとonMoveToViewが渡されること', async () => {
       // ビューを含むtreeStateを設定

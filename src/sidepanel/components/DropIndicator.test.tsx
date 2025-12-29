@@ -130,4 +130,36 @@ describe('DropIndicator', () => {
       expect(indicator).toHaveClass('transition-all');
     });
   });
+
+  describe('topPosition (Task 4.1)', () => {
+    it('topPositionが指定された場合、正しいY座標にインジケーターが配置される', () => {
+      render(<DropIndicator {...defaultProps} topPosition={100} />);
+
+      const indicator = screen.getByTestId('drop-indicator');
+      expect(indicator).toHaveStyle({ top: '100px' });
+    });
+
+    it('topPositionが0の場合、top: 0pxが適用される', () => {
+      render(<DropIndicator {...defaultProps} topPosition={0} />);
+
+      const indicator = screen.getByTestId('drop-indicator');
+      expect(indicator).toHaveStyle({ top: '0px' });
+    });
+
+    it('topPositionが指定されない場合、topスタイルは適用されない', () => {
+      render(<DropIndicator {...defaultProps} />);
+
+      const indicator = screen.getByTestId('drop-indicator');
+      // topPositionがundefinedの場合、topスタイルは設定されない
+      expect(indicator.style.top).toBe('');
+    });
+
+    it('topPositionとdepthが両方指定された場合、両方のスタイルが適用される', () => {
+      render(<DropIndicator {...defaultProps} targetDepth={2} topPosition={80} />);
+
+      const indicator = screen.getByTestId('drop-indicator');
+      // containerPadding(8px) + depth(2) * indentWidth(20) = 48px
+      expect(indicator).toHaveStyle({ left: '48px', top: '80px' });
+    });
+  });
 });

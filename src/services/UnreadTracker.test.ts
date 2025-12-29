@@ -189,6 +189,54 @@ describe('UnreadTracker', () => {
     });
   });
 
+  // Requirement 5.1, 5.2: 復元タブの未読インジケーター非表示
+  describe('ブラウザ復元時の未読状態', () => {
+    it('clear()でストレージの未読状態を全てクリアできる', async () => {
+      // ストレージに前回セッションの未読タブがある状態をシミュレート
+      mockStorageService.get = vi.fn().mockResolvedValue([1, 2, 3]);
+
+      // ストレージから読み込み
+      await unreadTracker.loadFromStorage();
+
+      // 読み込み直後は未読状態がある
+      expect(unreadTracker.isUnread(1)).toBe(true);
+      expect(unreadTracker.isUnread(2)).toBe(true);
+      expect(unreadTracker.isUnread(3)).toBe(true);
+
+      // clear()を呼び出し
+      await unreadTracker.clear();
+
+      // 全ての未読状態がクリアされる
+      expect(unreadTracker.isUnread(1)).toBe(false);
+      expect(unreadTracker.isUnread(2)).toBe(false);
+      expect(unreadTracker.isUnread(3)).toBe(false);
+      expect(unreadTracker.getUnreadCount()).toBe(0);
+    });
+
+    it('起動時にclear()を呼び出すことで復元タブに未読を付けない', async () => {
+      // シナリオ: ブラウザ起動時の初期化フロー
+      // 1. ストレージに前回セッションの未読状態がある
+      mockStorageService.get = vi.fn().mockResolvedValue([1, 2, 3]);
+
+      // 2. ストレージからロード（loadFromStorageはevent-handlers.tsで呼ばれる）
+      await unreadTracker.loadFromStorage();
+
+      // 3. 起動完了前にclear()を呼び出してストレージの未読状態をクリア
+      await unreadTracker.clear();
+
+      // 4. この時点で全ての未読状態がクリアされている
+      expect(unreadTracker.getUnreadCount()).toBe(0);
+
+      // 5. 起動完了をマーク
+      unreadTracker.setInitialLoadComplete();
+
+      // 6. 以降は新規タブのみ未読になる
+      await unreadTracker.markAsUnread(4); // 新規タブ
+      expect(unreadTracker.isUnread(4)).toBe(true);
+      expect(unreadTracker.isUnread(1)).toBe(false); // 復元タブは未読ではない
+    });
+  });
+
   // Requirements 13.1, 13.2, 13.3: 起動時の未読バッジ制御
   describe('initialLoadComplete', () => {
     it('初期状態ではisInitialLoadCompleteがfalseを返す', () => {

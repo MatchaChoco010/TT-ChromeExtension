@@ -39,8 +39,8 @@ test.describe('複数選択機能', () => {
     const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
     await tabNode1.click();
 
-    // 最初のタブが選択されていることを確認（ring-2クラスで選択状態を示す）
-    await expect(tabNode1).toHaveClass(/ring-2/);
+    // 最初のタブが選択されていることを確認（bg-gray-500クラスで選択状態を示す）
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
 
     // Shift+クリックで3番目のタブを選択
     const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);
@@ -48,9 +48,9 @@ test.describe('複数選択機能', () => {
 
     // Assert: 範囲内のすべてのタブが選択されている
     const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
-    await expect(tabNode1).toHaveClass(/ring-2/);
-    await expect(tabNode2).toHaveClass(/ring-2/);
-    await expect(tabNode3).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
+    await expect(tabNode2).toHaveClass(/bg-gray-500/);
+    await expect(tabNode3).toHaveClass(/bg-gray-500/);
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);
@@ -85,25 +85,25 @@ test.describe('複数選択機能', () => {
 
     // Act: 最初のタブをクリック
     await tabNode1.click();
-    await expect(tabNode1).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
 
     // Ctrl+クリックで2番目のタブを追加選択
     await tabNode2.click({ modifiers: ['Control'] });
-    await expect(tabNode1).toHaveClass(/ring-2/);
-    await expect(tabNode2).toHaveClass(/ring-2/);
-    await expect(tabNode3).not.toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
+    await expect(tabNode2).toHaveClass(/bg-gray-500/);
+    await expect(tabNode3).not.toHaveClass(/bg-gray-500/);
 
     // Ctrl+クリックで3番目のタブを追加選択
     await tabNode3.click({ modifiers: ['Control'] });
-    await expect(tabNode1).toHaveClass(/ring-2/);
-    await expect(tabNode2).toHaveClass(/ring-2/);
-    await expect(tabNode3).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
+    await expect(tabNode2).toHaveClass(/bg-gray-500/);
+    await expect(tabNode3).toHaveClass(/bg-gray-500/);
 
     // Ctrl+クリックで2番目のタブを選択解除
     await tabNode2.click({ modifiers: ['Control'] });
-    await expect(tabNode1).toHaveClass(/ring-2/);
-    await expect(tabNode2).not.toHaveClass(/ring-2/);
-    await expect(tabNode3).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
+    await expect(tabNode2).not.toHaveClass(/bg-gray-500/);
+    await expect(tabNode3).toHaveClass(/bg-gray-500/);
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);
@@ -133,11 +133,11 @@ test.describe('複数選択機能', () => {
 
     // 最初のタブをクリックして選択
     await tabNode1.click();
-    await expect(tabNode1).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
 
     // Ctrl+クリックで2番目のタブを追加選択
     await tabNode2.click({ modifiers: ['Control'] });
-    await expect(tabNode2).toHaveClass(/ring-2/);
+    await expect(tabNode2).toHaveClass(/bg-gray-500/);
 
     // 要素のバウンディングボックスが安定するまで待機
     await sidePanelPage.waitForFunction(
@@ -200,11 +200,11 @@ test.describe('複数選択機能', () => {
 
     // 最初のタブをクリックして選択
     await tabNode1.click();
-    await expect(tabNode1).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
 
     // Ctrl+クリックで2番目のタブを追加選択
     await tabNode2.click({ modifiers: ['Control'] });
-    await expect(tabNode2).toHaveClass(/ring-2/);
+    await expect(tabNode2).toHaveClass(/bg-gray-500/);
 
     // 要素のバウンディングボックスが安定するまで待機
     await sidePanelPage.waitForFunction(
@@ -267,11 +267,11 @@ test.describe('複数選択機能', () => {
 
     // 最初のタブをクリックして選択
     await tabNode1.click();
-    await expect(tabNode1).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
 
     // Ctrl+クリックで2番目のタブを追加選択
     await tabNode2.click({ modifiers: ['Control'] });
-    await expect(tabNode2).toHaveClass(/ring-2/);
+    await expect(tabNode2).toHaveClass(/bg-gray-500/);
 
     // 要素のバウンディングボックスが安定するまで待機
     await sidePanelPage.waitForFunction(
@@ -333,16 +333,16 @@ test.describe('複数選択機能', () => {
     // 複数選択を行う
     await tabNode1.click();
     await tabNode2.click({ modifiers: ['Control'] });
-    await expect(tabNode1).toHaveClass(/ring-2/);
-    await expect(tabNode2).toHaveClass(/ring-2/);
+    await expect(tabNode1).toHaveClass(/bg-gray-500/);
+    await expect(tabNode2).toHaveClass(/bg-gray-500/);
 
     // Act: 通常クリックで3番目のタブを選択
     await tabNode3.click();
 
     // Assert: 以前の選択がクリアされ、3番目のタブのみが選択されている
-    await expect(tabNode1).not.toHaveClass(/ring-2/);
-    await expect(tabNode2).not.toHaveClass(/ring-2/);
-    await expect(tabNode3).toHaveClass(/ring-2/);
+    await expect(tabNode1).not.toHaveClass(/bg-gray-500/);
+    await expect(tabNode2).not.toHaveClass(/bg-gray-500/);
+    await expect(tabNode3).toHaveClass(/bg-gray-500/);
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);

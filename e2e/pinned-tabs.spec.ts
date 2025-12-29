@@ -294,10 +294,8 @@ test.describe('ピン留めタブセクション', () => {
     });
   });
 
-  test.describe('ピン留めタブとツリービューの統合 (Requirement 1.2)', () => {
-    // TODO: 要件1.2の実装完了後にこのテストを有効化する
-    // 現在の実装ではピン留めタブがツリービューにも表示されるため、このテストはスキップ
-    test.skip('ピン留めタブはピン留めセクションにのみ表示され、ツリービューには表示されない', async ({
+  test.describe('ピン留めタブとツリービューの統合 (Requirement 10.1)', () => {
+    test('ピン留めタブはピン留めセクションにのみ表示され、ツリービューには表示されない', async ({
       extensionContext,
       serviceWorker,
       sidePanelPage,

@@ -6,6 +6,7 @@
  * Requirements: 3.6, 4.2
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
+export type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 /**
@@ -171,4 +172,53 @@ export async function assertWindowTreeSync(
 
   expect(tabs).toBeDefined();
   expect(Array.isArray(tabs)).toBe(true);
+}
+
+/**
+ * 指定されたウィンドウ用のサイドパネルを開く
+ *
+ * 注: Chrome拡張機能のサイドパネルはウィンドウごとに独立して開く。
+ * 各ウィンドウで独自のタブツリーを表示するため、この関数を使用して
+ * 特定のウィンドウのサイドパネルを取得する。
+ *
+ * @param context - ブラウザコンテキスト
+ * @param windowId - サイドパネルを開くウィンドウのID
+ * @returns Side PanelのPage
+ */
+export async function openSidePanelForWindow(
+  context: BrowserContext,
+  windowId: number
+): Promise<Page> {
+  const serviceWorker = await getServiceWorker(context);
+
+  // Extension IDを取得
+  const extensionId = serviceWorker.url().split('/')[2];
+
+  // ウィンドウをアクティブにする
+  await serviceWorker.evaluate(
+    ({ windowId }) => {
+      return chrome.windows.update(windowId, { focused: true });
+    },
+    { windowId }
+  );
+
+  // 少し待機してウィンドウのフォーカスが確定するのを待つ
+  await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 200)));
+
+  // 新しいページを作成し、サイドパネルURLを開く
+  // サイドパネルは現在アクティブなウィンドウに対応するため、
+  // windowIdをクエリパラメータとして渡してウィンドウを特定する
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
+
+  // DOMContentLoadedイベントを待機
+  await page.waitForLoadState('domcontentloaded');
+
+  // Reactのルート要素が表示されるまで待機
+  await page.waitForSelector('#root', { timeout: 5000 });
+
+  // Side Panelのルート要素が安定するまで待機
+  await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
+
+  return page;
 }

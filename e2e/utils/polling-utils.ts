@@ -763,3 +763,49 @@ export async function waitForViewSwitcher(
   // ビュースイッチャーが表示されるまで待機
   await page.waitForSelector('[data-testid="view-switcher-container"]', { timeout });
 }
+
+/**
+ * 汎用的な条件待機関数
+ *
+ * 指定された条件関数がtrueを返すまでポーリングで待機する。
+ * 条件関数はブラウザ外（Node.js）で実行されるため、
+ * Service WorkerやPageの評価結果を条件として使用できる。
+ *
+ * @param conditionFn - 条件関数（Promise<boolean>またはboolean）
+ * @param options - ポーリングオプション
+ *
+ * @example
+ * await waitForCondition(
+ *   async () => {
+ *     const result = await serviceWorker.evaluate(...);
+ *     return result === expectedValue;
+ *   },
+ *   { timeout: 5000, interval: 100 }
+ * );
+ */
+export async function waitForCondition(
+  conditionFn: () => Promise<boolean> | boolean,
+  options: PollingOptions = {}
+): Promise<void> {
+  const {
+    timeout = DEFAULT_TIMEOUT,
+    interval = DEFAULT_INTERVAL,
+    timeoutMessage = 'Condition was not met within timeout',
+  } = options;
+
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      const result = await conditionFn();
+      if (result) {
+        return;
+      }
+    } catch {
+      // 条件関数内のエラーは無視して続行
+    }
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
+
+  throw new Error(timeoutMessage);
+}

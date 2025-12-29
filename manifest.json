@@ -10,6 +10,7 @@
     "unlimitedStorage",
     "alarms"
   ],
+  "options_page": "settings.html",
   "side_panel": {
     "default_path": "sidepanel.html"
   },

@@ -41,6 +41,7 @@ const createMockTabInfo = (tabId: number): ExtendedTabInfo => ({
   favIconUrl: undefined,
   status: 'complete' as const,
   isPinned: false,
+  windowId: 1,
 });
 
 describe('Task 11.1: タブグループをツリービュー内に表示', () => {
