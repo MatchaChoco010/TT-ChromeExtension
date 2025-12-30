@@ -1668,6 +1668,209 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.tabs.move).toHaveBeenCalledWith(4, { index: 1 });
     });
   });
+
+  /**
+   * Task 3.1 (tab-tree-comprehensive-fix): 異なる深度のタブ間へのドロップテスト
+   * Requirements: 3.1, 3.2, 3.3
+   * 深度0のタブの下に深度1のタブがある場合、その間にドロップすると
+   * 正しい親（下のノードの親）を使用してドロップされることを検証
+   */
+  it('異なる深度のタブ間にドロップした場合、下のノードの親を使用する', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    // 構造: node-1 (深度0) → node-2 (子、深度1), node-3 (深度0)
+    // node-1
+    //   └── node-2
+    // node-3
+    const treeStateWithMixedDepths: TreeState = {
+      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 1,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 2,
+          parentId: 'node-1', // node-1の子
+          children: [],
+          isExpanded: true,
+          depth: 1,
+          viewId: 'default',
+        },
+        'node-3': {
+          id: 'node-3',
+          tabId: 3,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-4': {
+          id: 'node-4',
+          tabId: 4,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+      },
+      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3', '4': 'node-4' },
+    };
+
+    mockChrome.storage.local.get = vi.fn().mockResolvedValue({
+      tree_state: treeStateWithMixedDepths,
+    });
+    mockChrome.tabs.query = vi.fn().mockResolvedValue([
+      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true },
+      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false },
+      { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false },
+      { id: 4, title: 'Tab 4', url: 'https://tab4.com', pinned: false, active: false },
+    ]);
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態の確認
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-4-parent')).toHaveTextContent('null');
+    });
+
+    // node-4をnode-2とnode-3の間にドロップ
+    // aboveNodeId=node-2 (深度1, 親=node-1), belowNodeId=node-3 (深度0, 親=null)
+    // 結果: node-4の親はnode-3と同じ（null）になるべき
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-4',
+          insertIndex: 2,
+          aboveNodeId: 'node-2',
+          belowNodeId: 'node-3',
+        });
+      }
+    });
+
+    // node-4の親がnullのままであることを確認（ルートレベルに配置）
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-4-parent')).toHaveTextContent('null');
+    });
+  });
+
+  /**
+   * Task 3.1 (tab-tree-comprehensive-fix): 子タブの下への隙間ドロップテスト
+   * 親タブの子として正しく配置されることを検証
+   */
+  it('親タブの子の下にドロップした場合、同じ親の兄弟として配置される', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    // 構造: node-1 → node-2 (子), node-3 → node-4 (子)
+    const treeStateWithChildren: TreeState = {
+      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 1,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 2,
+          parentId: 'node-1',
+          children: [],
+          isExpanded: true,
+          depth: 1,
+          viewId: 'default',
+        },
+        'node-3': {
+          id: 'node-3',
+          tabId: 3,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-5': {
+          id: 'node-5',
+          tabId: 5,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+      },
+      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3', '5': 'node-5' },
+    };
+
+    mockChrome.storage.local.get = vi.fn().mockResolvedValue({
+      tree_state: treeStateWithChildren,
+    });
+    mockChrome.tabs.query = vi.fn().mockResolvedValue([
+      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true },
+      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false },
+      { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false },
+      { id: 5, title: 'Tab 5', url: 'https://tab5.com', pinned: false, active: false },
+    ]);
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態: node-5はルートレベル
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-5-parent')).toHaveTextContent('null');
+    });
+
+    // node-5をnode-2の下（同じ親node-1の兄弟として）にドロップ
+    // aboveNodeId=node-2 (親=node-1), belowNodeId=node-3 (親=null)
+    // 下のノードの親を使用するので、node-5の親はnullになるべき
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-5',
+          insertIndex: 2,
+          aboveNodeId: 'node-2',
+          belowNodeId: 'node-3',
+        });
+      }
+    });
+
+    // node-5の親がnullになる（下のノードと同じ親）
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-5-parent')).toHaveTextContent('null');
+    });
+  });
 });
 
 /**
@@ -2809,6 +3012,251 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
         tab_titles: expect.objectContaining({
           1: 'New Page After Navigation',
         }),
+      });
+    });
+  });
+});
+
+/**
+ * Task 2.1 (tab-tree-comprehensive-fix): ビューのタブカウント正確性のテスト
+ * Requirements: 2.1, 2.3
+ * 不整合タブ削除時にviewTabCountsが再計算されることをテスト
+ */
+describe('TreeStateProvider viewTabCounts 正確性', () => {
+  let mockMessageListeners: MessageListener[] = [];
+  let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
+  let mockChrome: MockChrome;
+
+  // viewTabCountsを表示するテストコンポーネント
+  function ViewTabCountsTestComponent() {
+    const { treeState, isLoading, viewTabCounts, tabInfoMap } = useTreeState();
+
+    if (isLoading) return <div>Loading...</div>;
+    if (!treeState) return <div>No state</div>;
+
+    return (
+      <div>
+        <div data-testid="view-tab-counts">{JSON.stringify(viewTabCounts)}</div>
+        <div data-testid="tab-info-map-keys">{JSON.stringify(Object.keys(tabInfoMap).map(Number))}</div>
+        <div data-testid="node-count">{Object.keys(treeState.nodes).length}</div>
+      </div>
+    );
+  }
+
+  beforeEach(() => {
+    mockMessageListeners = [];
+    mockStorageListeners = [];
+
+    // ツリー状態: タブ1, 2, 3がnodes内にあるが、タブ3は実際には存在しない（不整合タブ）
+    const treeStateWithInconsistentTabs: TreeState = {
+      views: [
+        { id: 'default', name: 'Default', color: '#3b82f6' },
+        { id: 'view-2', name: 'View 2', color: '#10b981' },
+      ],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 1,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 2,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-3': {
+          id: 'node-3',
+          tabId: 3, // このタブは実際には存在しない（不整合）
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-4': {
+          id: 'node-4',
+          tabId: 4,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'view-2',
+        },
+      },
+      tabToNode: {
+        1: 'node-1',
+        2: 'node-2',
+        3: 'node-3',
+        4: 'node-4',
+      },
+    };
+
+    mockChrome = {
+      storage: {
+        local: {
+          get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockImplementation(async (keys) => {
+            if (keys === 'tree_state' || (Array.isArray(keys) && keys.includes('tree_state'))) {
+              return { tree_state: treeStateWithInconsistentTabs };
+            }
+            if (keys === 'groups') {
+              return { groups: {} };
+            }
+            if (keys === 'unread_tabs') {
+              return { unread_tabs: [] };
+            }
+            if (keys === 'tab_titles') {
+              return { tab_titles: {} };
+            }
+            if (keys === 'tab_favicons') {
+              return { tab_favicons: {} };
+            }
+            return {};
+          }),
+          set: vi.fn<(items: Record<string, unknown>) => Promise<void>>().mockResolvedValue(undefined),
+          remove: vi.fn<(keys: string | string[]) => Promise<void>>(),
+          clear: vi.fn<() => Promise<void>>(),
+        },
+        onChanged: {
+          addListener: vi.fn((listener) => {
+            mockStorageListeners.push(listener);
+          }),
+          removeListener: vi.fn((listener) => {
+            mockStorageListeners = mockStorageListeners.filter(
+              (l) => l !== listener
+            );
+          }),
+        },
+      },
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener) => {
+            mockMessageListeners.push(listener as MessageListener);
+          }),
+          removeListener: vi.fn((listener) => {
+            mockMessageListeners = mockMessageListeners.filter(
+              (l) => l !== listener
+            );
+          }),
+        },
+        sendMessage: vi.fn().mockResolvedValue(undefined),
+        getURL: vi.fn(),
+      },
+      tabs: {
+        get: vi.fn(),
+        // タブ1, 2, 4のみ存在（タブ3は存在しない）
+        query: vi.fn().mockResolvedValue([
+          { id: 1, title: 'Tab 1', url: 'https://example.com/1', pinned: false, windowId: 1, status: 'complete' },
+          { id: 2, title: 'Tab 2', url: 'https://example.com/2', pinned: false, windowId: 1, status: 'complete' },
+          { id: 4, title: 'Tab 4', url: 'https://example.com/4', pinned: false, windowId: 1, status: 'complete' },
+        ]),
+        update: vi.fn(),
+        move: vi.fn(),
+        remove: vi.fn(),
+        create: vi.fn(),
+        duplicate: vi.fn(),
+        reload: vi.fn(),
+        onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+      windows: {
+        get: vi.fn(),
+        getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
+        create: vi.fn(),
+        onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+      sidePanel: {
+        open: vi.fn(),
+        getOptions: vi.fn(),
+        setOptions: vi.fn(),
+      },
+    };
+
+    global.chrome = mockChrome as unknown as typeof chrome;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('viewTabCountsは実際に存在するタブのみをカウントする（不整合タブを除外）', async () => {
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <ViewTabCountsTestComponent />
+        </TreeStateProvider>
+      );
+    });
+
+    // ノード数はツリー状態のまま4つ
+    await waitFor(() => {
+      expect(screen.getByTestId('node-count')).toHaveTextContent('4');
+    });
+
+    // tabInfoMapには実際に存在するタブ1, 2, 4のみが含まれる
+    await waitFor(() => {
+      const tabInfoMapKeys = JSON.parse(screen.getByTestId('tab-info-map-keys').textContent || '[]');
+      expect(tabInfoMapKeys).toEqual([1, 2, 4]);
+    });
+
+    // viewTabCountsは実際に存在するタブのみをカウント
+    // default: node-1(tab 1), node-2(tab 2) -> 2 (node-3のtab 3は存在しないので除外)
+    // view-2: node-4(tab 4) -> 1
+    await waitFor(() => {
+      const viewTabCounts = JSON.parse(screen.getByTestId('view-tab-counts').textContent || '{}');
+      expect(viewTabCounts).toEqual({
+        'default': 2,  // タブ3は実際に存在しないのでカウントしない
+        'view-2': 1,
+      });
+    });
+  });
+
+  it('すべてのタブが存在する場合は全ノードをカウントする', async () => {
+    // タブ3も存在するようにモックを更新
+    mockChrome.tabs.query.mockResolvedValue([
+      { id: 1, title: 'Tab 1', url: 'https://example.com/1', pinned: false, windowId: 1, status: 'complete', index: 0, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+      { id: 2, title: 'Tab 2', url: 'https://example.com/2', pinned: false, windowId: 1, status: 'complete', index: 1, highlighted: false, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+      { id: 3, title: 'Tab 3', url: 'https://example.com/3', pinned: false, windowId: 1, status: 'complete', index: 2, highlighted: false, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+      { id: 4, title: 'Tab 4', url: 'https://example.com/4', pinned: false, windowId: 1, status: 'complete', index: 3, highlighted: false, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+    ]);
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <ViewTabCountsTestComponent />
+        </TreeStateProvider>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('node-count')).toHaveTextContent('4');
+    });
+
+    // tabInfoMapには全タブが含まれる
+    await waitFor(() => {
+      const tabInfoMapKeys = JSON.parse(screen.getByTestId('tab-info-map-keys').textContent || '[]');
+      expect(tabInfoMapKeys.sort()).toEqual([1, 2, 3, 4]);
+    });
+
+    // すべてのタブが存在するので、全ノードがカウントされる
+    // default: 3, view-2: 1
+    await waitFor(() => {
+      const viewTabCounts = JSON.parse(screen.getByTestId('view-tab-counts').textContent || '{}');
+      expect(viewTabCounts).toEqual({
+        'default': 3,
+        'view-2': 1,
       });
     });
   });

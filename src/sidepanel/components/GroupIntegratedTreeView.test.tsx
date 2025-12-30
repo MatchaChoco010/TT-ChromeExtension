@@ -43,6 +43,7 @@ const createMockTabInfo = (tabId: number): ExtendedTabInfo => ({
   isPinned: false,
   windowId: 1,
   discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
+  index: tabId, // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブの順序同期
 });
 
 describe('Task 11.1: タブグループをツリービュー内に表示', () => {

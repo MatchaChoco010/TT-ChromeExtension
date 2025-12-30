@@ -1311,6 +1311,134 @@ describe('TreeNode', () => {
     });
   });
 
+  describe('未読インジケーターの右端固定表示 (Task 11.1: Requirement 11.1, 11.2, 11.3, 11.4)', () => {
+    it('未読インジケーターがタブの右端に固定表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Test Tab');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={true}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // 未読バッジが表示される
+      const unreadBadge = screen.getByTestId('unread-badge');
+      expect(unreadBadge).toBeInTheDocument();
+
+      // 未読バッジが右端固定コンテナ内にあること（right-actions-container）
+      const rightActionsContainer = unreadBadge.closest('[data-testid="right-actions-container"]');
+      expect(rightActionsContainer).toBeInTheDocument();
+    });
+
+    it('短いタイトルでも未読インジケーターがタブの右端に表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'A');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={true}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const unreadBadge = screen.getByTestId('unread-badge');
+      const rightActionsContainer = unreadBadge.closest('[data-testid="right-actions-container"]');
+      expect(rightActionsContainer).toBeInTheDocument();
+      // flex-shrink-0でサイズが維持される
+      expect(rightActionsContainer).toHaveClass('flex-shrink-0');
+    });
+
+    it('長いタイトルでも未読インジケーターがタブの右端に表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(
+        1,
+        'This is a very very very long tab title that extends beyond normal width'
+      );
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={true}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const unreadBadge = screen.getByTestId('unread-badge');
+      const rightActionsContainer = unreadBadge.closest('[data-testid="right-actions-container"]');
+      expect(rightActionsContainer).toBeInTheDocument();
+      // flex-shrink-0でサイズが維持される
+      expect(rightActionsContainer).toHaveClass('flex-shrink-0');
+    });
+
+    it('未読インジケーターがタイトルエリアの外（右端固定コンテナ内）に配置されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Test Tab');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={true}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const unreadBadge = screen.getByTestId('unread-badge');
+      // タイトルエリア（title-area）の外にあることを確認
+      const titleArea = screen.getByTestId('title-area');
+      expect(titleArea).not.toContainElement(unreadBadge);
+    });
+
+    it('ホバー時に閉じるボタンと未読インジケーターが両方表示されること', async () => {
+      const user = userEvent.setup();
+      const node = createMockNode('node-1', 1);
+      const tab = createMockTab(1, 'Test Tab');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={true}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const treeNodeElement = screen.getByTestId('tree-node-1');
+      await user.hover(treeNodeElement);
+
+      // 両方が表示される
+      expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('close-button')).toBeInTheDocument();
+
+      // 両方が同じ右端固定コンテナ内にあること
+      const rightActionsContainer = screen.getByTestId('right-actions-container');
+      expect(rightActionsContainer).toContainElement(screen.getByTestId('unread-badge'));
+      expect(rightActionsContainer).toContainElement(screen.getByTestId('close-button'));
+    });
+  });
+
   describe('休止タブのグレーアウト表示 (Task 4.1 tab-tree-bugfix: Requirement 3.1, 3.2)', () => {
     it('休止タブの場合、タイトルにグレーアウトスタイルが適用されること', () => {
       const node = createMockNode('node-1', 1);

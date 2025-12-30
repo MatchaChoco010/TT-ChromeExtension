@@ -23,10 +23,12 @@ export interface TabInfo {
 // Task 1.1: 拡張タブ情報（ピン状態を含む）
 // Task 6.2: windowIdを追加（複数ウィンドウ対応）
 // Task 4.1 (tab-tree-bugfix): discardedを追加（休止タブの視覚的区別）
+// Task 12.1 (tab-tree-comprehensive-fix): indexを追加（ピン留めタブの順序同期）
 export interface ExtendedTabInfo extends TabInfo {
   isPinned: boolean;
   windowId: number;
   discarded: boolean; // 休止状態のタブ（まだ読み込まれていない）
+  index: number; // タブのインデックス（ピン留めタブの順序同期に使用）
 }
 
 // Task 1.1: タブ情報マップ

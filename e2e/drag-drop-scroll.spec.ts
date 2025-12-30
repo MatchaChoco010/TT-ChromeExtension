@@ -1,12 +1,13 @@
 /**
  * ドラッグ＆ドロップ中のスクロール制限テスト
  *
- * Requirement 8: ドラッグ＆ドロップ操作 - スクロール制限
- * - 8.1: ドラッグ中にツリービューの縦スクロールをコンテンツ範囲内に制限する
- * - 8.2: ドラッグ中にツリービューの横スクロールを禁止する
- * - 8.3: ドラッグ中のスクロールはツリーコンテンツがビューポートを超えている場合のみ許可する
+ * Requirement 5: ドラッグ時スクロール制限
+ * - 5.1: ドラッグ中にツリービューの縦スクロールを本来のスクロール可能量を超えてスクロールしない
+ * - 5.2: タブツリーのコンテンツがビューポートより小さい場合、ドラッグ中にスクロールしない
+ * - 5.3: タブツリーのコンテンツがビューポートより大きい場合、コンテンツ末尾までのみスクロール可能
  *
- * Task 9.2 (tab-tree-bugfix): スクロール制限のE2Eテスト
+ * Task 5.1 (tab-tree-comprehensive-fix): スクロール量制限ロジックの実装
+ * Task 5.2 (tab-tree-comprehensive-fix): スクロール制限のE2Eテスト追加
  */
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
@@ -16,6 +17,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
   // ドラッグ操作のタイムアウトを延長
   test.setTimeout(120000);
 
+  // Requirement 5 (横スクロール禁止): ドラッグ中の横スクロールは無効化されている
   test('ドラッグ中に横スクロールが発生しないことを検証する', async ({
     extensionContext,
     sidePanelPage,
@@ -57,6 +59,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     await dropTab(sidePanelPage);
   });
 
+  // Requirement 5.2: コンテンツがビューポートより小さい場合、ドラッグ中にスクロールしない
   test('ドラッグ中にツリービューが必要以上に縦スクロールしないことを検証する', async ({
     extensionContext,
     sidePanelPage,
@@ -114,6 +117,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     await dropTab(sidePanelPage);
   });
 
+  // Requirement 5.1, 5.3: コンテンツがビューポートを超える場合、コンテンツ末尾までのみスクロール可能
   test('コンテンツがビューポートを超えている場合のみスクロールが許可されることを検証する', async ({
     extensionContext,
     sidePanelPage,
@@ -195,6 +199,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     }
   });
 
+  // Requirement 5.1: スクロール量が本来のスクロール可能量を超えない（加速度制限）
   test('ドラッグ中のスクロール加速度が制限されていることを検証する', async ({
     extensionContext,
     sidePanelPage,

@@ -95,6 +95,11 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
+        // Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
+        onMoved: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
       },
       // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
       windows: {

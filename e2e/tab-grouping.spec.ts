@@ -8,6 +8,13 @@
  * - 複数タブを選択してグループ化した際にグループ親タブが作成されることを検証
  * - グループ親タブが専用のタブとして表示されることを検証
  * - 単一タブをグループに追加できることを検証
+ *
+ * Task 6.2 (tab-tree-comprehensive-fix): グループ化機能のE2Eテスト追加
+ * Requirements: 6.5, 6.6, 6.7, 6.8
+ * - 6.5: コンテキストメニューからのグループ化操作を検証
+ * - 6.6: 単一タブのグループ化を検証
+ * - 6.7: 複数タブ選択時のグループ化を検証
+ * - 6.8: グループ化後の親子関係を検証
  */
 
 import { test, expect } from './fixtures/extension';
@@ -42,7 +49,10 @@ async function waitForTabInUI(
 
 test.describe('タブグループ化機能', () => {
   test.describe('複数タブのグループ化', () => {
-    test('Requirement 11.1: 複数タブを選択してグループ化した際にグループ親タブが作成される', async ({
+    /**
+     * Requirement 11.1, 6.5, 6.7: 複数タブを選択してコンテキストメニューからグループ化
+     */
+    test('Requirement 11.1, 6.5, 6.7: 複数タブを選択してグループ化した際にグループ親タブが作成される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -122,6 +132,9 @@ test.describe('タブグループ化機能', () => {
       await closeTab(extensionContext, tabId2);
     });
 
+    /**
+     * Requirement 11.2: グループ親タブの表示スタイル検証
+     */
     test('Requirement 11.2: グループ親タブが専用のタブとして表示される', async ({
       extensionContext,
       sidePanelPage,
@@ -194,6 +207,163 @@ test.describe('タブグループ化機能', () => {
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
       await closeTab(extensionContext, tabId2);
+    });
+  });
+
+  test.describe('単一タブのグループ化', () => {
+    /**
+     * Requirement 6.1-6.4, 6.5, 6.6, 6.8 (Task 6.1, 6.2):
+     * - 6.5: コンテキストメニューからのグループ化操作を検証
+     * - 6.6: 単一タブのグループ化を検証
+     * - 6.8: グループ化後の親子関係を検証
+     */
+    test('Requirement 6.1-6.4, 6.5, 6.6, 6.8: 単一タブを新しいグループにグループ化できる', async ({
+      extensionContext,
+      sidePanelPage,
+      serviceWorker,
+    }) => {
+      // Arrange: 単一のタブを作成
+      const tabId = await createTab(extensionContext, 'about:blank');
+      await waitForTabInUI(sidePanelPage, extensionContext, tabId);
+
+      // バックグラウンドスロットリングを回避
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+
+      // 要素が安定するまで待機
+      await sidePanelPage.waitForFunction(
+        (tabId) => {
+          const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+          if (!node) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        },
+        tabId,
+        { timeout: 5000 }
+      );
+
+      // Act: 右クリックでコンテキストメニューを開く
+      await tabNode.click({ button: 'right' });
+
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      // 「タブをグループ化」メニュー項目が表示されることを確認
+      const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /タブをグループ化/ });
+      await expect(groupMenuItem).toBeVisible();
+
+      // 「タブをグループ化」をクリック
+      await groupMenuItem.click();
+
+      // コンテキストメニューが閉じるまで待機
+      await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+
+      // Assert: グループ親タブが作成されていることを確認
+      await waitForCondition(
+        async () => {
+          const treeState = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('tree_state');
+            return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+          });
+          if (!treeState?.nodes) return false;
+          // group-で始まるIDを持つノードが存在するか確認
+          return Object.values(treeState.nodes).some(
+            (node) => node.id.startsWith('group-') && node.tabId < 0
+          );
+        },
+        { timeout: 10000, timeoutMessage: 'Group parent node was not created from single tab' }
+      );
+
+      // UIにグループノードが表示されていることを確認
+      const groupNode = sidePanelPage.locator('[data-testid^="group-header-"]');
+      await expect(groupNode.first()).toBeVisible({ timeout: 5000 });
+
+      // 元のタブがグループの子として配置されていることを確認
+      await waitForCondition(
+        async () => {
+          const treeState = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('tree_state');
+            return result.tree_state as {
+              nodes?: Record<string, { id: string; tabId: number; parentId: string | null; groupId?: string }>;
+              tabToNode?: Record<number, string>;
+            } | undefined;
+          });
+          if (!treeState?.nodes || !treeState?.tabToNode) return false;
+
+          const tabNodeId = treeState.tabToNode[tabId];
+          if (!tabNodeId) return false;
+
+          const tabNodeState = treeState.nodes[tabNodeId];
+          if (!tabNodeState) return false;
+
+          // タブがグループに属していることを確認（parentIdまたはgroupIdで判定）
+          return (tabNodeState.parentId !== null && tabNodeState.parentId.startsWith('group-')) ||
+                 (tabNodeState.groupId !== undefined && tabNodeState.groupId.startsWith('group-'));
+        },
+        { timeout: 10000, timeoutMessage: 'Tab was not added as child of group' }
+      );
+
+      // クリーンアップ
+      await closeTab(extensionContext, tabId);
+    });
+
+    /**
+     * Requirement 6.4 (Task 6.1): グループのデフォルト名設定検証
+     */
+    test('Requirement 6.4: 単一タブのグループ化時にデフォルト名「グループ」が設定される', async ({
+      extensionContext,
+      sidePanelPage,
+      serviceWorker,
+    }) => {
+      // Arrange: 単一のタブを作成
+      const tabId = await createTab(extensionContext, 'about:blank');
+      await waitForTabInUI(sidePanelPage, extensionContext, tabId);
+
+      // バックグラウンドスロットリングを回避
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+
+      // 要素が安定するまで待機
+      await sidePanelPage.waitForFunction(
+        (tabId) => {
+          const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+          if (!node) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        },
+        tabId,
+        { timeout: 5000 }
+      );
+
+      // Act: グループ化を実行
+      await tabNode.click({ button: 'right' });
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /タブをグループ化/ });
+      await groupMenuItem.click();
+      await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+
+      // Assert: グループ名が「グループ」であることを確認
+      await waitForCondition(
+        async () => {
+          const groups = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('groups');
+            return result.groups as Record<string, { id: string; name: string }> | undefined;
+          });
+          if (!groups) return false;
+          // 「グループ」という名前のグループが存在することを確認
+          return Object.values(groups).some((group) => group.name === 'グループ');
+        },
+        { timeout: 10000, timeoutMessage: 'Group with default name "グループ" was not created' }
+      );
+
+      // クリーンアップ
+      await closeTab(extensionContext, tabId);
     });
   });
 
@@ -272,8 +442,9 @@ test.describe('タブグループ化機能', () => {
         } catch { /* ignore */ }
       });
 
-      // グループ情報がUIに反映されるまで待機
-      await sidePanelPage.waitForTimeout(500);
+      // グループ情報がUIに反映されるまでポーリングで待機
+      const groupNode = sidePanelPage.locator('[data-testid^="group-header-"]');
+      await expect(groupNode.first()).toBeVisible({ timeout: 5000 });
 
       // 3番目のタブを選択解除して単独で選択
       const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);

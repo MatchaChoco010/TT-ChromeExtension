@@ -30,6 +30,11 @@ const mockTabsOnRemoved = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
+// Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
+const mockTabsOnMoved = {
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+};
 
 // Mock chrome.runtime for tests
 const mockRuntimeSendMessage = vi.fn();
@@ -37,6 +42,9 @@ const mockRuntimeOnMessage = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
+
+// Task 8.1 (tab-tree-comprehensive-fix): chrome.tabs.create のモック
+const mockTabsCreate = vi.fn();
 
 beforeEach(() => {
   // Setup chrome API mocks
@@ -51,11 +59,15 @@ beforeEach(() => {
     tabs: {
       query: mockTabsQuery,
       update: mockTabsUpdate,
+      // Task 8.1 (tab-tree-comprehensive-fix): chrome.tabs.create のモック
+      create: mockTabsCreate,
       onActivated: mockTabsOnActivated,
       onUpdated: mockTabsOnUpdated,
       // Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
       onCreated: mockTabsOnCreated,
       onRemoved: mockTabsOnRemoved,
+      // Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
+      onMoved: mockTabsOnMoved,
     },
     // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
     windows: {
@@ -72,6 +84,8 @@ beforeEach(() => {
   mockStorageSet.mockResolvedValue(undefined);
   mockTabsQuery.mockResolvedValue([]);
   mockTabsUpdate.mockResolvedValue({});
+  // Task 8.1 (tab-tree-comprehensive-fix): chrome.tabs.create のデフォルトレスポンス
+  mockTabsCreate.mockResolvedValue({ id: 999, windowId: 1 });
   mockRuntimeSendMessage.mockResolvedValue({ success: true });
 });
 
@@ -209,6 +223,31 @@ describe('SidePanelRoot', () => {
       // TabTreeViewがレンダリングされることを確認
       await waitFor(() => {
         expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Task 8.1 (tab-tree-comprehensive-fix): 新規タブ追加ボタン (Requirements 8.1, 8.2, 8.3, 8.4)', () => {
+    it('新規タブ追加ボタンがタブツリーの後に表示されること', async () => {
+      await act(async () => {
+        render(<SidePanelRoot />);
+      });
+
+      await waitFor(() => {
+        const newTabButton = screen.getByTestId('new-tab-button');
+        expect(newTabButton).toBeInTheDocument();
+      });
+    });
+
+    it('新規タブ追加ボタンがタブツリールート内に存在すること', async () => {
+      await act(async () => {
+        render(<SidePanelRoot />);
+      });
+
+      await waitFor(() => {
+        const tabTreeRoot = screen.getByTestId('tab-tree-root');
+        const newTabButton = screen.getByTestId('new-tab-button');
+        expect(tabTreeRoot).toContainElement(newTabButton);
       });
     });
   });

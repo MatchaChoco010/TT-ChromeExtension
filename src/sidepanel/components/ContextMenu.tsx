@@ -294,29 +294,40 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           選択されたタブをグループ化
         </button>
       ) : (
-        // Task 12.2 (tab-tree-bugfix): 単一タブ選択時はグループ一覧サブメニューを表示
-        <div
-          ref={addToGroupButtonRef}
-          className={`relative w-full px-4 py-2 text-left text-sm flex items-center justify-between cursor-default ${
-            hasAvailableGroups
-              ? 'hover:bg-gray-700 text-gray-100'
-              : 'text-gray-500 cursor-not-allowed'
-          }`}
-          onMouseEnter={handleAddToGroupMouseEnter}
-          onMouseLeave={handleAddToGroupMouseLeave}
-        >
-          <span>グループに追加</span>
-          {hasAvailableGroups && <span className="ml-2">▶</span>}
-          {isGroupSubMenuOpen && groupSubMenuParentRect && hasAvailableGroups && (
-            <SubMenu
-              label="グループに追加"
-              items={availableGroups}
-              onSelect={handleGroupSelect}
-              onClose={handleGroupSubMenuClose}
-              parentRect={groupSubMenuParentRect}
-            />
-          )}
-        </div>
+        // Task 6.1: 単一タブ選択時は「タブをグループ化」と「グループに追加」の両方を表示
+        <>
+          {/* Task 6.1: 単一タブでも新しいグループを作成できるオプション */}
+          <button
+            role="menuitem"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
+            onClick={() => handleMenuItemClick('group')}
+          >
+            タブをグループ化
+          </button>
+          {/* Task 12.2 (tab-tree-bugfix): 既存グループへの追加サブメニュー */}
+          <div
+            ref={addToGroupButtonRef}
+            className={`relative w-full px-4 py-2 text-left text-sm flex items-center justify-between cursor-default ${
+              hasAvailableGroups
+                ? 'hover:bg-gray-700 text-gray-100'
+                : 'text-gray-500 cursor-not-allowed'
+            }`}
+            onMouseEnter={handleAddToGroupMouseEnter}
+            onMouseLeave={handleAddToGroupMouseLeave}
+          >
+            <span>グループに追加</span>
+            {hasAvailableGroups && <span className="ml-2">▶</span>}
+            {isGroupSubMenuOpen && groupSubMenuParentRect && hasAvailableGroups && (
+              <SubMenu
+                label="グループに追加"
+                items={availableGroups}
+                onSelect={handleGroupSelect}
+                onClose={handleGroupSubMenuClose}
+                parentRect={groupSubMenuParentRect}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Task 7.2: 別のビューへ移動 (Requirements 18.1, 18.2, 18.3) */}

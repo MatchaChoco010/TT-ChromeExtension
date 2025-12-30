@@ -5,6 +5,8 @@ import ErrorBoundary from './ErrorBoundary';
 import TabTreeView from './TabTreeView';
 import ViewSwitcher from './ViewSwitcher';
 import PinnedTabsSection from './PinnedTabsSection';
+// Task 8.1 (tab-tree-comprehensive-fix): 新規タブ追加ボタン (Requirement 8.1, 8.2, 8.3, 8.4)
+import NewTabButton from './NewTabButton';
 // Task 9.1: OpenSettingsButton をサイドパネルから削除（要件20.1）
 // 設定へのアクセスはポップアップメニュー（Task 9.2）から行う
 import { ContextMenu } from './ContextMenu';
@@ -58,6 +60,10 @@ const TreeViewContent: React.FC = () => {
     moveTabsToView,
     // Task 6.2: 現在のウィンドウID（複数ウィンドウ対応）
     currentWindowId,
+    // Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ&ドロップ
+    handleCrossWindowDragStart,
+    handleCrossWindowDrop,
+    clearCrossWindowDragState,
   } = useTreeState();
 
   // Task 8.2: 設定画面はサイドパネル内ではなく、新規タブで開くように変更
@@ -224,7 +230,39 @@ const TreeViewContent: React.FC = () => {
       type: 'CREATE_WINDOW_WITH_SUBTREE',
       payload: { tabId },
     });
-  }, []);
+    // クロスウィンドウドラッグ状態をクリア
+    clearCrossWindowDragState();
+  }, [clearCrossWindowDragState]);
+
+  // Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ開始ハンドラ
+  // Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
+  const handleTreeDragStart = useCallback((event: { active: { id: string | number } }) => {
+    // ドラッグ開始時にクロスウィンドウドラッグ状態を設定
+    const nodeId = event.active.id as string;
+    // ノードからタブIDを取得
+    const node = treeState?.nodes[nodeId];
+    if (node) {
+      handleCrossWindowDragStart(node.tabId, nodes);
+    }
+  }, [treeState, nodes, handleCrossWindowDragStart]);
+
+  // Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドロップを含むドラッグ終了ハンドラ
+  // Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
+  const handleTreeDragEnd = useCallback(async (event: Parameters<typeof handleDragEnd>[0]) => {
+    // まずクロスウィンドウドロップかどうかを確認
+    const wasCrossWindowDrop = await handleCrossWindowDrop();
+
+    if (wasCrossWindowDrop) {
+      // クロスウィンドウドロップが処理された場合は終了
+      return;
+    }
+
+    // クロスウィンドウドロップでない場合は通常のドラッグ終了処理
+    await handleDragEnd(event);
+
+    // ドラッグ状態をクリア
+    await clearCrossWindowDragState();
+  }, [handleDragEnd, handleCrossWindowDrop, clearCrossWindowDragState]);
 
   return (
     <div className="flex flex-col h-full bg-gray-900">
@@ -279,7 +317,9 @@ const TreeViewContent: React.FC = () => {
           currentViewId={treeState?.currentViewId || 'default'}
           onNodeClick={handleNodeClick}
           onToggleExpand={handleToggleExpand}
-          onDragEnd={handleDragEnd}
+          // Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ統合
+          onDragStart={handleTreeDragStart}
+          onDragEnd={handleTreeDragEnd}
           // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
           onSiblingDrop={handleSiblingDrop}
           isTabUnread={isTabUnread}
@@ -301,6 +341,12 @@ const TreeViewContent: React.FC = () => {
           // Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)
           onExternalDrop={handleExternalDrop}
         />
+        {/* Task 8.1 (tab-tree-comprehensive-fix): 新規タブ追加ボタン */}
+        {/* Requirement 8.1: 全てのタブの最後に新規タブ追加ボタンを表示 */}
+        {/* Requirement 8.2: ツリービューの横幅いっぱいの幅を持つ */}
+        {/* Requirement 8.3: クリック時に新しいタブをツリーの末尾に追加 */}
+        {/* Requirement 8.4: クリック時に新しいタブをブラウザでアクティブにする */}
+        <NewTabButton />
       </div>
     </div>
   );

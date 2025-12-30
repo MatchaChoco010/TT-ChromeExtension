@@ -153,6 +153,11 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
+        // Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
+        onMoved: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
       },
       // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
       windows: {

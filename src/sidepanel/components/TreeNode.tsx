@@ -225,14 +225,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           )}
         </div>
 
-        {/* タブコンテンツ - タイトルエリアと閉じるボタンを左右に分離 */}
+        {/* タブコンテンツ - タイトルエリアと右端固定アクションを左右に分離 */}
         <div
           data-testid="tab-content"
           className="flex-1 flex items-center justify-between min-w-0"
         >
           {/* タブタイトルエリア - Task 4.2: タイトル表示改善 */}
           {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
-          <div className="flex items-center min-w-0 flex-1">
+          <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
             <span
               className={`truncate ${isDiscarded ? 'text-gray-400' : ''}`}
               data-testid={isDiscarded ? 'discarded-tab-title' : 'tab-title'}
@@ -249,13 +249,20 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 ⟳
               </span>
             )}
-
-            {/* 未読インジケータ */}
-            <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} />
           </div>
 
-          {/* 閉じるボタン (ホバー時のみ表示) - 常に右端に固定 */}
-          {isHovered && <CloseButton onClose={handleCloseClick} />}
+          {/* 右端固定コンテナ - 未読インジケータと閉じるボタン */}
+          {/* Task 11.1: 未読インジケーターをタブの右端に固定表示 */}
+          <div
+            data-testid="right-actions-container"
+            className="flex items-center flex-shrink-0 ml-2"
+          >
+            {/* 未読インジケータ - タイトル長に関わらず右端に固定 */}
+            <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} />
+
+            {/* 閉じるボタン (ホバー時のみ表示) - 常に右端に固定 */}
+            {isHovered && <CloseButton onClose={handleCloseClick} />}
+          </div>
         </div>
       </div>
 

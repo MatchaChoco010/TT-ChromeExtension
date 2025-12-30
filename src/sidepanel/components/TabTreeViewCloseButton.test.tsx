@@ -59,6 +59,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     isPinned: false,
     windowId: 1,
     discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
+    index: id, // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブの順序同期
   });
 
   const mockGetTabInfo = (nodes: TabNode[]): ((tabId: number) => ExtendedTabInfo | undefined) => {

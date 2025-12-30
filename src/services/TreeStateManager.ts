@@ -419,6 +419,8 @@ export class TreeStateManager {
 
   /**
    * ストレージに状態を永続化
+   * Task 10.1 (tab-tree-comprehensive-fix): 既存のviews, currentViewIdを保持
+   * Requirements: 10.1, 10.2, 10.3 - 新規タブ追加後もビューを維持
    */
   private async persistState(): Promise<void> {
     const nodesRecord: Record<string, TabNode> = {};
@@ -435,9 +437,28 @@ export class TreeStateManager {
       tabToNodeRecord[tabId] = nodeId;
     });
 
+    // Task 10.1: 既存のストレージからviews, currentViewIdを取得して保持
+    // これにより、新規タブ追加時にビューがリセットされることを防ぐ
+    let existingViews: TreeState['views'] = [];
+    let existingCurrentViewId = 'default';
+
+    try {
+      const existingState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+      if (existingState) {
+        if (existingState.views && existingState.views.length > 0) {
+          existingViews = existingState.views;
+        }
+        if (existingState.currentViewId) {
+          existingCurrentViewId = existingState.currentViewId;
+        }
+      }
+    } catch {
+      // ストレージ読み取りに失敗した場合はデフォルト値を使用
+    }
+
     const treeState: TreeState = {
-      views: [], // ビュー管理は別モジュールで実装予定
-      currentViewId: 'default', // Must match TreeStateProvider's default currentViewId
+      views: existingViews,
+      currentViewId: existingCurrentViewId,
       nodes: nodesRecord,
       tabToNode: tabToNodeRecord,
     };

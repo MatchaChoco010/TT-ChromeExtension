@@ -81,7 +81,26 @@ describe('Task 16.2: パフォーマンステスト', () => {
             addListener: vi.fn(),
             removeListener: vi.fn(),
           },
+          onUpdated: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          onMoved: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          onCreated: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          onRemoved: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
           query: vi.fn().mockResolvedValue([]),
+        },
+        windows: {
+          getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         },
       };
       vi.stubGlobal('chrome', chromeMock);
@@ -128,7 +147,26 @@ describe('Task 16.2: パフォーマンステスト', () => {
             addListener: vi.fn(),
             removeListener: vi.fn(),
           },
+          onUpdated: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          onMoved: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          onCreated: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          onRemoved: {
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+          },
           query: vi.fn().mockResolvedValue([]),
+        },
+        windows: {
+          getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         },
       };
       vi.stubGlobal('chrome', chromeMock);

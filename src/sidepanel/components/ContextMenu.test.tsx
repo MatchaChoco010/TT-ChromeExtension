@@ -712,6 +712,73 @@ describe('ContextMenu', () => {
     });
   });
 
+  describe('Requirement 6.1-6.4: 単一タブのグループ化機能 (Task 6.1)', () => {
+    it('単一タブ選択時に「タブをグループ化」オプションが表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          isGrouped={false}
+        />
+      );
+
+      // 単一タブでも「タブをグループ化」オプションが表示されることを確認
+      expect(screen.getByRole('menuitem', { name: /タブをグループ化/i })).toBeInTheDocument();
+    });
+
+    it('単一タブで「タブをグループ化」をクリックするとgroupアクションが実行される', async () => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          isGrouped={false}
+        />
+      );
+
+      const groupItem = screen.getByRole('menuitem', { name: /タブをグループ化/i });
+      await user.click(groupItem);
+
+      expect(onAction).toHaveBeenCalledWith('group');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('単一タブで「タブをグループ化」と「グループに追加」の両方が表示される', () => {
+      const mockGroups = {
+        'group_1': { id: 'group_1', name: 'Work', color: '#3b82f6', isExpanded: true },
+      };
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+      const onAddToGroup = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          isGrouped={false}
+          groups={mockGroups}
+          onAddToGroup={onAddToGroup}
+        />
+      );
+
+      // 両方のオプションが表示されることを確認
+      expect(screen.getByRole('menuitem', { name: /タブをグループ化/i })).toBeInTheDocument();
+      expect(screen.getByText('グループに追加')).toBeInTheDocument();
+    });
+  });
+
   describe('Requirement 11.3, 11.4: シングルタブのグループ追加機能 (Task 12.2)', () => {
     const mockGroups = {
       'group_1': { id: 'group_1', name: 'Work', color: '#3b82f6', isExpanded: true },
