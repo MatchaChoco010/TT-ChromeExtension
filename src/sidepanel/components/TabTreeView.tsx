@@ -1,59 +1,88 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
-import { useSortable, SortableContext } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
-  DndContext,
-  closestCenter,
-  DragOverEvent,
-  DragMoveEvent,
-  DragStartEvent,
-  MouseSensor,
-  TouchSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  useDndMonitor,
-} from '@dnd-kit/core';
 import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, Group, View } from '@/types';
+import { useDragDrop, type DropTarget, DropTargetType } from '../hooks/useDragDrop';
+import { useAutoScroll } from '../hooks/useAutoScroll';
+import { DragOverlay } from './DragOverlay';
 import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
 import UnreadBadge from './UnreadBadge';
 import CloseButton from './CloseButton';
 import DropIndicator from './DropIndicator';
 import {
-  calculateDropTarget,
   calculateIndicatorY,
-  DropTargetType,
-  type DropTarget,
   type TabPosition,
-  type ContainerBounds,
 } from './GapDropDetection';
 
 // Task 6.4: ドラッグホバー時のブランチ自動展開の閾値（ミリ秒）
 // Requirement 3.4: ホバー時間が1秒を超えたら展開
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 
+/**
+ * Task 2.2 (Requirement 12.1, 12.2): スタートページURLを判定するヘルパー関数
+ * Vivaldi/Chromeのスタートページ関連のURLを検出
+ */
+const isStartPageUrl = (url: string): boolean => {
+  if (!url) return false;
+
+  const startPageUrlPatterns = [
+    /^chrome:\/\/vivaldi-webui\/startpage/,
+    /^vivaldi:\/\/startpage/,
+  ];
+
+  return startPageUrlPatterns.some(pattern => pattern.test(url));
+};
+
+/**
+ * Task 2.2 (Requirement 12.1, 12.2): 新しいタブURLを判定するヘルパー関数
+ * Vivaldi/Chromeの新しいタブ関連のURLを検出（スタートページ以外）
+ */
+const isNewTabUrl = (url: string): boolean => {
+  if (!url) return false;
+
+  const newTabUrlPatterns = [
+    /^chrome:\/\/newtab/,
+    /^chrome-extension:\/\//,
+    /^vivaldi:\/\/newtab/,
+    /^about:blank$/,
+  ];
+
+  return newTabUrlPatterns.some(pattern => pattern.test(url));
+};
+
+/**
+ * Task 2.2 (Requirement 12.1, 12.2): 表示するタブタイトルを決定するヘルパー関数
+ * - Loading状態の場合: 「Loading...」
+ * - スタートページURLの場合: 「スタートページ」
+ * - 新しいタブURLの場合: 「新しいタブ」
+ * - それ以外: 元のタイトル
+ *
+ * Requirement 12.1, 12.2: Vivaldi専用URL（chrome://vivaldi-webui/startpage）の場合、
+ * 拡張機能にはURLが公開されないことがあるため、タイトルもチェックする
+ */
+const getDisplayTitle = (tab: { title: string; url: string; status?: 'loading' | 'complete' }): string => {
+  // Loading状態の場合
+  if (tab.status === 'loading') {
+    return 'Loading...';
+  }
+
+  // スタートページURLの場合
+  // URLをチェック、またはタイトルがURL形式でスタートページパターンの場合もチェック
+  if (isStartPageUrl(tab.url) || isStartPageUrl(tab.title)) {
+    return 'スタートページ';
+  }
+
+  // 新しいタブURLの場合
+  // URLをチェック、またはタイトルがURL形式で新しいタブパターンの場合もチェック
+  if (isNewTabUrl(tab.url) || isNewTabUrl(tab.title)) {
+    return '新しいタブ';
+  }
+
+  // 通常のタイトル
+  return tab.title;
+};
+
 // Task 4.3: インデント幅（ピクセル）
 const INDENT_WIDTH = 20;
-
-// Task 5.2: autoScroll設定
-// 要件7.1, 7.2: スクロール可能範囲を実際のコンテンツ範囲内に制限
-// Task 9.1 (tab-tree-bugfix): 横スクロールを禁止し、コンテンツ範囲内に制限
-const AUTO_SCROLL_CONFIG = {
-  // スクロール開始のしきい値
-  // x: 0に設定して横スクロールを完全に無効化（Requirements 8.2）
-  // y: 上下それぞれ15%の領域で自動スクロール開始
-  threshold: {
-    x: 0,  // 横スクロール無効化
-    y: 0.15,
-  },
-  // 加速度を抑えて過度なスクロールを防止（Requirements 8.1）
-  acceleration: 3,
-  // スクロール間隔を長めに設定して過度なスクロールを防止
-  interval: 15,
-  // レイアウトシフト補正を無効化してスクロール範囲を制限（Requirements 8.3）
-  layoutShiftCompensation: false,
-} as const;
 
 interface TreeNodeItemProps {
   node: TabNode;
@@ -88,6 +117,23 @@ interface TreeNodeItemProps {
   // Task 12.2 (tab-tree-bugfix): グループ追加サブメニュー用
   groups?: Record<string, Group>;
   onAddToGroup?: (groupId: string, tabIds: number[]) => void;
+  // Task 7.1 (tab-tree-bugfix-2): 自前D&D実装用のprops
+  /** getItemPropsから取得したprops */
+  dragItemProps?: {
+    onMouseDown: (e: React.MouseEvent) => void;
+    style: React.CSSProperties;
+    'data-dragging': boolean;
+  };
+  /** ドラッグ中かどうか（自前D&D） */
+  isDragging?: boolean;
+  /** 子ノード用のgetItemProps関数 */
+  getItemPropsForNode?: (nodeId: string, tabId: number) => {
+    onMouseDown: (e: React.MouseEvent) => void;
+    style: React.CSSProperties;
+    'data-dragging': boolean;
+  };
+  /** 子ノードがドラッグ中かどうかを判定する関数 */
+  isNodeDragging?: (nodeId: string) => boolean;
 }
 
 /**
@@ -95,8 +141,9 @@ interface TreeNodeItemProps {
  * Task 4.11: コンテキストメニュー機能を追加
  * Task 4.13: 未読バッジ表示を追加
  * Task 2.1: タブ情報（タイトル、ファビコン）表示を追加
+ * Task 7.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropに移行
  */
-const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
+const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   node,
   onNodeClick,
   onToggleExpand,
@@ -117,6 +164,10 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   onMoveToView,
   groups,
   onAddToGroup,
+  dragItemProps,
+  isDragging: isDraggingProp,
+  getItemPropsForNode,
+  isNodeDragging,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -134,6 +185,8 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const tabInfo = getTabInfo ? getTabInfo(node.tabId) : undefined;
   // Task 2.3: 選択状態を計算
   const isSelected = isNodeSelected ? isNodeSelected(node.id) : false;
+  // Task 7.1: ドラッグ中かどうか（propsから取得）
+  const isDragging = isDraggingProp ?? false;
 
   // Task 2.2: ホバー時のイベントハンドラ
   const handleMouseEnter = () => {
@@ -149,28 +202,11 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     chrome.tabs.remove(node.tabId);
   };
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: node.id,
-    disabled: !isDraggable,
-  });
-
-  // Task 4.4: ドラッグ中は他のノードのtransformを無効化してタブ位置を固定
-  // ドラッグ中のアイテム自体のみtransformを適用
-  const isActiveItem = activeNodeId === node.id;
-  const shouldApplyTransform = isDragging || (isActiveItem && globalIsDragging);
-
-  const style = {
-    // Task 4.4: ドラッグ中のアイテム以外はtransformを適用しない（リアルタイム並べ替え無効化）
-    transform: shouldApplyTransform ? CSS.Transform.toString(transform) : undefined,
-    transition: shouldApplyTransform ? transition : undefined,
+  // Task 7.1 (tab-tree-bugfix-2): 自前D&D用のスタイル
+  // ドラッグ中のアイテムは半透明に
+  const style: React.CSSProperties = {
     opacity: isDragging ? 0.5 : 1,
+    ...dragItemProps?.style,
   };
 
   // Task 4.11: 右クリック時のコンテキストメニュー表示
@@ -202,23 +238,37 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     onNodeClick(node.tabId);
   };
 
+  // Task 7.1: マウスダウンハンドラ（自前D&D用）
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // 展開ボタンや閉じるボタンのクリックを除外
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
+    // isDraggableでない場合は無視
+    if (!isDraggable) {
+      return;
+    }
+    // 自前D&DのonMouseDownを呼び出し
+    dragItemProps?.onMouseDown(e);
+  };
+
   return (
-    <div ref={setNodeRef} style={style}>
+    <div style={style}>
       {/* ノードの内容 */}
       <div
         data-testid={`tree-node-${node.tabId}`}
         data-node-id={node.id}
-        data-sortable-item={`sortable-item-${node.id}`}
+        data-draggable-item={`draggable-item-${node.id}`}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isDragging ? 'bg-gray-600 ring-2 ring-gray-500 ring-inset' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 ring-2 ring-gray-400 ring-inset' : ''}`}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isDragging ? 'bg-gray-600 ring-2 ring-gray-500 ring-inset is-dragging' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 ring-2 ring-gray-400 ring-inset' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        {...attributes}
-        {...listeners}
+        onMouseDown={handleMouseDown}
       >
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
@@ -268,18 +318,26 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           data-testid="tab-content"
           className="flex-1 flex items-center justify-between min-w-0"
         >
-          {/* タブタイトルエリア */}
+          {/* タブタイトルエリア - Task 2.3 (tab-tree-bugfix-2): 左側エリア */}
           {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
-          <div className="flex items-center min-w-0 flex-1">
-            {/* Task 2.1: タブタイトル表示 - Task 3.1: フォントサイズはCSS変数から継承 */}
+          <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
+            {/* Task 2.1, 2.2: タブタイトル表示 - Task 3.1: フォントサイズはCSS変数から継承 */}
             {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
+            {/* Task 2.2 (Requirement 12.1, 12.2): getDisplayTitleでスタートページ/新しいタブタイトルを変換 */}
             <span
               className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
               data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
             >
-              {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
+              {getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`}
             </span>
-            {/* Task 4.13: 未読バッジ */}
+          </div>
+          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 未読インジケータと閉じるボタン */}
+          {/* Requirement 13.1, 13.2: 未読インジケーターをタブの右端に固定表示 */}
+          <div
+            data-testid="right-actions-container"
+            className="flex items-center flex-shrink-0 ml-2"
+          >
+            {/* Task 4.13: 未読バッジ - タイトル長に関わらず右端に固定 */}
             <UnreadBadge isUnread={isUnread} showIndicator={true} />
             {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
             {hasChildren && unreadChildCount > 0 && (
@@ -292,13 +350,13 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
                 </span>
               </div>
             )}
-          </div>
-          {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
-          <div
-            data-testid="close-button-wrapper"
-            className={`flex-shrink-0 ${isHovered ? 'visible' : 'invisible'}`}
-          >
-            <CloseButton onClose={handleCloseClick} />
+            {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
+            <div
+              data-testid="close-button-wrapper"
+              className={`flex-shrink-0 ${isHovered ? 'visible' : 'invisible'}`}
+            >
+              <CloseButton onClose={handleCloseClick} />
+            </div>
           </div>
         </div>
       </div>
@@ -325,7 +383,7 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       {hasChildren && node.isExpanded && (
         <div>
           {node.children.map((child) => (
-            <SortableTreeNodeItem
+            <DraggableTreeNodeItem
               key={child.id}
               node={child}
               onNodeClick={onNodeClick}
@@ -346,6 +404,10 @@ const SortableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               onMoveToView={onMoveToView}
               groups={groups}
               onAddToGroup={onAddToGroup}
+              dragItemProps={getItemPropsForNode?.(child.id, child.tabId)}
+              isDragging={isNodeDragging?.(child.id)}
+              getItemPropsForNode={getItemPropsForNode}
+              isNodeDragging={isNodeDragging}
             />
           ))}
         </div>
@@ -502,18 +564,26 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           data-testid="tab-content"
           className="flex-1 flex items-center justify-between min-w-0"
         >
-          {/* タブタイトルエリア */}
+          {/* タブタイトルエリア - Task 2.3 (tab-tree-bugfix-2): 左側エリア */}
           {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
-          <div className="flex items-center min-w-0 flex-1">
-            {/* Task 2.1: タブタイトル表示 - Task 3.1: フォントサイズはCSS変数から継承 */}
+          <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
+            {/* Task 2.1, 2.2: タブタイトル表示 - Task 3.1: フォントサイズはCSS変数から継承 */}
             {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
+            {/* Task 2.2 (Requirement 12.1, 12.2): getDisplayTitleでスタートページ/新しいタブタイトルを変換 */}
             <span
               className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
               data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
             >
-              {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
+              {getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`}
             </span>
-            {/* Task 4.13: 未読バッジ */}
+          </div>
+          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 未読インジケータと閉じるボタン */}
+          {/* Requirement 13.1, 13.2: 未読インジケーターをタブの右端に固定表示 */}
+          <div
+            data-testid="right-actions-container"
+            className="flex items-center flex-shrink-0 ml-2"
+          >
+            {/* Task 4.13: 未読バッジ - タイトル長に関わらず右端に固定 */}
             <UnreadBadge isUnread={isUnread} showIndicator={true} />
             {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
             {hasChildren && unreadChildCount > 0 && (
@@ -526,13 +596,13 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
                 </span>
               </div>
             )}
-          </div>
-          {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
-          <div
-            data-testid="close-button-wrapper"
-            className={`flex-shrink-0 ${isHovered ? 'visible' : 'invisible'}`}
-          >
-            <CloseButton onClose={handleCloseClick} />
+            {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
+            <div
+              data-testid="close-button-wrapper"
+              className={`flex-shrink-0 ${isHovered ? 'visible' : 'invisible'}`}
+            >
+              <CloseButton onClose={handleCloseClick} />
+            </div>
           </div>
         </div>
       </div>
@@ -584,174 +654,19 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   );
 };
 
-/**
- * すべてのノードIDを再帰的に収集する
- */
-const collectAllNodeIds = (nodes: TabNode[]): string[] => {
-  const ids: string[] = [];
-  const collect = (node: TabNode) => {
-    ids.push(node.id);
-    if (node.children && node.children.length > 0) {
-      node.children.forEach(collect);
-    }
-  };
-  nodes.forEach(collect);
-  return ids;
-};
+// Task 7.1 (tab-tree-bugfix-2): DragMonitorコンポーネントとcollectAllNodeIds関数は削除（自前useDragDropに統合）
 
 /**
- * Task 4.3: ドラッグ中のドロップターゲット状態を監視するコンポーネント
- * useDndMonitorはDndContext内で使用する必要があるため、別コンポーネントに分離
- * Task 5.3: tabPositionsも提供（Gapドロップ時のノードID特定用）
- * Task 10.1: ツリービュー外へのドロップ検知（Requirements 9.1, 9.4）
- */
-interface DragMonitorProps {
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  onDropTargetChange: (target: DropTarget | null, tabPositions?: TabPosition[]) => void;
-  // Task 10.1: ツリービュー外へのドラッグ状態変化を通知
-  onOutsideTreeChange?: (isOutside: boolean) => void;
-  // Task 10.1: ツリービュー外状態を追跡するためのref
-  isOutsideTreeRef?: React.MutableRefObject<boolean>;
-}
-
-const DragMonitor: React.FC<DragMonitorProps> = ({
-  containerRef,
-  onDropTargetChange,
-  onOutsideTreeChange,
-  isOutsideTreeRef,
-}) => {
-  useDndMonitor({
-    onDragStart: () => {
-      // ドラッグ開始時は初期化
-      onDropTargetChange(null);
-      // Task 10.1: ツリー内にいるとマークする
-      if (isOutsideTreeRef) {
-        isOutsideTreeRef.current = false;
-      }
-      if (onOutsideTreeChange) {
-        onOutsideTreeChange(false);
-      }
-    },
-    onDragMove: (event: DragMoveEvent) => {
-      // マウス位置からドロップターゲットを計算
-      const container = containerRef.current;
-      if (!container) {
-        onDropTargetChange(null);
-        return;
-      }
-
-      // コンテナ内のタブ要素の位置を取得
-      const containerRect = container.getBoundingClientRect();
-
-      // Task 7.1: スクロールオフセットを考慮したマウスY座標計算
-      // スクロールオフセットを取得
-      const scrollTop = container.scrollTop || 0;
-
-      // Task 10.1: マウスの絶対位置を計算（ビューポート座標）
-      // dnd-kitのevent.delta はドラッグ開始位置からの相対移動量
-      const mouseClientX = event.activatorEvent instanceof MouseEvent
-        ? event.activatorEvent.clientX + event.delta.x
-        : 0;
-      const mouseClientY = event.activatorEvent instanceof MouseEvent
-        ? event.activatorEvent.clientY + event.delta.y
-        : 0;
-
-      // Task 10.1: ツリービュー外へのドラッグを検知（Requirements 9.1, 9.4）
-      // マウスがコンテナ境界の外にあるかどうかを確認
-      const isOutside =
-        mouseClientX < containerRect.left ||
-        mouseClientX > containerRect.right ||
-        mouseClientY < containerRect.top ||
-        mouseClientY > containerRect.bottom;
-
-      // Task 10.1: 状態が変化した場合のみ通知（不要な再レンダリングを防止）
-      if (isOutsideTreeRef) {
-        if (isOutsideTreeRef.current !== isOutside) {
-          isOutsideTreeRef.current = isOutside;
-          if (onOutsideTreeChange) {
-            onOutsideTreeChange(isOutside);
-          }
-        }
-      } else if (onOutsideTreeChange) {
-        // isOutsideTreeRefが提供されていない場合でも、コールバックは呼び出す
-        onOutsideTreeChange(isOutside);
-      }
-
-      // マウスのY座標を計算（コンテナ相対、スクロールオフセット考慮）
-      const mouseY = event.activatorEvent instanceof MouseEvent
-        ? event.activatorEvent.clientY + event.delta.y - containerRect.top + scrollTop
-        : 0;
-
-      // 各タブノードの位置情報を構築
-      const tabPositions: TabPosition[] = [];
-      const nodeElements = container.querySelectorAll('[data-node-id]');
-
-      nodeElements.forEach((element) => {
-        const nodeId = element.getAttribute('data-node-id');
-        const depth = parseInt(element.getAttribute('data-depth') || '0', 10);
-        const rect = element.getBoundingClientRect();
-
-        if (nodeId) {
-          // Task 7.1: タブ位置もスクロールオフセットを考慮
-          tabPositions.push({
-            nodeId,
-            top: rect.top - containerRect.top + scrollTop,
-            bottom: rect.bottom - containerRect.top + scrollTop,
-            depth,
-          });
-        }
-      });
-
-      // Task 7.1: コンテナ境界を計算（プレースホルダーをコンテナ内に制限）
-      // コンテナの可視領域とコンテンツ全体の境界を考慮
-      const containerBounds: ContainerBounds | undefined = tabPositions.length > 0
-        ? {
-            // コンテナの上端（スクロールオフセット考慮）
-            minY: scrollTop,
-            // コンテナの下端（スクロールオフセット + 可視領域高さ）または最後のタブの下端
-            maxY: Math.max(
-              scrollTop + containerRect.height,
-              tabPositions[tabPositions.length - 1].bottom
-            ),
-          }
-        : undefined;
-
-      // ドロップターゲットを計算
-      // Task 5.3: tabPositionsも提供（Gapドロップ時のノードID特定用）
-      // Task 7.1: containerBoundsを渡してコンテナ外ではNoneを返すようにする
-      const target = calculateDropTarget(mouseY, tabPositions, 0.25, containerBounds);
-      onDropTargetChange(target, tabPositions);
-    },
-    onDragEnd: () => {
-      // ドラッグ終了時にリセット
-      // Note: リセット前にhandleDragEndが呼ばれるため、dropTargetRefには最新の値が残っている
-      onDropTargetChange(null);
-      // Task 10.1: ドラッグ終了時にリセット（ただし、isOutsideTreeRefの値は保持してhandleDragEndで参照可能）
-    },
-    onDragCancel: () => {
-      // ドラッグキャンセル時にリセット
-      onDropTargetChange(null);
-      // Task 10.1: キャンセル時もリセット
-      if (isOutsideTreeRef) {
-        isOutsideTreeRef.current = false;
-      }
-      if (onOutsideTreeChange) {
-        onOutsideTreeChange(false);
-      }
-    },
-  });
-
-  return null;
-};
-
-/**
- * Task 12.1: グループノードかどうかを判定するヘルパー関数
- * TreeStateManager.createGroupFromTabsで作成されたノードは:
+ * Task 12.1, Task 15.2: グループノードかどうかを判定するヘルパー関数
+ * TreeStateManager.createGroupWithRealTabで作成されたノードは:
  * - idが'group-'で始まる
- * - tabIdが負の値
+ * - tabIdは正の値（実タブ）
+ *
+ * 注意: Task 15.2でグループ化は実タブを使用するように変更されたため、
+ * tabIdの符号ではなくIDプレフィックスのみで判定する
  */
 const isGroupNode = (node: TabNode): boolean => {
-  return node.id.startsWith('group-') && node.tabId < 0;
+  return node.id.startsWith('group-');
 };
 
 /**
@@ -877,7 +792,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onNodeClick,
   onToggleExpand,
   onDragEnd,
-  onDragOver,
+  // onDragOver is not used in the custom D&D implementation
   onDragStart: onDragStartProp,
   onDragCancel: onDragCancelProp,
   // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のコールバック
@@ -902,37 +817,23 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onExternalDrop,
   // Task 10.1: ツリービュー外へのドロップ検知 (Requirements 9.1, 9.4)
   onOutsideTreeChange,
+  // Task 7.2 (tab-tree-bugfix-2): サイドパネル境界参照 (Requirement 4.2, 4.3)
+  sidePanelRef,
 }) => {
-  // Task 4.3: ドロップターゲット状態とコンテナ参照
-  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-  // Task 5.3: dropTargetをrefでも追跡（handleDragEnd内で最新値を参照するため）
-  const dropTargetRef = useRef<DropTarget | null>(null);
-  // Task 5.3: tabPositionsもrefで追跡（Gapドロップ時のノードID特定用）
-  const tabPositionsRef = useRef<TabPosition[]>([]);
+  // コンテナ参照
   const containerRef = useRef<HTMLDivElement>(null);
   // Task 4.4: ドラッグ中のグローバル状態とアクティブノードID
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
-  // Task 10.1: ツリービュー外へのドラッグ状態を追跡するref（Requirements 9.1, 9.4）
-  // handleDragEnd内で最新値を参照するためにrefを使用
+  // Task 4.3: ドロップターゲット状態
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  // Task 5.3: tabPositionsもrefで追跡（Gapドロップ時のノードID特定用）
+  const tabPositionsRef = useRef<TabPosition[]>([]);
+  // Task 10.1: ツリービュー外へのドラッグ状態を追跡するref
   const isOutsideTreeRef = useRef<boolean>(false);
-
-  // dnd-kit sensors: MouseSensor + TouchSensor + KeyboardSensor
-  // PointerSensorはPlaywrightなどのE2Eテストツールでヘッドレスモードで問題が発生するため使用しない
-  // activationConstraint: { distance: 8 } で誤操作を防止
-  const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 8,
-    },
-  });
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 250,
-      tolerance: 5,
-    },
-  });
-  const keyboardSensor = useSensor(KeyboardSensor);
-  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
+  // Task 6.4: ドラッグホバー時のブランチ自動展開
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastHoverNodeIdRef = useRef<string | null>(null);
 
   // currentViewIdでフィルタリング
   const filteredNodes = useMemo(
@@ -965,26 +866,13 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
   const isDraggable = !!onDragEnd;
 
-  // すべてのノードIDを収集（SortableContext用）
-  const allNodeIds = useMemo(
-    () => collectAllNodeIds(filteredNodes),
-    [filteredNodes]
-  );
-
   // Task 4.3: ドロップターゲット変更ハンドラ
-  // Task 5.3: refも更新してhandleDragEnd内で最新値を参照可能に
-  const handleDropTargetChange = useCallback((target: DropTarget | null, tabPositions?: TabPosition[]) => {
+  const handleDropTargetChange = useCallback((target: DropTarget | null, newTabPositions?: TabPosition[]) => {
     setDropTarget(target);
-    dropTargetRef.current = target;
-    if (tabPositions) {
-      tabPositionsRef.current = tabPositions;
+    if (newTabPositions) {
+      tabPositionsRef.current = newTabPositions;
     }
   }, []);
-
-  // Task 6.4: ドラッグホバー時のブランチ自動展開
-  // ホバー中のノードIDとタイマーを管理
-  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastHoverNodeIdRef = useRef<string | null>(null);
 
   // ホバータイマーをクリーンアップ
   useEffect(() => {
@@ -995,63 +883,127 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     };
   }, []);
 
-  /**
-   * Task 4.4: ドラッグ開始イベントハンドラ
-   * ドラッグ開始時にisDraggingフラグを立て、アクティブノードIDを設定
-   * Task 5.2: 外部ドロップ連携のため、propsのonDragStartも呼び出す
-   */
-  const handleDragStart = React.useCallback(
-    (event: DragStartEvent) => {
-      setGlobalIsDragging(true);
-      setActiveNodeId(event.active.id as string);
-      // Task 5.2: 外部ドロップ連携のため、propsのonDragStartを呼び出す
-      if (onDragStartProp) {
-        onDragStartProp(event);
-      }
-    },
-    [onDragStartProp]
-  );
+  // Task 7.1 (tab-tree-bugfix-2): アイテムリストをuseDragDrop用に構築
+  const items = useMemo(() => {
+    const result: Array<{ id: string; tabId: number }> = [];
+    const collectItems = (nodeList: TabNode[]) => {
+      nodeList.forEach((node) => {
+        result.push({ id: node.id, tabId: node.tabId });
+        if (node.children && node.children.length > 0 && node.isExpanded) {
+          collectItems(node.children);
+        }
+      });
+    };
+    collectItems(filteredNodes);
+    return result;
+  }, [filteredNodes]);
 
-  /**
-   * ドラッグ終了イベントハンドラ
-   * ホバータイマーをクリアしてから元のonDragEndを呼び出す
-   * Task 4.4: ドラッグ終了時にisDraggingをfalseにする
-   * Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
-   * Task 4.3: ツリー外ドロップの場合はonExternalDropを呼び出す
-   * Task 10.1: isOutsideTreeRefを使用してツリー外ドロップを確実に検知（Requirements 9.1, 9.4）
-   */
-  const handleDragEnd = React.useCallback(
-    (event: Parameters<NonNullable<typeof onDragEnd>>[0]) => {
-      // Task 4.4: ドラッグ終了時にフラグをリセット
+  // Task 7.1 (tab-tree-bugfix-2): 自前D&D hookを使用
+  const {
+    dragState,
+    getItemProps,
+    cancelDrag,
+  } = useDragDrop({
+    containerRef,
+    items,
+    activationDistance: 8,
+    direction: 'vertical',
+    onDragStart: useCallback((itemId: string, _tabId: number) => {
+      setGlobalIsDragging(true);
+      setActiveNodeId(itemId);
+      // Task 5.2: 外部ドロップ連携のため、propsのonDragStartも呼び出す
+      // 自前実装では軽量なイベントオブジェクトを渡す
+      if (onDragStartProp) {
+        onDragStartProp({ active: { id: itemId } } as Parameters<typeof onDragStartProp>[0]);
+      }
+    }, [onDragStartProp]),
+    onDragMove: useCallback((position: { x: number; y: number }, newDropTarget: DropTarget | null) => {
+      // ドロップターゲットを更新
+      handleDropTargetChange(newDropTarget, tabPositionsRef.current);
+
+      // Task 7.2 (tab-tree-bugfix-2): 外部ドロップ判定（サイドパネル境界を基準にする）
+      // Requirement 4.2, 4.3: サイドパネル内の空白領域へのドラッグでは外部ドロップとしない
+      // sidePanelRefが指定されている場合はそちらを使用、そうでない場合はcontainerRefを使用（後方互換性維持）
+      const boundary = sidePanelRef?.current ?? containerRef.current;
+      if (boundary) {
+        const rect = boundary.getBoundingClientRect();
+        const isOutside =
+          position.x < rect.left ||
+          position.x > rect.right ||
+          position.y < rect.top ||
+          position.y > rect.bottom;
+
+        if (isOutsideTreeRef.current !== isOutside) {
+          isOutsideTreeRef.current = isOutside;
+          if (onOutsideTreeChange) {
+            onOutsideTreeChange(isOutside);
+          }
+        }
+      }
+
+      // 自動展開ロジック（ホバー1秒後に折りたたまれたブランチを展開）
+      if (newDropTarget?.type === DropTargetType.Tab && newDropTarget.targetNodeId) {
+        const overId = newDropTarget.targetNodeId;
+
+        if (overId !== lastHoverNodeIdRef.current) {
+          // 前回のタイマーをクリア
+          if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+          }
+
+          lastHoverNodeIdRef.current = overId;
+
+          // ノードを探す
+          const findNode = (nodeList: TabNode[]): TabNode | null => {
+            for (const n of nodeList) {
+              if (n.id === overId) return n;
+              if (n.children && n.children.length > 0) {
+                const found = findNode(n.children);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+
+          const overNode = findNode(nodes);
+          if (overNode && overNode.children && overNode.children.length > 0 && !overNode.isExpanded) {
+            hoverTimerRef.current = setTimeout(() => {
+              onToggleExpand(overId);
+              hoverTimerRef.current = null;
+              lastHoverNodeIdRef.current = null;
+            }, AUTO_EXPAND_HOVER_DELAY_MS);
+          }
+        }
+      } else {
+        // Gapの場合はタイマーをクリア
+        if (hoverTimerRef.current) {
+          clearTimeout(hoverTimerRef.current);
+          hoverTimerRef.current = null;
+        }
+        lastHoverNodeIdRef.current = null;
+      }
+    }, [nodes, onToggleExpand, handleDropTargetChange, onOutsideTreeChange, sidePanelRef]),
+    onDragEnd: useCallback((itemId: string, finalDropTarget: DropTarget | null) => {
+      // ドラッグ終了時にフラグをリセット
       setGlobalIsDragging(false);
-      const currentActiveNodeId = activeNodeId;
       setActiveNodeId(null);
 
-      // ドラッグ終了時にホバータイマーをクリア
+      // ホバータイマーをクリア
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
         hoverTimerRef.current = null;
       }
       lastHoverNodeIdRef.current = null;
 
-      // Task 4.3 & Task 10.1: ツリー外ドロップの検出
-      // Task 10.1: dnd-kit標準のevent.overだけでなく、isOutsideTreeRefも使用して確実に検知
-      // isOutsideTreeRef.currentがtrueの場合、マウス位置がツリービュー外にある
-      const isOutsideTree = isOutsideTreeRef.current || !event.over;
-
-      if (isOutsideTree && onExternalDrop && currentActiveNodeId) {
-        // ノードIDからタブIDを取得
+      // ツリー外ドロップの検出
+      if (isOutsideTreeRef.current && onExternalDrop) {
         const findTabIdByNodeId = (nodeId: string): number | null => {
           for (const node of nodes) {
-            if (node.id === nodeId) {
-              return node.tabId;
-            }
-            // 再帰的に子ノードを検索
+            if (node.id === nodeId) return node.tabId;
             const findInChildren = (children: typeof nodes): number | null => {
               for (const child of children) {
-                if (child.id === nodeId) {
-                  return child.tabId;
-                }
+                if (child.id === nodeId) return child.tabId;
                 const found = findInChildren(child.children);
                 if (found !== null) return found;
               }
@@ -1063,25 +1015,22 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           return null;
         };
 
-        const tabId = findTabIdByNodeId(currentActiveNodeId);
+        const tabId = findTabIdByNodeId(itemId);
         if (tabId !== null) {
-          // Task 10.1: isOutsideTreeRefをリセット
           isOutsideTreeRef.current = false;
           onExternalDrop(tabId);
+          handleDropTargetChange(null);
           return;
         }
       }
 
-      // Task 10.1: ツリー外ドロップでない場合もisOutsideTreeRefをリセット
       isOutsideTreeRef.current = false;
 
-      // Task 5.3: Gap判定の場合はonSiblingDropを呼び出す
-      const currentDropTarget = dropTargetRef.current;
-      if (currentDropTarget && currentDropTarget.type === DropTargetType.Gap && onSiblingDrop && currentActiveNodeId) {
+      // Gap判定の場合はonSiblingDropを呼び出す
+      if (finalDropTarget && finalDropTarget.type === DropTargetType.Gap && onSiblingDrop) {
         const tabPositions = tabPositionsRef.current;
-        const gapIndex = currentDropTarget.gapIndex ?? 0;
+        const gapIndex = finalDropTarget.gapIndex ?? 0;
 
-        // gapIndexから上下のノードIDを取得
         let aboveNodeId: string | undefined;
         let belowNodeId: string | undefined;
 
@@ -1092,118 +1041,121 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           belowNodeId = tabPositions[gapIndex]?.nodeId;
         }
 
-        // 兄弟として挿入
         onSiblingDrop({
-          activeNodeId: currentActiveNodeId,
+          activeNodeId: itemId,
           insertIndex: gapIndex,
           aboveNodeId,
           belowNodeId,
         });
+        handleDropTargetChange(null);
         return;
       }
 
       // Tab判定の場合は元のonDragEndを呼び出す（子として配置）
-      if (onDragEnd) {
-        onDragEnd(event);
-      }
-    },
-    [onDragEnd, onSiblingDrop, onExternalDrop, activeNodeId, nodes]
-  );
-
-  /**
-   * ドラッグキャンセルイベントハンドラ
-   * Escapeキー等でドラッグがキャンセルされた場合にホバータイマーをクリア
-   * Task 4.4: ドラッグキャンセル時にisDraggingをfalseにする
-   * Task 5.2: 外部ドロップ連携のため、propsのonDragCancelも呼び出す
-   */
-  const handleDragCancel = React.useCallback(() => {
-    // Task 4.4: ドラッグキャンセル時にフラグをリセット
-    setGlobalIsDragging(false);
-    setActiveNodeId(null);
-
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-    lastHoverNodeIdRef.current = null;
-
-    // Task 5.2: 外部ドロップ連携のため、propsのonDragCancelを呼び出す
-    if (onDragCancelProp) {
-      onDragCancelProp();
-    }
-  }, [onDragCancelProp]);
-
-  /**
-   * ドラッグオーバーイベントハンドラ
-   * 折りたたまれたブランチの上で1秒以上ホバーすると自動展開
-   */
-  const handleDragOver = React.useCallback(
-    (event: DragOverEvent) => {
-      // 外部のonDragOverコールバックを呼び出す
-      if (onDragOver) {
-        onDragOver(event);
+      if (finalDropTarget?.type === DropTargetType.Tab && onDragEnd) {
+        // dnd-kit形式のイベントオブジェクトを構築
+        onDragEnd({
+          active: { id: itemId },
+          over: finalDropTarget.targetNodeId ? { id: finalDropTarget.targetNodeId } : null,
+        } as Parameters<typeof onDragEnd>[0]);
       }
 
-      const { over } = event;
-      if (!over) {
-        // ホバーが解除された場合、タイマーをクリア
-        if (hoverTimerRef.current) {
-          clearTimeout(hoverTimerRef.current);
-          hoverTimerRef.current = null;
-        }
-        lastHoverNodeIdRef.current = null;
-        return;
-      }
+      handleDropTargetChange(null);
+    }, [nodes, onDragEnd, onSiblingDrop, onExternalDrop, handleDropTargetChange]),
+    onDragCancel: useCallback(() => {
+      setGlobalIsDragging(false);
+      setActiveNodeId(null);
 
-      const overId = over.id as string;
-
-      // 同じノードの上でホバーし続けている場合はスキップ
-      if (overId === lastHoverNodeIdRef.current) {
-        return;
-      }
-
-      // 前回のタイマーをクリア
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
         hoverTimerRef.current = null;
       }
+      lastHoverNodeIdRef.current = null;
+      handleDropTargetChange(null);
 
-      // 新しいホバーノードを記録
-      lastHoverNodeIdRef.current = overId;
-
-      // ノードを探す（全ノードから検索）
-      const findNode = (nodeList: TabNode[]): TabNode | null => {
-        for (const node of nodeList) {
-          if (node.id === overId) {
-            return node;
-          }
-          if (node.children && node.children.length > 0) {
-            const found = findNode(node.children);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-
-      const overNode = findNode(nodes);
-
-      // ノードが存在し、子を持ち、折りたたまれている場合のみタイマーを設定
-      if (
-        overNode &&
-        overNode.children &&
-        overNode.children.length > 0 &&
-        !overNode.isExpanded
-      ) {
-        // AUTO_EXPAND_HOVER_DELAY_MS後に自動展開
-        hoverTimerRef.current = setTimeout(() => {
-          onToggleExpand(overId);
-          hoverTimerRef.current = null;
-          lastHoverNodeIdRef.current = null;
-        }, AUTO_EXPAND_HOVER_DELAY_MS);
+      if (onDragCancelProp) {
+        onDragCancelProp();
       }
-    },
-    [nodes, onToggleExpand, onDragOver]
-  );
+    }, [onDragCancelProp, handleDropTargetChange]),
+    onExternalDrop,
+    // Task 7.2 (tab-tree-bugfix-2): サイドパネル境界を基準にドラッグアウト判定
+    // Requirement 4.2, 4.3: サイドパネル内の空白領域へのドラッグでは新規ウィンドウを作成しない
+    dragOutBoundaryRef: sidePanelRef,
+  });
+
+  // Task 7.1 (tab-tree-bugfix-2): 自動スクロールフックを使用
+  const { handleAutoScroll, stopAutoScroll } = useAutoScroll(containerRef, {
+    threshold: 50,
+    speed: 8,
+    clampToContent: true,
+  });
+
+  // ドラッグ中の自動スクロール処理
+  useEffect(() => {
+    if (dragState.isDragging) {
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        handleAutoScroll(dragState.currentPosition.y, rect);
+      }
+    } else {
+      stopAutoScroll();
+    }
+  }, [dragState.isDragging, dragState.currentPosition.y, handleAutoScroll, stopAutoScroll]);
+
+  // tabPositionsRefを更新
+  useEffect(() => {
+    if (dragState.isDragging) {
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const scrollTop = container.scrollTop || 0;
+        const tabPositions: TabPosition[] = [];
+        const nodeElements = container.querySelectorAll('[data-node-id]');
+
+        nodeElements.forEach((element) => {
+          const nodeId = element.getAttribute('data-node-id');
+          const depth = parseInt(element.getAttribute('data-depth') || '0', 10);
+          const elemRect = element.getBoundingClientRect();
+
+          if (nodeId) {
+            tabPositions.push({
+              nodeId,
+              top: elemRect.top - rect.top + scrollTop,
+              bottom: elemRect.bottom - rect.top + scrollTop,
+              depth,
+            });
+          }
+        });
+
+        tabPositionsRef.current = tabPositions;
+      }
+    }
+  }, [dragState.isDragging, dragState.currentPosition]);
+
+  // ESCキーでドラッグキャンセル
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && dragState.isDragging) {
+        cancelDrag();
+      }
+    };
+
+    if (dragState.isDragging) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [dragState.isDragging, cancelDrag]);
+
+  // getItemPropsをラップして子ノード用に提供
+  const getItemPropsForNode = useCallback((nodeId: string, tabId: number) => {
+    return getItemProps(nodeId, tabId);
+  }, [getItemProps]);
+
+  // ノードがドラッグ中かどうかを判定
+  const isNodeDragging = useCallback((nodeId: string) => {
+    return dragState.isDragging && dragState.draggedItemId === nodeId;
+  }, [dragState.isDragging, dragState.draggedItemId]);
 
   // Task 4.3: ドロップインジケーターの位置を計算
   // Task 4.1: Y座標（top）も計算してDropIndicatorに渡す
@@ -1253,7 +1205,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
     if (isDraggable) {
       return (
-        <SortableTreeNodeItem
+        <DraggableTreeNodeItem
           key={node.id}
           node={node}
           onNodeClick={onNodeClick}
@@ -1278,6 +1230,10 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           onMoveToView={onMoveToView}
           groups={groups}
           onAddToGroup={onAddToGroup}
+          dragItemProps={getItemPropsForNode(node.id, node.tabId)}
+          isDragging={isNodeDragging(node.id)}
+          getItemPropsForNode={getItemPropsForNode}
+          isNodeDragging={isNodeDragging}
         />
       );
     }
@@ -1335,38 +1291,61 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     </div>
   );
 
+  // Task 7.1 (tab-tree-bugfix-2): ドラッグ中のノード情報を取得
+  const draggedNode = useMemo(() => {
+    if (!dragState.isDragging || !dragState.draggedItemId) return null;
+    const findNode = (nodeList: TabNode[]): TabNode | null => {
+      for (const n of nodeList) {
+        if (n.id === dragState.draggedItemId) return n;
+        if (n.children && n.children.length > 0) {
+          const found = findNode(n.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    return findNode(nodes);
+  }, [dragState.isDragging, dragState.draggedItemId, nodes]);
+
+  // Task 7.1 (tab-tree-bugfix-2): ドラッグオーバーレイ用のタブ情報
+  const draggedTabInfo = draggedNode && getTabInfo ? getTabInfo(draggedNode.tabId) : undefined;
+
   return (
     <div data-testid="tab-tree-view" className="w-full select-none">
       {filteredNodes.length === 0 ? (
         <div className="p-4 text-gray-400 text-sm">No tabs in this view</div>
-      ) : isDraggable ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragOver={handleDragOver}
-          onDragCancel={handleDragCancel}
-          autoScroll={AUTO_SCROLL_CONFIG}
-        >
-          {/* Task 4.3: ドラッグ中のドロップターゲット監視 */}
-          {/* Task 10.1: ツリービュー外へのドロップ検知も追加 */}
-          <DragMonitor
-            containerRef={containerRef}
-            onDropTargetChange={handleDropTargetChange}
-            onOutsideTreeChange={onOutsideTreeChange}
-            isOutsideTreeRef={isOutsideTreeRef}
-          />
-          {/* Task 4.4: strategyをundefinedにしてリアルタイム並べ替えを無効化 */}
-          <SortableContext
-            items={allNodeIds}
-            strategy={undefined}
-          >
-            {content}
-          </SortableContext>
-        </DndContext>
       ) : (
-        content
+        <>
+          {content}
+          {/* Task 7.1 (tab-tree-bugfix-2): ドラッグオーバーレイ - 自前D&D実装 */}
+          <DragOverlay
+            isDragging={dragState.isDragging}
+            position={dragState.currentPosition}
+            offset={dragState.offset}
+          >
+            {draggedNode && (
+              <div
+                className="flex items-center p-2 bg-gray-700 text-gray-100 shadow-lg rounded border border-gray-600"
+                style={{ width: '250px' }}
+              >
+                {/* ファビコン */}
+                {draggedTabInfo?.favIconUrl ? (
+                  <img
+                    src={draggedTabInfo.favIconUrl}
+                    alt="Favicon"
+                    className="w-4 h-4 mr-2 flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-4 h-4 mr-2 bg-gray-300 rounded-sm flex-shrink-0" />
+                )}
+                {/* タイトル */}
+                <span className="truncate">
+                  {draggedTabInfo ? getDisplayTitle({ title: draggedTabInfo.title, url: draggedTabInfo.url || '', status: draggedTabInfo.status }) : `Tab ${draggedNode.tabId}`}
+                </span>
+              </div>
+            )}
+          </DragOverlay>
+        </>
       )}
     </div>
   );

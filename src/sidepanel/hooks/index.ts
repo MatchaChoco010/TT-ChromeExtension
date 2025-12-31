@@ -1,4 +1,10 @@
 export { useCrossWindowDrag } from './useCrossWindowDrag';
+export type { Position, UseCrossWindowDragProps } from './useCrossWindowDrag';
 export { useMenuActions } from './useMenuActions';
-export { useDragDepthCalculation } from './useDragDepthCalculation';
-export type { DragDepthState, UseDragDepthCalculationOptions } from './useDragDepthCalculation';
+export { useDragDrop } from './useDragDrop';
+export type {
+  DragState,
+  UseDragDropOptions,
+  UseDragDropReturn,
+  DropTarget,
+} from './useDragDrop';

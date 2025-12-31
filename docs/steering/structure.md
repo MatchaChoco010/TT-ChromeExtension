@@ -26,6 +26,12 @@
 
 **Example**: `SettingsPage.tsx`, `index.tsx`
 
+### Group Page (`/src/group/`)
+**Purpose**: グループタブ専用ページ（chrome-extension://スキームで表示）
+**Scope**: タブグループの親タブとして機能する拡張機能内ページ。グループ名と子タブリストを表示
+
+**Example**: `GroupPage.tsx`, `index.tsx`
+
 ### Services (`/src/services/`)
 **Purpose**: ビジネスロジック層（スナップショット管理等）
 **Example**: `SnapshotManager.ts`
@@ -66,10 +72,9 @@
 ```typescript
 // 外部ライブラリ
 import React from 'react';
-import type { DragEndEvent } from '@dnd-kit/core';
 
 // 内部モジュール（@/ alias使用）
-import type { TabNode, TabInfo } from '@/types';
+import type { TabNode, TabInfo, DragEndEvent } from '@/types';
 import { TreeStateProvider } from '@/sidepanel/providers/TreeStateProvider';
 import UnreadBadge from './UnreadBadge'; // 同階層コンポーネントは相対パス
 ```

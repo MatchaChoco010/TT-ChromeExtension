@@ -43,6 +43,7 @@ export interface TestGlobals {
   messageLog?: Array<{ type: string; timestamp: number }>;
   receivedCount?: number;
   pendingTabParents?: Map<number, number>;
+  pendingDuplicateSources?: Set<number>;
 }
 
 /**
@@ -125,4 +126,6 @@ declare global {
   var receivedCount: TestGlobals['receivedCount'];
   // eslint-disable-next-line no-var
   var pendingTabParents: TestGlobals['pendingTabParents'];
+  // eslint-disable-next-line no-var
+  var pendingDuplicateSources: TestGlobals['pendingDuplicateSources'];
 }

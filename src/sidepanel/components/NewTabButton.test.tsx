@@ -46,6 +46,16 @@ describe('NewTabButton', () => {
       // プラスアイコン（+）がボタン内に含まれていることを確認
       expect(button.textContent).toContain('+');
     });
+
+    it('ボタンは「+」アイコンのみを表示し、テキストラベルを表示しないこと', () => {
+      render(<NewTabButton />);
+      const button = screen.getByTestId('new-tab-button');
+      // Requirement 8.1, 8.2: 「+」アイコンのみ表示、テキストラベルは表示しない
+      // ボタンのテキストコンテンツは「+」のみであること
+      expect(button.textContent?.trim()).toBe('+');
+      // 「新規タブ」というテキストが含まれないこと
+      expect(button.textContent).not.toContain('新規タブ');
+    });
   });
 
   describe('クリック動作テスト', () => {
@@ -69,6 +79,23 @@ describe('NewTabButton', () => {
       expect(mockChromeTabs.create).toHaveBeenCalledWith(
         expect.objectContaining({
           active: true,
+        })
+      );
+    });
+
+    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - 新規タブのタイトルを「スタートページ」に修正
+    // NewTabButtonがchrome://vivaldi-webui/startpageを開くことで、getDisplayTitleが「スタートページ」を表示
+    it('クリック時にVivaldiスタートページが開かれること', async () => {
+      // Requirement 12.1, 12.2: 新規タブでVivaldiスタートページを開く
+      const user = userEvent.setup();
+      render(<NewTabButton />);
+
+      const button = screen.getByTestId('new-tab-button');
+      await user.click(button);
+
+      expect(mockChromeTabs.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'chrome://vivaldi-webui/startpage',
         })
       );
     });

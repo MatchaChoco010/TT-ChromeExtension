@@ -1,15 +1,17 @@
 /**
- * DragDropUtils
+ * DragDropUtils - Task 8.1 (tab-tree-bugfix-2)
  *
- * ドラッグ&ドロップ操作のシミュレーションとドロップ位置検証のヘルパー関数
+ * 自前D&D実装用のドラッグ&ドロップ操作シミュレーションユーティリティ
  *
- * Requirements: 3.2, 3.3, 3.4, 3.5
+ * Requirements: 3.2.1, 3.2.2
+ * - dnd-kit固有のセレクタを使用しない
+ * - マウスイベントベースのドラッグ操作シミュレーション
  */
 import type { Page, Worker } from '@playwright/test';
 
 /**
  * 要素のバウンディングボックスを取得
- * Playwrightの自動待機を活用してシンプルに実装
+ * Playwrightの自動待機を活用
  *
  * @param page - Page
  * @param selector - 要素のセレクタ
@@ -30,9 +32,32 @@ async function getBoundingBox(
 }
 
 /**
+ * ドラッグ状態が確立されるまでポーリングで待機
+ * 自前D&D実装では `is-dragging` クラスがドラッグコンテナに付与される
+ *
+ * @param page - Page
+ * @param maxWait - 最大待機時間（ミリ秒）
+ */
+async function waitForDragState(page: Page, maxWait: number = 2000): Promise<boolean> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWait) {
+    const dragContainer = page.locator('[data-drag-container]');
+    const hasDragClass = await dragContainer.evaluate((el) =>
+      el.classList.contains('is-dragging')
+    ).catch(() => false);
+    if (hasDragClass) {
+      return true;
+    }
+    // 短い間隔でポーリング
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
+  }
+  return false;
+}
+
+/**
  * タブノードをドラッグ開始
- * dnd-kitのPointerSensorは distance: 8 の制約があるため、
- * mouse.down()後に8px以上移動してドラッグを開始する必要がある
+ * 自前D&D実装は8px移動でドラッグを開始するため、
+ * mousedown後に8px以上移動してドラッグを開始する
  *
  * @param page - Side PanelのPage
  * @param sourceTabId - ドラッグするタブのID
@@ -43,30 +68,9 @@ export async function startDrag(page: Page, sourceTabId: number): Promise<void> 
   // 要素のバウンディングボックスを取得
   const box = await getBoundingBox(page, selector);
 
-  // タブノードの要素を検索
-  const tabNode = page.locator(selector);
-
-  // ドラッグハンドルが存在する場合はそれを使用
-  const dragHandle = tabNode.locator('[data-testid="drag-handle"]').first();
-  const hasDragHandle = (await dragHandle.count()) > 0;
-
-  // マウスを要素の中央に移動してからドラッグ開始
-  let startX: number;
-  let startY: number;
-
-  if (hasDragHandle) {
-    const handleBox = await dragHandle.boundingBox();
-    if (handleBox) {
-      startX = handleBox.x + handleBox.width / 2;
-      startY = handleBox.y + handleBox.height / 2;
-    } else {
-      startX = box.x + box.width / 2;
-      startY = box.y + box.height / 2;
-    }
-  } else {
-    startX = box.x + box.width / 2;
-    startY = box.y + box.height / 2;
-  }
+  // マウスを要素の中央に移動
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
 
   // バックグラウンドスロットリングを回避するためにページをフォーカス
   await page.bringToFront();
@@ -78,32 +82,15 @@ export async function startDrag(page: Page, sourceTabId: number): Promise<void> 
   // マウスボタンを押下
   await page.mouse.down();
 
-  // dnd-kitのMouseSensorはdistance: 8を要求するため、10px移動してドラッグを開始
-  // steps: 5 でdnd-kitがドラッグを確実に検出できるようにする
+  // 自前D&D実装は8px移動でドラッグを開始するため、10px移動
+  // steps: 5 でドラッグを確実に検出できるようにする
   await page.mouse.move(startX + 10, startY, { steps: 5 });
 
-  // ドラッグ状態が確立されるまで待機 - is-draggingクラスの出現を監視
-  // これによりdnd-kitがドラッグを検出したことを確実に確認できる
-  const dragContainer = page.locator('[data-drag-container]');
-  await dragContainer.waitFor({ state: 'visible', timeout: 5000 });
-
-  // is-draggingクラスが出現するまでポーリング（最大2秒）
-  const maxWait = 2000;
-  const startTime = Date.now();
-  while (Date.now() - startTime < maxWait) {
-    const hasDragClass = await dragContainer.evaluate((el) =>
-      el.classList.contains('is-dragging')
-    );
-    if (hasDragClass) {
-      return;
-    }
-    // 短い間隔でポーリング
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
+  // ドラッグ状態が確立されるまで待機
+  const isDragging = await waitForDragState(page);
+  if (!isDragging) {
+    console.warn('startDrag: is-dragging class did not appear within timeout');
   }
-
-  // タイムアウトした場合でも処理を続行（互換性のため）
-  // ただし警告をログ出力
-  console.warn('startDrag: is-dragging class did not appear within timeout');
 }
 
 /**
@@ -122,12 +109,24 @@ export async function hoverOverTab(page: Page, targetTabId: number): Promise<voi
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // ターゲットノードの中央にマウスを移動（steps: 10 でdnd-kitがホバーを確実に検出）
+  // ターゲットノードの中央にマウスを移動（steps: 10 でホバーを確実に検出）
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
 
-  // ホバー状態の検出はdnd-kitのonDragMoveで行われるため、
-  // マウス移動後にReactの状態更新を待機
-  // requestAnimationFrameを使用してレンダリングサイクルの完了を待つ
+  // Reactの状態更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+/**
+ * 指定位置へマウスを移動
+ * ドラッグ中に使用
+ *
+ * @param page - Side PanelのPage
+ * @param x - X座標
+ * @param y - Y座標
+ */
+export async function moveTo(page: Page, x: number, y: number): Promise<void> {
+  await page.mouse.move(x, y, { steps: 5 });
+  // Reactの状態更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
@@ -141,12 +140,11 @@ export async function dropTab(page: Page): Promise<void> {
   await page.mouse.up();
 
   // ドロップ後の状態更新を待機 - DOMの更新が完了するまで待機
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 /**
  * 同階層の並び替えを実行
- * page.dragAndDrop() APIを使用したシンプルな実装
  *
  * @param page - Side PanelのPage
  * @param sourceTabId - 移動元のタブID
@@ -162,34 +160,51 @@ export async function reorderTabs(
   const sourceSelector = `[data-testid="tree-node-${sourceTabId}"]`;
   const targetSelector = `[data-testid="tree-node-${targetTabId}"]`;
 
+  // ソース要素とターゲット要素のバウンディングボックスを取得
+  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
+  const targetBox = await getBoundingBox(page, targetSelector, 5000);
+
+  // ソース要素の中央座標
+  const sourceX = sourceBox.x + sourceBox.width / 2;
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+
+  // ターゲット要素の座標（位置に応じて上部または下部）
+  const targetX = targetBox.x + targetBox.width / 2;
+  const targetY = position === 'before'
+    ? targetBox.y + targetBox.height * 0.15  // 上部15%の位置（Gap判定領域）
+    : targetBox.y + targetBox.height * 0.85; // 下部85%の位置（Gap判定領域）
+
   // バックグラウンドスロットリングを回避するためにページをフォーカス
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // ターゲット要素のサイズを取得してドロップ位置を計算
-  const targetElement = page.locator(targetSelector).first();
-  const box = await targetElement.boundingBox();
-  if (!box) {
-    throw new Error(`Target element ${targetSelector} not found`);
-  }
+  // 1. マウスをソース位置に移動
+  await page.mouse.move(sourceX, sourceY, { steps: 3 });
 
-  // beforeの場合は上部25%、afterの場合は下部75%の位置にドロップ
-  const targetY = position === 'before' ? box.height * 0.25 : box.height * 0.75;
+  // 2. マウスボタンを押下
+  await page.mouse.down();
 
-  // Playwrightの組み込みdragAndDrop APIを使用
-  // force: true でactionability checkをスキップしてパフォーマンス向上
-  await page.dragAndDrop(sourceSelector, targetSelector, {
-    force: true,
-    targetPosition: { x: box.width / 2, y: targetY },
-  });
+  // 3. 8px以上移動してドラッグを開始
+  await page.mouse.move(sourceX + 10, sourceY, { steps: 5 });
 
-  // D&D後にUIを安定させるための短い待機
-  await page.waitForTimeout(100);
+  // 4. ドラッグ状態が確立されるまで待機
+  await waitForDragState(page);
+
+  // 5. ターゲット位置に移動
+  await page.mouse.move(targetX, targetY, { steps: 10 });
+
+  // 6. Reactの状態更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+  // 7. マウスをリリースしてドロップ
+  await page.mouse.up();
+
+  // D&D後のDOM更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 /**
  * 親子関係を作成（タブを別のタブの子にする）
- * dnd-kitのPointerSensorに対応するため、マウス操作を手動でシミュレート
  *
  * @param page - Side PanelのPage
  * @param childTabId - 子にするタブのID
@@ -213,7 +228,7 @@ export async function moveTabToParent(
   const sourceX = sourceBox.x + sourceBox.width / 2;
   const sourceY = sourceBox.y + sourceBox.height / 2;
 
-  // ターゲット要素の中央座標
+  // ターゲット要素の中央座標（タブの中央にドロップすると子タブになる）
   const targetX = targetBox.x + targetBox.width / 2;
   const targetY = targetBox.y + targetBox.height / 2;
 
@@ -221,31 +236,19 @@ export async function moveTabToParent(
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // dnd-kitのMouseSensorはdistance: 8を要求するため、手動でドラッグ操作を実行
   // 1. マウスをソース位置に移動
   await page.mouse.move(sourceX, sourceY, { steps: 3 });
 
   // 2. マウスボタンを押下
   await page.mouse.down();
 
-  // 3. まず8px以上移動してドラッグを開始させる（steps: 5でヘッドレスモード対応）
+  // 3. 8px以上移動してドラッグを開始
   await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
 
-  // 4. ドラッグ状態が確立されるまで待機 - is-draggingクラスの出現を監視
-  const dragContainer = page.locator('[data-drag-container]');
-  const maxWait = 2000;
-  const startTime = Date.now();
-  while (Date.now() - startTime < maxWait) {
-    const hasDragClass = await dragContainer.evaluate((el) =>
-      el.classList.contains('is-dragging')
-    ).catch(() => false);
-    if (hasDragClass) {
-      break;
-    }
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
-  }
+  // 4. ドラッグ状態が確立されるまで待機
+  await waitForDragState(page);
 
-  // 5. ターゲット位置に移動（steps: 5でヘッドレスモード対応）
+  // 5. ターゲット位置に移動（steps: 5で確実にホバーを検出）
   await page.mouse.move(targetX, targetY, { steps: 5 });
 
   // 6. Reactの状態更新を待機
@@ -301,23 +304,96 @@ export async function moveTabToParent(
 }
 
 /**
+ * タブをツリービュー外にドラッグ（新規ウィンドウ作成用）
+ *
+ * @param page - Side PanelのPage
+ * @param sourceTabId - ドラッグするタブのID
+ * @param direction - ドラッグアウト方向（'left', 'right', 'top', 'bottom'）
+ */
+export async function dragOutside(
+  page: Page,
+  sourceTabId: number,
+  direction: 'left' | 'right' | 'top' | 'bottom' = 'right'
+): Promise<void> {
+  const sourceSelector = `[data-testid="tree-node-${sourceTabId}"]`;
+
+  // ソース要素のバウンディングボックスを取得
+  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
+
+  // ソース要素の中央座標
+  const sourceX = sourceBox.x + sourceBox.width / 2;
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+
+  // ビューポートサイズを取得
+  const viewport = page.viewportSize() || { width: 800, height: 600 };
+
+  // ドラッグアウト先の座標を計算
+  let targetX: number;
+  let targetY: number;
+  switch (direction) {
+    case 'left':
+      targetX = -50;
+      targetY = sourceY;
+      break;
+    case 'right':
+      targetX = viewport.width + 50;
+      targetY = sourceY;
+      break;
+    case 'top':
+      targetX = sourceX;
+      targetY = -50;
+      break;
+    case 'bottom':
+      targetX = sourceX;
+      targetY = viewport.height + 50;
+      break;
+  }
+
+  // バックグラウンドスロットリングを回避するためにページをフォーカス
+  await page.bringToFront();
+  await page.evaluate(() => window.focus());
+
+  // 1. マウスをソース位置に移動
+  await page.mouse.move(sourceX, sourceY, { steps: 3 });
+
+  // 2. マウスボタンを押下
+  await page.mouse.down();
+
+  // 3. 8px以上移動してドラッグを開始
+  await page.mouse.move(sourceX + 10, sourceY, { steps: 5 });
+
+  // 4. ドラッグ状態が確立されるまで待機
+  await waitForDragState(page);
+
+  // 5. ツリービュー外の位置に移動
+  await page.mouse.move(targetX, targetY, { steps: 10 });
+
+  // 6. Reactの状態更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+  // 7. マウスをリリースしてドロップ（外部ドロップ発火）
+  await page.mouse.up();
+
+  // D&D後のDOM更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+/**
  * ドロップインジケータが表示されることを検証
  *
  * @param page - Side PanelのPage
- * @param position - ドロップ位置（'before', 'after', 'child'）
+ * @param _position - ドロップ位置（'before', 'after', 'child'）
  */
 export async function assertDropIndicator(
   page: Page,
   _position: 'before' | 'after' | 'child'
 ): Promise<void> {
   // ドロップインジケータの要素を検索
-  // （実装の詳細に依存するため、一般的なアプローチを使用）
   const indicator = page.locator('[data-testid="drop-indicator"]');
 
   // インジケータが表示されることを確認
   await indicator.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {
     // インジケータが見つからない場合もエラーにしない（実装に依存）
-    // 実際のテストでは、この検証を強化する必要がある
   });
 }
 
@@ -326,7 +402,7 @@ export async function assertDropIndicator(
  *
  * @param page - Side PanelのPage
  * @param parentTabId - 親タブのID
- * @param hoverDuration - ホバー時間（ミリ秒）
+ * @param _hoverDuration - ホバー時間（ミリ秒）
  */
 export async function assertAutoExpand(
   page: Page,
@@ -354,8 +430,105 @@ export async function assertAutoExpand(
     }
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
   }
+}
 
-  // 自動展開が機能したかを確認
-  // （実装の詳細に依存するため、ここでは基本的なチェックのみ）
-  // 実際のテストは実装後に追加する
+/**
+ * タブの順序を取得
+ *
+ * @param page - Side PanelのPage
+ * @returns タブIDの配列（表示順）
+ */
+export async function getTabOrder(page: Page): Promise<number[]> {
+  const treeNodes = page.locator('[data-testid^="tree-node-"]');
+  const count = await treeNodes.count();
+  const tabIds: number[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const testId = await treeNodes.nth(i).getAttribute('data-testid');
+    if (testId) {
+      const match = testId.match(/tree-node-(\d+)/);
+      if (match) {
+        tabIds.push(parseInt(match[1], 10));
+      }
+    }
+  }
+
+  return tabIds;
+}
+
+/**
+ * タブの親子関係を取得
+ *
+ * @param page - Side PanelのPage
+ * @param tabId - 親子関係を確認するタブのID
+ * @returns 親タブID（ルートの場合はnull）
+ */
+export async function getParentTabId(page: Page, tabId: number): Promise<number | null> {
+  const result = await page.evaluate(async (targetTabId) => {
+    interface TreeNode {
+      id: string;
+      tabId: number;
+      parentId: string | null;
+    }
+    interface LocalTreeState {
+      nodes: Record<string, TreeNode>;
+    }
+    const storageResult = await chrome.storage.local.get('tree_state');
+    const treeState = storageResult.tree_state as LocalTreeState | undefined;
+    if (!treeState?.nodes) return null;
+
+    const targetNode = Object.values(treeState.nodes).find(
+      (n: TreeNode) => n.tabId === targetTabId
+    );
+    if (!targetNode || !targetNode.parentId) return null;
+
+    const parentNode = treeState.nodes[targetNode.parentId];
+    return parentNode?.tabId ?? null;
+  }, tabId);
+
+  return result;
+}
+
+/**
+ * タブの深さ（インデントレベル）を取得
+ *
+ * @param page - Side PanelのPage
+ * @param tabId - 深さを確認するタブのID
+ * @returns 深さ（0が最上位）
+ */
+export async function getTabDepth(page: Page, tabId: number): Promise<number> {
+  const selector = `[data-testid="tree-node-${tabId}"]`;
+  const element = page.locator(selector).first();
+  const depth = await element.getAttribute('data-depth');
+  return depth ? parseInt(depth, 10) : 0;
+}
+
+/**
+ * ドラッグ中かどうかを確認
+ *
+ * @param page - Side PanelのPage
+ * @returns ドラッグ中の場合true
+ */
+export async function isDragging(page: Page): Promise<boolean> {
+  const dragContainer = page.locator('[data-drag-container]');
+  return await dragContainer.evaluate((el) =>
+    el.classList.contains('is-dragging')
+  ).catch(() => false);
+}
+
+/**
+ * ドラッグ状態が解除されるまで待機
+ *
+ * @param page - Side PanelのPage
+ * @param maxWait - 最大待機時間（ミリ秒）
+ */
+export async function waitForDragEnd(page: Page, maxWait: number = 2000): Promise<void> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWait) {
+    const dragging = await isDragging(page);
+    if (!dragging) {
+      return;
+    }
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
+  }
 }

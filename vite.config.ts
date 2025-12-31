@@ -20,6 +20,7 @@ export default defineConfig({
         sidepanel: 'sidepanel.html',
         settings: 'settings.html',
         popup: 'popup.html',
+        group: 'group.html',
       },
     },
   },

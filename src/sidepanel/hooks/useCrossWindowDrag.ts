@@ -1,200 +1,122 @@
-import { useCallback } from 'react';
-import type { MessageResponse, TabNode } from '@/types';
+/**
+ * Task 13.2: useCrossWindowDragフックの実装
+ *
+ * Requirements:
+ * - 6.1: 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
+ * - 6.2: クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
+ * - 6.3: クロスウィンドウドラッグはドラッグアウトとして判定されない
+ * - 6.4: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
+ * - 6.5: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
+ * - 6.7: Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
+ */
+import { useEffect, useRef, useCallback } from 'react';
+import type { RefObject } from 'react';
+import type { MessageResponse } from '@/types';
+import type { DragSession } from '@/background/drag-session-manager';
 
-interface UseCrossWindowDragProps {
-  currentWindowId: number;
-}
-
-interface DragState {
-  tabId: number;
-  treeData: TabNode[];
-  sourceWindowId: number;
+/**
+ * Position interface
+ */
+export interface Position {
+  x: number;
+  y: number;
 }
 
 /**
- * Hook for handling cross-window drag and drop operations
- * Requirement 4.1, 4.2: クロスウィンドウドラッグ&ドロップ
+ * useCrossWindowDragフックのオプション
  */
-export function useCrossWindowDrag({ currentWindowId }: UseCrossWindowDragProps) {
-  /**
-   * Handle drag start event
-   * Sets the drag state in the service worker for cross-window communication
-   */
-  const handleDragStart = useCallback(
-    async (tabId: number, treeData: TabNode[]): Promise<void> => {
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: 'SET_DRAG_STATE',
-            payload: {
-              tabId,
-              treeData,
-              sourceWindowId: currentWindowId,
-            },
-          },
-          (response: MessageResponse<unknown>) => {
-            if (!response.success) {
-              console.error('Failed to set drag state:', response.error);
-            }
-            resolve();
-          }
-        );
-      });
-    },
-    [currentWindowId]
-  );
+export interface UseCrossWindowDragProps {
+  /** コンテナ要素のref */
+  containerRef: RefObject<HTMLElement | null>;
+  /** ドラッグ受信時のコールバック */
+  onDragReceived: (tabId: number, position: Position) => void;
+}
+
+/**
+ * クロスウィンドウドラッグの検知と処理を行うフック
+ *
+ * mouseenterイベントでドラッグセッションをチェックし、
+ * 別ウィンドウからのドラッグの場合、タブ移動を実行して
+ * ドラッグ状態を継続させる。
+ */
+export function useCrossWindowDrag({
+  containerRef,
+  onDragReceived,
+}: UseCrossWindowDragProps): void {
+  const currentWindowIdRef = useRef<number | null>(null);
+  const onDragReceivedRef = useRef(onDragReceived);
+
+  // コールバックの更新を同期
+  useEffect(() => {
+    onDragReceivedRef.current = onDragReceived;
+  }, [onDragReceived]);
+
+  // 現在のウィンドウIDを取得
+  useEffect(() => {
+    chrome.windows.getCurrent().then((window) => {
+      currentWindowIdRef.current = window.id ?? null;
+    });
+  }, []);
 
   /**
-   * Handle drag end event
-   * Clears drag state or creates new window if dragged outside panel
-   * @param isDraggedOutside - Whether the drag ended outside the panel
-   * @param hasChildren - Whether the dragged tab has children (Task 7.3)
+   * mouseenterイベントハンドラ
+   * Service Workerからドラッグセッションを取得し、
+   * 別ウィンドウからのドラッグの場合はタブ移動を実行
    */
-  const handleDragEnd = useCallback(
-    async (isDraggedOutside: boolean, hasChildren = false): Promise<void> => {
-      if (!isDraggedOutside) {
-        // Drag ended inside panel, just clear the state
-        return new Promise((resolve) => {
-          chrome.runtime.sendMessage(
-            { type: 'CLEAR_DRAG_STATE' },
-            (response: MessageResponse<unknown>) => {
-              if (!response.success) {
-                console.error('Failed to clear drag state:', response.error);
-              }
-              resolve();
-            }
-          );
-        });
+  const handleMouseEnter = useCallback(async (e: MouseEvent) => {
+    const currentWindowId = currentWindowIdRef.current;
+    if (currentWindowId === null) return;
+
+    try {
+      // Service Workerからドラッグセッションを取得
+      const response = await chrome.runtime.sendMessage({
+        type: 'GET_DRAG_SESSION',
+      }) as MessageResponse<DragSession | null>;
+
+      if (!response.success) {
+        return;
       }
 
-      // Drag ended outside panel, get drag state and create new window
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'GET_DRAG_STATE' },
-          (response: MessageResponse<DragState | null>) => {
-            if (!response.success) {
-              console.error('Failed to get drag state:', response.error);
-              resolve();
-              return;
-            }
+      const session = response.data;
 
-            const dragState = response.data;
-            if (!dragState) {
-              resolve();
-              return;
-            }
+      // セッションがない、またはidleの場合は何もしない
+      if (!session || session.state === 'idle') {
+        return;
+      }
 
-            // Task 7.3: If tab has children, move entire subtree
-            const messageType = hasChildren
-              ? 'CREATE_WINDOW_WITH_SUBTREE'
-              : 'CREATE_WINDOW_WITH_TAB';
+      // 同じウィンドウからのドラッグは無視
+      if (session.currentWindowId === currentWindowId) {
+        return;
+      }
 
-            // Create new window with the dragged tab (or subtree)
-            chrome.runtime.sendMessage(
-              {
-                type: messageType,
-                payload: { tabId: dragState.tabId },
-              },
-              (createResponse: MessageResponse<unknown>) => {
-                if (!createResponse.success) {
-                  console.error(
-                    'Failed to create window:',
-                    createResponse.error
-                  );
-                }
+      // クロスウィンドウ移動を開始
+      const moveResponse = await chrome.runtime.sendMessage({
+        type: 'BEGIN_CROSS_WINDOW_MOVE',
+        targetWindowId: currentWindowId,
+      }) as MessageResponse<void>;
 
-                // Clear drag state after creating window
-                chrome.runtime.sendMessage(
-                  { type: 'CLEAR_DRAG_STATE' },
-                  (clearResponse: MessageResponse<unknown>) => {
-                    if (!clearResponse.success) {
-                      console.error(
-                        'Failed to clear drag state:',
-                        clearResponse.error
-                      );
-                    }
-                    resolve();
-                  }
-                );
-              }
-            );
-          }
-        );
-      });
-    },
-    []
-  );
+      if (!moveResponse.success) {
+        console.error('[CrossWindowDrag] Failed to move tab:', moveResponse.error);
+        return;
+      }
 
-  /**
-   * Handle drop from another window
-   * Moves the dragged tab (or subtree) to the current window
-   * @param hasChildren - Whether the dragged tab has children (Task 7.3)
-   */
-  const handleDropFromOtherWindow = useCallback(
-    async (hasChildren = false): Promise<void> => {
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: 'GET_DRAG_STATE' },
-          (response: MessageResponse<DragState | null>) => {
-            if (!response.success) {
-              console.error('Failed to get drag state:', response.error);
-              resolve();
-              return;
-            }
+      // 移動成功：ドラッグ状態を継続
+      onDragReceivedRef.current(session.tabId, { x: e.clientX, y: e.clientY });
+    } catch (error) {
+      // エラー時はサイレントにログを出力（Requirement 6.7）
+      console.error('[CrossWindowDrag] Failed to move tab:', error);
+      // onDragReceivedは呼ばない（ドラッグをキャンセル）
+    }
+  }, []);
 
-            const dragState = response.data;
-            if (!dragState) {
-              resolve();
-              return;
-            }
+  // イベントリスナーの設定とクリーンアップ
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-            // Only move if tab is from a different window
-            if (dragState.sourceWindowId === currentWindowId) {
-              resolve();
-              return;
-            }
-
-            // Task 7.3: If tab has children, move entire subtree
-            const messageType = hasChildren
-              ? 'MOVE_SUBTREE_TO_WINDOW'
-              : 'MOVE_TAB_TO_WINDOW';
-
-            // Move tab (or subtree) to current window
-            chrome.runtime.sendMessage(
-              {
-                type: messageType,
-                payload: { tabId: dragState.tabId, windowId: currentWindowId },
-              },
-              (moveResponse: MessageResponse<unknown>) => {
-                if (!moveResponse.success) {
-                  console.error('Failed to move tab:', moveResponse.error);
-                }
-
-                // Clear drag state after moving
-                chrome.runtime.sendMessage(
-                  { type: 'CLEAR_DRAG_STATE' },
-                  (clearResponse: MessageResponse<unknown>) => {
-                    if (!clearResponse.success) {
-                      console.error(
-                        'Failed to clear drag state:',
-                        clearResponse.error
-                      );
-                    }
-                    resolve();
-                  }
-                );
-              }
-            );
-          }
-        );
-      });
-    },
-    [currentWindowId]
-  );
-
-  return {
-    handleDragStart,
-    handleDragEnd,
-    handleDropFromOtherWindow,
-  };
+    container.addEventListener('mouseenter', handleMouseEnter);
+    return () => {
+      container.removeEventListener('mouseenter', handleMouseEnter);
+    };
+  }, [containerRef, handleMouseEnter]);
 }

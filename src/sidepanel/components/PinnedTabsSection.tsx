@@ -1,20 +1,7 @@
-import React from 'react';
-import {
-  DndContext,
-  closestCenter,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  horizontalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import React, { useRef, useCallback } from 'react';
 import type { TabInfoMap } from '@/types';
+import { useDragDrop, DropTargetType } from '../hooks/useDragDrop';
+import { DragOverlay } from './DragOverlay';
 
 interface PinnedTabsSectionProps {
   pinnedTabIds: number[];
@@ -29,60 +16,50 @@ interface PinnedTabsSectionProps {
 }
 
 /**
- * ソート可能なピン留めタブアイテムコンポーネント
- * Task 11.1 (tab-tree-bugfix): ドラッグ＆ドロップ並び替え機能を追加
+ * ピン留めタブアイテムコンポーネント
+ * Task 10.2 (tab-tree-bugfix-2): dnd-kit削除、自前D&D実装に移行
  */
-interface SortablePinnedTabItemProps {
+interface PinnedTabItemProps {
   tabId: number;
   tabInfo: { title: string; favIconUrl?: string };
   isActive: boolean;
   isDraggable: boolean;
+  isDragging: boolean;
+  index: number;
   onTabClick: (tabId: number) => void;
   onContextMenu: (tabId: number, event: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent) => void;
 }
 
-const SortablePinnedTabItem: React.FC<SortablePinnedTabItemProps> = ({
+const PinnedTabItem: React.FC<PinnedTabItemProps> = ({
   tabId,
   tabInfo,
   isActive,
   isDraggable,
+  isDragging,
+  index,
   onTabClick,
   onContextMenu,
+  onMouseDown,
 }) => {
-  const sortableId = `pinned-${tabId}`;
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: sortableId,
-    disabled: !isDraggable,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+  const nodeId = `pinned-${tabId}`;
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...(isDraggable ? listeners : {})}
-      key={tabId}
       data-testid={`pinned-tab-${tabId}`}
       data-sortable={isDraggable ? 'true' : undefined}
-      data-pinned-id={isDraggable ? sortableId : undefined}
+      data-pinned-id={isDraggable ? nodeId : undefined}
+      data-node-id={isDraggable ? nodeId : undefined}
+      data-pinned-index={index}
       className={`relative flex items-center justify-center w-7 h-7 rounded cursor-pointer hover:bg-gray-700 ${isActive ? 'bg-gray-600' : ''}`}
+      style={{
+        opacity: isDragging ? 0.5 : 1,
+        cursor: isDraggable ? 'grab' : 'pointer',
+      }}
       title={tabInfo.title}
       onClick={() => onTabClick(tabId)}
       onContextMenu={(e) => onContextMenu(tabId, e)}
+      onMouseDown={isDraggable ? onMouseDown : undefined}
     >
       {/* ファビコン */}
       {tabInfo.favIconUrl ? (
@@ -114,6 +91,7 @@ const SortablePinnedTabItem: React.FC<SortablePinnedTabItemProps> = ({
  * Task 3.1: ピン留めタブセクションコンポーネント
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5 (tree-tab-ux-improvements)
  * Task 11.1 (tab-tree-bugfix): ドラッグ＆ドロップ並び替え機能を追加 (Requirements 10.1, 10.2, 10.3, 10.4)
+ * Task 10.2 (tab-tree-bugfix-2): dnd-kit削除、自前D&D実装に移行 (Requirements 3.1.1, 3.1.7)
  *
  * - ピン留めタブをツリービュー上部に配置
  * - ファビコンサイズで横並びグリッド表示
@@ -121,7 +99,7 @@ const SortablePinnedTabItem: React.FC<SortablePinnedTabItemProps> = ({
  * - ピン留めタブが0件の場合は非表示
  * - 閉じるボタンは表示しない（要件1.1）
  * - ピン留めタブに対する閉じる操作は無効化（要件1.3）
- * - ドラッグ＆ドロップによる並び替え機能（Requirements 10.1, 10.2, 10.3, 10.4）
+ * - ドラッグ＆ドロップによる並び替え機能（自前D&D実装、水平モード）
  */
 const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
   pinnedTabIds,
@@ -131,20 +109,8 @@ const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
   activeTabId,
   onPinnedTabReorder,
 }) => {
-  // ドラッグセンサー設定
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 5, // 5px移動でドラッグ開始
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 150,
-        tolerance: 5,
-      },
-    })
-  );
+  // コンテナの参照
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // ピン留めタブが0件の場合は何も表示しない
   if (pinnedTabIds.length === 0) {
@@ -159,8 +125,103 @@ const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
     return null;
   }
 
-  // SortableContext用のID配列を生成
-  const sortableIds = validPinnedTabs.map(tabId => `pinned-${tabId}`);
+  // ドラッグ可能かどうか
+  const isDraggable = !!onPinnedTabReorder;
+
+  // 自前D&Dフックに渡すアイテムリスト
+  const items = validPinnedTabs.map(tabId => ({
+    id: `pinned-${tabId}`,
+    tabId,
+  }));
+
+  return (
+    <PinnedTabsSectionContent
+      validPinnedTabs={validPinnedTabs}
+      tabInfoMap={tabInfoMap}
+      onTabClick={onTabClick}
+      onContextMenu={onContextMenu}
+      activeTabId={activeTabId}
+      onPinnedTabReorder={onPinnedTabReorder}
+      isDraggable={isDraggable}
+      items={items}
+      containerRef={containerRef}
+    />
+  );
+};
+
+/**
+ * ピン留めタブセクションのコンテンツ（フック使用のため分離）
+ */
+interface PinnedTabsSectionContentProps {
+  validPinnedTabs: number[];
+  tabInfoMap: TabInfoMap;
+  onTabClick: (tabId: number) => void;
+  onContextMenu?: (tabId: number, position: { x: number; y: number }) => void;
+  activeTabId?: number | null;
+  onPinnedTabReorder?: (tabId: number, newIndex: number) => void;
+  isDraggable: boolean;
+  items: Array<{ id: string; tabId: number }>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}
+
+const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
+  validPinnedTabs,
+  tabInfoMap,
+  onTabClick,
+  onContextMenu,
+  activeTabId,
+  onPinnedTabReorder,
+  isDraggable,
+  items,
+  containerRef,
+}) => {
+  // refコールバックでcontainerRefに値を設定
+  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+    (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  }, [containerRef]);
+
+  /**
+   * ドラッグ終了ハンドラ
+   * Task 10.2 (tab-tree-bugfix-2): 自前D&D実装でピン留めタブの順序変更
+   */
+  const handleDragEnd = useCallback((itemId: string, dropTarget: { type: string; insertIndex?: number } | null) => {
+    if (!dropTarget || dropTarget.type !== DropTargetType.HorizontalGap || !onPinnedTabReorder) {
+      return;
+    }
+
+    // ピン留めタブのIDを抽出（"pinned-123" -> 123）
+    if (!itemId.startsWith('pinned-')) {
+      return;
+    }
+
+    const draggedTabId = parseInt(itemId.replace('pinned-', ''), 10);
+    const newIndex = dropTarget.insertIndex;
+
+    if (newIndex !== undefined && newIndex !== -1) {
+      // 元のインデックスを取得
+      const oldIndex = validPinnedTabs.indexOf(draggedTabId);
+
+      // 挿入位置を調整（自分より後ろに移動する場合は-1）
+      let adjustedIndex = newIndex;
+      if (oldIndex < newIndex) {
+        adjustedIndex = newIndex - 1;
+      }
+
+      // 同じ位置なら何もしない
+      if (oldIndex !== adjustedIndex) {
+        onPinnedTabReorder(draggedTabId, adjustedIndex);
+      }
+    }
+  }, [onPinnedTabReorder, validPinnedTabs]);
+
+  // 自前D&Dフック（水平モード）
+  const { dragState, getItemProps } = useDragDrop({
+    activationDistance: 5, // 5px移動でドラッグ開始
+    direction: 'horizontal',
+    containerRef,
+    items,
+    onDragEnd: handleDragEnd,
+  });
 
   const handleTabClick = (tabId: number) => {
     onTabClick(tabId);
@@ -177,80 +238,62 @@ const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
     }
   };
 
-  /**
-   * ドラッグ終了ハンドラ
-   * Task 11.1 (tab-tree-bugfix): ピン留めタブの順序変更をブラウザと同期
-   */
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (!over || active.id === over.id || !onPinnedTabReorder) {
-      return;
-    }
-
-    // ピン留めタブのIDを抽出（"pinned-123" -> 123）
-    const activeId = String(active.id);
-    const overId = String(over.id);
-
-    if (!activeId.startsWith('pinned-') || !overId.startsWith('pinned-')) {
-      return;
-    }
-
-    const activeTabId = parseInt(activeId.replace('pinned-', ''), 10);
-    const overTabId = parseInt(overId.replace('pinned-', ''), 10);
-
-    // 新しいインデックスを計算
-    const newIndex = validPinnedTabs.indexOf(overTabId);
-
-    if (newIndex !== -1) {
-      onPinnedTabReorder(activeTabId, newIndex);
-    }
-  };
-
-  // ドラッグ可能かどうか
-  const isDraggable = !!onPinnedTabReorder;
-
-  // コンテンツ部分
-  const content = (
-    <div
-      data-testid="pinned-tabs-section"
-      className="flex flex-wrap gap-1 p-2"
-    >
-      {validPinnedTabs.map(tabId => {
-        const tabInfo = tabInfoMap[tabId];
-        // Task 6.1 (tab-tree-bugfix): アクティブタブの判定
-        const isActive = activeTabId === tabId;
-
-        return (
-          <SortablePinnedTabItem
-            key={tabId}
-            tabId={tabId}
-            tabInfo={tabInfo}
-            isActive={isActive}
-            isDraggable={isDraggable}
-            onTabClick={handleTabClick}
-            onContextMenu={handleContextMenu}
-          />
-        );
-      })}
-    </div>
-  );
+  // ドラッグ中のタブ情報を取得
+  const draggedTabId = dragState.draggedTabId;
+  const draggedTabInfo = draggedTabId ? tabInfoMap[draggedTabId] : null;
 
   return (
     <>
       {/* ピン留めタブセクション */}
-      {isDraggable ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+      <div
+        ref={setContainerRef}
+        data-testid="pinned-tabs-section"
+        className="flex flex-wrap gap-1 p-2"
+      >
+        {validPinnedTabs.map((tabId, index) => {
+          const tabInfo = tabInfoMap[tabId];
+          // Task 6.1 (tab-tree-bugfix): アクティブタブの判定
+          const isActive = activeTabId === tabId;
+          const itemId = `pinned-${tabId}`;
+          const itemProps = isDraggable ? getItemProps(itemId, tabId) : { onMouseDown: () => {}, style: {}, 'data-dragging': false };
+          const isDragging = dragState.draggedItemId === itemId && dragState.isDragging;
+
+          return (
+            <PinnedTabItem
+              key={tabId}
+              tabId={tabId}
+              tabInfo={tabInfo}
+              isActive={isActive}
+              isDraggable={isDraggable}
+              isDragging={isDragging}
+              index={index}
+              onTabClick={handleTabClick}
+              onContextMenu={handleContextMenu}
+              onMouseDown={itemProps.onMouseDown}
+            />
+          );
+        })}
+      </div>
+
+      {/* ドラッグオーバーレイ */}
+      {isDraggable && draggedTabInfo && (
+        <DragOverlay
+          isDragging={dragState.isDragging}
+          position={dragState.currentPosition}
+          offset={dragState.offset}
         >
-          <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
-            {content}
-          </SortableContext>
-        </DndContext>
-      ) : (
-        content
+          <div className="flex items-center justify-center w-7 h-7 rounded bg-gray-700 shadow-lg">
+            {draggedTabInfo.favIconUrl ? (
+              <img
+                src={draggedTabInfo.favIconUrl}
+                alt={draggedTabInfo.title}
+                className="w-4 h-4"
+              />
+            ) : (
+              <div className="w-4 h-4 bg-gray-400 rounded" />
+            )}
+          </div>
+        </DragOverlay>
       )}
 
       {/* 区切り線 */}

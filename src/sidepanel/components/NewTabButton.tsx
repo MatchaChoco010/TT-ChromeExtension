@@ -31,8 +31,10 @@ const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
 
     try {
       // Requirement 8.4: 新しいタブをアクティブにする
+      // Requirement 12.1, 12.2: Vivaldiスタートページを開く
       await chrome.tabs.create({
         active: true,
+        url: 'chrome://vivaldi-webui/startpage',
       });
 
       // コールバックが提供されている場合は呼び出す
@@ -52,8 +54,7 @@ const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
       className="w-full p-2 flex items-center justify-center cursor-pointer text-gray-400 hover:text-gray-100 hover:bg-gray-700 border-t border-gray-700 transition-colors"
       aria-label="新規タブを追加"
     >
-      <span className="mr-2 text-lg">+</span>
-      <span className="text-sm">新規タブ</span>
+      <span className="text-lg">+</span>
     </button>
   );
 };

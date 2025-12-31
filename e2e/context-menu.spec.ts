@@ -123,16 +123,16 @@ test.describe('コンテキストメニュー操作', () => {
 
     // 子タブを作成
     const childTabId1 = await createTab(extensionContext, 'about:blank', parentTabId);
-    await expect(async () => {
-      const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTabId1}"]`);
-      await expect(childNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    // 子タブが表示されるまで待機
+    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId1}"]`)).toBeVisible({ timeout: 10000 });
+    // 親子関係がUIに反映されるまで待機（depth=1）
+    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId1}"][data-depth="1"]`)).toBeVisible({ timeout: 10000 });
 
     const childTabId2 = await createTab(extensionContext, 'about:blank', parentTabId);
-    await expect(async () => {
-      const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"]`);
-      await expect(childNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    // 子タブが表示されるまで待機
+    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"]`)).toBeVisible({ timeout: 10000 });
+    // 親子関係がUIに反映されるまで待機（depth=1）
+    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"][data-depth="1"]`)).toBeVisible({ timeout: 10000 });
 
     // 現在のタブ数を取得（初期タブ + 親タブ + 子タブ2つ）
     const initialTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
@@ -167,11 +167,13 @@ test.describe('コンテキストメニュー操作', () => {
     // コンテキストメニューが閉じるまで待機
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-    // Assert: サブツリー全体（親 + 子2つ = 3タブ）が削除されている
-    await expect(async () => {
-      const currentTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
-      expect(currentTabNodes).toBe(initialTabNodes - 3);
-    }).toPass({ timeout: 5000 });
+    // Assert: 親タブと子タブがすべて削除されている
+    // 親タブが削除されていることを確認
+    await expect(sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`)).not.toBeVisible({ timeout: 5000 });
+    // 子タブ1が削除されていることを確認
+    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId1}"]`)).not.toBeVisible({ timeout: 5000 });
+    // 子タブ2が削除されていることを確認
+    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"]`)).not.toBeVisible({ timeout: 5000 });
   });
 
   test('コンテキストメニューから"グループに追加"を選択した場合、グループ選択またはグループ作成のインタラクションが開始される', async ({

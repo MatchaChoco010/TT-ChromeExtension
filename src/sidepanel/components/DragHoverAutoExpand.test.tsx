@@ -104,7 +104,7 @@ describe('Task 6.4: ドラッグホバー時のブランチ自動展開', () => 
     vi.useFakeTimers(); // フェイクタイマーに戻す
   });
 
-  it('DndContextにonDragOverが設定されていることを確認', () => {
+  it('ドラッグ中のホバー検出が設定されていることを確認', () => {
     const handleToggleExpand = vi.fn();
     const handleDragEnd = vi.fn();
 
@@ -130,7 +130,7 @@ describe('Task 6.4: ドラッグホバー時のブランチ自動展開', () => 
       />
     );
 
-    // DndContextが正しくレンダリングされていることを確認
+    // ドラッグコンテナが正しくレンダリングされていることを確認
     expect(container).toBeTruthy();
 
     // タイマーが存在することを確認（実装にsetTimeoutが含まれている）

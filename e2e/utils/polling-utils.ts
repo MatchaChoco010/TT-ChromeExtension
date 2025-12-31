@@ -241,7 +241,7 @@ export async function waitForParentChildRelation(
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const found = await serviceWorker.evaluate(
     async ({ parentTabId, childTabId, iterations, interval }) => {
       interface TreeNode {
         parentId: string | null;
@@ -259,15 +259,20 @@ export async function waitForParentChildRelation(
           if (parentNodeId && childNodeId) {
             const childNode = treeState.nodes[childNodeId];
             if (childNode && childNode.parentId === parentNodeId) {
-              return;
+              return true;
             }
           }
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return false;
     },
     { parentTabId, childTabId, iterations, interval }
   );
+
+  if (!found) {
+    throw new Error(`Parent-child relation not established: parent=${parentTabId}, child=${childTabId}`);
+  }
 }
 
 /**

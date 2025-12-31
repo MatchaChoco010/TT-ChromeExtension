@@ -54,30 +54,85 @@ const isNewTabUrl = (url: string): boolean => {
 };
 
 /**
- * Task 4.2 (Requirement 4.1, 4.2, 4.3, 4.4): 表示するタブタイトルを決定するヘルパー関数
+ * Task 3.2 (Requirement 17.1): タイトルがURL形式かどうかを判定
+ * PDFなど、file://でも正しいタイトルが設定されている場合がある
+ */
+const isTitleUrlFormat = (title: string): boolean => {
+  // スキーム://で始まる場合はURL形式とみなす
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(title);
+};
+
+/**
+ * Task 3.2 (Requirement 17.1): システムURLのフレンドリー名マッピング
+ */
+const SYSTEM_URL_FRIENDLY_NAMES: Record<string, string> = {
+  'chrome://settings': '設定',
+  'chrome://extensions': '拡張機能',
+  'chrome://history': '履歴',
+  'chrome://downloads': 'ダウンロード',
+  'chrome://bookmarks': 'ブックマーク',
+  'vivaldi://settings': '設定',
+  'vivaldi://extensions': '拡張機能',
+  'chrome://vivaldi-webui/startpage': 'スタートページ',
+  'chrome://newtab': '新しいタブ',
+};
+
+/**
+ * Task 4.2, 3.2 (Requirement 4.1, 4.2, 4.3, 4.4, 17.1): 表示するタブタイトルを決定するヘルパー関数
  * - Loading状態の場合: 「Loading...」
  * - スタートページURLの場合: 「スタートページ」
  * - 新しいタブURLの場合: 「新しいタブ」
+ * - タイトルがURL形式でシステムページの場合: フレンドリー名に置換
+ * - file://でタイトルがURL形式の場合: ファイル名に置換
  * - それ以外: 元のタイトル
+ *
+ * Requirement 12.1, 12.2: Vivaldi専用URL（chrome://vivaldi-webui/startpage）の場合、
+ * 拡張機能にはURLが公開されないことがあるため、タイトルもチェックする
+ *
+ * Requirement 17.1: タイトルがURL形式の場合のみフレンドリー名に置き換え。
+ * PDFなど既にタイトルが設定されている場合はそのまま表示。
  */
 const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 'complete' }): string => {
+  const title = tab.title || '';
+  const url = tab.url || '';
+
   // Requirement 4.4: Loading状態の場合
   if (tab.status === 'loading') {
     return 'Loading...';
   }
 
-  // Requirement 2.2: スタートページURLの場合
-  if (isStartPageUrl(tab.url)) {
+  // Requirement 2.2, 12.1, 12.2: スタートページURLの場合
+  // URLをチェック、またはタイトルがURL形式でスタートページパターンの場合もチェック
+  if (isStartPageUrl(url) || isStartPageUrl(title)) {
     return 'スタートページ';
   }
 
   // Requirement 4.3: 新しいタブURLの場合
-  if (isNewTabUrl(tab.url)) {
+  // URLをチェック、またはタイトルがURL形式で新しいタブパターンの場合もチェック
+  if (isNewTabUrl(url) || isNewTabUrl(title)) {
     return '新しいタブ';
   }
 
+  // Requirement 17.1: タイトルがURL形式でない場合はそのまま表示（例：PDFファイル名）
+  if (!isTitleUrlFormat(title)) {
+    return title;
+  }
+
+  // Requirement 17.1: タイトルがURL形式の場合、フレンドリー名があれば使用
+  for (const [urlPattern, friendlyName] of Object.entries(SYSTEM_URL_FRIENDLY_NAMES)) {
+    if (url.startsWith(urlPattern)) {
+      return friendlyName;
+    }
+  }
+
+  // Requirement 17.1: file://の場合はファイル名を抽出
+  if (url.startsWith('file://') && isTitleUrlFormat(title)) {
+    const filename = url.split('/').pop() || title;
+    return decodeURIComponent(filename);
+  }
+
   // Requirement 4.1, 4.2: 通常のタイトル
-  return tab.title;
+  return title;
 };
 
 /**

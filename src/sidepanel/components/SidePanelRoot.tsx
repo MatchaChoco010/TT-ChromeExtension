@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { ThemeProvider } from '../providers/ThemeProvider';
 import ErrorBoundary from './ErrorBoundary';
@@ -71,6 +71,10 @@ const TreeViewContent: React.FC = () => {
 
   // Task 5.1: ExternalDropZone（新規ウィンドウドロップエリア）を削除
   // useExternalDropフックの使用を削除（要件6.1: 専用領域を表示しない）
+
+  // Task 7.2 (tab-tree-bugfix-2): サイドパネル境界参照
+  // Requirement 4.2, 4.3: ドラッグアウト判定はサイドパネル全体の境界を基準にする
+  const sidePanelRef = useRef<HTMLDivElement>(null);
 
   // Task 6.2: スナップショット取得ハンドラ
   const handleSnapshot = useCallback(async () => {
@@ -224,15 +228,17 @@ const TreeViewContent: React.FC = () => {
   // 要件6.1: 専用領域を表示しないため、外部ドロップ連携は不要
 
   // Task 4.3: ツリー外ドロップで新規ウィンドウ作成（要件13.1, 13.2）
+  // Task 14.1: 空ウィンドウの自動クローズ（Requirements 7.1, 7.2）
   const handleExternalDrop = useCallback((tabId: number) => {
     // サブツリーごと新しいウィンドウに移動（子タブがある場合は一緒に移動）
+    // Task 14.1: sourceWindowIdを渡して、全タブ移動後にウィンドウを閉じる
     chrome.runtime.sendMessage({
       type: 'CREATE_WINDOW_WITH_SUBTREE',
-      payload: { tabId },
+      payload: { tabId, sourceWindowId: currentWindowId ?? undefined },
     });
     // クロスウィンドウドラッグ状態をクリア
     clearCrossWindowDragState();
-  }, [clearCrossWindowDragState]);
+  }, [clearCrossWindowDragState, currentWindowId]);
 
   // Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ開始ハンドラ
   // Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
@@ -311,7 +317,8 @@ const TreeViewContent: React.FC = () => {
       {/* Task 4.3: カスタムスクロールバースタイルを適用 */}
       {/* Task 5.1: ExternalDropZone（新規ウィンドウドロップエリア）を削除（要件6.1） */}
       {/* Task 2.4: タブツリーの水平スクロール禁止（要件12.1, 12.2） */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
+      {/* Task 7.2 (tab-tree-bugfix-2): サイドパネル境界参照を設定 */}
+      <div ref={sidePanelRef} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
         <TabTreeView
           nodes={nodes}
           currentViewId={treeState?.currentViewId || 'default'}
@@ -340,6 +347,8 @@ const TreeViewContent: React.FC = () => {
           onMoveToView={moveTabsToView}
           // Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)
           onExternalDrop={handleExternalDrop}
+          // Task 7.2 (tab-tree-bugfix-2): サイドパネル境界参照 (Requirement 4.2, 4.3)
+          sidePanelRef={sidePanelRef}
         />
         {/* Task 8.1 (tab-tree-comprehensive-fix): 新規タブ追加ボタン */}
         {/* Requirement 8.1: 全てのタブの最後に新規タブ追加ボタンを表示 */}

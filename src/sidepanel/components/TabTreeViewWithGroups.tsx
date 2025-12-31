@@ -1,22 +1,12 @@
-import React, { useMemo, useState, useCallback } from 'react';
-import {
-  DndContext,
-  closestCenter,
-  DragEndEvent,
-  DragStartEvent,
-  MouseSensor,
-  TouchSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import { useSortable, SortableContext } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import type { TabNode, Group, ExtendedTabInfo, MenuAction } from '@/types';
 import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
 import UnreadBadge from './UnreadBadge';
 import CloseButton from './CloseButton';
+import { useDragDrop, type DropTarget, DropTargetType } from '../hooks/useDragDrop';
+import { useAutoScroll } from '../hooks/useAutoScroll';
+import { DragOverlay } from './DragOverlay';
 
 /**
  * Task 11.1: タブグループをツリービュー内に表示するコンポーネント
@@ -62,10 +52,15 @@ interface GroupTreeNodeProps {
 /**
  * Task 11.2: ドラッグ可能なグループツリーノードのprops
  * Requirements: 2.2
+ * Task 12.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropへ移行
  */
-interface SortableGroupTreeNodeProps extends GroupTreeNodeProps {
+interface DraggableGroupTreeNodeProps extends GroupTreeNodeProps {
+  /** 自前D&D: このグループがドラッグ中かどうか */
   isDragging?: boolean;
+  /** 自前D&D: グローバルでドラッグ中かどうか */
   globalIsDragging?: boolean;
+  /** 自前D&D: マウスダウンハンドラ */
+  onMouseDown?: (e: React.MouseEvent) => void;
 }
 
 /**
@@ -268,23 +263,39 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           </div>
         ) : null}
 
-        {/* タブの内容 - Task 3.1: フォントサイズはCSS変数から継承 */}
-        <div className="flex-1 flex items-center min-w-0">
-          <span className="truncate">
-            {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
-          </span>
-          <UnreadBadge isUnread={isUnread} showIndicator={true} />
-          {hasChildren && unreadChildCount > 0 && (
-            <div
-              data-testid="unread-child-indicator"
-              className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
+        {/* タブの内容 - Task 2.3 (tab-tree-bugfix-2): タイトルと右端固定要素を分離 */}
+        <div
+          data-testid="tab-content"
+          className="flex-1 flex items-center justify-between min-w-0"
+        >
+          {/* タブタイトルエリア - Task 2.3 (tab-tree-bugfix-2): 左側エリア */}
+          <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
+            <span
+              className="truncate"
+              data-testid="tab-title"
             >
-              <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
-                {unreadChildCount > 99 ? '99+' : unreadChildCount}
-              </span>
-            </div>
-          )}
-          {isHovered && <CloseButton onClose={handleCloseClick} />}
+              {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
+            </span>
+          </div>
+          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 未読インジケータと閉じるボタン */}
+          {/* Requirement 13.1, 13.2: 未読インジケーターをタブの右端に固定表示 */}
+          <div
+            data-testid="right-actions-container"
+            className="flex items-center flex-shrink-0 ml-2"
+          >
+            <UnreadBadge isUnread={isUnread} showIndicator={true} />
+            {hasChildren && unreadChildCount > 0 && (
+              <div
+                data-testid="unread-child-indicator"
+                className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
+              >
+                <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
+                  {unreadChildCount > 99 ? '99+' : unreadChildCount}
+                </span>
+              </div>
+            )}
+            {isHovered && <CloseButton onClose={handleCloseClick} />}
+          </div>
         </div>
       </div>
 
@@ -422,10 +433,11 @@ export default TabTreeViewWithGroups;
 /**
  * Task 11.2: ドラッグ可能なグループツリーノードコンポーネント
  * Requirements: 2.2
+ * Task 12.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropへ移行
  *
  * グループをドラッグ可能にして、グループ単位での移動を可能にする
  */
-const SortableGroupTreeNode: React.FC<SortableGroupTreeNodeProps> = ({
+const DraggableGroupTreeNode: React.FC<DraggableGroupTreeNodeProps> = ({
   group,
   childNodes,
   onGroupToggle,
@@ -438,23 +450,12 @@ const SortableGroupTreeNode: React.FC<SortableGroupTreeNodeProps> = ({
   isNodeSelected,
   onSelect,
   onSnapshot,
+  isDragging = false,
   // globalIsDraggingは将来の拡張用に残しておく（ドラッグ中の他のグループのスタイリングなど）
   globalIsDragging: _globalIsDragging,
+  onMouseDown,
 }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: `group-${group.id}`,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  const style: React.CSSProperties = {
     opacity: isDragging ? 0.5 : 1,
   };
 
@@ -463,15 +464,25 @@ const SortableGroupTreeNode: React.FC<SortableGroupTreeNodeProps> = ({
     onGroupToggle(group.id);
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // 展開ボタンのクリックは除外
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
+    onMouseDown?.(e);
+  };
+
   return (
-    <div ref={setNodeRef} style={style} data-testid={`group-tree-node-${group.id}`}>
+    <div style={style} data-testid={`group-tree-node-${group.id}`}>
       {/* グループヘッダー（ドラッグハンドル付き） */}
       <div
-        data-sortable-item={`sortable-group-${group.id}`}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer bg-gray-800 ${isDragging ? 'bg-gray-600 border-2 border-gray-500' : ''}`}
+        data-draggable-item={`draggable-group-${group.id}`}
+        data-node-id={`group-${group.id}`}
+        data-depth={0}
+        className={`flex items-center p-2 hover:bg-gray-700 cursor-grab bg-gray-800 select-none ${isDragging ? 'bg-gray-600 ring-2 ring-gray-500 ring-inset is-dragging' : ''}`}
         style={{ paddingLeft: '8px' }}
-        {...attributes}
-        {...listeners}
+        onMouseDown={handleMouseDown}
       >
         {/* 展開/折りたたみボタン */}
         <button
@@ -523,13 +534,17 @@ const SortableGroupTreeNode: React.FC<SortableGroupTreeNodeProps> = ({
 /**
  * Task 11.2: ドラッグ可能なタブグループ統合ツリービュー
  * Requirements: 2.2
+ * Task 12.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropへ移行
  *
  * タブグループとタブをドラッグ&ドロップで並び替え可能にする
  */
 interface DraggableTabTreeViewWithGroupsProps extends TabTreeViewWithGroupsProps {
-  onDragEnd: (event: DragEndEvent) => void;
+  /** ドラッグ終了時のコールバック（dnd-kit形式の互換性を維持） */
+  onDragEnd: (event: { active: { id: string }; over: { id: string } | null }) => void;
+  /** グループドラッグ終了時のコールバック */
   onGroupDragEnd: (groupId: string, newIndex: number, tabIds: number[]) => void;
-  onDragStart?: (event: DragStartEvent) => void;
+  /** ドラッグ開始時のコールバック（dnd-kit形式の互換性を維持） */
+  onDragStart?: (event: { active: { id: string } }) => void;
 }
 
 export const DraggableTabTreeViewWithGroups: React.FC<DraggableTabTreeViewWithGroupsProps> = ({
@@ -550,22 +565,8 @@ export const DraggableTabTreeViewWithGroups: React.FC<DraggableTabTreeViewWithGr
   onSelect,
   onSnapshot,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
-
-  // dnd-kit sensors
-  const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 8,
-    },
-  });
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 250,
-      tolerance: 5,
-    },
-  });
-  const keyboardSensor = useSensor(KeyboardSensor);
-  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
 
   // 現在のビューでフィルタリングされたノード
   const filteredNodes = useMemo(
@@ -592,115 +593,200 @@ export const DraggableTabTreeViewWithGroups: React.FC<DraggableTabTreeViewWithGr
     return { groupedNodes: grouped, ungroupedNodes: ungrouped };
   }, [filteredNodes, groups]);
 
-  // SortableContext用のアイテムIDリストを生成
-  const sortableItems = useMemo(() => {
-    const items: string[] = [];
+  // 自前D&D用のアイテムリストを生成
+  const items = useMemo(() => {
+    const result: Array<{ id: string; tabId: number }> = [];
 
-    // グループIDを追加（group-プレフィックス付き）
-    Object.keys(groups).forEach((groupId) => {
-      items.push(`group-${groupId}`);
+    // グループIDを追加（group-プレフィックス付き、tabIdは-1とする仮想ID）
+    Object.keys(groups).forEach((groupId, idx) => {
+      result.push({ id: `group-${groupId}`, tabId: -(idx + 1) });
     });
 
-    // グループに属さないノードIDを追加
+    // グループに属さないノードを追加
     ungroupedNodes.forEach((node) => {
-      items.push(node.id);
+      result.push({ id: node.id, tabId: node.tabId });
     });
 
-    return items;
+    return result;
   }, [groups, ungroupedNodes]);
 
-  const handleDragStart = useCallback(
-    (event: DragStartEvent) => {
+  // Task 12.1: 自前D&Dフックを使用
+  const {
+    dragState,
+    getItemProps,
+    cancelDrag,
+  } = useDragDrop({
+    containerRef,
+    items,
+    activationDistance: 8,
+    direction: 'vertical',
+    onDragStart: useCallback((itemId: string, _tabId: number) => {
       setGlobalIsDragging(true);
       if (onDragStart) {
-        onDragStart(event);
+        onDragStart({ active: { id: itemId } });
       }
-    },
-    [onDragStart]
-  );
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
+    }, [onDragStart]),
+    onDragMove: useCallback((_position: { x: number; y: number }, _dropTarget: DropTarget | null) => {
+      // ドロップターゲットの更新（必要に応じて実装）
+    }, []),
+    onDragEnd: useCallback((itemId: string, dropTarget: DropTarget | null) => {
       setGlobalIsDragging(false);
 
-      const { active, over } = event;
-      if (!over || active.id === over.id) {
+      // ドロップターゲットがない場合は何もしない
+      if (!dropTarget) {
         return;
       }
 
-      const activeId = active.id as string;
-
       // グループがドラッグされた場合
-      if (activeId.startsWith('group-')) {
-        const groupId = activeId.replace('group-', '');
+      if (itemId.startsWith('group-')) {
+        const groupId = itemId.replace('group-', '');
         const childTabIds = groupedNodes[groupId]?.map((node) => node.tabId) || [];
 
-        // 新しいインデックスを計算
-        const overIndex = sortableItems.indexOf(over.id as string);
-        onGroupDragEnd(groupId, overIndex, childTabIds);
+        // 新しいインデックスを計算（dropTarget.gapIndexを使用）
+        const newIndex = dropTarget.gapIndex ?? 0;
+        onGroupDragEnd(groupId, newIndex, childTabIds);
       } else {
         // 通常のタブがドラッグされた場合
-        onDragEnd(event);
+        // dnd-kit形式の互換イベントを作成
+        const overId = dropTarget.type === DropTargetType.Tab
+          ? dropTarget.targetNodeId
+          : null;
+
+        if (overId) {
+          onDragEnd({
+            active: { id: itemId },
+            over: { id: overId },
+          });
+        }
       }
-    },
-    [onDragEnd, onGroupDragEnd, groupedNodes, sortableItems]
-  );
+    }, [onDragEnd, onGroupDragEnd, groupedNodes]),
+    onDragCancel: useCallback(() => {
+      setGlobalIsDragging(false);
+    }, []),
+  });
+
+  // 自動スクロールフック
+  const { handleAutoScroll, stopAutoScroll } = useAutoScroll(containerRef, {
+    threshold: 50,
+    speed: 8,
+    clampToContent: true,
+  });
+
+  // ドラッグ中の自動スクロール処理
+  useEffect(() => {
+    if (dragState.isDragging) {
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        handleAutoScroll(dragState.currentPosition.y, rect);
+      }
+    } else {
+      stopAutoScroll();
+    }
+  }, [dragState.isDragging, dragState.currentPosition.y, handleAutoScroll, stopAutoScroll]);
+
+  // ESCキーでドラッグキャンセル
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && dragState.isDragging) {
+        cancelDrag();
+      }
+    };
+
+    if (dragState.isDragging) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [dragState.isDragging, cancelDrag]);
+
+  // グループ用のマウスダウンハンドラを生成
+  const getGroupMouseDownHandler = useCallback((groupId: string, idx: number) => {
+    return (e: React.MouseEvent) => {
+      const props = getItemProps(`group-${groupId}`, -(idx + 1));
+      props.onMouseDown(e);
+    };
+  }, [getItemProps]);
+
+  // ドラッグ中のグループ情報を取得
+  const draggedGroup = useMemo(() => {
+    if (!dragState.isDragging || !dragState.draggedItemId) return null;
+    if (!dragState.draggedItemId.startsWith('group-')) return null;
+    const groupId = dragState.draggedItemId.replace('group-', '');
+    return groups[groupId] || null;
+  }, [dragState.isDragging, dragState.draggedItemId, groups]);
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={sortableItems}>
-        <div data-testid="tab-tree-view-with-groups" className="w-full">
-          {/* グループとそのタブを表示 */}
-          {Object.entries(groups).map(([groupId, group]) => {
-            const childNodes = groupedNodes[groupId] || [];
-            return (
-              <SortableGroupTreeNode
-                key={groupId}
-                group={group}
-                childNodes={childNodes}
-                onGroupToggle={onGroupToggle}
-                onNodeClick={onNodeClick}
-                onToggleExpand={onToggleExpand}
-                getTabInfo={getTabInfo}
-                isTabUnread={isTabUnread}
-                getUnreadChildCount={getUnreadChildCount}
-                activeTabId={activeTabId}
-                isNodeSelected={isNodeSelected}
-                onSelect={onSelect}
-                onSnapshot={onSnapshot}
-                globalIsDragging={globalIsDragging}
-              />
-            );
-          })}
+    <div ref={containerRef} data-testid="tab-tree-view-with-groups" className="w-full">
+      {/* グループとそのタブを表示 */}
+      {Object.entries(groups).map(([groupId, group], idx) => {
+        const childNodes = groupedNodes[groupId] || [];
+        const isDragging = dragState.isDragging && dragState.draggedItemId === `group-${groupId}`;
 
-          {/* グループに属さないタブを表示 */}
-          {ungroupedNodes.map((node) => (
-            <TreeNodeItem
-              key={node.id}
-              node={node}
-              onNodeClick={onNodeClick}
-              onToggleExpand={onToggleExpand}
-              getTabInfo={getTabInfo}
-              isTabUnread={isTabUnread}
-              getUnreadChildCount={getUnreadChildCount}
-              activeTabId={activeTabId}
-              isNodeSelected={isNodeSelected}
-              onSelect={onSelect}
-              onSnapshot={onSnapshot}
+        return (
+          <DraggableGroupTreeNode
+            key={groupId}
+            group={group}
+            childNodes={childNodes}
+            onGroupToggle={onGroupToggle}
+            onNodeClick={onNodeClick}
+            onToggleExpand={onToggleExpand}
+            getTabInfo={getTabInfo}
+            isTabUnread={isTabUnread}
+            getUnreadChildCount={getUnreadChildCount}
+            activeTabId={activeTabId}
+            isNodeSelected={isNodeSelected}
+            onSelect={onSelect}
+            onSnapshot={onSnapshot}
+            isDragging={isDragging}
+            globalIsDragging={globalIsDragging}
+            onMouseDown={getGroupMouseDownHandler(groupId, idx)}
+          />
+        );
+      })}
+
+      {/* グループに属さないタブを表示 */}
+      {ungroupedNodes.map((node) => (
+        <TreeNodeItem
+          key={node.id}
+          node={node}
+          onNodeClick={onNodeClick}
+          onToggleExpand={onToggleExpand}
+          getTabInfo={getTabInfo}
+          isTabUnread={isTabUnread}
+          getUnreadChildCount={getUnreadChildCount}
+          activeTabId={activeTabId}
+          isNodeSelected={isNodeSelected}
+          onSelect={onSelect}
+          onSnapshot={onSnapshot}
+        />
+      ))}
+
+      {/* 何も表示するものがない場合 */}
+      {Object.keys(groups).length === 0 && ungroupedNodes.length === 0 && (
+        <div className="p-4 text-gray-400 text-sm">No tabs in this view</div>
+      )}
+
+      {/* ドラッグオーバーレイ（グループ用） */}
+      <DragOverlay
+        isDragging={dragState.isDragging && !!draggedGroup}
+        position={dragState.currentPosition}
+        offset={dragState.offset}
+      >
+        {draggedGroup && (
+          <div
+            className="flex items-center p-2 bg-gray-700 text-gray-100 shadow-lg rounded border border-gray-600"
+            style={{ width: '250px' }}
+          >
+            {/* グループカラーインジケータ */}
+            <div
+              className="mr-2 w-3 h-3 rounded-full flex-shrink-0"
+              style={{ backgroundColor: draggedGroup.color }}
             />
-          ))}
-
-          {/* 何も表示するものがない場合 */}
-          {Object.keys(groups).length === 0 && ungroupedNodes.length === 0 && (
-            <div className="p-4 text-gray-400 text-sm">No tabs in this view</div>
-          )}
-        </div>
-      </SortableContext>
-    </DndContext>
+            {/* グループ名 */}
+            <span className="truncate text-sm font-medium">{draggedGroup.name}</span>
+          </div>
+        )}
+      </DragOverlay>
+    </div>
   );
 };

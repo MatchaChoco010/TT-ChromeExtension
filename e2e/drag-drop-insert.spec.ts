@@ -1,10 +1,10 @@
 /**
- * ドラッグ&ドロップ - ドロップ処理のE2Eテスト
+ * ドラッグ&ドロップ - タブ挿入のE2Eテスト
  *
- * Task 8.2: ドロップ処理のE2Eテスト
- * Requirements: 7.1, 7.2
+ * Task 8.3 (tab-tree-bugfix-2): 自前D&D実装用に書き直し
+ * Requirements: 3.2.1, 3.2.3
  *
- * このテストスイートでは、ドラッグ&ドロップ後のタブ挿入を検証します。
+ * このテストスイートでは、ドラッグ&ドロップによるタブの挿入を検証します。
  * - タブをドロップした位置にタブが正確に挿入されること
  * - ドロップ後のツリー構造がブラウザタブの順序と同期していること
  *
@@ -12,7 +12,7 @@
  */
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
-import { moveTabToParent, startDrag, dropTab } from './utils/drag-drop-utils';
+import { reorderTabs, moveTabToParent } from './utils/drag-drop-utils';
 import type { Page, Worker } from '@playwright/test';
 
 /**
@@ -76,77 +76,32 @@ async function getBrowserTabOrder(
 }
 
 /**
- * タブをタブ間の隙間にドラッグ（Gap領域へのドロップ）
- * dnd-kitのonDragMoveを適切にトリガーするため、手動でマウス操作をシミュレート
+ * ストレージへの反映を待機
  */
-async function dragTabToGap(
-  page: Page,
-  sourceTabId: number,
-  targetTabId: number,
-  position: 'before' | 'after'
+async function waitForStorageSync(
+  serviceWorker: Worker,
+  tabIds: number[]
 ): Promise<void> {
-  const sourceSelector = `[data-testid="tree-node-${sourceTabId}"]`;
-  const targetSelector = `[data-testid="tree-node-${targetTabId}"]`;
-
-  // ソース要素とターゲット要素のバウンディングボックスを取得
-  const sourceElement = page.locator(sourceSelector).first();
-  const targetElement = page.locator(targetSelector).first();
-
-  await sourceElement.waitFor({ state: 'visible', timeout: 5000 });
-  await targetElement.waitFor({ state: 'visible', timeout: 5000 });
-
-  const sourceBox = await sourceElement.boundingBox();
-  const targetBox = await targetElement.boundingBox();
-
-  if (!sourceBox || !targetBox) {
-    throw new Error('Could not get bounding box for source or target element');
-  }
-
-  // ソース要素の中央座標
-  const sourceX = sourceBox.x + sourceBox.width / 2;
-  const sourceY = sourceBox.y + sourceBox.height / 2;
-
-  // Gap領域の座標を計算
-  // beforeの場合はターゲットの上端10%、afterの場合は下端90%
-  const gapY = position === 'before'
-    ? targetBox.y + (targetBox.height * 0.1)
-    : targetBox.y + (targetBox.height * 0.9);
-  const targetX = targetBox.x + targetBox.width / 2;
-
-  // バックグラウンドスロットリングを回避するためにページをフォーカス
-  await page.bringToFront();
-  await page.evaluate(() => window.focus());
-
-  // 1. マウスをソース位置に移動
-  await page.mouse.move(sourceX, sourceY, { steps: 3 });
-
-  // 2. マウスボタンを押下
-  await page.mouse.down();
-
-  // 3. まず8px以上移動してドラッグを開始させる
-  await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
-
-  // 4. ドラッグ状態が確立されるまで待機
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
-
-  // 5. Gap領域に移動（複数ステップで移動してonDragMoveをトリガー）
-  await page.mouse.move(targetX, gapY, { steps: 10 });
-
-  // 6. Gap判定が更新されるまで待機
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
-
-  // 7. マウスをリリースしてドロップ
-  await page.mouse.up();
-
-  // D&D後にUIを安定させるための待機
-  await page.waitForTimeout(200);
+  await serviceWorker.evaluate(async (ids: number[]) => {
+    for (let i = 0; i < 30; i++) {
+      const result = await chrome.storage.local.get('tree_state');
+      const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+      if (treeState?.tabToNode) {
+        const allTabsExist = ids.every(id => treeState.tabToNode?.[id]);
+        if (allTabsExist) {
+          return;
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }, tabIds);
 }
 
-test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
+test.describe('ドラッグ&ドロップ - タブ挿入', () => {
   // タイムアウトを120秒に設定
   test.setTimeout(120000);
 
-  test.describe('Requirement 7.1: ドロップ位置への挿入', () => {
+  test.describe('タブの挿入位置', () => {
     test('タブをドロップすると、ドロップ操作が正常に完了すること', async ({
       extensionContext,
       sidePanelPage,
@@ -166,23 +121,11 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
       const initialOrder = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3]);
       expect(initialOrder.length).toBe(3);
 
-      // 実行: tab3をGap領域にドラッグ&ドロップ
-      await dragTabToGap(sidePanelPage, tab3, tab1, 'before');
+      // 実行: tab3をtab1の前にドラッグ&ドロップ
+      await reorderTabs(sidePanelPage, tab3, tab1, 'before');
 
       // ストレージへの反映を待機
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 30; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }, [tab1, tab2, tab3]);
+      await waitForStorageSync(serviceWorker, [tab1, tab2, tab3]);
 
       // 検証: すべてのタブがツリーに表示されていること
       const finalOrder = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3]);
@@ -211,29 +154,19 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
       await assertTabInTree(sidePanelPage, tab3);
       await assertTabInTree(sidePanelPage, tab4);
 
-      // 実行: tab4をGap領域にドラッグ&ドロップ
-      await dragTabToGap(sidePanelPage, tab4, tab2, 'before');
+      // 実行: tab4をtab2の前にドラッグ&ドロップ
+      await reorderTabs(sidePanelPage, tab4, tab2, 'before');
 
       // ストレージへの反映を待機
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 30; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }, [tab1, tab2, tab3, tab4]);
+      await waitForStorageSync(serviceWorker, [tab1, tab2, tab3, tab4]);
 
-      // 検証: すべてのタブがUIに表示されていること
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first()).toBeVisible();
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab2}"]`).first()).toBeVisible();
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab3}"]`).first()).toBeVisible();
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab4}"]`).first()).toBeVisible();
+      // 検証: すべてのタブがUIに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first()).toBeVisible();
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab2}"]`).first()).toBeVisible();
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab3}"]`).first()).toBeVisible();
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab4}"]`).first()).toBeVisible();
+      }).toPass({ timeout: 3000 });
     });
 
     test('ドロップ後にタブのツリー構造が維持されること', async ({
@@ -251,23 +184,11 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
       await assertTabInTree(sidePanelPage, tab2);
       await assertTabInTree(sidePanelPage, tab3);
 
-      // 実行: tab3をGap領域にドラッグ&ドロップ
-      await dragTabToGap(sidePanelPage, tab3, tab1, 'before');
+      // 実行: tab3をtab1の前にドラッグ&ドロップ
+      await reorderTabs(sidePanelPage, tab3, tab1, 'before');
 
       // ストレージへの反映を待機
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 30; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }, [tab1, tab2, tab3]);
+      await waitForStorageSync(serviceWorker, [tab1, tab2, tab3]);
 
       // 検証: ストレージ内のツリー状態にすべてのタブが存在すること
       const treeStateCheck = await serviceWorker.evaluate(async (tabIds: number[]) => {
@@ -285,7 +206,7 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
     });
   });
 
-  test.describe('Requirement 7.2: ツリー構造とブラウザタブ順序の同期', () => {
+  test.describe('ツリー構造とブラウザタブ順序の同期', () => {
     test('ドロップ後のツリー状態がストレージと同期されていること', async ({
       extensionContext,
       sidePanelPage,
@@ -303,26 +224,11 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
       await assertTabInTree(sidePanelPage, tab3);
       await assertTabInTree(sidePanelPage, tab4);
 
-      // 実行: tab4をGap領域にドラッグ&ドロップ
-      await dragTabToGap(sidePanelPage, tab4, tab2, 'before');
+      // 実行: tab4をtab2の前にドラッグ&ドロップ
+      await reorderTabs(sidePanelPage, tab4, tab2, 'before');
 
       // ストレージへの反映を待機
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 30; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      }, [tab1, tab2, tab3, tab4]);
-
-      // UI更新とブラウザタブ移動を待機
-      await sidePanelPage.waitForTimeout(300);
+      await waitForStorageSync(serviceWorker, [tab1, tab2, tab3, tab4]);
 
       // 検証: ストレージ内のツリー状態にすべてのタブが存在すること
       const storageCheck = await serviceWorker.evaluate(async (tabIds: number[]) => {
@@ -339,13 +245,15 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
       expect(storageCheck.allExist).toBe(true);
       expect(storageCheck.nodeCount).toBeGreaterThanOrEqual(4);
 
-      // 検証: UIにすべてのタブが表示されていること
-      const uiTabIds = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
-      expect(uiTabIds.length).toBe(4);
-      expect(uiTabIds).toContain(tab1);
-      expect(uiTabIds).toContain(tab2);
-      expect(uiTabIds).toContain(tab3);
-      expect(uiTabIds).toContain(tab4);
+      // 検証: UIにすべてのタブが表示されていること（ポーリングで待機）
+      await expect(async () => {
+        const uiTabIds = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
+        expect(uiTabIds.length).toBe(4);
+        expect(uiTabIds).toContain(tab1);
+        expect(uiTabIds).toContain(tab2);
+        expect(uiTabIds).toContain(tab3);
+        expect(uiTabIds).toContain(tab4);
+      }).toPass({ timeout: 3000 });
     });
 
     test('複数回のドロップ操作後もすべてのタブが保持されること', async ({
@@ -365,40 +273,23 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
       await assertTabInTree(sidePanelPage, tab3);
       await assertTabInTree(sidePanelPage, tab4);
 
-      // ページをフォーカスしてバックグラウンドスロットリングを回避
-      await sidePanelPage.bringToFront();
-      await sidePanelPage.evaluate(() => window.focus());
+      // 1回目のドロップ: tab4をtab1の前にドラッグ
+      await reorderTabs(sidePanelPage, tab4, tab1, 'before');
+      await waitForStorageSync(serviceWorker, [tab1, tab2, tab3, tab4]);
 
-      // 1回目のドロップ: tab4をGap領域にドラッグ
-      await dragTabToGap(sidePanelPage, tab4, tab1, 'before');
-      await sidePanelPage.waitForTimeout(500);
+      // 2回目のドロップ: tab2をtab3の後にドラッグ
+      await reorderTabs(sidePanelPage, tab2, tab3, 'after');
+      await waitForStorageSync(serviceWorker, [tab1, tab2, tab3, tab4]);
 
-      // 2回目のドロップ: tab2をGap領域にドラッグ
-      await dragTabToGap(sidePanelPage, tab2, tab3, 'after');
-      await sidePanelPage.waitForTimeout(500);
-
-      // ストレージへの反映を待機（リトライ回数を増加）
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 50; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, [tab1, tab2, tab3, tab4]);
-
-      // 検証: すべてのタブがUIに表示されていること
-      const uiTabIds = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
-      expect(uiTabIds.length).toBe(4);
-      expect(uiTabIds).toContain(tab1);
-      expect(uiTabIds).toContain(tab2);
-      expect(uiTabIds).toContain(tab3);
-      expect(uiTabIds).toContain(tab4);
+      // 検証: すべてのタブがUIに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        const uiTabIds = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
+        expect(uiTabIds.length).toBe(4);
+        expect(uiTabIds).toContain(tab1);
+        expect(uiTabIds).toContain(tab2);
+        expect(uiTabIds).toContain(tab3);
+        expect(uiTabIds).toContain(tab4);
+      }).toPass({ timeout: 3000 });
 
       // 検証: すべてのブラウザタブが存在すること
       const browserTabIds = await getBrowserTabOrder(serviceWorker, [tab1, tab2, tab3, tab4]);
@@ -424,30 +315,11 @@ test.describe('ドラッグ&ドロップ - ドロップ処理', () => {
       await assertTabInTree(sidePanelPage, tab2);
       await assertTabInTree(sidePanelPage, tab3);
 
-      // ページをフォーカスしてバックグラウンドスロットリングを回避
-      await sidePanelPage.bringToFront();
-      await sidePanelPage.evaluate(() => window.focus());
-
       // tab2をtab1の子として配置
       await moveTabToParent(sidePanelPage, tab2, tab1, serviceWorker);
 
-      // ストレージへの反映を待機（リトライ回数とタイムアウトを増加）
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 50; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, [tab1, tab2, tab3]);
-
-      // UI更新を待機
-      await sidePanelPage.waitForTimeout(500);
+      // ストレージへの反映を待機
+      await waitForStorageSync(serviceWorker, [tab1, tab2, tab3]);
 
       // 検証: 親子関係がストレージに反映されていること（ポーリングで確認）
       const relationCheck = await serviceWorker.evaluate(async (ids: { parentId: number; childId: number }) => {

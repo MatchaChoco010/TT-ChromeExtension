@@ -223,7 +223,7 @@ describe('IconPicker', () => {
   });
 
   describe('選択確定', () => {
-    it('SelectボタンをクリックするとonSelectが呼ばれる', async () => {
+    it('アイコンをクリックすると即座にonSelectが呼ばれる (Requirement 9.3)', async () => {
       const user = userEvent.setup();
       render(
         <IconPicker
@@ -233,18 +233,38 @@ describe('IconPicker', () => {
         />
       );
 
-      // アイコンを選択
+      // アイコンを選択 - 即座にonSelectが呼ばれる
       const iconGrid = screen.getByTestId('icon-grid');
       const firstIconButton = iconGrid.querySelector('[data-testid^="icon-button-"]');
       await user.click(firstIconButton!);
 
-      // Selectボタンをクリック
+      // onSelectが即座に呼ばれる（Selectボタン不要）
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledWith(expect.any(String));
+    });
+
+    it('Selectボタンをクリックしても追加でonSelectが呼ばれる', async () => {
+      const user = userEvent.setup();
+      render(
+        <IconPicker
+          currentIcon={undefined}
+          onSelect={mockOnSelect}
+          onCancel={mockOnCancel}
+        />
+      );
+
+      // アイコンを選択（1回目のonSelect呼び出し）
+      const iconGrid = screen.getByTestId('icon-grid');
+      const firstIconButton = iconGrid.querySelector('[data-testid^="icon-button-"]');
+      await user.click(firstIconButton!);
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+
+      // Selectボタンをクリック（2回目のonSelect呼び出し）
       const selectButton = screen.getByRole('button', { name: /select/i });
       await user.click(selectButton);
 
-      // onSelectが呼ばれる
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
-      expect(mockOnSelect).toHaveBeenCalledWith(expect.any(String));
+      // 合計2回呼ばれる
+      expect(mockOnSelect).toHaveBeenCalledTimes(2);
     });
 
     it('何も選択せずにSelectボタンをクリックした場合、onSelectは呼ばれない', async () => {

@@ -1,14 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CrossWindowDragHandler } from './CrossWindowDragHandler';
+import { useCrossWindowDrag } from '../hooks/useCrossWindowDrag';
 
 // Mock the useCrossWindowDrag hook
 vi.mock('../hooks/useCrossWindowDrag', () => ({
-  useCrossWindowDrag: vi.fn(() => ({
-    handleDragStart: vi.fn(),
-    handleDragEnd: vi.fn(),
-    handleDropFromOtherWindow: vi.fn(),
-  })),
+  useCrossWindowDrag: vi.fn(),
 }));
 
 describe('CrossWindowDragHandler', () => {
@@ -18,11 +15,16 @@ describe('CrossWindowDragHandler', () => {
     // Mock chrome.windows API
     global.chrome = {
       windows: {
-        getCurrent: vi.fn((callback) => {
-          callback({ id: 1 } as chrome.windows.Window);
-        }),
+        getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
+      },
+      runtime: {
+        sendMessage: vi.fn().mockResolvedValue({ success: true, data: null }),
       },
     } as never;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   it('should render children', () => {
@@ -35,40 +37,36 @@ describe('CrossWindowDragHandler', () => {
     expect(screen.getByTestId('child')).toBeInTheDocument();
   });
 
-  it('should get current window ID on mount', () => {
-    const getCurrent = vi.fn((callback) => {
-      callback({ id: 1 } as chrome.windows.Window);
-    });
-
-    global.chrome = {
-      windows: {
-        getCurrent,
-      },
-    } as never;
-
-    render(
+  it('should render children inside a container div', () => {
+    const { container } = render(
       <CrossWindowDragHandler>
-        <div>Test</div>
+        <div data-testid="child">Test Child</div>
       </CrossWindowDragHandler>
     );
 
-    expect(getCurrent).toHaveBeenCalled();
+    // Container should be a div with children
+    expect(container.firstChild).toBeInstanceOf(HTMLDivElement);
+    expect(screen.getByTestId('child')).toBeInTheDocument();
   });
 
-  it('should handle errors when getting current window', () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
+  it('should call useCrossWindowDrag with containerRef and onDragReceived', () => {
+    const mockedUseCrossWindowDrag = vi.mocked(useCrossWindowDrag);
+    const onDragReceived = vi.fn();
 
-    const getCurrent = vi.fn(() => {
-      throw new Error('Test error');
+    render(
+      <CrossWindowDragHandler onDragReceived={onDragReceived}>
+        <div>Test</div>
+      </CrossWindowDragHandler>
+    );
+
+    expect(mockedUseCrossWindowDrag).toHaveBeenCalledWith({
+      containerRef: expect.objectContaining({ current: expect.any(HTMLDivElement) }),
+      onDragReceived: expect.any(Function),
     });
+  });
 
-    global.chrome = {
-      windows: {
-        getCurrent,
-      },
-    } as never;
+  it('should work without onDragReceived callback', () => {
+    const mockedUseCrossWindowDrag = vi.mocked(useCrossWindowDrag);
 
     render(
       <CrossWindowDragHandler>
@@ -76,11 +74,9 @@ describe('CrossWindowDragHandler', () => {
       </CrossWindowDragHandler>
     );
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Error getting current window:',
-      expect.any(Error)
-    );
-
-    consoleErrorSpy.mockRestore();
+    expect(mockedUseCrossWindowDrag).toHaveBeenCalledWith({
+      containerRef: expect.objectContaining({ current: expect.any(HTMLDivElement) }),
+      onDragReceived: expect.any(Function),
+    });
   });
 });

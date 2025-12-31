@@ -1620,11 +1620,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
       tree_state: treeStateWithMultipleRoots,
     });
+    // Task 7.3: indexプロパティを追加（belowNodeのインデックスを取得するために必要）
     mockChrome.tabs.query = vi.fn().mockResolvedValue([
-      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true },
-      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false },
-      { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false },
-      { id: 4, title: 'Tab 4', url: 'https://tab4.com', pinned: false, active: false },
+      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true, index: 0 },
+      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false, index: 1 },
+      { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false, index: 2 },
+      { id: 4, title: 'Tab 4', url: 'https://tab4.com', pinned: false, active: false, index: 3 },
     ]);
 
     await act(async () => {
@@ -1662,8 +1663,8 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(screen.getByTestId('node-node-4-parent')).toHaveTextContent('null');
     });
 
-    // ブラウザタブの順序が同期されることを確認
-    // chrome.tabs.moveが呼ばれるべき（insertIndex=1の位置に移動）
+    // Task 7.3: ブラウザタブの順序が同期されることを確認
+    // belowNodeId=node-2のタブインデックス（1）の位置に移動
     await waitFor(() => {
       expect(mockChrome.tabs.move).toHaveBeenCalledWith(4, { index: 1 });
     });
@@ -1869,6 +1870,282 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     // node-5の親がnullになる（下のノードと同じ親）
     await waitFor(() => {
       expect(screen.getByTestId('node-node-5-parent')).toHaveTextContent('null');
+    });
+  });
+
+  /**
+   * Task 7.3 (tab-tree-bugfix-2): ピン留めタブを考慮したブラウザタブインデックス計算テスト
+   * Requirements: 2.1, 2.2, 2.3
+   * ピン留めタブが存在する場合、ブラウザタブのインデックスはピン留めタブの数を考慮する必要がある
+   */
+  it('ピン留めタブが存在する場合、belowNodeのインデックスを使用してタブを移動する', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    // 3つのルートノードを持つツリー状態
+    // 実際のブラウザタブには2つのピン留めタブが含まれる
+    const treeStateWithMultipleRoots: TreeState = {
+      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 3, // ブラウザタブインデックス2（ピン留め2つの後）
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 4, // ブラウザタブインデックス3
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-3': {
+          id: 'node-3',
+          tabId: 5, // ブラウザタブインデックス4
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+      },
+      tabToNode: { '3': 'node-1', '4': 'node-2', '5': 'node-3' },
+    };
+
+    mockChrome.storage.local.get = vi.fn().mockResolvedValue({
+      tree_state: treeStateWithMultipleRoots,
+    });
+    // ピン留めタブ2つ + 通常タブ3つ
+    mockChrome.tabs.query = vi.fn().mockResolvedValue([
+      { id: 1, title: 'Pinned 1', url: 'https://pinned1.com', pinned: true, active: false, index: 0 },
+      { id: 2, title: 'Pinned 2', url: 'https://pinned2.com', pinned: true, active: false, index: 1 },
+      { id: 3, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true, index: 2 },
+      { id: 4, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false, index: 3 },
+      { id: 5, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false, index: 4 },
+    ]);
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態の確認
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-1-parent')).toHaveTextContent('null');
+      expect(screen.getByTestId('node-node-3-parent')).toHaveTextContent('null');
+    });
+
+    // node-3（tabId=5）をnode-1の前にドロップ
+    // ツリー内のinsertIndex=0だが、実際のブラウザタブではindexは2（ピン留め2つの後）
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-3',
+          insertIndex: 0, // ツリー内の位置
+          aboveNodeId: undefined, // 先頭なので上のノードなし
+          belowNodeId: 'node-1', // 下のノード
+        });
+      }
+    });
+
+    // ブラウザタブの順序が正しく同期されることを確認
+    // belowNodeId=node-1のtabId=3のインデックス（2）を使用してタブを移動すべき
+    await waitFor(() => {
+      expect(mockChrome.tabs.move).toHaveBeenCalledWith(5, { index: 2 });
+    });
+  });
+
+  /**
+   * Task 7.3 (tab-tree-bugfix-2): タブ間ドロップ時の正確なインデックス計算テスト
+   * Requirements: 2.1, 2.2, 2.3
+   * タブ間にドロップした場合、belowNodeのインデックスを使用してタブを移動する
+   */
+  it('タブ間にドロップした場合、belowNodeのブラウザタブインデックスを使用してタブを移動する', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    // 3つのルートノードを持つツリー状態
+    const treeStateWithMultipleRoots: TreeState = {
+      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 1,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 2,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-3': {
+          id: 'node-3',
+          tabId: 3,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+      },
+      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3' },
+    };
+
+    mockChrome.storage.local.get = vi.fn().mockResolvedValue({
+      tree_state: treeStateWithMultipleRoots,
+    });
+    mockChrome.tabs.query = vi.fn().mockResolvedValue([
+      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true, index: 0 },
+      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false, index: 1 },
+      { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false, index: 2 },
+    ]);
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態の確認
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-1-parent')).toHaveTextContent('null');
+    });
+
+    // node-3（tabId=3, index=2）をnode-1とnode-2の間にドロップ
+    // aboveNodeId=node-1, belowNodeId=node-2
+    // belowNodeのインデックス（1）にタブを移動すべき
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-3',
+          insertIndex: 1, // ツリー内の位置（使用されない）
+          aboveNodeId: 'node-1',
+          belowNodeId: 'node-2',
+        });
+      }
+    });
+
+    // ブラウザタブの順序が正しく同期されることを確認
+    // belowNodeId=node-2のtabId=2のインデックス（1）を使用してタブを移動すべき
+    await waitFor(() => {
+      expect(mockChrome.tabs.move).toHaveBeenCalledWith(3, { index: 1 });
+    });
+  });
+
+  /**
+   * Task 7.3 (tab-tree-bugfix-2): リスト末尾へのドロップテスト
+   * Requirements: 2.1, 2.2, 2.3
+   * belowNodeがない場合（リスト末尾へのドロップ）、aboveNodeの次のインデックスを使用
+   */
+  it('リスト末尾にドロップした場合、正しいインデックスでタブを移動する', async () => {
+    let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
+
+    // 3つのルートノードを持つツリー状態
+    const treeStateWithMultipleRoots: TreeState = {
+      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      currentViewId: 'default',
+      nodes: {
+        'node-1': {
+          id: 'node-1',
+          tabId: 1,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-2': {
+          id: 'node-2',
+          tabId: 2,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+        'node-3': {
+          id: 'node-3',
+          tabId: 3,
+          parentId: null,
+          children: [],
+          isExpanded: true,
+          depth: 0,
+          viewId: 'default',
+        },
+      },
+      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3' },
+    };
+
+    mockChrome.storage.local.get = vi.fn().mockResolvedValue({
+      tree_state: treeStateWithMultipleRoots,
+    });
+    mockChrome.tabs.query = vi.fn().mockResolvedValue([
+      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true, index: 0 },
+      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false, index: 1 },
+      { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false, index: 2 },
+    ]);
+
+    await act(async () => {
+      render(
+        <TreeStateProvider>
+          <SiblingDropTestComponent
+            onReady={(fn) => {
+              handleSiblingDrop = fn;
+            }}
+          />
+        </TreeStateProvider>
+      );
+    });
+
+    // 初期状態の確認
+    await waitFor(() => {
+      expect(screen.getByTestId('node-node-1-parent')).toHaveTextContent('null');
+    });
+
+    // node-1（tabId=1, index=0）をリスト末尾にドロップ
+    // aboveNodeId=node-3, belowNodeId=undefined
+    await act(async () => {
+      if (handleSiblingDrop) {
+        await handleSiblingDrop({
+          activeNodeId: 'node-1',
+          insertIndex: 2, // ツリー内の位置
+          aboveNodeId: 'node-3',
+          belowNodeId: undefined, // リスト末尾
+        });
+      }
+    });
+
+    // ブラウザタブの順序が正しく同期されることを確認
+    // リスト末尾なのでindex=-1（末尾に移動）を使用すべき
+    await waitFor(() => {
+      expect(mockChrome.tabs.move).toHaveBeenCalledWith(1, { index: -1 });
     });
   });
 });

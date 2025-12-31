@@ -14,11 +14,10 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { DragEndEvent } from '@dnd-kit/core';
 import TabTreeView from './TabTreeView';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { act } from 'react';
-import type { TreeState } from '@/types';
+import type { TreeState, DragEndEvent } from '@/types';
 import { getMockChrome } from '@/test/test-types';
 
 // テストコンポーネント: 完全な統合テスト用

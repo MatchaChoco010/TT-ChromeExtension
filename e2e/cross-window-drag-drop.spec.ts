@@ -1,10 +1,17 @@
 /**
  * E2E Tests: Cross-Window Drag and Drop Tab Movement
  *
- * Requirement 7.4, 7.5, 7.6: Cross-window drag and drop E2E tests
- * - Verify tab movement via cross-window drag
- * - Verify drop indicator display in destination window
- * - Verify moved tab belongs to destination window
+ * Task 16.1 (tab-tree-bugfix-2): cross-window-drag-drop.spec.ts の書き直し
+ *
+ * Requirements:
+ * - 6.1: 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
+ * - 6.2: クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
+ * - 6.3: クロスウィンドウドラッグはドラッグアウトとして判定されない
+ * - 6.4: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
+ * - 6.5: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
+ * - 6.7: Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
+ * - 6.8: E2Eテストでクロスウィンドウドラッグ機能を検証
+ * - 6.9: E2Eテストは --repeat-each=10 で10回連続成功
  *
  * Note: Run with `npm run test:e2e`
  */
@@ -17,453 +24,888 @@ import {
   waitForTabInWindow,
   waitForCondition,
 } from './utils/polling-utils';
+import type { DragSession } from '../src/background/drag-session-manager';
+import type { MessageResponse, TabNode } from '../src/types';
 
 test.describe('Cross-Window Drag and Drop Tab Movement', () => {
-  test('tab should be moved to destination window via MOVE_TAB_TO_WINDOW message', async ({
-    extensionContext,
-    serviceWorker,
-  }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
+  test.describe('DragSessionManager Integration', () => {
+    test('should start drag session with correct state', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
 
-    // Create a tab in the original window
-    const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
+      // Create a tab in the original window
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      expect(tabId).toBeGreaterThan(0);
 
-    // Wait for tab to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId);
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
 
-    // Create a new window
-    const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
-    expect(newWindowId).not.toBe(originalWindowId);
+      // Open side panel
+      const sidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(sidePanel, serviceWorker);
 
-    // Open side panels for both windows
-    const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-    await waitForSidePanelReady(originalSidePanel, serviceWorker);
+      // Start a drag session via message
+      const startResult = await sidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          const response = await new Promise<MessageResponse<DragSession>>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              (response) => resolve(response as MessageResponse<DragSession>)
+            );
+          });
+          return response;
+        },
+        { tabId, windowId: originalWindowId }
+      );
 
-    const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newSidePanel, serviceWorker);
+      expect(startResult.success).toBe(true);
+      expect(startResult.data).toBeDefined();
+      expect(startResult.data?.tabId).toBe(tabId);
+      expect(startResult.data?.sourceWindowId).toBe(originalWindowId);
+      expect(startResult.data?.currentWindowId).toBe(originalWindowId);
+      expect(startResult.data?.state).toBe('dragging_local');
+      expect(startResult.data?.isLocked).toBe(false);
 
-    // Simulate cross-window drag by setting drag state
-    await originalSidePanel.evaluate(
-      ({ tabId, windowId }) => {
+      // Clean up: end the session
+      await sidePanel.evaluate(() => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage(
-            {
-              type: 'SET_DRAG_STATE',
-              payload: {
-                tabId,
-                treeData: [],
-                sourceWindowId: windowId,
-              },
-            },
+            { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
             () => resolve()
           );
         });
-      },
-      { tabId, windowId: originalWindowId }
-    );
-
-    // Move tab to new window via MOVE_TAB_TO_WINDOW message
-    const moveResult = await newSidePanel.evaluate(
-      ({ tabId, windowId }) => {
-        return new Promise<{ success: boolean }>((resolve) => {
-          chrome.runtime.sendMessage(
-            {
-              type: 'MOVE_TAB_TO_WINDOW',
-              payload: { tabId, windowId },
-            },
-            (response) => {
-              resolve(response || { success: false });
-            }
-          );
-        });
-      },
-      { tabId, windowId: newWindowId }
-    );
-
-    expect(moveResult.success).toBe(true);
-
-    // Wait for tab to appear in new window
-    await waitForTabInWindow(extensionContext, tabId, newWindowId);
-
-    // Verify tab is in new window
-    const tabAfterMove = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-
-    expect(tabAfterMove.windowId).toBe(newWindowId);
-
-    // Clear drag state
-    await originalSidePanel.evaluate(() => {
-      return new Promise<void>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'CLEAR_DRAG_STATE' }, () => resolve());
       });
     });
-  });
 
-  test('moved tab should appear in destination window tree and disappear from source', async ({
-    extensionContext,
-    serviceWorker,
-  }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
+    test('should get current drag session', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
 
-    // Create a tab in the original window
-    const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
+      // Create a tab in the original window
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      expect(tabId).toBeGreaterThan(0);
 
-    // Wait for tab to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId);
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
 
-    // Create a new window
-    const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+      // Open side panel
+      const sidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(sidePanel, serviceWorker);
 
-    // Open side panels for both windows
-    const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-    await waitForSidePanelReady(originalSidePanel, serviceWorker);
+      // Start a drag session
+      await sidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId, windowId: originalWindowId }
+      );
 
-    const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newSidePanel, serviceWorker);
+      // Get the session
+      const getResult = await sidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response;
+      });
 
-    // Verify tab is visible in original window's tree
-    const treeNodeInOriginal = originalSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(treeNodeInOriginal).toBeVisible();
+      expect(getResult.success).toBe(true);
+      expect(getResult.data).not.toBeNull();
+      expect(getResult.data?.tabId).toBe(tabId);
+      expect(getResult.data?.state).toBe('dragging_local');
 
-    // Move tab to new window using chrome.tabs.move (simulating drop action)
-    await moveTabToWindow(extensionContext, tabId, newWindowId);
-
-    // Wait for tab to appear in new window
-    await waitForTabInWindow(extensionContext, tabId, newWindowId);
-
-    // Reload side panels to reflect the change
-    await newSidePanel.reload();
-    await waitForSidePanelReady(newSidePanel, serviceWorker);
-
-    await originalSidePanel.reload();
-    await waitForSidePanelReady(originalSidePanel, serviceWorker);
-
-    // Tab should appear in new window's tree
-    const treeNodeInNew = newSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(treeNodeInNew).toBeVisible({ timeout: 10000 });
-
-    // Tab should not appear in original window's tree
-    await expect(treeNodeInOriginal).not.toBeVisible();
-  });
-
-  test('drag state should include source window information for cross-window detection', async ({
-    extensionContext,
-    serviceWorker,
-  }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // Create a tab in the original window
-    const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
-
-    // Wait for tab to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId);
-
-    // Create a new window
-    const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
-
-    // Open side panels for both windows
-    const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-    await waitForSidePanelReady(originalSidePanel, serviceWorker);
-
-    const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newSidePanel, serviceWorker);
-
-    // Set drag state from original window
-    await originalSidePanel.evaluate(
-      ({ tabId, windowId }) => {
+      // Clean up
+      await sidePanel.evaluate(() => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage(
-            {
-              type: 'SET_DRAG_STATE',
-              payload: {
-                tabId,
-                treeData: [],
-                sourceWindowId: windowId,
-              },
-            },
+            { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
             () => resolve()
           );
         });
-      },
-      { tabId, windowId: originalWindowId }
-    );
-
-    // New window should be able to detect drag is from different window
-    const dragState = await newSidePanel.evaluate(async () => {
-      const response = await new Promise<{
-        success: boolean;
-        data: { tabId: number; sourceWindowId: number } | null;
-      }>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'GET_DRAG_STATE' }, (response) => {
-          resolve(response || { success: false, data: null });
-        });
-      });
-      return response.data;
-    });
-
-    expect(dragState).not.toBeNull();
-    expect(dragState?.tabId).toBe(tabId);
-    expect(dragState?.sourceWindowId).toBe(originalWindowId);
-    expect(dragState?.sourceWindowId).not.toBe(newWindowId);
-
-    // New window can determine it's a cross-window drag
-    const currentWindowId = await newSidePanel.evaluate(() => {
-      return new Promise<number>((resolve) => {
-        chrome.windows.getCurrent((window) => {
-          resolve(window.id as number);
-        });
       });
     });
 
-    const isCrossWindowDrag = dragState?.sourceWindowId !== currentWindowId;
-    expect(isCrossWindowDrag).toBe(true);
-
-    // Clean up
-    await originalSidePanel.evaluate(() => {
-      return new Promise<void>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'CLEAR_DRAG_STATE' }, () => resolve());
+    test('should end drag session and return null on get', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
       });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create a tab in the original window
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      expect(tabId).toBeGreaterThan(0);
+
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
+
+      // Open side panel
+      const sidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(sidePanel, serviceWorker);
+
+      // Start a drag session
+      await sidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId, windowId: originalWindowId }
+      );
+
+      // End the session
+      const endResult = await sidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'END_DRAG_SESSION', payload: { reason: 'COMPLETED' } },
+            (response) => resolve(response as MessageResponse<null>)
+          );
+        });
+        return response;
+      });
+
+      expect(endResult.success).toBe(true);
+
+      // Get the session (should be null)
+      const getResult = await sidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response;
+      });
+
+      expect(getResult.success).toBe(true);
+      expect(getResult.data).toBeNull();
     });
   });
 
-  test('tab should belong to destination window after move operation', async ({
-    extensionContext,
-    serviceWorker,
-  }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
+  test.describe('Cross-Window Move Operations', () => {
+    test('should move tab to destination window via BEGIN_CROSS_WINDOW_MOVE', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
 
-    // Create multiple tabs in original window
-    const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
-    const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
-    expect(tabId1).toBeGreaterThan(0);
-    expect(tabId2).toBeGreaterThan(0);
+      // Create a tab in the original window
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      expect(tabId).toBeGreaterThan(0);
 
-    // Wait for tabs to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await waitForTabInTreeState(extensionContext, tabId2);
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
 
-    // Create a new window
-    const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+      // Create a new window
+      const newWindowId = await createWindow(extensionContext);
+      expect(newWindowId).toBeGreaterThan(0);
+      expect(newWindowId).not.toBe(originalWindowId);
 
-    // Verify both tabs belong to original window before move
-    const tabs = await serviceWorker.evaluate(({ windowId }) => {
-      return chrome.tabs.query({ windowId });
-    }, { windowId: originalWindowId });
+      // Open side panels for both windows
+      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
 
-    const tab1InOriginal = tabs.find((tab: chrome.tabs.Tab) => tab.id === tabId1);
-    const tab2InOriginal = tabs.find((tab: chrome.tabs.Tab) => tab.id === tabId2);
-    expect(tab1InOriginal).toBeDefined();
-    expect(tab2InOriginal).toBeDefined();
+      const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
 
-    // Move tab1 to new window
-    await moveTabToWindow(extensionContext, tabId1, newWindowId);
+      // Start drag session from original window
+      await originalSidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId, windowId: originalWindowId }
+      );
 
-    // Wait for tab to move
-    await waitForTabInWindow(extensionContext, tabId1, newWindowId);
+      // Move tab to new window via BEGIN_CROSS_WINDOW_MOVE
+      const moveResult = await newSidePanel.evaluate(
+        async ({ targetWindowId }) => {
+          const response = await new Promise<MessageResponse<void>>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'BEGIN_CROSS_WINDOW_MOVE',
+                payload: { targetWindowId },
+              },
+              (response) => resolve(response as MessageResponse<void>)
+            );
+          });
+          return response;
+        },
+        { targetWindowId: newWindowId }
+      );
 
-    // Verify tab1 belongs to new window
-    const tab1AfterMove = await serviceWorker.evaluate(
-      ({ tabId }) => chrome.tabs.get(tabId),
-      { tabId: tabId1 }
-    );
-    expect(tab1AfterMove.windowId).toBe(newWindowId);
+      expect(moveResult.success).toBe(true);
 
-    // Verify tab2 still belongs to original window
-    const tab2AfterMove = await serviceWorker.evaluate(
-      ({ tabId }) => chrome.tabs.get(tabId),
-      { tabId: tabId2 }
-    );
-    expect(tab2AfterMove.windowId).toBe(originalWindowId);
+      // Wait for tab to appear in new window
+      await waitForTabInWindow(extensionContext, tabId, newWindowId);
 
-    // Verify window tab counts
-    const tabsInOriginal = await serviceWorker.evaluate(
-      ({ windowId }) => chrome.tabs.query({ windowId }),
-      { windowId: originalWindowId }
-    );
-    const tabsInNew = await serviceWorker.evaluate(
-      ({ windowId }) => chrome.tabs.query({ windowId }),
-      { windowId: newWindowId }
-    );
+      // Verify tab is now in the new window
+      const tabAfterMove = await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.get(tabId),
+        { tabId }
+      );
+      expect(tabAfterMove.windowId).toBe(newWindowId);
 
-    // tab1 should be in new window
-    expect(tabsInNew.find((tab: chrome.tabs.Tab) => tab.id === tabId1)).toBeDefined();
-    // tab1 should not be in original window
-    expect(tabsInOriginal.find((tab: chrome.tabs.Tab) => tab.id === tabId1)).toBeUndefined();
-    // tab2 should still be in original window
-    expect(tabsInOriginal.find((tab: chrome.tabs.Tab) => tab.id === tabId2)).toBeDefined();
-  });
+      // Verify session state updated
+      const sessionAfterMove = await newSidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response.data;
+      });
 
-  test('cross-window drag state should be cleared after successful move', async ({
-    extensionContext,
-    serviceWorker,
-  }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
+      expect(sessionAfterMove).not.toBeNull();
+      expect(sessionAfterMove?.currentWindowId).toBe(newWindowId);
+      expect(sessionAfterMove?.state).toBe('dragging_cross_window');
 
-    // Create a tab in the original window
-    const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
-
-    // Wait for tab to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId);
-
-    // Create a new window
-    const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
-
-    // Open side panels
-    const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-    await waitForSidePanelReady(originalSidePanel, serviceWorker);
-
-    const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newSidePanel, serviceWorker);
-
-    // Set drag state
-    await originalSidePanel.evaluate(
-      ({ tabId, windowId }) => {
+      // Clean up
+      await newSidePanel.evaluate(() => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage(
-            {
-              type: 'SET_DRAG_STATE',
-              payload: {
-                tabId,
-                treeData: [],
-                sourceWindowId: windowId,
-              },
-            },
+            { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
             () => resolve()
           );
         });
-      },
-      { tabId, windowId: originalWindowId }
-    );
+      });
+    });
 
-    // Verify drag state is set
-    const dragStateBefore = await newSidePanel.evaluate(async () => {
-      const response = await new Promise<{ success: boolean; data: unknown }>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'GET_DRAG_STATE' }, (response) => {
-          resolve(response || { success: false, data: null });
+    test('should detect cross-window drag from different window', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create a tab in the original window
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      expect(tabId).toBeGreaterThan(0);
+
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
+
+      // Create a new window
+      const newWindowId = await createWindow(extensionContext);
+      expect(newWindowId).toBeGreaterThan(0);
+
+      // Open side panels for both windows
+      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
+
+      const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
+
+      // Start drag session from original window
+      await originalSidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId, windowId: originalWindowId }
+      );
+
+      // From new window, get session and check if it's from a different window
+      const sessionFromNewWindow = await newSidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response.data;
+      });
+
+      const currentWindowIdFromNewPanel = await newSidePanel.evaluate(() => {
+        return new Promise<number>((resolve) => {
+          chrome.windows.getCurrent((window) => {
+            resolve(window.id as number);
+          });
         });
       });
-      return response.data;
-    });
 
-    expect(dragStateBefore).not.toBeNull();
+      expect(sessionFromNewWindow).not.toBeNull();
+      expect(sessionFromNewWindow?.tabId).toBe(tabId);
+      expect(sessionFromNewWindow?.sourceWindowId).toBe(originalWindowId);
 
-    // Move tab and clear drag state
-    await moveTabToWindow(extensionContext, tabId, newWindowId);
+      // Cross-window detection: source window != current window
+      const isCrossWindowDrag = sessionFromNewWindow?.currentWindowId !== currentWindowIdFromNewPanel;
+      expect(isCrossWindowDrag).toBe(true);
 
-    // Clear drag state (simulating drop completion)
-    await newSidePanel.evaluate(() => {
-      return new Promise<void>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'CLEAR_DRAG_STATE' }, () => resolve());
-      });
-    });
-
-    // Verify drag state is cleared
-    const dragStateAfter = await newSidePanel.evaluate(async () => {
-      const response = await new Promise<{ success: boolean; data: unknown }>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'GET_DRAG_STATE' }, (response) => {
-          resolve(response || { success: false, data: null });
+      // Clean up
+      await originalSidePanel.evaluate(() => {
+        return new Promise<void>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
+            () => resolve()
+          );
         });
       });
-      return response.data;
     });
 
-    expect(dragStateAfter).toBeNull();
+    test('tab should belong to destination window after cross-window move', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create multiple tabs in original window
+      const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
+      const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+      expect(tabId1).toBeGreaterThan(0);
+      expect(tabId2).toBeGreaterThan(0);
+
+      // Wait for tabs to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId1);
+      await waitForTabInTreeState(extensionContext, tabId2);
+
+      // Create a new window
+      const newWindowId = await createWindow(extensionContext);
+      expect(newWindowId).toBeGreaterThan(0);
+
+      // Verify both tabs belong to original window before move
+      const tabsBeforeMove = await serviceWorker.evaluate(({ windowId }) => {
+        return chrome.tabs.query({ windowId });
+      }, { windowId: originalWindowId });
+
+      const tab1InOriginal = tabsBeforeMove.find((tab: chrome.tabs.Tab) => tab.id === tabId1);
+      const tab2InOriginal = tabsBeforeMove.find((tab: chrome.tabs.Tab) => tab.id === tabId2);
+      expect(tab1InOriginal).toBeDefined();
+      expect(tab2InOriginal).toBeDefined();
+
+      // Open side panels
+      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
+
+      const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
+
+      // Start drag session for tab1
+      await originalSidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId: tabId1, windowId: originalWindowId }
+      );
+
+      // Move tab1 to new window
+      await newSidePanel.evaluate(
+        async ({ targetWindowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'BEGIN_CROSS_WINDOW_MOVE',
+                payload: { targetWindowId },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { targetWindowId: newWindowId }
+      );
+
+      // Wait for tab to move
+      await waitForTabInWindow(extensionContext, tabId1, newWindowId);
+
+      // End the session
+      await newSidePanel.evaluate(() => {
+        return new Promise<void>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'END_DRAG_SESSION', payload: { reason: 'COMPLETED' } },
+            () => resolve()
+          );
+        });
+      });
+
+      // Verify tab1 belongs to new window
+      const tab1AfterMove = await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.get(tabId),
+        { tabId: tabId1 }
+      );
+      expect(tab1AfterMove.windowId).toBe(newWindowId);
+
+      // Verify tab2 still belongs to original window
+      const tab2AfterMove = await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.get(tabId),
+        { tabId: tabId2 }
+      );
+      expect(tab2AfterMove.windowId).toBe(originalWindowId);
+
+      // Verify window tab counts
+      const tabsInOriginal = await serviceWorker.evaluate(
+        ({ windowId }) => chrome.tabs.query({ windowId }),
+        { windowId: originalWindowId }
+      );
+      const tabsInNew = await serviceWorker.evaluate(
+        ({ windowId }) => chrome.tabs.query({ windowId }),
+        { windowId: newWindowId }
+      );
+
+      // tab1 should be in new window
+      expect(tabsInNew.find((tab: chrome.tabs.Tab) => tab.id === tabId1)).toBeDefined();
+      // tab1 should not be in original window
+      expect(tabsInOriginal.find((tab: chrome.tabs.Tab) => tab.id === tabId1)).toBeUndefined();
+      // tab2 should still be in original window
+      expect(tabsInOriginal.find((tab: chrome.tabs.Tab) => tab.id === tabId2)).toBeDefined();
+    });
   });
 
-  test('tab tree should reflect correct window after cross-window move', async ({
-    extensionContext,
-    serviceWorker,
-  }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
+  test.describe('UI Tree Synchronization', () => {
+    test('moved tab should appear in destination window tree and disappear from source', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create a tab in the original window
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      expect(tabId).toBeGreaterThan(0);
+
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
+
+      // Create a new window
+      const newWindowId = await createWindow(extensionContext);
+      expect(newWindowId).toBeGreaterThan(0);
+
+      // Open side panels for both windows
+      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
+
+      const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
+
+      // Verify tab is visible in original window's tree
+      const treeNodeInOriginal = originalSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
+      await expect(treeNodeInOriginal).toBeVisible();
+
+      // Move tab to new window using chrome.tabs.move (simulating completed drop)
+      await moveTabToWindow(extensionContext, tabId, newWindowId);
+
+      // Wait for tab to appear in new window
+      await waitForTabInWindow(extensionContext, tabId, newWindowId);
+
+      // Reload side panels to reflect the change
+      await newSidePanel.reload();
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
+
+      await originalSidePanel.reload();
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
+
+      // Tab should appear in new window's tree
+      const treeNodeInNew = newSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
+      await expect(treeNodeInNew).toBeVisible({ timeout: 10000 });
+
+      // Tab should not appear in original window's tree
+      await expect(treeNodeInOriginal).not.toBeVisible();
     });
-    const originalWindowId = originalWindow.id as number;
 
-    // Create a tab with specific URL for identification
-    const tabUrl = 'https://example.com/cross-window-test';
-    const tabId = await createTab(extensionContext, tabUrl);
-    expect(tabId).toBeGreaterThan(0);
+    test('tab tree should reflect correct window after cross-window move via session', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
 
-    // Wait for tab to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId);
+      // Create a tab with specific URL for identification
+      const tabUrl = 'https://example.com/cross-window-test';
+      const tabId = await createTab(extensionContext, tabUrl);
+      expect(tabId).toBeGreaterThan(0);
 
-    // Create a new window
-    const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
 
-    // Open side panels for both windows
-    const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-    await waitForSidePanelReady(originalSidePanel, serviceWorker);
+      // Create a new window
+      const newWindowId = await createWindow(extensionContext);
+      expect(newWindowId).toBeGreaterThan(0);
 
-    const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newSidePanel, serviceWorker);
+      // Open side panels for both windows
+      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
 
-    // Get tree node count in both windows before move
-    const originalTreeNodesBeforeMove = await originalSidePanel
-      .locator('[data-testid^="tree-node-"]')
-      .count();
+      const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
 
-    // Move tab to new window
-    await moveTabToWindow(extensionContext, tabId, newWindowId);
+      // Get tree node count in original window before move
+      const originalTreeNodesBeforeMove = await originalSidePanel
+        .locator('[data-testid^="tree-node-"]')
+        .count();
 
-    // Wait for tab to appear in new window
-    await waitForTabInWindow(extensionContext, tabId, newWindowId);
+      // Start drag session
+      await originalSidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId, windowId: originalWindowId }
+      );
 
-    // Reload side panels
-    await newSidePanel.reload();
-    await waitForSidePanelReady(newSidePanel, serviceWorker);
+      // Move via BEGIN_CROSS_WINDOW_MOVE
+      await newSidePanel.evaluate(
+        async ({ targetWindowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'BEGIN_CROSS_WINDOW_MOVE',
+                payload: { targetWindowId },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { targetWindowId: newWindowId }
+      );
 
-    await originalSidePanel.reload();
-    await waitForSidePanelReady(originalSidePanel, serviceWorker);
+      // Wait for tab to move
+      await waitForTabInWindow(extensionContext, tabId, newWindowId);
 
-    // Tab should be in new window's tree
-    const treeNodeInNew = newSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(treeNodeInNew).toBeVisible({ timeout: 10000 });
+      // End the session
+      await newSidePanel.evaluate(() => {
+        return new Promise<void>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'END_DRAG_SESSION', payload: { reason: 'COMPLETED' } },
+            () => resolve()
+          );
+        });
+      });
 
-    // Tab should not be in original window's tree
-    const treeNodeInOriginal = originalSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(treeNodeInOriginal).not.toBeVisible();
+      // Reload side panels
+      await newSidePanel.reload();
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
 
-    // Original window should have one less tree node
-    const originalTreeNodesAfterMove = await originalSidePanel
-      .locator('[data-testid^="tree-node-"]')
-      .count();
+      await originalSidePanel.reload();
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
 
-    // Note: The count may vary depending on other tabs, but the moved tab should be gone
-    expect(originalTreeNodesAfterMove).toBeLessThan(originalTreeNodesBeforeMove);
+      // Tab should be in new window's tree
+      const treeNodeInNew = newSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
+      await expect(treeNodeInNew).toBeVisible({ timeout: 10000 });
+
+      // Tab should not be in original window's tree
+      const treeNodeInOriginal = originalSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
+      await expect(treeNodeInOriginal).not.toBeVisible();
+
+      // Original window should have one less tree node
+      const originalTreeNodesAfterMove = await originalSidePanel
+        .locator('[data-testid^="tree-node-"]')
+        .count();
+
+      // The moved tab should be gone from original window
+      expect(originalTreeNodesAfterMove).toBeLessThan(originalTreeNodesBeforeMove);
+    });
+  });
+
+  test.describe('Session Lifecycle', () => {
+    test('cross-window drag state should be cleared after session end', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create a tab in the original window
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      expect(tabId).toBeGreaterThan(0);
+
+      // Wait for tab to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId);
+
+      // Create a new window
+      const newWindowId = await createWindow(extensionContext);
+      expect(newWindowId).toBeGreaterThan(0);
+
+      // Open side panels
+      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(originalSidePanel, serviceWorker);
+
+      const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
+
+      // Start drag session
+      await originalSidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId, windowId: originalWindowId }
+      );
+
+      // Verify session exists
+      const sessionBefore = await newSidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response.data;
+      });
+
+      expect(sessionBefore).not.toBeNull();
+
+      // Move tab and complete the session
+      await newSidePanel.evaluate(
+        async ({ targetWindowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'BEGIN_CROSS_WINDOW_MOVE',
+                payload: { targetWindowId },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { targetWindowId: newWindowId }
+      );
+
+      // End the session
+      await newSidePanel.evaluate(() => {
+        return new Promise<void>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'END_DRAG_SESSION', payload: { reason: 'COMPLETED' } },
+            () => resolve()
+          );
+        });
+      });
+
+      // Verify session is cleared
+      const sessionAfter = await newSidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response.data;
+      });
+
+      expect(sessionAfter).toBeNull();
+    });
+
+    test('should handle session replacement when new session starts', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create two tabs
+      const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
+      const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+      expect(tabId1).toBeGreaterThan(0);
+      expect(tabId2).toBeGreaterThan(0);
+
+      // Wait for tabs to appear in tree state
+      await waitForTabInTreeState(extensionContext, tabId1);
+      await waitForTabInTreeState(extensionContext, tabId2);
+
+      // Open side panel
+      const sidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
+      await waitForSidePanelReady(sidePanel, serviceWorker);
+
+      // Start first session
+      await sidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId: tabId1, windowId: originalWindowId }
+      );
+
+      // Verify first session
+      const session1 = await sidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response.data;
+      });
+
+      expect(session1?.tabId).toBe(tabId1);
+
+      // Start second session (should replace first)
+      await sidePanel.evaluate(
+        async ({ tabId, windowId }) => {
+          await new Promise<void>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'START_DRAG_SESSION',
+                payload: {
+                  tabId,
+                  windowId,
+                  treeData: [] as TabNode[],
+                },
+              },
+              () => resolve()
+            );
+          });
+        },
+        { tabId: tabId2, windowId: originalWindowId }
+      );
+
+      // Verify second session replaced first
+      const session2 = await sidePanel.evaluate(async () => {
+        const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'GET_DRAG_SESSION' },
+            (response) => resolve(response as MessageResponse<DragSession | null>)
+          );
+        });
+        return response.data;
+      });
+
+      expect(session2?.tabId).toBe(tabId2);
+      expect(session2?.sessionId).not.toBe(session1?.sessionId);
+
+      // Clean up
+      await sidePanel.evaluate(() => {
+        return new Promise<void>((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
+            () => resolve()
+          );
+        });
+      });
+    });
   });
 });

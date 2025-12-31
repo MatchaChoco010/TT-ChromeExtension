@@ -1,309 +1,407 @@
+/**
+ * Task 13.2: useCrossWindowDragフックのテスト
+ *
+ * Requirements:
+ * - 6.1: 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
+ * - 6.2: クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
+ * - 6.3: クロスウィンドウドラッグはドラッグアウトとして判定されない
+ * - 6.4: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
+ * - 6.5: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
+ * - 6.7: Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCrossWindowDrag } from './useCrossWindowDrag';
-import type { TabNode } from '@/types';
+import type { DragSession } from '@/background/drag-session-manager';
 
-// Sample TabNode for testing
-const createTestTabNode = (tabId: number): TabNode => ({
-  id: `node-${tabId}`,
-  tabId,
-  parentId: null,
-  children: [],
-  isExpanded: true,
-  depth: 0,
-  viewId: 'view-1',
+// Mock chrome.windows.getCurrent
+const mockGetCurrent = vi.fn();
+const mockSendMessage = vi.fn();
+
+// Setup chrome mock
+beforeEach(() => {
+  global.chrome = {
+    windows: {
+      getCurrent: mockGetCurrent,
+    },
+    runtime: {
+      sendMessage: mockSendMessage,
+    },
+  } as never;
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
 });
 
 describe('useCrossWindowDrag', () => {
-  let mockSendMessage: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    // Mock chrome.runtime.sendMessage
-    mockSendMessage = vi.fn((_message, callback) => {
-      if (callback) {
-        callback({ success: true });
-      }
-      return true;
-    });
-
-    global.chrome = {
-      runtime: {
-        sendMessage: mockSendMessage,
-      },
-    } as never;
+  const createMockDragSession = (overrides: Partial<DragSession> = {}): DragSession => ({
+    sessionId: 'test-session-id',
+    tabId: 123,
+    state: 'dragging_local',
+    sourceWindowId: 2,
+    currentWindowId: 2,
+    startedAt: Date.now(),
+    updatedAt: Date.now(),
+    treeData: [],
+    isLocked: false,
+    ...overrides,
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+  describe('mouseenter event handling', () => {
+    it('should check for drag session when mouse enters container', async () => {
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockImplementation((message) => {
+        if (message.type === 'GET_DRAG_SESSION') {
+          return Promise.resolve({ success: true, data: null });
+        }
+        return Promise.resolve({ success: true });
+      });
 
-  describe('handleDragStart', () => {
-    it('should set drag state in service worker when drag starts', async () => {
-      const { result } = renderHook(() =>
+      const containerRef = { current: document.createElement('div') };
+      const onDragReceived = vi.fn();
+
+      renderHook(() =>
         useCrossWindowDrag({
-          currentWindowId: 1,
+          containerRef,
+          onDragReceived,
         })
       );
 
-      const tabId = 123;
-      const treeData: TabNode[] = [createTestTabNode(123)];
-
+      // Wait for window ID to be fetched
       await act(async () => {
-        await result.current.handleDragStart(tabId, treeData);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Simulate mouseenter event
+      await act(async () => {
+        const mouseEnterEvent = new MouseEvent('mouseenter', {
+          clientX: 100,
+          clientY: 200,
+          bubbles: true,
+        });
+        containerRef.current?.dispatchEvent(mouseEnterEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'SET_DRAG_STATE',
-          payload: {
-            tabId,
-            treeData,
-            sourceWindowId: 1,
-          },
-        },
-        expect.any(Function)
+        expect.objectContaining({ type: 'GET_DRAG_SESSION' })
       );
     });
 
-    it('should handle errors when setting drag state fails', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      mockSendMessage.mockImplementation((_message, callback) => {
-        if (callback) {
-          callback({ success: false, error: 'Test error' });
+    it('should not trigger onDragReceived when session is idle', async () => {
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockImplementation((message) => {
+        if (message.type === 'GET_DRAG_SESSION') {
+          return Promise.resolve({
+            success: true,
+            data: createMockDragSession({ state: 'idle' }),
+          });
         }
-        return true;
+        return Promise.resolve({ success: true });
       });
 
-      const { result } = renderHook(() =>
+      const containerRef = { current: document.createElement('div') };
+      const onDragReceived = vi.fn();
+
+      renderHook(() =>
         useCrossWindowDrag({
-          currentWindowId: 1,
+          containerRef,
+          onDragReceived,
         })
       );
 
       await act(async () => {
-        await result.current.handleDragStart(123, []);
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to set drag state:',
-        'Test error'
+      await act(async () => {
+        const mouseEnterEvent = new MouseEvent('mouseenter', {
+          clientX: 100,
+          clientY: 200,
+          bubbles: true,
+        });
+        containerRef.current?.dispatchEvent(mouseEnterEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(onDragReceived).not.toHaveBeenCalled();
+    });
+
+    it('should not trigger onDragReceived when dragging in same window', async () => {
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockImplementation((message) => {
+        if (message.type === 'GET_DRAG_SESSION') {
+          return Promise.resolve({
+            success: true,
+            data: createMockDragSession({
+              currentWindowId: 1, // Same window
+            }),
+          });
+        }
+        return Promise.resolve({ success: true });
+      });
+
+      const containerRef = { current: document.createElement('div') };
+      const onDragReceived = vi.fn();
+
+      renderHook(() =>
+        useCrossWindowDrag({
+          containerRef,
+          onDragReceived,
+        })
       );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      await act(async () => {
+        const mouseEnterEvent = new MouseEvent('mouseenter', {
+          clientX: 100,
+          clientY: 200,
+          bubbles: true,
+        });
+        containerRef.current?.dispatchEvent(mouseEnterEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(onDragReceived).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cross-window drag detection', () => {
+    it('should begin cross-window move when drag is from different window', async () => {
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockImplementation((message) => {
+        if (message.type === 'GET_DRAG_SESSION') {
+          return Promise.resolve({
+            success: true,
+            data: createMockDragSession({
+              currentWindowId: 2, // Different window
+              tabId: 123,
+            }),
+          });
+        }
+        if (message.type === 'BEGIN_CROSS_WINDOW_MOVE') {
+          return Promise.resolve({ success: true });
+        }
+        return Promise.resolve({ success: true });
+      });
+
+      const containerRef = { current: document.createElement('div') };
+      const onDragReceived = vi.fn();
+
+      renderHook(() =>
+        useCrossWindowDrag({
+          containerRef,
+          onDragReceived,
+        })
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      await act(async () => {
+        const mouseEnterEvent = new MouseEvent('mouseenter', {
+          clientX: 100,
+          clientY: 200,
+          bubbles: true,
+        });
+        containerRef.current?.dispatchEvent(mouseEnterEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'BEGIN_CROSS_WINDOW_MOVE',
+          targetWindowId: 1,
+        })
+      );
+    });
+
+    it('should call onDragReceived with tab info after successful move', async () => {
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockImplementation((message) => {
+        if (message.type === 'GET_DRAG_SESSION') {
+          return Promise.resolve({
+            success: true,
+            data: createMockDragSession({
+              currentWindowId: 2,
+              tabId: 123,
+            }),
+          });
+        }
+        if (message.type === 'BEGIN_CROSS_WINDOW_MOVE') {
+          return Promise.resolve({ success: true });
+        }
+        return Promise.resolve({ success: true });
+      });
+
+      const containerRef = { current: document.createElement('div') };
+      const onDragReceived = vi.fn();
+
+      renderHook(() =>
+        useCrossWindowDrag({
+          containerRef,
+          onDragReceived,
+        })
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      await act(async () => {
+        const mouseEnterEvent = new MouseEvent('mouseenter', {
+          clientX: 100,
+          clientY: 200,
+          bubbles: true,
+        });
+        containerRef.current?.dispatchEvent(mouseEnterEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(onDragReceived).toHaveBeenCalledWith(123, { x: 100, y: 200 });
+    });
+  });
+
+  describe('error handling', () => {
+    it('should silently cancel on BEGIN_CROSS_WINDOW_MOVE error', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockImplementation((message) => {
+        if (message.type === 'GET_DRAG_SESSION') {
+          return Promise.resolve({
+            success: true,
+            data: createMockDragSession({
+              currentWindowId: 2,
+              tabId: 123,
+            }),
+          });
+        }
+        if (message.type === 'BEGIN_CROSS_WINDOW_MOVE') {
+          return Promise.resolve({ success: false, error: 'Tab not found' });
+        }
+        return Promise.resolve({ success: true });
+      });
+
+      const containerRef = { current: document.createElement('div') };
+      const onDragReceived = vi.fn();
+
+      renderHook(() =>
+        useCrossWindowDrag({
+          containerRef,
+          onDragReceived,
+        })
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      await act(async () => {
+        const mouseEnterEvent = new MouseEvent('mouseenter', {
+          clientX: 100,
+          clientY: 200,
+          bubbles: true,
+        });
+        containerRef.current?.dispatchEvent(mouseEnterEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Should log error but not throw
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[CrossWindowDrag] Failed to move tab:',
+        'Tab not found'
+      );
+      // Should not call onDragReceived on error
+      expect(onDragReceived).not.toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should silently cancel on network error', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockImplementation((message) => {
+        if (message.type === 'GET_DRAG_SESSION') {
+          return Promise.resolve({
+            success: true,
+            data: createMockDragSession({
+              currentWindowId: 2,
+              tabId: 123,
+            }),
+          });
+        }
+        if (message.type === 'BEGIN_CROSS_WINDOW_MOVE') {
+          return Promise.reject(new Error('Network error'));
+        }
+        return Promise.resolve({ success: true });
+      });
+
+      const containerRef = { current: document.createElement('div') };
+      const onDragReceived = vi.fn();
+
+      renderHook(() =>
+        useCrossWindowDrag({
+          containerRef,
+          onDragReceived,
+        })
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      await act(async () => {
+        const mouseEnterEvent = new MouseEvent('mouseenter', {
+          clientX: 100,
+          clientY: 200,
+          bubbles: true,
+        });
+        containerRef.current?.dispatchEvent(mouseEnterEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Should log error but not throw
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      // Should not call onDragReceived on error
+      expect(onDragReceived).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
   });
 
-  describe('handleDragEnd', () => {
-    it('should clear drag state when drag ends inside panel', async () => {
-      const { result } = renderHook(() =>
+  describe('cleanup', () => {
+    it('should remove event listener on unmount', async () => {
+      mockGetCurrent.mockResolvedValue({ id: 1 });
+      mockSendMessage.mockResolvedValue({ success: true, data: null });
+
+      const containerRef = { current: document.createElement('div') };
+      const removeEventListenerSpy = vi.spyOn(
+        containerRef.current,
+        'removeEventListener'
+      );
+
+      const { unmount } = renderHook(() =>
         useCrossWindowDrag({
-          currentWindowId: 1,
+          containerRef,
+          onDragReceived: vi.fn(),
         })
       );
 
       await act(async () => {
-        await result.current.handleDragEnd(false);
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'CLEAR_DRAG_STATE',
-        },
-        expect.any(Function)
-      );
-    });
+      unmount();
 
-    it('should detect drag outside panel and get drag state', async () => {
-      // Mock GET_DRAG_STATE response
-      mockSendMessage.mockImplementation((message, callback) => {
-        if (message.type === 'GET_DRAG_STATE' && callback) {
-          callback({
-            success: true,
-            data: {
-              tabId: 123,
-              treeData: [createTestTabNode(123)],
-              sourceWindowId: 1,
-            },
-          });
-        } else if (callback) {
-          callback({ success: true });
-        }
-        return true;
-      });
-
-      const { result } = renderHook(() =>
-        useCrossWindowDrag({
-          currentWindowId: 1,
-        })
-      );
-
-      await act(async () => {
-        await result.current.handleDragEnd(true);
-      });
-
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'GET_DRAG_STATE',
-        },
-        expect.any(Function)
-      );
-
-      // Should clear drag state after handling
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'CLEAR_DRAG_STATE',
-        },
-        expect.any(Function)
-      );
-    });
-
-    it('should create new window when dragged outside panel', async () => {
-      mockSendMessage.mockImplementation((message, callback) => {
-        if (message.type === 'GET_DRAG_STATE' && callback) {
-          callback({
-            success: true,
-            data: {
-              tabId: 123,
-              treeData: [createTestTabNode(123)],
-              sourceWindowId: 1,
-            },
-          });
-        } else if (callback) {
-          callback({ success: true });
-        }
-        return true;
-      });
-
-      const { result } = renderHook(() =>
-        useCrossWindowDrag({
-          currentWindowId: 1,
-        })
-      );
-
-      await act(async () => {
-        await result.current.handleDragEnd(true);
-      });
-
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'CREATE_WINDOW_WITH_TAB',
-          payload: { tabId: 123 },
-        },
-        expect.any(Function)
-      );
-    });
-  });
-
-  describe('handleDropFromOtherWindow', () => {
-    it('should move tab to current window when dropped from another window', async () => {
-      mockSendMessage.mockImplementation((message, callback) => {
-        if (message.type === 'GET_DRAG_STATE' && callback) {
-          callback({
-            success: true,
-            data: {
-              tabId: 123,
-              treeData: [createTestTabNode(123)],
-              sourceWindowId: 2, // Different window
-            },
-          });
-        } else if (callback) {
-          callback({ success: true });
-        }
-        return true;
-      });
-
-      const { result } = renderHook(() =>
-        useCrossWindowDrag({
-          currentWindowId: 1,
-        })
-      );
-
-      await act(async () => {
-        await result.current.handleDropFromOtherWindow();
-      });
-
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'MOVE_TAB_TO_WINDOW',
-          payload: { tabId: 123, windowId: 1 },
-        },
-        expect.any(Function)
-      );
-
-      // Should clear drag state after moving
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'CLEAR_DRAG_STATE',
-        },
-        expect.any(Function)
-      );
-    });
-
-    it('should not move tab if drag state is null', async () => {
-      mockSendMessage.mockImplementation((message, callback) => {
-        if (message.type === 'GET_DRAG_STATE' && callback) {
-          callback({ success: true, data: null });
-        } else if (callback) {
-          callback({ success: true });
-        }
-        return true;
-      });
-
-      const { result } = renderHook(() =>
-        useCrossWindowDrag({
-          currentWindowId: 1,
-        })
-      );
-
-      await act(async () => {
-        await result.current.handleDropFromOtherWindow();
-      });
-
-      // Should only call GET_DRAG_STATE
-      expect(mockSendMessage).toHaveBeenCalledTimes(1);
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'GET_DRAG_STATE',
-        },
-        expect.any(Function)
-      );
-    });
-
-    it('should not move tab if source window is the same as current window', async () => {
-      mockSendMessage.mockImplementation((message, callback) => {
-        if (message.type === 'GET_DRAG_STATE' && callback) {
-          callback({
-            success: true,
-            data: {
-              tabId: 123,
-              treeData: [createTestTabNode(123)],
-              sourceWindowId: 1, // Same window
-            },
-          });
-        } else if (callback) {
-          callback({ success: true });
-        }
-        return true;
-      });
-
-      const { result } = renderHook(() =>
-        useCrossWindowDrag({
-          currentWindowId: 1,
-        })
-      );
-
-      await act(async () => {
-        await result.current.handleDropFromOtherWindow();
-      });
-
-      // Should only call GET_DRAG_STATE
-      expect(mockSendMessage).toHaveBeenCalledTimes(1);
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        {
-          type: 'GET_DRAG_STATE',
-        },
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        'mouseenter',
         expect.any(Function)
       );
     });

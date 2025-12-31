@@ -14,6 +14,8 @@ export enum DropTargetType {
   Tab = 'tab',
   /** タブ間の隙間へのドロップ（兄弟として配置） */
   Gap = 'gap',
+  /** 水平方向のタブ間の隙間へのドロップ（ピン留めタブ用） */
+  HorizontalGap = 'horizontal_gap',
   /** ドロップ不可 */
   None = 'none',
 }
@@ -54,6 +56,8 @@ export interface DropTarget {
   gapIndex?: number;
   /** 隙間ターゲットの場合の隣接ノードdepth情報 */
   adjacentDepths?: AdjacentDepths;
+  /** 水平ドロップの場合の挿入インデックス（ピン留めタブ用） */
+  insertIndex?: number;
 }
 
 /**
@@ -206,4 +210,110 @@ export function calculateIndicatorY(
   const aboveTab = tabPositions[gapIndex - 1];
   const belowTab = tabPositions[gapIndex];
   return (aboveTab.bottom + belowTab.top) / 2;
+}
+
+/**
+ * Task 10.1: 水平方向のタブ位置情報（ピン留めタブ用）
+ */
+export interface HorizontalTabPosition {
+  /** ノードID */
+  nodeId: string;
+  /** タブの左端X座標（コンテナ相対） */
+  left: number;
+  /** タブの右端X座標（コンテナ相対） */
+  right: number;
+  /** タブのインデックス */
+  index: number;
+}
+
+/**
+ * Task 10.1: 水平方向のドロップターゲットを計算する（ピン留めタブ用）
+ *
+ * @param mouseX - マウスのX座標（コンテナ相対）
+ * @param tabPositions - タブノードの水平位置情報配列（左から順）
+ * @returns ドロップターゲット情報
+ */
+export function calculateHorizontalDropTarget(
+  mouseX: number,
+  tabPositions: HorizontalTabPosition[]
+): DropTarget {
+  // タブリストが空の場合
+  if (tabPositions.length === 0) {
+    return { type: DropTargetType.None };
+  }
+
+  // X座標が最初のタブより左の場合
+  const firstTab = tabPositions[0];
+  if (mouseX < firstTab.left) {
+    return {
+      type: DropTargetType.HorizontalGap,
+      insertIndex: 0,
+    };
+  }
+
+  // X座標が最後のタブより右の場合
+  const lastTab = tabPositions[tabPositions.length - 1];
+  if (mouseX >= lastTab.right) {
+    return {
+      type: DropTargetType.HorizontalGap,
+      insertIndex: tabPositions.length,
+    };
+  }
+
+  // 各タブを検索して挿入位置を決定
+  for (let i = 0; i < tabPositions.length; i++) {
+    const tab = tabPositions[i];
+    const tabWidth = tab.right - tab.left;
+    const tabCenter = tab.left + tabWidth / 2;
+
+    // タブの範囲内かチェック
+    if (mouseX >= tab.left && mouseX < tab.right) {
+      // タブの中心より左なら、このタブの前に挿入
+      if (mouseX < tabCenter) {
+        return {
+          type: DropTargetType.HorizontalGap,
+          insertIndex: i,
+        };
+      }
+      // タブの中心より右なら、このタブの後に挿入
+      return {
+        type: DropTargetType.HorizontalGap,
+        insertIndex: i + 1,
+      };
+    }
+  }
+
+  // ここには到達しないはずだが、安全のため
+  return { type: DropTargetType.None };
+}
+
+/**
+ * Task 10.1: 水平方向のドロップインジケーターのX座標を計算する
+ *
+ * @param insertIndex - 挿入インデックス
+ * @param tabPositions - タブノードの水平位置情報配列
+ * @returns ドロップインジケーターのX座標
+ */
+export function calculateHorizontalIndicatorX(
+  insertIndex: number,
+  tabPositions: HorizontalTabPosition[]
+): number {
+  if (tabPositions.length === 0) {
+    return 0;
+  }
+
+  // 先頭に挿入
+  if (insertIndex === 0) {
+    return tabPositions[0].left;
+  }
+
+  // 末尾に挿入
+  if (insertIndex >= tabPositions.length) {
+    return tabPositions[tabPositions.length - 1].right;
+  }
+
+  // タブ間に挿入
+  const leftTab = tabPositions[insertIndex - 1];
+  const rightTab = tabPositions[insertIndex];
+  return (leftTab.right + rightTab.left) / 2;
 }

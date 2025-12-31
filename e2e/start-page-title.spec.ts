@@ -2,13 +2,15 @@
  * スタートページタイトルのE2Eテスト
  *
  * Task 9.2: スタートページタイトルのE2Eテスト追加
- * Requirements: 9.4, 9.5
+ * Requirements: 9.4, 9.5, 12.1, 12.2
  *
  * テスト対象:
  * 1. 新規タブのタイトルが「スタートページ」または「新しいタブ」であることを検証 (Requirement 9.4)
  * 2. ページ遷移後のタイトル更新を検証 (Requirement 9.5)
+ * 3. 新規タブのURLがVivaldiスタートページであることを検証 (Requirement 12.1, 12.2)
  *
- * 注意: Chromiumでは新規タブは chrome://newtab が開かれ「新しいタブ」と表示される
+ * 注意: Chromiumでは chrome://vivaldi-webui/startpage はエラーページとして扱われるが、
+ *       URLが正しく設定されていることを検証する
  *       Vivaldiではスタートページが開かれ「スタートページ」と表示される
  */
 
@@ -37,8 +39,8 @@ async function getTabTitleElement(sidePanelPage: import('@playwright/test').Page
 }
 
 test.describe('スタートページタイトル', () => {
-  test.describe('Requirement 9.4: 新規タブのタイトルが「スタートページ」または「新しいタブ」であること', () => {
-    test('新規タブ追加ボタンで作成されたタブのタイトルが適切に表示される', async ({
+  test.describe('Requirement 12.1, 12.2: 新規タブボタンでVivaldiスタートページURLが設定される', () => {
+    test('新規タブ追加ボタンで作成されたタブにVivaldiスタートページURLが設定され、タイトルが「スタートページ」と表示される', async ({
       extensionContext,
       serviceWorker,
       sidePanelPage,
@@ -89,27 +91,46 @@ test.describe('スタートページタイトル', () => {
         await expect(newTabNode).toBeVisible();
       }).toPass({ timeout: 10000 });
 
+      // ツリー状態からタブのURLを取得して検証
+      // Requirement 12.1, 12.2: URLがVivaldiスタートページであることを確認
+      const treeTabUrl = await sidePanelPage.evaluate(async (tabId: number) => {
+        // サイドパネル内のTreeStateContextからタブ情報を取得
+        const tabNode = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!tabNode) return null;
+        // data-tab-url属性があれば取得
+        return tabNode.getAttribute('data-tab-url');
+      }, newTabId!);
+
+      // ツリー状態にURLが保存されている場合は検証
+      // 注: data-tab-url属性がない場合は、タイトル表示で検証
+      if (treeTabUrl) {
+        expect(treeTabUrl).toBe('chrome://vivaldi-webui/startpage');
+      }
+
       // タブノード内のタイトル要素を取得
       const tabTitleElement = await getTabTitleElement(sidePanelPage, newTabId!);
 
-      // タイトルが「スタートページ」または「新しいタブ」になるまで待機
-      // Chromiumでは chrome://newtab が開かれるため「新しいタブ」
-      // Vivaldiではスタートページが開かれるため「スタートページ」
+      // タイトルが「スタートページ」になることを確認
+      // chrome://vivaldi-webui/startpage のURLを持つタブは、
+      // TreeNodeのgetDisplayTitle関数で「スタートページ」に変換される
       await waitForCondition(
         async () => {
           const titleText = await tabTitleElement.textContent();
-          return titleText === 'スタートページ' || titleText === '新しいタブ';
+          return titleText === 'スタートページ';
         },
         {
           timeout: 10000,
           interval: 200,
-          timeoutMessage: 'Tab title did not become "スタートページ" or "新しいタブ"'
+          timeoutMessage: 'Tab title did not become "スタートページ" (expected for chrome://vivaldi-webui/startpage URL)'
         }
       );
 
       const titleText = await tabTitleElement.textContent();
-      expect(['スタートページ', '新しいタブ']).toContain(titleText);
+      expect(titleText).toBe('スタートページ');
     });
+  });
+
+  test.describe('Requirement 9.4: 新規タブのタイトルが「スタートページ」または「新しいタブ」であること', () => {
 
     test('chrome.tabs.createで作成された新規タブのタイトルが適切に表示される', async ({
       extensionContext,
@@ -216,23 +237,22 @@ test.describe('スタートページタイトル', () => {
       // タブノード内のタイトル要素を取得
       const tabTitleElement = await getTabTitleElement(sidePanelPage, newTabId!);
 
-      // タイトルが「スタートページ」、「新しいタブ」、または「Loading...」であることを確認
+      // タイトルが「スタートページ」（chrome://vivaldi-webui/startpageを開くため）または「Loading...」であることを確認
       await waitForCondition(
         async () => {
           const titleText = await tabTitleElement.textContent();
-          return titleText === 'スタートページ' ||
-                 titleText === '新しいタブ' ||
-                 titleText === 'Loading...';
+          // 新規タブボタンはchrome://vivaldi-webui/startpageを開くため、タイトルは「スタートページ」
+          return titleText === 'スタートページ' || titleText === 'Loading...';
         },
         {
           timeout: 5000,
           interval: 200,
-          timeoutMessage: 'Initial tab title was not set properly'
+          timeoutMessage: 'Initial tab title was not set properly (expected "スタートページ" or "Loading...")'
         }
       );
 
       const initialTitle = await tabTitleElement.textContent();
-      expect(['スタートページ', '新しいタブ', 'Loading...']).toContain(initialTitle);
+      expect(['スタートページ', 'Loading...']).toContain(initialTitle);
 
       // example.comに遷移
       await serviceWorker.evaluate(async (tabId) => {
@@ -256,7 +276,6 @@ test.describe('スタートページタイトル', () => {
         async () => {
           const titleText = await tabTitleElement.textContent();
           return titleText !== 'スタートページ' &&
-                 titleText !== '新しいタブ' &&
                  titleText !== 'Loading...';
         },
         {
@@ -269,7 +288,7 @@ test.describe('スタートページタイトル', () => {
       // 最終的なタイトルがスタートページ関連の表示ではないことを確認
       const finalTitle = await tabTitleElement.textContent();
       expect(finalTitle).not.toBe('スタートページ');
-      expect(finalTitle).not.toBe('新しいタブ');
+      expect(finalTitle).not.toBe('Loading...');
       expect(finalTitle).toBeTruthy();
 
       // クリーンアップ

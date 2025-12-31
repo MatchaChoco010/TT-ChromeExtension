@@ -181,13 +181,15 @@ describe('ViewEditModal', () => {
       expect(colorInput).toHaveValue('#10b981');
     });
 
-    it('IconPickerでアイコンを選択して変更できる', () => {
+    it('IconPickerでアイコンを選択して変更できる (即時反映)', () => {
+      const mockOnImmediateUpdate = vi.fn();
       render(
         <ViewEditModal
           view={mockView}
           isOpen={true}
           onSave={mockOnSave}
           onClose={mockOnClose}
+          onImmediateUpdate={mockOnImmediateUpdate}
         />
       );
 
@@ -195,23 +197,19 @@ describe('ViewEditModal', () => {
       const iconSelectButton = screen.getByTestId('icon-select-button');
       fireEvent.click(iconSelectButton);
 
-      // アイコンを選択
+      // アイコンを選択 - 即座に選択が確定される（Selectボタン不要）
       const briefcaseButton = screen.getByTestId('icon-button-briefcase');
       fireEvent.click(briefcaseButton);
 
-      // Selectボタンをクリック（正確なテキストで検索）
-      const selectButton = screen.getByRole('button', { name: 'Select' });
-      fireEvent.click(selectButton);
-
-      // 保存して確認
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      fireEvent.click(saveButton);
-
-      expect(mockOnSave).toHaveBeenCalledWith(
+      // onImmediateUpdateが呼ばれる（即時反映）
+      expect(mockOnImmediateUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           icon: 'briefcase',
         })
       );
+
+      // IconPickerが閉じる
+      expect(screen.queryByTestId('icon-picker')).not.toBeInTheDocument();
     });
   });
 
@@ -233,12 +231,14 @@ describe('ViewEditModal', () => {
     });
 
     it('編集後にSaveボタンをクリックすると変更された値でonSaveが呼ばれる', () => {
+      const mockOnImmediateUpdate = vi.fn();
       render(
         <ViewEditModal
           view={mockView}
           isOpen={true}
           onSave={mockOnSave}
           onClose={mockOnClose}
+          onImmediateUpdate={mockOnImmediateUpdate}
         />
       );
 
@@ -253,15 +253,18 @@ describe('ViewEditModal', () => {
       const iconSelectButton = screen.getByTestId('icon-select-button');
       fireEvent.click(iconSelectButton);
 
-      // briefcaseアイコンを選択
+      // briefcaseアイコンを選択 - 即座に選択が確定される
       const briefcaseButton = screen.getByTestId('icon-button-briefcase');
       fireEvent.click(briefcaseButton);
 
-      // Selectボタンをクリック（正確なテキストで検索）
-      const selectButton = screen.getByRole('button', { name: 'Select' });
-      fireEvent.click(selectButton);
+      // onImmediateUpdateが呼ばれる（IconPicker選択時の即時反映）
+      expect(mockOnImmediateUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          icon: 'briefcase',
+        })
+      );
 
-      // 保存
+      // 保存ボタンでも保存できる（名前や色が後から変更された場合用）
       const saveButton = screen.getByRole('button', { name: /save/i });
       fireEvent.click(saveButton);
 
@@ -581,13 +584,15 @@ describe('ViewEditModal', () => {
       expect(screen.getByTestId('icon-picker')).toBeInTheDocument();
     });
 
-    it('IconPickerでアイコンを選択すると選択が反映される', () => {
+    it('IconPickerでアイコンを選択すると選択が反映される (即時反映)', () => {
+      const mockOnImmediateUpdate = vi.fn();
       render(
         <ViewEditModal
           view={mockView}
           isOpen={true}
           onSave={mockOnSave}
           onClose={mockOnClose}
+          onImmediateUpdate={mockOnImmediateUpdate}
         />
       );
 
@@ -595,27 +600,28 @@ describe('ViewEditModal', () => {
       const iconSelectButton = screen.getByTestId('icon-select-button');
       fireEvent.click(iconSelectButton);
 
-      // アイコンを選択
+      // アイコンを選択 - 即座に選択が確定される（Selectボタン不要）
       const iconGrid = screen.getByTestId('icon-grid');
       const firstIconButton = iconGrid.querySelector('[data-testid^="icon-button-"]');
       expect(firstIconButton).toBeInTheDocument();
       fireEvent.click(firstIconButton!);
 
-      // Selectボタンをクリック（正確なテキストで検索）
-      const selectButton = screen.getByRole('button', { name: 'Select' });
-      fireEvent.click(selectButton);
+      // onImmediateUpdateが呼ばれる（即時反映）
+      expect(mockOnImmediateUpdate).toHaveBeenCalled();
 
       // IconPickerが閉じる
       expect(screen.queryByTestId('icon-picker')).not.toBeInTheDocument();
     });
 
-    it('IconPickerで選択したアイコンが保存時に反映される', () => {
+    it('IconPickerで選択したアイコンが即時反映される', () => {
+      const mockOnImmediateUpdate = vi.fn();
       render(
         <ViewEditModal
           view={mockView}
           isOpen={true}
           onSave={mockOnSave}
           onClose={mockOnClose}
+          onImmediateUpdate={mockOnImmediateUpdate}
         />
       );
 
@@ -623,27 +629,22 @@ describe('ViewEditModal', () => {
       const iconSelectButton = screen.getByTestId('icon-select-button');
       fireEvent.click(iconSelectButton);
 
-      // briefcaseアイコンを選択（workカテゴリの最初のアイコン）
+      // briefcaseアイコンを選択 - 即座に選択が確定される
       const briefcaseButton = screen.getByTestId('icon-button-briefcase');
       fireEvent.click(briefcaseButton);
 
-      // Selectボタンをクリック（正確なテキストで検索）
-      const selectButton = screen.getByRole('button', { name: 'Select' });
-      fireEvent.click(selectButton);
-
-      // モーダルの保存ボタンをクリック
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      fireEvent.click(saveButton);
-
-      // onSaveが呼ばれ、iconがbriefcaseになっている
-      expect(mockOnSave).toHaveBeenCalledWith(
+      // onImmediateUpdateが即座に呼ばれ、iconがbriefcaseになっている
+      expect(mockOnImmediateUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           icon: 'briefcase',
         })
       );
+
+      // IconPickerが閉じる
+      expect(screen.queryByTestId('icon-picker')).not.toBeInTheDocument();
     });
 
-    it('IconPickerをキャンセルしても元のアイコン設定は維持される', async () => {
+    it('IconPickerをキャンセルすると何も選択せずに閉じる', async () => {
       render(
         <ViewEditModal
           view={mockViewWithIcon}
@@ -662,11 +663,7 @@ describe('ViewEditModal', () => {
       const iconSelectButton = screen.getByTestId('icon-select-button');
       fireEvent.click(iconSelectButton);
 
-      // アイコンを選択
-      const briefcaseButton = screen.getByTestId('icon-button-briefcase');
-      fireEvent.click(briefcaseButton);
-
-      // IconPicker内のキャンセルボタンをクリック（正確なテキストで検索）
+      // IconPicker内のキャンセルボタンをクリック（アイコンを選択せずにキャンセル）
       const iconPicker = screen.getByTestId('icon-picker');
       // Cancelボタンはフッターの最初のボタン
       const cancelButtons = Array.from(iconPicker.querySelectorAll('button')).filter(
@@ -675,11 +672,14 @@ describe('ViewEditModal', () => {
       expect(cancelButtons.length).toBe(1);
       fireEvent.click(cancelButtons[0]);
 
+      // IconPickerが閉じる
+      expect(screen.queryByTestId('icon-picker')).not.toBeInTheDocument();
+
       // モーダルの保存ボタンをクリック
       const saveButton = screen.getByRole('button', { name: /save/i });
       fireEvent.click(saveButton);
 
-      // onSaveが呼ばれ、iconは元のURL
+      // onSaveが呼ばれ、iconは元のURL（変更されていない）
       expect(mockOnSave).toHaveBeenCalledWith(
         expect.objectContaining({
           icon: 'https://example.com/icon.png',
@@ -766,15 +766,14 @@ describe('ViewEditModal', () => {
       const iconSelectButton = screen.getByTestId('icon-select-button');
       fireEvent.click(iconSelectButton);
 
-      // codeアイコンを選択
+      // codeアイコンを選択 - 即座に選択が確定される
       const devTab = screen.getByRole('tab', { name: /dev/i });
       fireEvent.click(devTab);
       const codeButton = screen.getByTestId('icon-button-code');
       fireEvent.click(codeButton);
 
-      // Selectボタンをクリック（正確なテキストで検索）
-      const selectButton = screen.getByRole('button', { name: 'Select' });
-      fireEvent.click(selectButton);
+      // IconPickerが閉じる（即時選択のため）
+      expect(screen.queryByTestId('icon-picker')).not.toBeInTheDocument();
 
       // 保存
       const saveButton = screen.getByRole('button', { name: /save/i });

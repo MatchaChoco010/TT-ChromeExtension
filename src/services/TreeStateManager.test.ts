@@ -432,6 +432,130 @@ describe('TreeStateManager', () => {
     });
   });
 
+  describe('createGroupWithRealTab (Requirement 5.1, 5.2, 5.3, 5.6, 5.7)', () => {
+    it('実際のタブIDでグループノードを作成できる', async () => {
+      const viewId = 'view-1';
+
+      // 子タブとなるタブを追加
+      const childTab1 = { id: 1, url: 'https://example.com/1', title: 'Child1' } as chrome.tabs.Tab;
+      const childTab2 = { id: 2, url: 'https://example.com/2', title: 'Child2' } as chrome.tabs.Tab;
+
+      await manager.addTab(childTab1, null, viewId);
+      await manager.addTab(childTab2, null, viewId);
+
+      // 実際のグループタブID（正の整数）を使用してグループを作成
+      const groupTabId = 100;
+      const groupNodeId = await manager.createGroupWithRealTab(groupTabId, [1, 2], 'テストグループ');
+
+      // グループノードが作成されていることを確認
+      const groupNode = manager.getNodeByTabId(groupTabId);
+      expect(groupNode).toBeDefined();
+      expect(groupNode?.id).toBe(groupNodeId);
+      expect(groupNode?.tabId).toBe(groupTabId);
+
+      // 子タブがグループノードの下に移動していることを確認
+      const child1 = manager.getNodeByTabId(1);
+      const child2 = manager.getNodeByTabId(2);
+      expect(child1?.parentId).toBe(groupNodeId);
+      expect(child2?.parentId).toBe(groupNodeId);
+      expect(child1?.depth).toBe(1);
+      expect(child2?.depth).toBe(1);
+    });
+
+    it('グループノードがルートレベルに作成される', async () => {
+      const viewId = 'view-1';
+      const childTab = { id: 1, url: 'https://example.com/1', title: 'Child' } as chrome.tabs.Tab;
+      await manager.addTab(childTab, null, viewId);
+
+      const groupTabId = 100;
+      await manager.createGroupWithRealTab(groupTabId, [1], 'グループ');
+
+      const groupNode = manager.getNodeByTabId(groupTabId);
+      expect(groupNode?.parentId).toBeNull();
+      expect(groupNode?.depth).toBe(0);
+    });
+
+    it('グループ情報がストレージに保存される', async () => {
+      const viewId = 'view-1';
+      const childTab = { id: 1, url: 'https://example.com/1', title: 'Child' } as chrome.tabs.Tab;
+      await manager.addTab(childTab, null, viewId);
+
+      // chrome.storage.local.get/set のモック
+      const mockGroups: Record<string, unknown> = {};
+      vi.stubGlobal('chrome', {
+        ...globalThis.chrome,
+        storage: {
+          local: {
+            get: vi.fn().mockImplementation((key: string) => {
+              if (key === 'groups') {
+                return Promise.resolve({ groups: mockGroups });
+              }
+              return Promise.resolve({});
+            }),
+            set: vi.fn().mockImplementation((data: Record<string, unknown>) => {
+              if (data.groups) {
+                Object.assign(mockGroups, data.groups);
+              }
+              return Promise.resolve();
+            }),
+          },
+        },
+        tabs: {
+          query: vi.fn().mockResolvedValue([]),
+        },
+      });
+
+      const groupTabId = 100;
+      await manager.createGroupWithRealTab(groupTabId, [1], 'テストグループ');
+
+      // chrome.storage.local.setが呼ばれたことを確認
+      expect(chrome.storage.local.set).toHaveBeenCalled();
+    });
+
+    it('子タブが既に別の親を持つ場合、その親から削除されてグループに移動する', async () => {
+      const viewId = 'view-1';
+
+      // 親タブと子タブを作成
+      const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
+      const childTab = { id: 2, url: 'https://example.com/child', title: 'Child' } as chrome.tabs.Tab;
+
+      await manager.addTab(parentTab, null, viewId);
+      const parentNode = manager.getNodeByTabId(1);
+      await manager.addTab(childTab, parentNode!.id, viewId);
+
+      // childTabは元のparentの子
+      const childBefore = manager.getNodeByTabId(2);
+      expect(childBefore?.parentId).toBe(parentNode!.id);
+
+      // 新しいグループを作成してchildTabを移動
+      const groupTabId = 100;
+      await manager.createGroupWithRealTab(groupTabId, [2], 'グループ');
+
+      // 元の親からは削除されている
+      const parentAfter = manager.getNodeByTabId(1);
+      expect(parentAfter?.children.find(c => c.tabId === 2)).toBeUndefined();
+
+      // 新しいグループの子になっている
+      const childAfter = manager.getNodeByTabId(2);
+      const groupNode = manager.getNodeByTabId(100);
+      expect(childAfter?.parentId).toBe(groupNode?.id);
+    });
+
+    it('タブIDが存在しない場合はエラーをスローする', async () => {
+      const groupTabId = 100;
+      await expect(
+        manager.createGroupWithRealTab(groupTabId, [999], 'グループ')
+      ).rejects.toThrow('First tab not found');
+    });
+
+    it('空のタブID配列でエラーをスローする', async () => {
+      const groupTabId = 100;
+      await expect(
+        manager.createGroupWithRealTab(groupTabId, [], 'グループ')
+      ).rejects.toThrow('No tabs specified for grouping');
+    });
+  });
+
   describe('cleanupStaleNodes (Requirement 2.1, 2.2, 2.3)', () => {
     it('ブラウザに存在しないタブをツリーから削除する', async () => {
       const viewId = 'default';

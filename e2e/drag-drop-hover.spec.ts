@@ -1,25 +1,29 @@
 /**
  * ドラッグ&ドロップのホバー自動展開テスト
  *
- * Requirement 3.5: ドラッグ&ドロップのホバー自動展開
+ * Task 8.8: drag-drop-hover.spec.tsの書き直し（tab-tree-bugfix-2）
+ * Requirements: 3.2.1, 3.2.3
  *
  * このテストスイートでは、ドラッグ中のホバー自動展開機能を検証します。
  * - 折りたたまれた親タブの上にタブをホバーした場合の自動展開
  * - 自動展開のタイムアウト前にホバーを離れた場合のキャンセル
  * - 深いツリー構造で複数のノードを経由してドラッグした場合の順次自動展開
  *
+ * 自前D&D実装用にテストを書き直し
+ * - dnd-kit固有のセレクタを使用しない
+ * - 固定時間待機をポーリングベースに変更
+ *
  * Note: ヘッドレスモードで実行すること（npm run test:e2e）
  * Note: 展開/折りたたみ状態の変更はservice workerを通じてストレージを操作します
  */
 import { test, expect } from './fixtures/extension';
-import type { BrowserContext } from '@playwright/test';
-import { createTab, assertTabInTree } from './utils/tab-utils';
-import { startDrag, hoverOverTab, dropTab } from './utils/drag-drop-utils';
+import type { BrowserContext, Page } from '@playwright/test';
+import { createTab, assertTabInTree, refreshSidePanel } from './utils/tab-utils';
+import { startDrag, hoverOverTab, dropTab, moveTabToParent } from './utils/drag-drop-utils';
+import { waitForCondition } from './utils/polling-utils';
 
 // 自動展開のホバー遅延（ミリ秒）- TabTreeView.tsxのAUTO_EXPAND_HOVER_DELAY_MSと一致
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
-// テストで使用するホバー時間のバッファ
-const HOVER_BUFFER_MS = 500;
 
 /**
  * Service Workerを取得
@@ -78,7 +82,7 @@ async function waitForNodeExpanded(
  * DOMとストレージの両方で折りたたみ状態が反映されるまで待機
  */
 async function collapseNodeViaUI(
-  page: import('@playwright/test').Page,
+  page: Page,
   context: BrowserContext,
   tabId: number
 ): Promise<void> {
@@ -99,6 +103,69 @@ async function collapseNodeViaUI(
   }
 }
 
+/**
+ * ホバー中に展開状態になるまで待機（自動展開用）
+ * 固定時間待機の代わりにポーリングベースで展開状態を監視する
+ */
+async function waitForAutoExpand(
+  page: Page,
+  context: BrowserContext,
+  tabId: number,
+  maxWait: number = AUTO_EXPAND_HOVER_DELAY_MS + 2000
+): Promise<boolean> {
+  const parentNode = page.locator(`[data-testid="tree-node-${tabId}"]`).first();
+
+  try {
+    await waitForCondition(
+      async () => {
+        // DOM側の展開状態を確認
+        const domExpanded = await parentNode.getAttribute('data-expanded');
+        if (domExpanded === 'true') {
+          return true;
+        }
+        // ストレージ側の展開状態も確認
+        const storageExpanded = await isNodeExpanded(context, tabId);
+        return storageExpanded;
+      },
+      { timeout: maxWait, interval: 100 }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 折りたたみ状態が維持されていることを確認（自動展開キャンセル用）
+ * 指定時間内に展開されないことを確認する
+ */
+async function verifyRemainsCollapsed(
+  page: Page,
+  context: BrowserContext,
+  tabId: number,
+  duration: number = AUTO_EXPAND_HOVER_DELAY_MS + 500
+): Promise<boolean> {
+  const parentNode = page.locator(`[data-testid="tree-node-${tabId}"]`).first();
+  const endTime = Date.now() + duration;
+
+  while (Date.now() < endTime) {
+    // DOM側の展開状態を確認
+    const domExpanded = await parentNode.getAttribute('data-expanded');
+    if (domExpanded === 'true') {
+      return false; // 展開されてしまった
+    }
+    // ストレージ側の展開状態も確認
+    const storageExpanded = await isNodeExpanded(context, tabId);
+    if (storageExpanded) {
+      return false; // 展開されてしまった
+    }
+    // 短い間隔でポーリング
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  }
+
+  return true; // 折りたたみ状態を維持
+}
+
 test.describe('ドラッグ&ドロップのホバー自動展開', () => {
   // タイムアウトを60秒に設定
   test.setTimeout(60000);
@@ -111,12 +178,10 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 準備: 親タブと子タブを作成
+    // 準備: タブを作成（親子関係はドラッグ&ドロップで設定）
     // ネットワーク不要のdata: URLを使用して安定性向上
     const parentTab = await createTab(extensionContext, 'data:text/html,<h1>Parent</h1>');
-    const childTab = await createTab(extensionContext, 'data:text/html,<h1>Child</h1>', parentTab);
-
-    // 別のルートレベルのタブを作成（ドラッグ対象）
+    const childTab = await createTab(extensionContext, 'data:text/html,<h1>Child</h1>');
     const dragTab = await createTab(extensionContext, 'data:text/html,<h1>Drag</h1>');
 
     // タブがツリーに表示されるまで待機
@@ -124,12 +189,24 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await assertTabInTree(sidePanelPage, childTab);
     await assertTabInTree(sidePanelPage, dragTab);
 
+    // ドラッグ&ドロップで親子関係を作成
+    await moveTabToParent(sidePanelPage, childTab, parentTab);
+
+    // Side Panelを更新して親子関係がUIに反映されるのを確認
+    await refreshSidePanel(extensionContext, sidePanelPage);
+
     // 親タブを展開（子タブを追加すると自動展開されるため）
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
 
-    // 展開ボタンが表示されるまで待機
-    await expect(expandButton.first()).toBeVisible({ timeout: 5000 });
+    // 展開ボタンが表示されるまでポーリングで待機（親子関係のUI反映を待つ）
+    await waitForCondition(
+      async () => {
+        const count = await expandButton.count();
+        return count > 0;
+      },
+      { timeout: 15000, interval: 200, timeoutMessage: 'Expand button did not appear - parent-child relation may not be reflected in UI' }
+    );
 
     // 展開状態を確認し、展開されていなければ展開
     const isExpanded = await parentNode.getAttribute('data-expanded');
@@ -148,18 +225,18 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     const dragNode = sidePanelPage.locator(`[data-testid="tree-node-${dragTab}"]`).first();
     await expect(dragNode).toBeVisible({ timeout: 5000 });
 
-    // 実行: dragTabをドラッグ開始（dnd-kitのdistance: 8を満たすよう10px移動）
+    // 実行: dragTabをドラッグ開始（自前D&D実装は8px移動でドラッグを開始）
     await startDrag(sidePanelPage, dragTab);
 
     // 親タブの上にホバーして、自動展開を待つ
     await hoverOverTab(sidePanelPage, parentTab);
 
-    // 自動展開のタイマーが発火するまでホバー状態を維持
-    const hoverWaitTime = AUTO_EXPAND_HOVER_DELAY_MS + HOVER_BUFFER_MS;
-    await sidePanelPage.evaluate((waitMs) => new Promise(resolve => setTimeout(resolve, waitMs)), hoverWaitTime);
-
-    // 展開状態がストレージに反映されるまでポーリングで待機
-    const expandedDuringHover = await waitForNodeExpanded(extensionContext, parentTab, true, 5000);
+    // ポーリングベースで自動展開を待機（固定時間待機の代わり）
+    const expandedDuringHover = await waitForAutoExpand(
+      sidePanelPage,
+      extensionContext,
+      parentTab
+    );
 
     // ドロップを実行
     await dropTab(sidePanelPage);
@@ -179,10 +256,10 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 準備: createTabで親子関係を作成
+    // 準備: タブを作成（親子関係はドラッグ&ドロップで設定）
     // 4つのタブを作成: parentTab(折りたたみ対象), childTab(親の子), anotherTab(ホバー先), dragTab(ドラッグ対象)
     const parentTab = await createTab(extensionContext, 'data:text/html,<h1>Parent</h1>');
-    const childTab = await createTab(extensionContext, 'data:text/html,<h1>Child</h1>', parentTab);
+    const childTab = await createTab(extensionContext, 'data:text/html,<h1>Child</h1>');
     const anotherTab = await createTab(extensionContext, 'data:text/html,<h1>Another</h1>');
     const dragTab = await createTab(extensionContext, 'data:text/html,<h1>Drag</h1>');
 
@@ -191,6 +268,12 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await assertTabInTree(sidePanelPage, childTab);
     await assertTabInTree(sidePanelPage, anotherTab);
     await assertTabInTree(sidePanelPage, dragTab);
+
+    // ドラッグ&ドロップで親子関係を作成
+    await moveTabToParent(sidePanelPage, childTab, parentTab);
+
+    // Side Panelを更新して親子関係がUIに反映されるのを確認
+    await refreshSidePanel(extensionContext, sidePanelPage);
 
     // 事前条件の検証
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -201,9 +284,15 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await expect(dragNode).toBeVisible({ timeout: 5000 });
     await expect(anotherNode).toBeVisible({ timeout: 5000 });
 
-    // 展開ボタンが表示されるまで待機
+    // 展開ボタンが表示されるまでポーリングで待機（親子関係のUI反映を待つ）
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
-    await expect(expandButton.first()).toBeVisible({ timeout: 5000 });
+    await waitForCondition(
+      async () => {
+        const count = await expandButton.count();
+        return count > 0;
+      },
+      { timeout: 15000, interval: 200, timeoutMessage: 'Expand button did not appear - parent-child relation may not be reflected in UI' }
+    );
 
     // 展開状態を確認し、展開されていなければ展開
     const isExpanded = await parentNode.getAttribute('data-expanded');
@@ -231,8 +320,9 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     // 親タブの上にホバー（タイマー開始）
     await hoverOverTab(sidePanelPage, parentTab);
 
-    // 200ms待機（1秒未満なのでタイマーはまだ発火しない）
-    await sidePanelPage.waitForTimeout(200);
+    // 短時間待機後（自動展開タイマー1秒未満）、折りたたまれていることを確認
+    // ポーリングベースで折りたたみ状態を確認（200ms以内に展開されていないこと）
+    await sidePanelPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
     // 親タブが未だ折りたたまれていることを確認
     const midCheckExpanded = await parentNode.getAttribute('data-expanded');
@@ -241,15 +331,25 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     // 別のタブ（anotherTab）にホバーを移動してタイマーをクリア
     // これによりonDragOverが発火し、over.idが変わることでタイマーがキャンセルされる
     await hoverOverTab(sidePanelPage, anotherTab);
-    await sidePanelPage.waitForTimeout(100);
+
+    // Reactの状態更新を待機
+    await sidePanelPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
     // ドラッグを終了
     await dropTab(sidePanelPage);
 
-    // さらに1秒以上待機しても、親タブが展開されないことを確認
-    await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 200);
+    // タイマーがクリアされたため、親タブが折りたたまれたまま維持されることを確認
+    // ポーリングベースで折りたたみ状態が維持されていることを確認
+    const remainsCollapsed = await verifyRemainsCollapsed(
+      sidePanelPage,
+      extensionContext,
+      parentTab
+    );
 
     // 検証: タイマーがクリアされたため、親タブは折りたたまれたまま
+    expect(remainsCollapsed).toBe(true);
+
+    // DOM側でも確認
     const dataExpanded = await parentNode.getAttribute('data-expanded');
     expect(dataExpanded).toBe('false');
 
@@ -266,12 +366,12 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 準備: 親タブと子タブを作成（2階層のシンプルな構造）
+    // 準備: タブを作成（2階層のシンプルな構造、親子関係はドラッグ&ドロップで設定）
     // level0 (ルートレベル)
     //   └─ level1
     // ネットワーク不要のdata: URLを使用して安定性向上
     const level0 = await createTab(extensionContext, 'data:text/html,<h1>Level0</h1>');
-    const level1 = await createTab(extensionContext, 'data:text/html,<h1>Level1</h1>', level0);
+    const level1 = await createTab(extensionContext, 'data:text/html,<h1>Level1</h1>');
 
     // ドラッグ対象のタブを作成
     const dragTab = await createTab(extensionContext, 'data:text/html,<h1>Drag</h1>');
@@ -281,12 +381,24 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await assertTabInTree(sidePanelPage, level1);
     await assertTabInTree(sidePanelPage, dragTab);
 
+    // ドラッグ&ドロップで親子関係を作成
+    await moveTabToParent(sidePanelPage, level1, level0);
+
+    // Side Panelを更新して親子関係がUIに反映されるのを確認
+    await refreshSidePanel(extensionContext, sidePanelPage);
+
     // level0ノードが存在することを確認
     const level0Node = sidePanelPage.locator(`[data-testid="tree-node-${level0}"]`).first();
     const expandButton = level0Node.locator('[data-testid="expand-button"]');
 
-    // 展開ボタンが表示されるまで待機
-    await expect(expandButton.first()).toBeVisible({ timeout: 5000 });
+    // 展開ボタンが表示されるまでポーリングで待機（親子関係のUI反映を待つ）
+    await waitForCondition(
+      async () => {
+        const count = await expandButton.count();
+        return count > 0;
+      },
+      { timeout: 15000, interval: 200, timeoutMessage: 'Expand button did not appear - parent-child relation may not be reflected in UI' }
+    );
 
     // 展開状態を確認し、展開されていなければ展開
     const isExpanded = await level0Node.getAttribute('data-expanded');
@@ -311,17 +423,20 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     // level0の上でホバーして自動展開を待つ
     await hoverOverTab(sidePanelPage, level0);
 
-    // 自動展開のタイマーが発火するまでホバー状態を維持
-    const hoverWaitTime = AUTO_EXPAND_HOVER_DELAY_MS + HOVER_BUFFER_MS;
-    await sidePanelPage.evaluate((waitMs) => new Promise(resolve => setTimeout(resolve, waitMs)), hoverWaitTime);
-
-    // 展開状態がストレージに反映されるまでポーリングで待機
-    await waitForNodeExpanded(extensionContext, level0, true, 5000);
+    // ポーリングベースで自動展開を待機（固定時間待機の代わり）
+    const expandedDuringHover = await waitForAutoExpand(
+      sidePanelPage,
+      extensionContext,
+      level0
+    );
 
     // ドロップを実行
     await dropTab(sidePanelPage);
 
-    // 検証: level0が展開されたこと（DOM属性で確認）
+    // 検証: level0が展開されたこと
+    expect(expandedDuringHover).toBe(true);
+
+    // DOM属性でも確認
     await expect(level0Node).toHaveAttribute('data-expanded', 'true', { timeout: 5000 });
 
     // level1が表示されていること

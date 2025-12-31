@@ -199,11 +199,11 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムには data-sortable-item 属性がある（tabIdで検索）
-      const sortableItem = screen.getByTestId('tree-node-1');
-      expect(sortableItem).toHaveAttribute(
-        'data-sortable-item',
-        'sortable-item-node-1'
+      // Task 7.1 (tab-tree-bugfix-2): ドラッグ可能なアイテムには data-draggable-item 属性がある
+      const draggableItem = screen.getByTestId('tree-node-1');
+      expect(draggableItem).toHaveAttribute(
+        'data-draggable-item',
+        'draggable-item-node-1'
       );
     });
 
@@ -224,9 +224,10 @@ describe('TabTreeView', () => {
       const nodeElement = screen.getByTestId('tree-node-1');
       // ドラッグ可能なアイテムが存在すること
       expect(nodeElement).toBeInTheDocument();
+      // Task 7.1 (tab-tree-bugfix-2): 自前D&D実装に変更
       expect(nodeElement).toHaveAttribute(
-        'data-sortable-item',
-        'sortable-item-node-1'
+        'data-draggable-item',
+        'draggable-item-node-1'
       );
     });
 
@@ -244,17 +245,17 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムが2つ存在することを確認（tabIdで検索）
-      const sortableItem1 = screen.getByTestId('tree-node-1');
-      const sortableItem2 = screen.getByTestId('tree-node-2');
+      // Task 7.1 (tab-tree-bugfix-2): ドラッグ可能なアイテムが2つ存在することを確認
+      const draggableItem1 = screen.getByTestId('tree-node-1');
+      const draggableItem2 = screen.getByTestId('tree-node-2');
 
-      expect(sortableItem1).toHaveAttribute(
-        'data-sortable-item',
-        'sortable-item-node-1'
+      expect(draggableItem1).toHaveAttribute(
+        'data-draggable-item',
+        'draggable-item-node-1'
       );
-      expect(sortableItem2).toHaveAttribute(
-        'data-sortable-item',
-        'sortable-item-node-2'
+      expect(draggableItem2).toHaveAttribute(
+        'data-draggable-item',
+        'draggable-item-node-2'
       );
     });
   });
@@ -703,7 +704,7 @@ describe('TabTreeView', () => {
   });
 
   describe('Task 5.2: ドラッグ時のスクロール制御 (Requirements 7.1, 7.2)', () => {
-    it('DndContextにautoScroll設定が適用されていること', () => {
+    it('ドラッグコンテナにautoScroll設定が適用されていること', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -719,7 +720,7 @@ describe('TabTreeView', () => {
         />
       );
 
-      // DndContextが存在することを確認（ドラッグ可能なビューがレンダリングされる）
+      // ドラッグコンテナが存在することを確認（ドラッグ可能なビューがレンダリングされる）
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).toBeInTheDocument();
     });
@@ -894,8 +895,9 @@ describe('TabTreeView', () => {
         />
       );
 
+      // Task 7.1 (tab-tree-bugfix-2): 自前D&D実装に変更
       const nodeElement = screen.getByTestId('tree-node-1');
-      expect(nodeElement).toHaveAttribute('data-sortable-item', 'sortable-item-node-1');
+      expect(nodeElement).toHaveAttribute('data-draggable-item', 'draggable-item-node-1');
     });
 
     it('コンテナがrelative positionを持っていること（DropIndicator配置のため）', () => {
@@ -919,8 +921,8 @@ describe('TabTreeView', () => {
 
   describe('Task 5.4: ドラッグ中のタブサイズ安定化 (Requirements 14.1, 14.2, 14.3)', () => {
     it('Requirement 14.1: ドラッグ中に他のタブのtransformが無効化されていること', () => {
-      // SortableContextのstrategyをundefinedにすることでリアルタイム並べ替えが無効化される
-      // 実装上、shouldApplyTransformフラグで制御されている
+      // 自前D&D実装では、ドラッグ中の他タブの移動は行わない設計
+      // ドロップ位置のみインジケーターで表示される
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -1001,9 +1003,9 @@ describe('TabTreeView', () => {
       expect(container?.children.length).toBeGreaterThanOrEqual(3);
     });
 
-    it('SortableContextのstrategyがundefinedで設定されていること（リアルタイム並べ替え無効化）', () => {
-      // 実装確認：TabTreeView.tsxのSortableContextでstrategy={undefined}が設定されている
-      // これによりドラッグ中の他タブの位置変更が無効化され、サイズが安定する
+    it('自前D&D実装によりリアルタイム並べ替えが無効化されていること', () => {
+      // Task 7.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropに移行
+      // 自前実装では他タブの位置変更が発生しないため、サイズが安定する
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -1016,9 +1018,9 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なソータブルアイテムが正しくレンダリングされていること
-      const sortableItem = screen.getByTestId('tree-node-1');
-      expect(sortableItem).toHaveAttribute('data-sortable-item');
+      // Task 7.1 (tab-tree-bugfix-2): ドラッグ可能なアイテムが正しくレンダリングされていること
+      const draggableItem = screen.getByTestId('tree-node-1');
+      expect(draggableItem).toHaveAttribute('data-draggable-item');
     });
   });
 

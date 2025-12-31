@@ -3,6 +3,7 @@ import {
   registerTabEventListeners,
   registerWindowEventListeners,
   registerMessageListener,
+  registerAlarmListener,
 } from './event-handlers';
 
 // Get TreeStateManager instance for initialization
@@ -131,6 +132,9 @@ chrome.runtime.onInstalled.addListener(async () => {
 registerTabEventListeners();
 registerWindowEventListeners();
 registerMessageListener();
+
+// Task 13.1 (tab-tree-bugfix-2): アラームリスナーを登録（DragSessionManager keep-alive用）
+registerAlarmListener();
 
 // Task 9.2: 設定変更監視を登録
 registerSettingsChangeListener();

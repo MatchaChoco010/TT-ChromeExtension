@@ -1,20 +1,20 @@
 /**
  * ドラッグ&ドロップによるタブの並び替え（同階層）テスト
  *
- * Requirement 3.2: ドラッグ&ドロップによるタブの並び替え（同階層）
+ * Task 8.2 (tab-tree-bugfix-2): 自前D&D実装用に書き直し
+ * Requirements: 2.4, 2.5, 3.2.1, 3.2.3
  *
  * このテストスイートでは、同じ階層内でのタブの並び替えを検証します。
  * - ルートレベルのタブの並び替え
  * - 同じ親を持つ子タブの並び替え
  * - 複数の子を持つサブツリー内でのタブの並び替え
- * - ドロップインジケータの表示
+ * - ドラッグ中の視覚的フィードバック
  *
  * Note: ヘッドレスモードで実行すること（npm run test:e2e）
  */
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
-import { reorderTabs, moveTabToParent } from './utils/drag-drop-utils';
-import { waitForTreeStateInitialized } from './utils/polling-utils';
+import { reorderTabs, moveTabToParent, startDrag, dropTab, isDragging } from './utils/drag-drop-utils';
 
 test.describe('ドラッグ&ドロップによるタブの並び替え（同階層）', () => {
   // Playwrightのmouse.moveは各ステップで約1秒かかるため、タイムアウトを延長
@@ -216,7 +216,7 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     }).toPass({ timeout: 3000 });
   });
 
-  test('ドラッグ中にドロップ位置のプレビューが表示される場合、視覚的なフィードバック（ドロップインジケータ）が正しい位置に表示されること', async ({
+  test('ドラッグ中にis-draggingクラスが付与され、視覚的なフィードバックが表示されること', async ({
     extensionContext,
     sidePanelPage,
   }) => {
@@ -228,51 +228,27 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await assertTabInTree(sidePanelPage, tab1, 'Example');
     await assertTabInTree(sidePanelPage, tab2);
 
-    // 実行: tab2をドラッグ開始してtab1の上にホバー
-    const tab2Node = sidePanelPage.locator(`[data-testid="tree-node-${tab2}"]`).first();
-    // 要素が完全に表示されるまで待機
-    await expect(tab2Node).toBeVisible({ timeout: 5000 });
+    // 実行: tab2をドラッグ開始
+    await startDrag(sidePanelPage, tab2);
 
-    // 要素のバウンディングボックスが安定するまで待機
-    await sidePanelPage.waitForFunction(
-      (tabId) => {
-        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
-        if (!node) return false;
-        const rect = node.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      },
-      tab2,
-      { timeout: 5000 }
-    );
-
-    // バックグラウンドスロットリングを回避するためにページをフォーカス
-    await sidePanelPage.bringToFront();
-    await sidePanelPage.evaluate(() => window.focus());
-
-    await tab2Node.hover();
-    await sidePanelPage.mouse.down();
-    // ドラッグ状態が安定するまで少し待機
-    // eslint-disable-next-line no-undef
-    await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
-
-    const tab1Node = sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first();
-    await tab1Node.hover();
-    // ホバー状態が安定するまで少し待機
-    // eslint-disable-next-line no-undef
-    await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
-
-    // 検証: ドラッグ状態を確認（視覚的なフィードバックの存在）
-    // Note: 実装に依存するため、ドラッグ中の状態を簡易的に確認
-    // ドロップインジケータの具体的な検証は実装詳細に応じて調整が必要
+    // 検証: ドラッグ状態を確認（is-draggingクラスの存在）
+    // 自前D&D実装ではis-draggingクラスでドラッグ中を表現
+    const dragging = await isDragging(sidePanelPage);
+    expect(dragging).toBe(true);
 
     // クリーンアップ: ドロップを実行
-    await sidePanelPage.mouse.up();
-    // ドロップ後のUI安定を待機
-    // eslint-disable-next-line no-undef
-    await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+    await dropTab(sidePanelPage);
+
+    // ドロップ後はドラッグ状態が解除されることを確認
+    await expect(async () => {
+      const stillDragging = await isDragging(sidePanelPage);
+      expect(stillDragging).toBe(false);
+    }).toPass({ timeout: 2000 });
 
     // タブが存在することを確認
-    await expect(tab1Node).toBeVisible({ timeout: 5000 });
-    await expect(tab2Node).toBeVisible({ timeout: 5000 });
+    const tab1Node = sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first();
+    const tab2Node = sidePanelPage.locator(`[data-testid="tree-node-${tab2}"]`).first();
+    await expect(tab1Node).toBeVisible({ timeout: 3000 });
+    await expect(tab2Node).toBeVisible({ timeout: 3000 });
   });
 });

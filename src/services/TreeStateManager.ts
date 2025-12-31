@@ -642,13 +642,108 @@ export class TreeStateManager {
   }
 
   /**
-   * Task 6.2: 複数タブからグループを作成
+   * Task 15.2: 実タブを使用してグループを作成
+   * Requirement 5.1, 5.2, 5.3, 5.6, 5.7: 実際のタブIDを使用したグループ作成
+   *
+   * chrome.tabs.create()で作成された実際のタブIDを使用してグループノードを作成し、
+   * 選択されたタブをその子要素として移動します。
+   *
+   * @param groupTabId - chrome.tabs.create()で作成されたグループタブのID（実タブID）
+   * @param tabIds - グループ化するタブIDの配列
+   * @param groupName - グループ名
+   * @returns 作成されたグループノードのID
+   */
+  async createGroupWithRealTab(groupTabId: number, tabIds: number[], groupName: string = 'グループ'): Promise<string> {
+    if (tabIds.length === 0) {
+      throw new Error('No tabs specified for grouping');
+    }
+
+    // 最初のタブからviewIdを取得
+    const firstNode = this.getNodeByTabId(tabIds[0]);
+    if (!firstNode) {
+      throw new Error('First tab not found');
+    }
+    const viewId = firstNode.viewId;
+
+    // グループノードIDを生成（実タブIDを使用）
+    const groupNodeId = `group-${groupTabId}`;
+
+    // グループノードを作成
+    const groupNode: TabNode = {
+      id: groupNodeId,
+      tabId: groupTabId,
+      parentId: null,
+      children: [],
+      isExpanded: true,
+      depth: 0,
+      viewId,
+      groupId: groupNodeId, // グループノード自体にgroupIdを設定
+    };
+
+    // マッピングに追加
+    this.nodes.set(groupNodeId, groupNode);
+    this.tabToNode.set(groupTabId, groupNodeId);
+    this.expandedNodes.add(groupNodeId);
+
+    // ビューに追加
+    const viewNodes = this.views.get(viewId) || [];
+    viewNodes.push(groupNodeId);
+    this.views.set(viewId, viewNodes);
+
+    // 選択されたタブをグループの子として移動
+    for (const tabId of tabIds) {
+      const node = this.getNodeByTabId(tabId);
+      if (!node) continue;
+
+      // 既存の親から削除
+      if (node.parentId) {
+        const oldParent = this.nodes.get(node.parentId);
+        if (oldParent) {
+          oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
+        }
+      }
+
+      // グループの子として追加
+      node.parentId = groupNodeId;
+      node.depth = 1;
+      node.groupId = groupNodeId;
+      groupNode.children.push(node);
+
+      // 子ノードの深さを再帰的に更新
+      this.updateChildrenDepth(node);
+    }
+
+    // ストレージに永続化
+    await this.persistState();
+
+    // グループ情報をgroupsストレージにも保存
+    try {
+      const result = await chrome.storage.local.get('groups');
+      const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
+      existingGroups[groupNodeId] = {
+        id: groupNodeId,
+        name: groupName,
+        color: '#f59e0b',  // オレンジ色のデフォルト
+        isExpanded: true,
+      };
+      await chrome.storage.local.set({ groups: existingGroups });
+    } catch (_err) {
+      // グループストレージの保存に失敗してもグループ作成自体は成功とする
+    }
+
+    return groupNodeId;
+  }
+
+  /**
+   * Task 6.2: 複数タブからグループを作成（仮想タブID版 - 後方互換性のため残す）
    * Requirement 12.1, 12.2, 12.3: 複数タブをグループ化
    *
    * 新しいグループ親ノードを作成し、選択されたタブをその子要素として移動します。
+   * 注意: この関数は仮想タブIDを使用するため、新しいコードではcreateGroupWithRealTabを使用してください。
    *
    * @param tabIds - グループ化するタブIDの配列
    * @returns 作成されたグループノードのID
+   * @deprecated createGroupWithRealTabを使用してください
    */
   async createGroupFromTabs(tabIds: number[]): Promise<string> {
     if (tabIds.length === 0) {
@@ -787,5 +882,61 @@ export class TreeStateManager {
 
     // ストレージに永続化
     await this.persistState();
+  }
+
+  /**
+   * Task 15.1: グループ情報を取得
+   * Requirements: 5.4, 5.5, 5.8
+   *
+   * グループタブのタブIDからグループ情報（名前と子タブリスト）を取得します。
+   *
+   * @param tabId - グループノードのタブID
+   * @returns グループ情報（名前と子タブのリスト）
+   */
+  async getGroupInfo(tabId: number): Promise<{
+    name: string;
+    children: Array<{ tabId: number; title: string; url: string }>;
+  }> {
+    const node = this.getNodeByTabId(tabId);
+    if (!node) {
+      throw new Error('Group not found');
+    }
+
+    // グループノードかどうかを確認
+    if (!node.id.startsWith('group-')) {
+      throw new Error('Not a group tab');
+    }
+
+    // グループ名をストレージから取得
+    let groupName = 'グループ';
+    try {
+      const result = await chrome.storage.local.get('groups');
+      const groups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
+      if (groups[node.id]) {
+        groupName = groups[node.id].name;
+      }
+    } catch (_err) {
+      // グループ情報の取得に失敗した場合はデフォルト名を使用
+    }
+
+    // 子タブの情報を取得
+    const children: Array<{ tabId: number; title: string; url: string }> = [];
+    for (const child of node.children) {
+      try {
+        const tab = await chrome.tabs.get(child.tabId);
+        children.push({
+          tabId: child.tabId,
+          title: tab.title || '',
+          url: tab.url || '',
+        });
+      } catch (_err) {
+        // タブが見つからない場合はスキップ
+      }
+    }
+
+    return {
+      name: groupName,
+      children,
+    };
   }
 }

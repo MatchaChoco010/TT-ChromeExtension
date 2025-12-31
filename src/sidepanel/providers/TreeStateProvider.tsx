@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, SiblingDropInfo } from '@/types';
-import type { DragEndEvent } from '@dnd-kit/core';
+import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, SiblingDropInfo, DragEndEvent } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
 interface TreeStateContextType {
@@ -392,6 +391,10 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   useEffect(() => {
     const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
       setActiveTabId(activeInfo.tabId);
+      // Note: アクティブタブ変更時に選択状態を解除しない
+      // ツリー内でのタブクリックでもonActivatedが発火するため、
+      // クリック時の選択操作と競合してしまう
+      // 代わりに、新しいタブ作成時とタブ削除時にのみ選択を解除する
     };
 
     chrome.tabs.onActivated.addListener(handleTabActivated);
@@ -404,6 +407,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   // Task 12.3 (tab-tree-bugfix): chrome.tabs.onCreatedで新しいタブをtabInfoMapに追加
   // これにより、新しく作成されたタブが即座にUIに反映される
   // Task 12.1 (tab-tree-comprehensive-fix): indexを含める（ピン留めタブの順序同期）
+  // Task 4.1 (tab-tree-bugfix-2): 新しいタブ作成時に選択状態を解除
+  // Requirements: 15.1, 15.2
   useEffect(() => {
     const handleTabCreated = (tab: chrome.tabs.Tab) => {
       if (tab.id !== undefined) {
@@ -421,6 +426,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             index: tab.index,
           },
         }));
+        // Task 4.1: 新しいタブが作成されたら選択状態を解除
+        setSelectedNodeIds(new Set());
+        setLastSelectedNodeId(null);
       }
     };
 
@@ -432,6 +440,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   // Task 12.3 (tab-tree-bugfix): chrome.tabs.onRemovedでタブをtabInfoMapから削除
+  // Task 4.1 (tab-tree-bugfix-2): タブ削除時に選択状態を解除
+  // Requirements: 15.1, 15.2
   useEffect(() => {
     const handleTabRemoved = (tabId: number) => {
       setTabInfoMap(prev => {
@@ -439,6 +449,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         delete newMap[tabId];
         return newMap;
       });
+      // Task 4.1: タブが削除されたら選択状態を解除
+      setSelectedNodeIds(new Set());
+      setLastSelectedNodeId(null);
     };
 
     chrome.tabs.onRemoved.addListener(handleTabRemoved);
@@ -800,7 +813,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
    */
   const handleSiblingDrop = useCallback(
     async (info: SiblingDropInfo) => {
-      const { activeNodeId, insertIndex, aboveNodeId, belowNodeId } = info;
+      // Task 7.3: insertIndexはツリー内の位置であり、ブラウザタブのインデックスとは異なるため未使用
+      // belowNodeIdのタブのインデックスを直接取得してブラウザタブを移動する
+      const { activeNodeId, insertIndex: _insertIndex, aboveNodeId, belowNodeId } = info;
 
       if (!treeState) {
         return;
@@ -902,16 +917,36 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
       await updateTreeState(newTreeState);
 
-      // Task 8.1 (tab-tree-bugfix): ブラウザタブの順序をツリー構造と同期
-      // Requirements: 7.2 - ドロップ後のツリー構造がブラウザタブの順序と同期
+      // Task 7.3 (tab-tree-bugfix-2): ブラウザタブの順序をツリー構造と同期
+      // Requirements: 2.1, 2.2, 2.3 - ドロップ位置に対応した正しいインデックスにタブを移動
+      // insertIndexはツリー内のインデックスであり、ブラウザタブのインデックスとは異なる
+      // belowNodeIdのタブのインデックスを使用するか、リスト末尾の場合は-1を使用
       try {
-        await chrome.tabs.move(activeNode.tabId, { index: insertIndex });
+        let browserTabIndex: number;
+
+        if (belowNodeId && treeState.nodes[belowNodeId]) {
+          // 下のノードが存在する場合、下のノードのタブのインデックスを取得
+          const belowNode = treeState.nodes[belowNodeId];
+          const belowTabInfo = tabInfoMap[belowNode.tabId];
+          if (belowTabInfo) {
+            browserTabIndex = belowTabInfo.index;
+          } else {
+            // tabInfoMapにない場合はchrome.tabs.getでインデックスを取得
+            const tab = await chrome.tabs.get(belowNode.tabId);
+            browserTabIndex = tab.index;
+          }
+        } else {
+          // リスト末尾にドロップした場合は-1（末尾に移動）
+          browserTabIndex = -1;
+        }
+
+        await chrome.tabs.move(activeNode.tabId, { index: browserTabIndex });
       } catch (_err) {
         // タブ移動に失敗してもツリー状態の更新は維持する
         // タブが既に存在しない場合などに発生する可能性がある
       }
     },
-    [treeState, updateTreeState]
+    [treeState, updateTreeState, tabInfoMap]
   );
 
   /**

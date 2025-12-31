@@ -571,11 +571,12 @@ export const IconPicker: React.FC<IconPickerProps> = ({
     setSelectedCategory(categoryId);
   }, []);
 
-  // アイコン選択
+  // アイコン選択 - 即座にonSelectを呼び出す (Requirement 9.3: Select button不要)
   const handleIconSelect = useCallback((iconName: string) => {
     setSelectedIcon(iconName);
     setUrlInput(''); // アイコン選択時はURL入力をクリア
-  }, []);
+    onSelect(iconName); // 即座に選択を確定
+  }, [onSelect]);
 
   // URL入力変更
   const handleUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

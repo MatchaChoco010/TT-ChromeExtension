@@ -126,8 +126,13 @@ describe('SettingsPanel', () => {
     });
   });
 
-  describe('Requirement 9.1: 新規タブ位置設定', () => {
-    it('should display newTabPosition setting options', () => {
+  /**
+   * Task 3.1 (tab-tree-bugfix-2): 個別のタブ位置設定テスト
+   * Requirement 17.4: 「デフォルトの新しいタブの位置」設定を削除
+   * 代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定
+   */
+  describe('Requirement 17.4: 個別のタブ位置設定', () => {
+    it('should display link click tab position setting', () => {
       render(
         <SettingsPanel
           settings={defaultSettings}
@@ -135,14 +140,26 @@ describe('SettingsPanel', () => {
         />
       );
 
-      // 新しいタブの位置設定ラベルが表示される
-      expect(screen.getByText(/新しいタブの位置/i)).toBeInTheDocument();
+      // リンククリックから開かれたタブの位置設定ラベルが表示される
+      expect(screen.getByLabelText(/リンククリックから開かれたタブの位置/i)).toBeInTheDocument();
     });
 
-    it('should display current newTabPosition value as selected option', () => {
+    it('should display manual tab position setting', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      // 手動で開かれたタブの位置設定ラベルが表示される
+      expect(screen.getByLabelText(/手動で開かれたタブの位置/i)).toBeInTheDocument();
+    });
+
+    it('should display current newTabPositionFromLink value as selected option', () => {
       const settingsWithChild = {
         ...defaultSettings,
-        newTabPosition: 'child' as const,
+        newTabPositionFromLink: 'child' as const,
       };
 
       render(
@@ -153,34 +170,12 @@ describe('SettingsPanel', () => {
       );
 
       const select = screen.getByLabelText(
-        /新しいタブの位置/i
+        /リンククリックから開かれたタブの位置/i
       ) as HTMLSelectElement;
       expect(select.value).toBe('child');
     });
 
-    it('should allow user to change newTabPosition to "child"', () => {
-      const settingsWithEnd = {
-        ...defaultSettings,
-        newTabPosition: 'end' as const,
-      };
-
-      render(
-        <SettingsPanel
-          settings={settingsWithEnd}
-          onSettingsChange={onSettingsChange}
-        />
-      );
-
-      const select = screen.getByLabelText(/新しいタブの位置/i);
-      fireEvent.change(select, { target: { value: 'child' } });
-
-      expect(onSettingsChange).toHaveBeenCalledWith({
-        ...settingsWithEnd,
-        newTabPosition: 'child',
-      });
-    });
-
-    it('should allow user to change newTabPosition to "sibling"', () => {
+    it('should default to "child" for newTabPositionFromLink when not set', () => {
       render(
         <SettingsPanel
           settings={defaultSettings}
@@ -188,16 +183,14 @@ describe('SettingsPanel', () => {
         />
       );
 
-      const select = screen.getByLabelText(/新しいタブの位置/i);
-      fireEvent.change(select, { target: { value: 'sibling' } });
-
-      expect(onSettingsChange).toHaveBeenCalledWith({
-        ...defaultSettings,
-        newTabPosition: 'sibling',
-      });
+      const select = screen.getByLabelText(
+        /リンククリックから開かれたタブの位置/i
+      ) as HTMLSelectElement;
+      // デフォルトは 'child'
+      expect(select.value).toBe('child');
     });
 
-    it('should allow user to change newTabPosition to "end"', () => {
+    it('should default to "end" for newTabPositionManual when not set', () => {
       render(
         <SettingsPanel
           settings={defaultSettings}
@@ -205,16 +198,48 @@ describe('SettingsPanel', () => {
         />
       );
 
-      const select = screen.getByLabelText(/新しいタブの位置/i);
+      const select = screen.getByLabelText(
+        /手動で開かれたタブの位置/i
+      ) as HTMLSelectElement;
+      // デフォルトは 'end'
+      expect(select.value).toBe('end');
+    });
+
+    it('should allow user to change newTabPositionFromLink', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const select = screen.getByLabelText(/リンククリックから開かれたタブの位置/i);
       fireEvent.change(select, { target: { value: 'end' } });
 
       expect(onSettingsChange).toHaveBeenCalledWith({
         ...defaultSettings,
-        newTabPosition: 'end',
+        newTabPositionFromLink: 'end',
       });
     });
 
-    it('should display all three options: child, sibling, end', () => {
+    it('should allow user to change newTabPositionManual', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const select = screen.getByLabelText(/手動で開かれたタブの位置/i);
+      fireEvent.change(select, { target: { value: 'child' } });
+
+      expect(onSettingsChange).toHaveBeenCalledWith({
+        ...defaultSettings,
+        newTabPositionManual: 'child',
+      });
+    });
+
+    it('should display all three options for both settings', () => {
       render(
         <SettingsPanel
           settings={defaultSettings}
@@ -228,7 +253,7 @@ describe('SettingsPanel', () => {
       expect(screen.getAllByText(/リストの最後/i).length).toBeGreaterThan(0);
     });
 
-    it('should display description for newTabPosition setting', () => {
+    it('should display description for manual tab position setting', () => {
       render(
         <SettingsPanel
           settings={defaultSettings}
@@ -237,7 +262,7 @@ describe('SettingsPanel', () => {
       );
 
       expect(
-        screen.getByText(/新しく開かれるタブの挿入位置を選択できます/i)
+        screen.getByText(/手動で開かれたタブ\(アドレスバー、新規タブボタン、設定画面など\)の挿入位置/i)
       ).toBeInTheDocument();
     });
   });

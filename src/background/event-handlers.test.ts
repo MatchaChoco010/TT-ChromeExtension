@@ -581,6 +581,27 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
+    // Task 15.2: chrome.tabs.create, chrome.tabs.get, chrome.tabs.update, chrome.runtime.id のモックを設定
+    const groupTabId = 100;
+    (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: groupTabId,
+      index: 3,
+      windowId: 1,
+      url: `chrome-extension://test-id/group.html`,
+    } as chrome.tabs.Tab);
+    (chromeMock.tabs.get as ReturnType<typeof vi.fn>).mockImplementation(async (tabId: number) => {
+      if (tabId === 1) return { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
+      if (tabId === 2) return { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
+      if (tabId === 3) return { id: 3, index: 2, windowId: 1, url: 'https://example3.com' } as chrome.tabs.Tab;
+      return null;
+    });
+    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: groupTabId,
+      index: 3,
+      windowId: 1,
+      url: `chrome-extension://test-id/group.html?tabId=${groupTabId}`,
+    } as chrome.tabs.Tab);
+
     // 事前にタブを作成しておく
     const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
     const tab2 = { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
@@ -603,7 +624,7 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
     chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
 
     // 非同期処理を待つ
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // レスポンスが成功であることを確認
     expect(sendResponse).toHaveBeenCalledWith(
@@ -639,6 +660,26 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
+    // Task 15.2: chrome.tabs.create, chrome.tabs.get, chrome.tabs.update のモックを設定
+    const groupTabId = 100;
+    (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: groupTabId,
+      index: 2,
+      windowId: 1,
+      url: `chrome-extension://test-id/group.html`,
+    } as chrome.tabs.Tab);
+    (chromeMock.tabs.get as ReturnType<typeof vi.fn>).mockImplementation(async (tabId: number) => {
+      if (tabId === 1) return { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
+      if (tabId === 2) return { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
+      return null;
+    });
+    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: groupTabId,
+      index: 2,
+      windowId: 1,
+      url: `chrome-extension://test-id/group.html?tabId=${groupTabId}`,
+    } as chrome.tabs.Tab);
+
     // 事前にタブを作成しておく
     const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
     const tab2 = { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
@@ -659,29 +700,29 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
     chromeMock.runtime.onMessage.trigger(createMessage, {}, createResponse);
 
     // 非同期処理を待つ
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // 作成されたグループのタブIDを取得（グループノードのtabIdを使用）
     const setCalls = (chromeMock.storage.local.set as ReturnType<typeof vi.fn>).mock.calls;
-    let groupTabId: number | undefined;
+    let foundGroupTabId: number | undefined;
 
     for (const call of setCalls) {
       if (call[0]['tree_state']) {
         const nodes = Object.values(call[0]['tree_state'].nodes) as TabNode[];
         const groupNode = nodes.find((node) => node.id.startsWith('group-'));
         if (groupNode) {
-          groupTabId = groupNode.tabId;
+          foundGroupTabId = groupNode.tabId;
           break;
         }
       }
     }
 
-    expect(groupTabId).toBeDefined();
+    expect(foundGroupTabId).toBeDefined();
 
     // DISSOLVE_GROUPメッセージを送信
     const dissolveMessage = {
       type: 'DISSOLVE_GROUP',
-      payload: { tabIds: [groupTabId] },
+      payload: { tabIds: [foundGroupTabId] },
     };
     const dissolveResponse = vi.fn();
 
@@ -694,5 +735,167 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
     expect(dissolveResponse).toHaveBeenCalledWith(
       expect.objectContaining({ success: true })
     );
+  });
+});
+
+/**
+ * Task 14.1: 空ウィンドウの自動クローズ
+ * Requirements: 7.1, 7.2
+ */
+describe('Task 14.1: 空ウィンドウの自動クローズ', () => {
+  beforeEach(() => {
+    chromeMock.clearAllListeners();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    chromeMock.clearAllListeners();
+  });
+
+  it('Requirement 7.1: ドラッグアウトにより全てのタブが移動されたとき、元のウィンドウを自動的に閉じる', async () => {
+    registerMessageListener();
+    registerTabEventListeners();
+
+    const sourceWindowId = 100;
+    const tabId = 1001;
+
+    // Mock sendMessage
+    const sendMessageSpy = vi.fn(() => Promise.resolve());
+    chromeMock.runtime.sendMessage = sendMessageSpy;
+
+    // Mock chrome.tabs.query to return no tabs in the source window after move
+    (chromeMock.tabs.query as ReturnType<typeof vi.fn>).mockImplementation(
+      async (queryInfo: chrome.tabs.QueryInfo) => {
+        if (queryInfo.windowId === sourceWindowId) {
+          // ウィンドウにタブが残っていない状態をシミュレート
+          return [];
+        }
+        return [];
+      }
+    );
+
+    // Mock chrome.windows.remove
+    const windowsRemoveSpy = vi.fn(() => Promise.resolve());
+    chromeMock.windows.remove = windowsRemoveSpy;
+
+    // Mock chrome.windows.create to simulate new window creation
+    const newWindowId = 200;
+    (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockImplementation(
+      (_createData: chrome.windows.CreateData, callback?: (window: chrome.windows.Window) => void) => {
+        if (callback) {
+          callback({ id: newWindowId, focused: true } as chrome.windows.Window);
+        }
+        return Promise.resolve({ id: newWindowId, focused: true } as chrome.windows.Window);
+      }
+    );
+
+    // 事前にタブを作成（元のウィンドウに1つだけ）
+    const tab = {
+      id: tabId,
+      index: 0,
+      windowId: sourceWindowId,
+      url: 'https://example.com',
+    } as chrome.tabs.Tab;
+
+    chromeMock.tabs.onCreated.trigger(tab);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // CREATE_WINDOW_WITH_SUBTREEメッセージを送信（ドラッグアウト）
+    const message = {
+      type: 'CREATE_WINDOW_WITH_SUBTREE',
+      payload: { tabId, sourceWindowId },
+    };
+    const sendResponse = vi.fn();
+
+    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
+
+    // 非同期処理を待つ
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // レスポンスが成功であることを確認
+    expect(sendResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true })
+    );
+
+    // 元のウィンドウが閉じられたことを確認
+    expect(windowsRemoveSpy).toHaveBeenCalledWith(sourceWindowId);
+  });
+
+  it('Requirement 7.2: ウィンドウにタブが残っている場合、ウィンドウは開いたまま維持される', async () => {
+    registerMessageListener();
+    registerTabEventListeners();
+
+    const sourceWindowId = 100;
+    const tabId = 1001;
+    const remainingTabId = 1002;
+
+    // Mock sendMessage
+    const sendMessageSpy = vi.fn(() => Promise.resolve());
+    chromeMock.runtime.sendMessage = sendMessageSpy;
+
+    // Mock chrome.tabs.query to return remaining tabs in the source window
+    (chromeMock.tabs.query as ReturnType<typeof vi.fn>).mockImplementation(
+      async (queryInfo: chrome.tabs.QueryInfo) => {
+        if (queryInfo.windowId === sourceWindowId) {
+          // ウィンドウにまだタブが残っている状態をシミュレート
+          return [{ id: remainingTabId, index: 0, windowId: sourceWindowId }];
+        }
+        return [];
+      }
+    );
+
+    // Mock chrome.windows.remove
+    const windowsRemoveSpy = vi.fn(() => Promise.resolve());
+    chromeMock.windows.remove = windowsRemoveSpy;
+
+    // Mock chrome.windows.create to simulate new window creation
+    const newWindowId = 200;
+    (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockImplementation(
+      (_createData: chrome.windows.CreateData, callback?: (window: chrome.windows.Window) => void) => {
+        if (callback) {
+          callback({ id: newWindowId, focused: true } as chrome.windows.Window);
+        }
+        return Promise.resolve({ id: newWindowId, focused: true } as chrome.windows.Window);
+      }
+    );
+
+    // 事前にタブを作成（元のウィンドウに2つ）
+    const tab1 = {
+      id: tabId,
+      index: 0,
+      windowId: sourceWindowId,
+      url: 'https://example1.com',
+    } as chrome.tabs.Tab;
+
+    const tab2 = {
+      id: remainingTabId,
+      index: 1,
+      windowId: sourceWindowId,
+      url: 'https://example2.com',
+    } as chrome.tabs.Tab;
+
+    chromeMock.tabs.onCreated.trigger(tab1);
+    chromeMock.tabs.onCreated.trigger(tab2);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // CREATE_WINDOW_WITH_SUBTREEメッセージを送信（ドラッグアウト）
+    const message = {
+      type: 'CREATE_WINDOW_WITH_SUBTREE',
+      payload: { tabId, sourceWindowId },
+    };
+    const sendResponse = vi.fn();
+
+    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
+
+    // 非同期処理を待つ
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // レスポンスが成功であることを確認
+    expect(sendResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true })
+    );
+
+    // 元のウィンドウが閉じられていないことを確認
+    expect(windowsRemoveSpy).not.toHaveBeenCalled();
   });
 });

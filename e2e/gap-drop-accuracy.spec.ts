@@ -1,8 +1,8 @@
 /**
  * Gapドロップ精度のE2Eテスト
  *
- * Task 3.2: Gapドロップ精度のE2Eテスト追加
- * Requirements: 3.4, 3.5, 3.6
+ * Task 8.10 (tab-tree-bugfix-2): 自前D&D実装用に書き直し
+ * Requirements: 3.2.1, 3.2.3
  *
  * このテストスイートでは、タブ間隙間へのドロップ精度を検証します。
  * - タブ間隙間へのドロップで正確な位置に配置されること
@@ -13,7 +13,7 @@
  */
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
-import { startDrag, dropTab, moveTabToParent } from './utils/drag-drop-utils';
+import { startDrag, dropTab, moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
 import { waitForCondition } from './utils/polling-utils';
 import type { Page, Worker } from '@playwright/test';
 
@@ -54,73 +54,6 @@ async function getTabOrderInTree(
   // Y座標でソートして順序を取得
   positions.sort((a, b) => a.y - b.y);
   return positions.map(p => p.tabId);
-}
-
-/**
- * タブをタブ間の隙間にドラッグ（Gap領域へのドロップ）
- * 既存のdrag-drop-insert.spec.tsと同様のアプローチ
- */
-async function dragTabToGap(
-  page: Page,
-  sourceTabId: number,
-  targetTabId: number,
-  position: 'before' | 'after'
-): Promise<void> {
-  const sourceSelector = `[data-testid="tree-node-${sourceTabId}"]`;
-  const targetSelector = `[data-testid="tree-node-${targetTabId}"]`;
-
-  // ソース要素とターゲット要素のバウンディングボックスを取得
-  const sourceElement = page.locator(sourceSelector).first();
-  const targetElement = page.locator(targetSelector).first();
-
-  await sourceElement.waitFor({ state: 'visible', timeout: 5000 });
-  await targetElement.waitFor({ state: 'visible', timeout: 5000 });
-
-  const sourceBox = await sourceElement.boundingBox();
-  const targetBox = await targetElement.boundingBox();
-
-  if (!sourceBox || !targetBox) {
-    throw new Error('Could not get bounding box for source or target element');
-  }
-
-  // ソース要素の中央座標
-  const sourceX = sourceBox.x + sourceBox.width / 2;
-  const sourceY = sourceBox.y + sourceBox.height / 2;
-
-  // Gap領域の座標を計算
-  // beforeの場合はターゲットの上端10%、afterの場合は下端90%
-  const gapY = position === 'before'
-    ? targetBox.y + (targetBox.height * 0.1)
-    : targetBox.y + (targetBox.height * 0.9);
-  const targetX = targetBox.x + targetBox.width / 2;
-
-  // バックグラウンドスロットリングを回避するためにページをフォーカス
-  await page.bringToFront();
-  await page.evaluate(() => window.focus());
-
-  // 1. マウスをソース位置に移動
-  await page.mouse.move(sourceX, sourceY, { steps: 3 });
-
-  // 2. マウスボタンを押下
-  await page.mouse.down();
-
-  // 3. まず8px以上移動してドラッグを開始させる
-  await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
-
-  // 4. ドラッグ状態が確立されるまで待機
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
-
-  // 5. Gap領域に移動（複数ステップで移動してonDragMoveをトリガー）
-  await page.mouse.move(targetX, gapY, { steps: 10 });
-
-  // 6. Gap判定が更新されるまで待機
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
-
-  // 7. マウスをリリースしてドロップ
-  await page.mouse.up();
-
-  // D&D後にUIを安定させるための待機
-  await page.waitForTimeout(200);
 }
 
 /**
@@ -172,20 +105,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       expect(initialOrder.length).toBe(4);
 
       // 実行: tab4をtab1の前にドラッグ&ドロップ
-      await dragTabToGap(sidePanelPage, tab4, tab1, 'before');
+      await reorderTabs(sidePanelPage, tab4, tab1, 'before');
 
       // ストレージへの反映を待機
       await waitForAllTabsInStorage(serviceWorker, [tab1, tab2, tab3, tab4]);
 
-      // 検証: すべてのタブがツリーに表示されていること
-      const finalOrder = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
-      expect(finalOrder.length).toBe(4);
-
-      // 検証: すべてのタブIDが結果に含まれていること
-      expect(finalOrder).toContain(tab1);
-      expect(finalOrder).toContain(tab2);
-      expect(finalOrder).toContain(tab3);
-      expect(finalOrder).toContain(tab4);
+      // 検証: すべてのタブがツリーに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        const finalOrder = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
+        expect(finalOrder.length).toBe(4);
+        expect(finalOrder).toContain(tab1);
+        expect(finalOrder).toContain(tab2);
+        expect(finalOrder).toContain(tab3);
+        expect(finalOrder).toContain(tab4);
+      }).toPass({ timeout: 3000 });
     });
 
     test('タブをGap領域（after位置）にドロップすると、正常に完了すること', async ({
@@ -208,15 +141,17 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       expect(initialOrder.length).toBe(3);
 
       // 実行: tab3をtab1の後にドラッグ&ドロップ
-      await dragTabToGap(sidePanelPage, tab3, tab1, 'after');
+      await reorderTabs(sidePanelPage, tab3, tab1, 'after');
 
       // ストレージへの反映を待機
       await waitForAllTabsInStorage(serviceWorker, [tab1, tab2, tab3]);
 
-      // 検証: すべてのタブがUIに表示されていること
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first()).toBeVisible();
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab2}"]`).first()).toBeVisible();
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab3}"]`).first()).toBeVisible();
+      // 検証: すべてのタブがUIに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first()).toBeVisible();
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab2}"]`).first()).toBeVisible();
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab3}"]`).first()).toBeVisible();
+      }).toPass({ timeout: 3000 });
     });
 
     test('複数回のGapドロップを連続で行ってもすべてのタブが保持されること', async ({
@@ -236,40 +171,23 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       await assertTabInTree(sidePanelPage, tab3);
       await assertTabInTree(sidePanelPage, tab4);
 
-      // ページをフォーカスしてバックグラウンドスロットリングを回避
-      await sidePanelPage.bringToFront();
-      await sidePanelPage.evaluate(() => window.focus());
-
       // 1回目のドロップ: tab4をtab1の前に
-      await dragTabToGap(sidePanelPage, tab4, tab1, 'before');
-      await sidePanelPage.waitForTimeout(500);
+      await reorderTabs(sidePanelPage, tab4, tab1, 'before');
+      await waitForAllTabsInStorage(serviceWorker, [tab1, tab2, tab3, tab4]);
 
       // 2回目のドロップ: tab2をtab3の後に
-      await dragTabToGap(sidePanelPage, tab2, tab3, 'after');
-      await sidePanelPage.waitForTimeout(500);
+      await reorderTabs(sidePanelPage, tab2, tab3, 'after');
+      await waitForAllTabsInStorage(serviceWorker, [tab1, tab2, tab3, tab4]);
 
-      // ストレージへの反映を待機（リトライ回数を増加）
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 50; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, [tab1, tab2, tab3, tab4]);
-
-      // 検証: すべてのタブがUIに表示されていること
-      const uiTabIds = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
-      expect(uiTabIds.length).toBe(4);
-      expect(uiTabIds).toContain(tab1);
-      expect(uiTabIds).toContain(tab2);
-      expect(uiTabIds).toContain(tab3);
-      expect(uiTabIds).toContain(tab4);
+      // 検証: すべてのタブがUIに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        const uiTabIds = await getTabOrderInTree(sidePanelPage, [tab1, tab2, tab3, tab4]);
+        expect(uiTabIds.length).toBe(4);
+        expect(uiTabIds).toContain(tab1);
+        expect(uiTabIds).toContain(tab2);
+        expect(uiTabIds).toContain(tab3);
+        expect(uiTabIds).toContain(tab4);
+      }).toPass({ timeout: 3000 });
     });
   });
 
@@ -290,16 +208,18 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       // child1を parentTabの子として配置
       await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
 
-      // 親タブを展開
-      const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-      const expandButton = parentNode.locator('[data-testid="expand-button"]');
-      if ((await expandButton.count()) > 0) {
-        const isExpanded = await parentNode.getAttribute('data-expanded');
-        if (isExpanded !== 'true') {
-          await expandButton.click();
-          await expect(parentNode).toHaveAttribute('data-expanded', 'true', { timeout: 3000 });
+      // 親タブを展開（ポーリングで確認）
+      await expect(async () => {
+        const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
+        const expandButton = parentNode.locator('[data-testid="expand-button"]');
+        if ((await expandButton.count()) > 0) {
+          const isExpanded = await parentNode.getAttribute('data-expanded');
+          if (isExpanded !== 'true') {
+            await expandButton.click();
+          }
         }
-      }
+        await expect(parentNode).toHaveAttribute('data-expanded', 'true');
+      }).toPass({ timeout: 5000 });
 
       // 別のルートタブを作成
       const rootTab = await createTab(extensionContext, 'https://www.w3.org');
@@ -311,15 +231,17 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       await expect(sidePanelPage.locator(`[data-testid="tree-node-${rootTab}"]`).first()).toBeVisible();
 
       // rootTabをparentTabの前にドラッグ&ドロップ
-      await dragTabToGap(sidePanelPage, rootTab, parentTab, 'before');
+      await reorderTabs(sidePanelPage, rootTab, parentTab, 'before');
 
       // ストレージへの反映を待機
       await waitForAllTabsInStorage(serviceWorker, [parentTab, child1, rootTab]);
 
-      // 検証: すべてのタブがUIに表示されていること
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first()).toBeVisible();
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${child1}"]`).first()).toBeVisible();
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${rootTab}"]`).first()).toBeVisible();
+      // 検証: すべてのタブがUIに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first()).toBeVisible();
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${child1}"]`).first()).toBeVisible();
+        await expect(sidePanelPage.locator(`[data-testid="tree-node-${rootTab}"]`).first()).toBeVisible();
+      }).toPass({ timeout: 3000 });
     });
 
     test('子タブとして配置した後もGapドロップが動作すること', async ({
@@ -337,67 +259,41 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       await assertTabInTree(sidePanelPage, tab2);
       await assertTabInTree(sidePanelPage, tab3);
 
-      // ページをフォーカスしてバックグラウンドスロットリングを回避
-      await sidePanelPage.bringToFront();
-      await sidePanelPage.evaluate(() => window.focus());
-
       // tab2をtab1の子として配置
       await moveTabToParent(sidePanelPage, tab2, tab1, serviceWorker);
 
-      // ストレージへの反映を待機（リトライ回数とタイムアウトを増加）
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 50; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode) {
-            const allTabsExist = tabIds.every(id => treeState.tabToNode?.[id]);
-            if (allTabsExist) {
-              return;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, [tab1, tab2, tab3]);
-
-      // UI更新を待機
-      await sidePanelPage.waitForTimeout(500);
+      // ストレージへの反映を待機
+      await waitForAllTabsInStorage(serviceWorker, [tab1, tab2, tab3]);
 
       // 検証: 親子関係がストレージに反映されていること（ポーリングで確認）
-      const relationCheck = await serviceWorker.evaluate(async (ids: { parentId: number; childId: number }) => {
-        interface TreeNode {
-          id: string;
-          tabId: number;
-          parentId: string | null;
-        }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
-          nodes: Record<string, TreeNode>;
-        }
+      await expect(async () => {
+        const relationCheck = await serviceWorker.evaluate(async (ids: { parentId: number; childId: number }) => {
+          interface TreeNode {
+            id: string;
+            tabId: number;
+            parentId: string | null;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, string>;
+            nodes: Record<string, TreeNode>;
+          }
 
-        // 親子関係が反映されるまでポーリング
-        for (let i = 0; i < 30; i++) {
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
           if (!treeState?.tabToNode || !treeState?.nodes) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            continue;
+            return { hasRelation: false };
           }
           const parentNodeId = treeState.tabToNode[ids.parentId];
           const childNodeId = treeState.tabToNode[ids.childId];
           if (!parentNodeId || !childNodeId) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            continue;
+            return { hasRelation: false };
           }
           const childNode = treeState.nodes[childNodeId];
-          if (childNode?.parentId === parentNodeId) {
-            return { hasRelation: true };
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        return { hasRelation: false };
-      }, { parentId: tab1, childId: tab2 });
+          return { hasRelation: childNode?.parentId === parentNodeId };
+        }, { parentId: tab1, childId: tab2 });
 
-      expect(relationCheck.hasRelation).toBe(true);
+        expect(relationCheck.hasRelation).toBe(true);
+      }).toPass({ timeout: 5000 });
     });
   });
 
@@ -421,20 +317,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         await assertTabInTree(sidePanelPage, tab);
       }
 
-      // ドロップ操作を実行
-      await dragTabToGap(sidePanelPage, tab5, tab1, 'before');
-      await sidePanelPage.waitForTimeout(500);
-
-      await dragTabToGap(sidePanelPage, tab4, tab2, 'before');
-      await sidePanelPage.waitForTimeout(500);
-
-      // ストレージへの反映を待機
+      // 1回目のドロップ操作
+      await reorderTabs(sidePanelPage, tab5, tab1, 'before');
       await waitForAllTabsInStorage(serviceWorker, allTabs);
 
-      // 検証: 全てのタブがUIに表示されていること
-      for (const tab of allTabs) {
-        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab}"]`).first()).toBeVisible({ timeout: 5000 });
-      }
+      // 2回目のドロップ操作
+      await reorderTabs(sidePanelPage, tab4, tab2, 'before');
+      await waitForAllTabsInStorage(serviceWorker, allTabs);
+
+      // 検証: 全てのタブがUIに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        for (const tab of allTabs) {
+          await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab}"]`).first()).toBeVisible();
+        }
+      }).toPass({ timeout: 5000 });
 
       // 検証: ストレージにも全てのタブが存在すること
       const storageCheck = await serviceWorker.evaluate(async (tabIds: number[]) => {
@@ -475,7 +371,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       const gapY = (tab1Box.y + tab1Box.height + tab2Box.y) / 2;
       await sidePanelPage.mouse.move(tab1Box.x + tab1Box.width / 2, gapY, { steps: 10 });
 
-      // ドロップインジケーターが表示されるまで待機
+      // ドロップインジケーターが表示されるまで待機（ポーリング）
       await waitForCondition(
         async () => {
           const indicator = sidePanelPage.locator('[data-testid="drop-indicator"]');
@@ -490,10 +386,12 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       // ストレージへの反映を待機
       await waitForAllTabsInStorage(serviceWorker, allTabs);
 
-      // 検証: 全てのタブがUIに表示されていること
-      for (const tab of allTabs) {
-        await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab}"]`).first()).toBeVisible({ timeout: 5000 });
-      }
+      // 検証: 全てのタブがUIに表示されていること（ポーリングで待機）
+      await expect(async () => {
+        for (const tab of allTabs) {
+          await expect(sidePanelPage.locator(`[data-testid="tree-node-${tab}"]`).first()).toBeVisible();
+        }
+      }).toPass({ timeout: 5000 });
     });
 
     test('ドロップインジケーターがGap位置に正しく表示されること', async ({
@@ -509,10 +407,6 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       await assertTabInTree(sidePanelPage, tab1, 'Example');
       await assertTabInTree(sidePanelPage, tab2);
       await assertTabInTree(sidePanelPage, tab3);
-
-      // ページをフォーカス
-      await sidePanelPage.bringToFront();
-      await sidePanelPage.evaluate(() => window.focus());
 
       // tab3をドラッグ開始
       await startDrag(sidePanelPage, tab3);

@@ -49,8 +49,15 @@ export const useMenuActions = () => {
           break;
 
         case 'duplicate':
-          // タブを複製
+          // Task 4.2 (tab-tree-bugfix-2): タブを複製（兄弟として配置）
+          // Requirement 16.1, 16.2, 16.3: 複製されたタブを元のタブの兄弟として配置
           for (const tabId of tabIds) {
+            // 複製前にService Workerに複製元を登録（onCreatedより先に実行される必要がある）
+            await chrome.runtime.sendMessage({
+              type: 'REGISTER_DUPLICATE_SOURCE',
+              payload: { sourceTabId: tabId },
+            });
+            // 複製を実行
             await chrome.tabs.duplicate(tabId);
           }
           break;

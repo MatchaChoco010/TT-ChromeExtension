@@ -1,23 +1,91 @@
 /**
  * ドラッグ＆ドロップ中のスクロール制限テスト
  *
- * Requirement 5: ドラッグ時スクロール制限
- * - 5.1: ドラッグ中にツリービューの縦スクロールを本来のスクロール可能量を超えてスクロールしない
- * - 5.2: タブツリーのコンテンツがビューポートより小さい場合、ドラッグ中にスクロールしない
- * - 5.3: タブツリーのコンテンツがビューポートより大きい場合、コンテンツ末尾までのみスクロール可能
+ * Requirement 3: ドラッグ時スクロール制限
+ * - 3.1: ドラッグ中にツリービューの縦スクロールを本来のスクロール可能量を超えてスクロールしない
+ * - 3.2: タブツリーのコンテンツがビューポートより小さい場合、ドラッグ中にスクロールしない
+ * - 3.3: タブツリーのコンテンツがビューポートより大きい場合、コンテンツ末尾までのみスクロール可能
+ * - 3.4: スクロール制限が正しく動作すること
  *
- * Task 5.1 (tab-tree-comprehensive-fix): スクロール量制限ロジックの実装
- * Task 5.2 (tab-tree-comprehensive-fix): スクロール制限のE2Eテスト追加
+ * Task 8.9 (tab-tree-bugfix-2): スクロール制限のE2Eテスト（自前D&D実装対応）
  */
 import { test, expect } from './fixtures/extension';
+import type { Page, Locator } from '@playwright/test';
 import { createTab, assertTabInTree } from './utils/tab-utils';
 import { startDrag, dropTab } from './utils/drag-drop-utils';
+
+/**
+ * スクロール位置が変化するまで待機（ポーリング）
+ *
+ * @param page - Page
+ * @param container - スクロールコンテナのLocator
+ * @param initialScrollTop - 初期スクロール位置
+ * @param direction - 期待するスクロール方向（'down'または'up'）
+ * @param maxWait - 最大待機時間（ミリ秒）
+ * @returns 最終スクロール位置
+ */
+async function waitForScrollChange(
+  page: Page,
+  container: Locator,
+  initialScrollTop: number,
+  direction: 'down' | 'up',
+  maxWait: number = 1000
+): Promise<number> {
+  const startTime = Date.now();
+  let currentScrollTop = initialScrollTop;
+
+  while (Date.now() - startTime < maxWait) {
+    currentScrollTop = await container.evaluate((el) => el.scrollTop);
+    if (direction === 'down' && currentScrollTop > initialScrollTop) {
+      return currentScrollTop;
+    }
+    if (direction === 'up' && currentScrollTop < initialScrollTop) {
+      return currentScrollTop;
+    }
+    // requestAnimationFrameで待機
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+  }
+  return currentScrollTop;
+}
+
+/**
+ * スクロール位置が安定するまで待機（ポーリング）
+ *
+ * @param page - Page
+ * @param container - スクロールコンテナのLocator
+ * @param maxWait - 最大待機時間（ミリ秒）
+ * @returns 最終スクロール位置
+ */
+async function waitForScrollStabilize(
+  page: Page,
+  container: Locator,
+  maxWait: number = 500
+): Promise<number> {
+  const startTime = Date.now();
+  let lastScrollTop = await container.evaluate((el) => el.scrollTop);
+  let stableCount = 0;
+
+  while (Date.now() - startTime < maxWait) {
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    const currentScrollTop = await container.evaluate((el) => el.scrollTop);
+    if (currentScrollTop === lastScrollTop) {
+      stableCount++;
+      if (stableCount >= 3) {
+        return currentScrollTop;
+      }
+    } else {
+      stableCount = 0;
+      lastScrollTop = currentScrollTop;
+    }
+  }
+  return lastScrollTop;
+}
 
 test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
   // ドラッグ操作のタイムアウトを延長
   test.setTimeout(120000);
 
-  // Requirement 5 (横スクロール禁止): ドラッグ中の横スクロールは無効化されている
+  // Requirement 3 (横スクロール禁止): ドラッグ中の横スクロールは無効化されている
   test('ドラッグ中に横スクロールが発生しないことを検証する', async ({
     extensionContext,
     sidePanelPage,
@@ -46,12 +114,12 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     if (box) {
       // コンテナの右端を超えてマウスを移動
       await sidePanelPage.mouse.move(box.x + box.width + 100, box.y + box.height / 2, { steps: 5 });
-      // 少し待機してautoScrollの反応を確認
-      await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 200)));
+      // スクロール位置が安定するまで待機（ポーリング）
+      await waitForScrollStabilize(sidePanelPage, container);
     }
 
     // 横スクロールが発生していないことを検証
-    // autoScroll設定でthreshold.x: 0に設定されているため、横スクロールは無効
+    // autoScroll設定で横スクロールは無効
     const finalScrollLeft = await container.evaluate((el) => el.scrollLeft);
     expect(finalScrollLeft).toBe(initialScrollLeft);
 
@@ -59,7 +127,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     await dropTab(sidePanelPage);
   });
 
-  // Requirement 5.2: コンテンツがビューポートより小さい場合、ドラッグ中にスクロールしない
+  // Requirement 3.2: コンテンツがビューポートより小さい場合、ドラッグ中にスクロールしない
   test('ドラッグ中にツリービューが必要以上に縦スクロールしないことを検証する', async ({
     extensionContext,
     sidePanelPage,
@@ -89,8 +157,8 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     if (box) {
       // コンテナの下端を超えてマウスを移動
       await sidePanelPage.mouse.move(box.x + box.width / 2, box.y + box.height + 200, { steps: 5 });
-      // autoScrollの反応を待機
-      await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 200)));
+      // スクロール位置が安定するまで待機（ポーリング）
+      await waitForScrollStabilize(sidePanelPage, container);
     }
 
     // スクロール量を取得
@@ -117,7 +185,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     await dropTab(sidePanelPage);
   });
 
-  // Requirement 5.1, 5.3: コンテンツがビューポートを超える場合、コンテンツ末尾までのみスクロール可能
+  // Requirement 3.1, 3.3: コンテンツがビューポートを超える場合、コンテンツ末尾までのみスクロール可能
   test('コンテンツがビューポートを超えている場合のみスクロールが許可されることを検証する', async ({
     extensionContext,
     sidePanelPage,
@@ -173,8 +241,8 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       const box = await container.boundingBox();
       if (box) {
         await sidePanelPage.mouse.move(box.x + box.width / 2, box.y + box.height + 100, { steps: 5 });
-        // autoScrollの反応を待機
-        await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 300)));
+        // スクロール位置が変化するか安定するまで待機（ポーリング）
+        await waitForScrollChange(sidePanelPage, container, initialScrollTop, 'down');
       }
 
       // スクロール位置を取得
@@ -199,7 +267,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     }
   });
 
-  // Requirement 5.1: スクロール量が本来のスクロール可能量を超えない（加速度制限）
+  // Requirement 3.1, 3.4: スクロール量が本来のスクロール可能量を超えない（加速度制限）
   test('ドラッグ中のスクロール加速度が制限されていることを検証する', async ({
     extensionContext,
     sidePanelPage,
@@ -253,7 +321,10 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
             box.y + box.height + (i * 20),
             { steps: 2 }
           );
-          await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
+          // rAFベースの待機でスクロール反映を待つ
+          await sidePanelPage.evaluate(() =>
+            new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+          );
           const scrollTop = await container.evaluate((el) => el.scrollTop);
           scrollPositions.push(scrollTop);
         }
@@ -265,7 +336,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       for (let i = 1; i < scrollPositions.length; i++) {
         const diff = scrollPositions[i] - scrollPositions[i - 1];
         // 1ステップあたりのスクロール量が過大でないことを確認
-        // AUTO_SCROLL_CONFIG.acceleration: 3 と interval: 15 により制限されている
+        // AUTO_SCROLL_CONFIG.speed: 8 により制限されている
         expect(diff).toBeLessThan(200); // 妥当な閾値
       }
 

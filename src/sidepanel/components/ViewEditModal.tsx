@@ -45,6 +45,8 @@ export interface ViewEditModalProps {
   onSave: (view: View) => void;
   /** クローズ時のコールバック */
   onClose: () => void;
+  /** 即時更新用のコールバック（モーダルを閉じずにビューを更新） */
+  onImmediateUpdate?: (view: View) => void;
 }
 
 /**
@@ -61,6 +63,7 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
   isOpen,
   onSave,
   onClose,
+  onImmediateUpdate,
 }) => {
   // フォーム状態
   // Note: 親コンポーネントでkey={view?.id}を使用することで、
@@ -89,11 +92,20 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
     };
   }, [handleKeyDown]);
 
-  // IconPicker選択ハンドラ
+  // IconPicker選択ハンドラ - アイコン選択時に即座に反映 (Requirement 9.1, 9.2, 9.3)
   const handleIconSelect = useCallback((selectedIcon: string) => {
     setIcon(selectedIcon);
     setShowIconPicker(false);
-  }, []);
+    // 即座にビューを更新して変更を反映（モーダルは閉じない）
+    if (view && name.trim() && onImmediateUpdate) {
+      onImmediateUpdate({
+        id: view.id,
+        name: name.trim(),
+        color,
+        icon: selectedIcon.trim() || undefined,
+      });
+    }
+  }, [view, name, color, onImmediateUpdate]);
 
   // IconPickerキャンセルハンドラ
   const handleIconPickerCancel = useCallback(() => {

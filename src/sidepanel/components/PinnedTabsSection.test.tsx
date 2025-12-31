@@ -411,7 +411,7 @@ describe('PinnedTabsSection', () => {
       mockOnPinnedTabReorder.mockClear();
     });
 
-    it('ピン留めタブがSortableContext内でレンダリングされること', () => {
+    it('ピン留めタブがドラッグ可能コンテキスト内でレンダリングされること', () => {
       const pinnedTabIds = [1, 2, 3];
       const tabInfoMap: TabInfoMap = {
         1: createMockTabInfo(1, 'Tab 1', true, 'https://example.com/favicon1.ico'),
@@ -467,7 +467,7 @@ describe('PinnedTabsSection', () => {
         3: createMockTabInfo(3, 'Tab 3', true),
       };
 
-      // 内部DndContextのonDragEndをシミュレートするためのラッパーが必要
+      // 内部のドラッグ&ドロップハンドラをシミュレートするためのラッパーが必要
       // ここではpropsの型をテスト
       render(
         <PinnedTabsSection

@@ -15,6 +15,7 @@ import React, { useState, useCallback } from 'react';
 import type { View } from '@/types';
 import { ViewContextMenu } from './ViewContextMenu';
 import { ViewEditModal } from './ViewEditModal';
+import { getIconByName, isCustomIcon } from './IconPicker';
 
 export interface ViewSwitcherProps {
   /** すべてのビュー */
@@ -116,6 +117,15 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
     [onViewUpdate]
   );
 
+  // 即時更新（モーダルを閉じずにビューを更新）- Requirement 9.1, 9.2
+  const handleImmediateUpdate = useCallback(
+    (view: View) => {
+      onViewUpdate(view.id, view);
+      // モーダルは閉じないので setEditingView は呼ばない
+    },
+    [onViewUpdate]
+  );
+
   // Task 3.2: マウスホイールでビュー切り替え
   const handleWheel = useCallback(
     (event: React.WheelEvent) => {
@@ -178,26 +188,38 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
               data-color={view.color}
               title={view.name}
             >
-              {/* アイコンが設定されている場合はアイコン画像を表示 */}
+              {/* アイコンが設定されている場合 */}
               {view.icon ? (
-                <img
-                  src={view.icon}
-                  alt={view.name}
-                  className="w-5 h-5 rounded object-cover"
-                  onError={(e) => {
-                    // アイコン読み込み失敗時はカラーサークルにフォールバック
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const fallback = target.nextElementSibling as HTMLElement;
-                    if (fallback) {
-                      fallback.style.display = 'block';
-                    }
-                  }}
-                />
+                isCustomIcon(view.icon) ? (
+                  // カスタムアイコン（SVGプリセット）を表示
+                  <span
+                    className="w-5 h-5 text-gray-200"
+                    data-testid="view-custom-icon"
+                  >
+                    {getIconByName(view.icon)?.svg}
+                  </span>
+                ) : (
+                  // URL画像アイコンを表示
+                  <img
+                    src={view.icon}
+                    alt={view.name}
+                    className="w-5 h-5 rounded object-cover"
+                    data-testid="view-url-icon"
+                    onError={(e) => {
+                      // アイコン読み込み失敗時はカラーサークルにフォールバック
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) {
+                        fallback.style.display = 'block';
+                      }
+                    }}
+                  />
+                )
               ) : null}
               {/* アイコンがない場合、またはフォールバック用のカラーサークル */}
               <span
-                className={`w-5 h-5 rounded-full flex-shrink-0 ${view.icon ? 'hidden' : ''}`}
+                className={`w-5 h-5 rounded-full flex-shrink-0 ${view.icon && !isCustomIcon(view.icon) ? 'hidden' : view.icon ? 'hidden' : ''}`}
                 style={{ backgroundColor: view.color }}
                 aria-hidden="true"
                 data-testid="view-color-circle"
@@ -261,6 +283,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
         isOpen={editingView !== null}
         onSave={handleSaveView}
         onClose={handleCloseModal}
+        onImmediateUpdate={handleImmediateUpdate}
       />
     </>
   );

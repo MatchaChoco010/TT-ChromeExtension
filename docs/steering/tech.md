@@ -14,7 +14,7 @@ Chrome Extension Manifest V3アーキテクチャを採用。Service WorkerとSi
 
 ## Key Libraries
 
-- **@dnd-kit**: ドラッグ&ドロップ機能（sortable tree実装）
+- **自前D&D実装**: ドラッグ&ドロップ機能（useDragDrop, useAutoScroll, DragOverlay）
 - **React Testing Library + Vitest**: コンポーネントテスト
 - **Playwright**: Chrome拡張機能のE2Eテスト
 - **fake-indexeddb**: ストレージテスト用のモック
@@ -152,7 +152,7 @@ await sidePanelPage.evaluate(() => window.focus());
 await startDrag(sidePanelPage, tabId);
 ```
 
-この対策を怠ると`mouse.move`が958ms（本来7ms）かかり、dnd-kitの衝突検出が1秒間隔でしか動作しなくなります。
+この対策を怠ると`mouse.move`が958ms（本来7ms）かかり、ドラッグ&ドロップの衝突検出が1秒間隔でしか動作しなくなります。
 
 #### テスト実行時間の最適化
 

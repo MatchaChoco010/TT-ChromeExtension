@@ -488,8 +488,8 @@ describe('Task 11.2: タブグループのドラッグ&ドロップ操作', () =
       // Then: グループノードがドラッグハンドルを持つこと
       const groupNode = screen.getByTestId('group-tree-node-group-1');
       expect(groupNode).toBeInTheDocument();
-      // ドラッグハンドルの存在を確認（data-sortable-item属性の存在）
-      const draggableElement = groupNode.querySelector('[data-sortable-item]');
+      // Task 12.1 (tab-tree-bugfix-2): ドラッグハンドルの存在を確認（data-draggable-item属性の存在）
+      const draggableElement = groupNode.querySelector('[data-draggable-item]');
       expect(draggableElement).toBeInTheDocument();
     });
 

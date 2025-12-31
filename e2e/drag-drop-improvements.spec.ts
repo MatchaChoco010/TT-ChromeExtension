@@ -92,10 +92,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const gapY = (tab1Box.y + tab1Box.height + tab2Box.y) / 2;
       await sidePanelPage.mouse.move(tab1Box.x + tab1Box.width / 2, gapY, { steps: 3 });
 
-      // ドロップインジケーターの表示を待機
-      await sidePanelPage.waitForTimeout(100);
-
-      // ドロップインジケーターが表示されていることを確認
+      // ドロップインジケーターが表示されていることを確認（ポーリング待機）
       const dropIndicator = sidePanelPage.locator('[data-testid="drop-indicator"]');
       await expect(dropIndicator).toBeVisible({ timeout: 3000 });
 
@@ -169,7 +166,9 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
       // tab1の上にホバー（他のタブの位置を変更させようと試みる）
       await hoverOverTab(sidePanelPage, tab1);
-      await sidePanelPage.waitForTimeout(100);
+
+      // Reactの状態更新を待機
+      await sidePanelPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
       // ドラッグ中の各タブのY位置を確認
       const positionsDuring = await getTabPositions(sidePanelPage, [tab1, tab2, tab3]);
@@ -214,7 +213,9 @@ test.describe('ドラッグ&ドロップ改善', () => {
       // tab3をドラッグ開始してtab1の上に移動
       await startDrag(sidePanelPage, tab3);
       await hoverOverTab(sidePanelPage, tab1);
-      await sidePanelPage.waitForTimeout(200);
+
+      // Reactの状態更新を待機
+      await sidePanelPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
       // ドラッグ中のストレージ状態を取得（変更されていないはず）
       const stateDuringDrag = await serviceWorker.evaluate(async () => {
@@ -277,12 +278,11 @@ test.describe('ドラッグ&ドロップ改善', () => {
       // ドロップを実行
       await dropTab(sidePanelPage);
 
-      // ドロップ後はis-draggingクラスが解除されていることを確認
-      await sidePanelPage.waitForTimeout(100);
-      const hasDraggingClassAfter = await container.evaluate((el) => {
-        return el.classList.contains('is-dragging');
-      });
-      expect(hasDraggingClassAfter).toBe(false);
+      // ドロップ後はis-draggingクラスが解除されていることを確認（ポーリング待機）
+      await expect(async () => {
+        const hasDraggingClass = await container.evaluate((el) => el.classList.contains('is-dragging'));
+        expect(hasDraggingClass).toBe(false);
+      }).toPass({ timeout: 3000 });
     });
 
     test('ドラッグ中にマウスを左右に動かしてもビューが横スクロールしないこと', async ({
@@ -344,13 +344,12 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await startDrag(sidePanelPage, tab2);
       await dropTab(sidePanelPage);
 
-      // ドロップ後はoverflow-x: hiddenが解除されていることを確認
-      await sidePanelPage.waitForTimeout(100);
-      const overflowXAfter = await container.evaluate((el) => {
-        return window.getComputedStyle(el).overflowX;
-      });
-      // overflow-x: hiddenでないこと（visible, auto, scrollのいずれか）
-      expect(overflowXAfter).not.toBe('hidden');
+      // ドロップ後はoverflow-x: hiddenが解除されていることを確認（ポーリング待機）
+      await expect(async () => {
+        const overflowXAfter = await container.evaluate((el) => window.getComputedStyle(el).overflowX);
+        // overflow-x: hiddenでないこと（visible, auto, scrollのいずれか）
+        expect(overflowXAfter).not.toBe('hidden');
+      }).toPass({ timeout: 3000 });
     });
   });
 
@@ -394,7 +393,9 @@ test.describe('ドラッグ&ドロップ改善', () => {
       // タブ間の隙間に移動
       const gapY = (parentBox.y + parentBox.height + childBox.y) / 2;
       await sidePanelPage.mouse.move(parentBox.x + parentBox.width / 2, gapY, { steps: 3 });
-      await sidePanelPage.waitForTimeout(100);
+
+      // Reactの状態更新を待機
+      await sidePanelPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
       // ドロップインジケーターが表示されていることを確認
       const dropIndicator = sidePanelPage.locator('[data-testid="drop-indicator"]');

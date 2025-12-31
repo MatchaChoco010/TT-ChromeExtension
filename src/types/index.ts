@@ -165,7 +165,8 @@ export type MessageType =
     }
   | {
       type: 'CREATE_WINDOW_WITH_SUBTREE';
-      payload: { tabId: number };
+      // Task 14.1: sourceWindowIdを追加（空ウィンドウ自動クローズ用）
+      payload: { tabId: number; sourceWindowId?: number };
     }
   | {
       type: 'MOVE_SUBTREE_TO_WINDOW';
@@ -186,24 +187,62 @@ export type MessageType =
   | { type: 'CREATE_GROUP'; payload: { tabIds: number[] } }
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
   // Task 9.3: ポップアップからスナップショット取得
-  | { type: 'CREATE_SNAPSHOT' };
+  | { type: 'CREATE_SNAPSHOT' }
+  // Task 4.2 (tab-tree-bugfix-2): タブ複製時の兄弟配置
+  | { type: 'REGISTER_DUPLICATE_SOURCE'; payload: { sourceTabId: number } }
+  // Task 13.1 (tab-tree-bugfix-2): クロスウィンドウドラッグセッション管理
+  | {
+      type: 'START_DRAG_SESSION';
+      payload: { tabId: number; windowId: number; treeData: TabNode[] };
+    }
+  | { type: 'GET_DRAG_SESSION' }
+  | { type: 'END_DRAG_SESSION'; payload: { reason?: string } }
+  | {
+      type: 'BEGIN_CROSS_WINDOW_MOVE';
+      payload: { targetWindowId: number };
+    }
+  // Task 15.1 (tab-tree-bugfix-2): グループ情報取得
+  | { type: 'GET_GROUP_INFO'; payload: { tabId: number } };
 
 export type MessageResponse<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-// Drag and Drop types
-import type {
-  DragStartEvent,
-  DragOverEvent,
-  DragEndEvent,
-} from '@dnd-kit/core';
+// Drag and Drop types - 自前D&D実装用の型定義
+// Task 17.1 (tab-tree-bugfix-2): dnd-kitを削除し自前の型を使用
+// Requirements: 3.1.1, 3.1.7
 
-export interface DragDropCallbacks {
-  onDragStart: (event: DragStartEvent) => void;
-  onDragOver: (event: DragOverEvent) => void;
-  onDragEnd: (event: DragEndEvent) => void;
-  onDragCancel: () => void;
+/**
+ * ドラッグ開始イベント
+ */
+export interface DragStartEvent {
+  active: {
+    id: string;
+  };
+}
+
+/**
+ * ドラッグ中のイベント（ホバー時）
+ */
+export interface DragOverEvent {
+  active: {
+    id: string;
+  };
+  over: {
+    id: string;
+  } | null;
+}
+
+/**
+ * ドラッグ終了イベント
+ */
+export interface DragEndEvent {
+  active: {
+    id: string;
+  };
+  over: {
+    id: string;
+  } | null;
 }
 
 export interface DragEndResult {
@@ -267,6 +306,9 @@ export interface TabTreeViewProps {
   // Task 10.1: ツリービュー外へのドロップ検知 (Requirements 9.1, 9.4)
   // ドラッグ中にマウスがツリービュー外に移動したかどうかを通知するコールバック
   onOutsideTreeChange?: (isOutside: boolean) => void;
+  // Task 7.2 (tab-tree-bugfix-2): サイドパネル境界参照 (Requirement 4.2, 4.3)
+  // ドラッグアウト判定はサイドパネル全体の境界を基準にする
+  sidePanelRef?: React.RefObject<HTMLElement | null>;
 }
 
 // Context Menu types

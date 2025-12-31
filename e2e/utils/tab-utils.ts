@@ -24,6 +24,10 @@ export interface CreateTabOptions {
    * タブのインデックス（位置）
    */
   index?: number;
+  /**
+   * タブを作成するウィンドウのID
+   */
+  windowId?: number;
 }
 
 /**
@@ -52,15 +56,30 @@ async function getServiceWorker(context: BrowserContext): Promise<Worker> {
 export async function createTab(
   context: BrowserContext,
   url: string,
-  parentTabId?: number,
+  parentTabIdOrOptions?: number | CreateTabOptions,
   options: CreateTabOptions = {}
 ): Promise<number> {
-  const { active = true, index } = options;
+  // Handle both old signature (parentTabId as number) and new signature (options object)
+  let parentTabId: number | undefined;
+  let resolvedOptions: CreateTabOptions;
+
+  if (typeof parentTabIdOrOptions === 'number') {
+    parentTabId = parentTabIdOrOptions;
+    resolvedOptions = options;
+  } else if (typeof parentTabIdOrOptions === 'object') {
+    parentTabId = undefined;
+    resolvedOptions = parentTabIdOrOptions;
+  } else {
+    parentTabId = undefined;
+    resolvedOptions = options;
+  }
+
+  const { active = true, index, windowId } = resolvedOptions;
   const serviceWorker = await getServiceWorker(context);
 
   // Service Workerコンテキストでchrome.tabs.create()を実行
   const tab = await serviceWorker.evaluate(
-    async ({ url, parentTabId, active, index }) => {
+    async ({ url, parentTabId, active, index, windowId }) => {
       // IMPORTANT: Chrome doesn't reliably include openerTabId in the onCreated event
       // To work around this, we call chrome.tabs.create and immediately get the tab object
       // which DOES include the openerTabId, then we can handle parent relationship properly
@@ -69,6 +88,7 @@ export async function createTab(
         active,
         ...(parentTabId !== undefined && { openerTabId: parentTabId }),
         ...(index !== undefined && { index }),
+        ...(windowId !== undefined && { windowId }),
       });
 
       // If we have a parent and the created tab has an ID, ensure the relationship is preserved
@@ -84,7 +104,7 @@ export async function createTab(
 
       return createdTab;
     },
-    { url, parentTabId, active, index }
+    { url, parentTabId, active, index, windowId }
   );
 
   // IMPORTANT: Wait for the tab to be fully added to TreeStateManager
@@ -109,6 +129,7 @@ export async function createTab(
   // If a parent tab was specified, manually update the tree state to set the parent relationship
   // This is needed because Chrome's openerTabId is not always reliably passed to the onCreated event
   if (parentTabId !== undefined) {
+    // Update storage and treeStateManager to set parent relationship
     await serviceWorker.evaluate(
       async ({ tabId, parentTabId }) => {
         interface TreeNode {
@@ -119,6 +140,10 @@ export async function createTab(
           tabToNode: Record<number, string>;
           nodes: Record<string, TreeNode>;
         }
+
+        // First, wait for any pending persistState to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
         if (!treeState) return;
@@ -135,6 +160,13 @@ export async function createTab(
           // Save updated state
           await chrome.storage.local.set({ tree_state: treeState });
 
+          // IMPORTANT: Reload treeStateManager from storage to sync the in-memory state
+          // @ts-expect-error accessing global treeStateManager
+          if (globalThis.treeStateManager) {
+            // @ts-expect-error accessing global treeStateManager
+            await globalThis.treeStateManager.loadState();
+          }
+
           // Notify Side Panel about the state update
           try {
             await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
@@ -146,8 +178,7 @@ export async function createTab(
       { tabId: tab.id, parentTabId }
     );
 
-    // Wait for the parent-child relationship to be reflected in the UI
-    // by checking that the parent node has children in storage
+    // Wait for the parent-child relationship to be reflected in storage
     // 50ms interval x 20 iterations = 1 second max
     await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {

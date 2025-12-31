@@ -377,4 +377,88 @@ extensionTest.describe('未読インジケーター位置', () => {
       await closeTab(extensionContext, bgTabId);
     }
   );
+
+  /**
+   * Task 2.3 (tab-tree-bugfix-2): Requirement 13.1, 13.2
+   * 未読インジケーターがタブの右端（tab-contentの右端付近）に固定表示されることを検証
+   * タイトルの長さに関わらず、未読インジケーターは同じ水平位置（右端付近）に配置される
+   */
+  extensionTest(
+    '未読インジケーターがタブの右端に固定されていること（タイトル長に依存しない）',
+    async ({ extensionContext, sidePanelPage }) => {
+      // アクティブなタブを取得
+      const [initialPage] = extensionContext.pages();
+      await initialPage.waitForLoadState('load');
+
+      // 短いタイトルのタブを作成（バックグラウンド）
+      const shortTitleTabId = await createTab(
+        extensionContext,
+        'https://example.com/',
+        undefined,
+        { active: false }
+      );
+
+      // 長いタイトルのタブを作成（バックグラウンド）
+      const longTitleTabId = await createTab(
+        extensionContext,
+        'https://example.org/this-is-a-very-long-path-to-create-a-long-title-for-testing-purposes',
+        undefined,
+        { active: false }
+      );
+
+      // ツリーが表示されるまで待機
+      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // 両方のタブノードがDOMに表示されるまで待機
+      const shortTitleTabNode = sidePanelPage.locator(`[data-testid="tree-node-${shortTitleTabId}"]`);
+      const longTitleTabNode = sidePanelPage.locator(`[data-testid="tree-node-${longTitleTabId}"]`);
+      await expect(shortTitleTabNode).toBeVisible({ timeout: 10000 });
+      await expect(longTitleTabNode).toBeVisible({ timeout: 10000 });
+
+      // 両方の未読バッジが表示されることを確認
+      await assertUnreadBadge(sidePanelPage, shortTitleTabId);
+      await assertUnreadBadge(sidePanelPage, longTitleTabId);
+
+      // 短いタイトルのタブでのバッジ位置とtab-content位置を取得
+      const shortTitleTabContent = shortTitleTabNode.locator('[data-testid="tab-content"]');
+      const shortTitleRightContainer = shortTitleTabNode.locator('[data-testid="right-actions-container"]');
+      await expect(shortTitleRightContainer).toBeVisible({ timeout: 5000 });
+      const shortTitleTabContentBounds = await shortTitleTabContent.boundingBox();
+      const shortTitleRightContainerBounds = await shortTitleRightContainer.boundingBox();
+
+      // 長いタイトルのタブでのバッジ位置とtab-content位置を取得
+      const longTitleTabContent = longTitleTabNode.locator('[data-testid="tab-content"]');
+      const longTitleRightContainer = longTitleTabNode.locator('[data-testid="right-actions-container"]');
+      await expect(longTitleRightContainer).toBeVisible({ timeout: 5000 });
+      const longTitleTabContentBounds = await longTitleTabContent.boundingBox();
+      const longTitleRightContainerBounds = await longTitleRightContainer.boundingBox();
+
+      // 位置情報が取得できていることを確認
+      expect(shortTitleTabContentBounds).not.toBeNull();
+      expect(longTitleTabContentBounds).not.toBeNull();
+      expect(shortTitleRightContainerBounds).not.toBeNull();
+      expect(longTitleRightContainerBounds).not.toBeNull();
+
+      if (shortTitleTabContentBounds && longTitleTabContentBounds && shortTitleRightContainerBounds && longTitleRightContainerBounds) {
+        // 右端コンテナがtab-contentの右端に配置されていることを検証
+        // right-actions-containerの右端がtab-contentの右端と近い位置にあること（余白を考慮して10px以内）
+        const shortTitleRightEdgeDiff = (shortTitleTabContentBounds.x + shortTitleTabContentBounds.width) - (shortTitleRightContainerBounds.x + shortTitleRightContainerBounds.width);
+        const longTitleRightEdgeDiff = (longTitleTabContentBounds.x + longTitleTabContentBounds.width) - (longTitleRightContainerBounds.x + longTitleRightContainerBounds.width);
+
+        // 両方とも10px以内の差であること（右端に固定されている）
+        expect(shortTitleRightEdgeDiff).toBeLessThanOrEqual(10);
+        expect(longTitleRightEdgeDiff).toBeLessThanOrEqual(10);
+
+        // 両方のright-actions-containerのX座標（右端）がほぼ同じ位置にあること（タイトル長に依存しない）
+        // 許容誤差は5px（サイドパネル幅の差などの要因）
+        const shortRightX = shortTitleRightContainerBounds.x + shortTitleRightContainerBounds.width;
+        const longRightX = longTitleRightContainerBounds.x + longTitleRightContainerBounds.width;
+        expect(Math.abs(shortRightX - longRightX)).toBeLessThanOrEqual(5);
+      }
+
+      // クリーンアップ
+      await closeTab(extensionContext, longTitleTabId);
+      await closeTab(extensionContext, shortTitleTabId);
+    }
+  );
 });

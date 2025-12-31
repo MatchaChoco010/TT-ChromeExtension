@@ -997,6 +997,8 @@ describe('TreeNode', () => {
       expect(screen.getByText('Loaded Page Title')).toBeInTheDocument();
     });
 
+    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - 新規タブのタイトルを「スタートページ」に修正
+    // NewTabButtonで開かれるchrome://vivaldi-webui/startpageのURLに対して「スタートページ」と表示される
     it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) に対して「スタートページ」と表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1023,6 +1025,35 @@ describe('TreeNode', () => {
       expect(screen.queryByText('Start Page')).not.toBeInTheDocument();
     });
 
+    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - タイトルがURL形式の場合も対応
+    it('タイトルがchrome://vivaldi-webui/startpage形式でURLが空の場合も「スタートページ」と表示されること', () => {
+      // Requirement 12.1, 12.2: Chromiumでは拡張機能にvivaldi-webui URLが公開されない場合がある
+      // その場合、タイトルがURL形式になることがあるので、タイトルもチェックする
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'chrome://vivaldi-webui/startpage',
+        url: '', // 拡張機能にはURLが公開されない
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('スタートページ')).toBeInTheDocument();
+    });
+
+    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - vivaldi://スキームにも対応
     it('vivaldi://startpage URLに対して「スタートページ」と表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1436,6 +1467,314 @@ describe('TreeNode', () => {
       const rightActionsContainer = screen.getByTestId('right-actions-container');
       expect(rightActionsContainer).toContainElement(screen.getByTestId('unread-badge'));
       expect(rightActionsContainer).toContainElement(screen.getByTestId('close-button'));
+    });
+  });
+
+  describe('システムページタイトルのフレンドリー表示 (Task 3.2: Requirement 17.1)', () => {
+    it('chrome://settingsのタイトルがURL形式の場合「設定」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'chrome://settings/',
+        url: 'chrome://settings/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('設定')).toBeInTheDocument();
+    });
+
+    it('vivaldi://settingsのタイトルがURL形式の場合「設定」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'vivaldi://settings/',
+        url: 'vivaldi://settings/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('設定')).toBeInTheDocument();
+    });
+
+    it('chrome://extensionsのタイトルがURL形式の場合「拡張機能」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'chrome://extensions/',
+        url: 'chrome://extensions/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('拡張機能')).toBeInTheDocument();
+    });
+
+    it('chrome://historyのタイトルがURL形式の場合「履歴」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'chrome://history/',
+        url: 'chrome://history/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('履歴')).toBeInTheDocument();
+    });
+
+    it('chrome://downloadsのタイトルがURL形式の場合「ダウンロード」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'chrome://downloads/',
+        url: 'chrome://downloads/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('ダウンロード')).toBeInTheDocument();
+    });
+
+    it('chrome://bookmarksのタイトルがURL形式の場合「ブックマーク」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'chrome://bookmarks/',
+        url: 'chrome://bookmarks/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('ブックマーク')).toBeInTheDocument();
+    });
+
+    it('about:blankのタイトルがURL形式の場合「空白ページ」と表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      // about:blankはabout:スキームなのでスキーム://ではないため、別のテストで確認
+      const tab: TabInfo = {
+        id: 1,
+        title: 'about:blank',
+        url: 'about:blank',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // about:blankは既存の「新しいタブ」判定で処理されている
+      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+    });
+
+    it('file://のタイトルがURL形式の場合、ファイル名に置き換えられること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'file:///path/to/document.pdf',
+        url: 'file:///path/to/document.pdf',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('document.pdf')).toBeInTheDocument();
+    });
+
+    it('file://のタイトルがすでにファイル名の場合、そのまま表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'My Document.pdf',
+        url: 'file:///path/to/document.pdf',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // タイトルがURL形式でないので、そのまま表示される
+      expect(screen.getByText('My Document.pdf')).toBeInTheDocument();
+    });
+
+    it('システムページでもタイトルがURL形式でない場合はそのまま表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: '設定 - Chrome', // すでに適切なタイトルが設定されている
+        url: 'chrome://settings/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // タイトルがURL形式でないので、そのまま表示される
+      expect(screen.getByText('設定 - Chrome')).toBeInTheDocument();
+    });
+
+    it('PDFを開いた場合、タイトルがPDFファイル名のままならそのまま表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: '重要な資料.pdf',
+        url: 'file:///Users/user/Documents/important.pdf',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // タイトルがURL形式でないので、そのまま表示される
+      expect(screen.getByText('重要な資料.pdf')).toBeInTheDocument();
+    });
+
+    it('URL形式のタイトルでフレンドリー名マッピングがないものはそのまま表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'https://unknown-system-page.com/',
+        url: 'https://unknown-system-page.com/',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // マッピングがないのでそのまま表示
+      expect(screen.getByText('https://unknown-system-page.com/')).toBeInTheDocument();
     });
   });
 

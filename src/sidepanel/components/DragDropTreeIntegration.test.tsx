@@ -9,9 +9,8 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
-import { DragEndEvent } from '@dnd-kit/core';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
-import type { TreeState } from '@/types';
+import type { TreeState, DragEndEvent } from '@/types';
 import { getMockChrome } from '@/test/test-types';
 
 describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () => {

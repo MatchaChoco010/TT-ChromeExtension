@@ -30,15 +30,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
-  const handleNewTabPositionChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const value = e.target.value as 'child' | 'sibling' | 'end';
-    onSettingsChange({
-      ...settings,
-      newTabPosition: value,
-    });
-  };
+  // Task 3.1 (tab-tree-bugfix-2): 「デフォルトの新しいタブの位置」設定を削除
+  // Requirement 17.4: 設定画面から「デフォルトの新しいタブの位置」設定を削除
+  // 代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定
 
   // Task 12.2: タブ開き方別の位置ルール (Requirements 9.2, 9.3, 9.4)
   const handleNewTabPositionFromLinkChange = (
@@ -235,28 +229,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-4 text-gray-100">タブの動作</h2>
 
-        {/* 新しいタブの位置設定 (Requirement 9.1) */}
-        <div className="mb-4">
-          <label
-            htmlFor="newTabPosition"
-            className="block text-sm font-medium text-gray-300 mb-2"
-          >
-            新しいタブの位置(デフォルト)
-          </label>
-          <select
-            id="newTabPosition"
-            value={settings.newTabPosition}
-            onChange={handleNewTabPositionChange}
-            className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
-          >
-            <option value="child">現在のタブの子</option>
-            <option value="sibling">現在のタブの隣</option>
-            <option value="end">リストの最後</option>
-          </select>
-          <p className="text-xs text-gray-400 mt-1">
-            新しく開かれるタブの挿入位置を選択できます(デフォルト)
-          </p>
-        </div>
+        {/* Task 3.1 (tab-tree-bugfix-2): 「デフォルトの新しいタブの位置」設定を削除
+            Requirement 17.4: 設定画面から「デフォルトの新しいタブの位置」設定を削除
+            代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定 */}
 
         {/* Task 12.2: タブ開き方別の位置ルール (Requirements 9.2, 9.3, 9.4) */}
         <div className="mb-4">
@@ -268,7 +243,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </label>
           <select
             id="newTabPositionFromLink"
-            value={settings.newTabPositionFromLink ?? settings.newTabPosition}
+            value={settings.newTabPositionFromLink ?? 'child'}
             onChange={handleNewTabPositionFromLinkChange}
             className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
           >
@@ -290,7 +265,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </label>
           <select
             id="newTabPositionManual"
-            value={settings.newTabPositionManual ?? settings.newTabPosition}
+            value={settings.newTabPositionManual ?? 'end'}
             onChange={handleNewTabPositionManualChange}
             className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
           >
@@ -299,7 +274,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <option value="end">リストの最後</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
-            手動で開かれたタブ(アドレスバー、新規タブボタンなど)の挿入位置
+            手動で開かれたタブ(アドレスバー、新規タブボタン、設定画面など)の挿入位置
           </p>
         </div>
 

@@ -1,47 +1,43 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
-import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, waitFor, act } from '@testing-library/react';
 import { CrossWindowDragHandler } from './CrossWindowDragHandler';
-import { useCrossWindowDrag } from '../hooks/useCrossWindowDrag';
-import type { TabNode } from '@/types';
-
-// Don't mock useCrossWindowDrag for integration test
-vi.unmock('../hooks/useCrossWindowDrag');
-
-// Sample TabNode for testing
-const createTestTabNode = (tabId: number): TabNode => ({
-  id: `node-${tabId}`,
-  tabId,
-  parentId: null,
-  children: [],
-  isExpanded: true,
-  depth: 0,
-  viewId: 'view-1',
-});
+import type { DragSession } from '@/background/drag-session-manager';
 
 describe('CrossWindowDragHandler Integration', () => {
   let mockSendMessage: ReturnType<typeof vi.fn>;
+  let mockGetCurrent: ReturnType<typeof vi.fn>;
+
+  const createMockDragSession = (overrides: Partial<DragSession> = {}): DragSession => ({
+    sessionId: 'test-session-id',
+    tabId: 123,
+    state: 'dragging_local',
+    sourceWindowId: 2,
+    currentWindowId: 2,
+    startedAt: Date.now(),
+    updatedAt: Date.now(),
+    treeData: [],
+    isLocked: false,
+    ...overrides,
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockSendMessage = vi.fn((_message, callback) => {
-      if (callback) {
-        callback({ success: true, data: null });
-      }
-      return true;
-    });
+    mockSendMessage = vi.fn().mockResolvedValue({ success: true, data: null });
+    mockGetCurrent = vi.fn().mockResolvedValue({ id: 1 });
 
     global.chrome = {
       runtime: {
         sendMessage: mockSendMessage,
       },
       windows: {
-        getCurrent: vi.fn((callback) => {
-          callback({ id: 1 } as chrome.windows.Window);
-        }),
+        getCurrent: mockGetCurrent,
       },
     } as never;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   it('should integrate with useCrossWindowDrag hook and get current window ID', async () => {
@@ -52,145 +48,173 @@ describe('CrossWindowDragHandler Integration', () => {
     );
 
     await waitFor(() => {
-      expect(global.chrome.windows.getCurrent).toHaveBeenCalled();
+      expect(mockGetCurrent).toHaveBeenCalled();
     });
   });
 
-  it('should allow drag handlers to be called from integrated hook', async () => {
-    const TestComponent = () => {
-      const { handleDragStart, handleDragEnd } = useCrossWindowDrag({
-        currentWindowId: 1,
-      });
-
-      React.useEffect(() => {
-        // Simulate drag start
-        handleDragStart(123, [createTestTabNode(123)]);
-
-        // Simulate drag end inside panel
-        handleDragEnd(false);
-      }, [handleDragStart, handleDragEnd]);
-
-      return <div>Test</div>;
-    };
-
-    render(
+  it('should render children inside the container div', () => {
+    const { getByText } = render(
       <CrossWindowDragHandler>
-        <TestComponent />
+        <div>Test Content</div>
       </CrossWindowDragHandler>
     );
 
-    await waitFor(() => {
-      // Should have called SET_DRAG_STATE
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'SET_DRAG_STATE',
-        }),
-        expect.any(Function)
-      );
-
-      // Should have called CLEAR_DRAG_STATE
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'CLEAR_DRAG_STATE',
-        }),
-        expect.any(Function)
-      );
-    });
+    expect(getByText('Test Content')).toBeDefined();
   });
 
-  it('should handle drag outside panel scenario', async () => {
-    mockSendMessage.mockImplementation((message, callback) => {
-      if (message.type === 'GET_DRAG_STATE' && callback) {
-        callback({
+  it('should call onDragReceived when cross-window drag is detected', async () => {
+    mockSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_DRAG_SESSION') {
+        return Promise.resolve({
           success: true,
-          data: {
+          data: createMockDragSession({
+            currentWindowId: 2, // Different window
             tabId: 123,
-            treeData: [createTestTabNode(123)],
-            sourceWindowId: 1,
-          },
+          }),
         });
-      } else if (callback) {
-        callback({ success: true });
       }
-      return true;
+      if (message.type === 'BEGIN_CROSS_WINDOW_MOVE') {
+        return Promise.resolve({ success: true });
+      }
+      return Promise.resolve({ success: true });
     });
 
-    const TestComponent = () => {
-      const { handleDragEnd } = useCrossWindowDrag({
-        currentWindowId: 1,
-      });
+    const onDragReceived = vi.fn();
 
-      React.useEffect(() => {
-        // Simulate drag end outside panel
-        handleDragEnd(true);
-      }, [handleDragEnd]);
-
-      return <div>Test</div>;
-    };
-
-    render(
-      <CrossWindowDragHandler>
-        <TestComponent />
+    const { container } = render(
+      <CrossWindowDragHandler onDragReceived={onDragReceived}>
+        <div>Test Content</div>
       </CrossWindowDragHandler>
     );
 
+    // Wait for window ID to be fetched
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    // Simulate mouseenter event on the container
+    const containerDiv = container.firstChild as HTMLDivElement;
+    await act(async () => {
+      const mouseEnterEvent = new MouseEvent('mouseenter', {
+        clientX: 100,
+        clientY: 200,
+        bubbles: true,
+      });
+      containerDiv.dispatchEvent(mouseEnterEvent);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
     await waitFor(() => {
-      // Should have called CREATE_WINDOW_WITH_TAB
       expect(mockSendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'CREATE_WINDOW_WITH_TAB',
-          payload: { tabId: 123 },
-        }),
-        expect.any(Function)
+        expect.objectContaining({ type: 'GET_DRAG_SESSION' })
       );
+    });
+
+    await waitFor(() => {
+      expect(onDragReceived).toHaveBeenCalledWith(123, { x: 100, y: 200 });
     });
   });
 
-  it('should handle drop from other window scenario', async () => {
-    mockSendMessage.mockImplementation((message, callback) => {
-      if (message.type === 'GET_DRAG_STATE' && callback) {
-        callback({
+  it('should not call onDragReceived when drag is from same window', async () => {
+    mockSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_DRAG_SESSION') {
+        return Promise.resolve({
           success: true,
-          data: {
-            tabId: 456,
-            treeData: [createTestTabNode(456)],
-            sourceWindowId: 2, // Different window
-          },
+          data: createMockDragSession({
+            currentWindowId: 1, // Same window
+            tabId: 123,
+          }),
         });
-      } else if (callback) {
-        callback({ success: true });
       }
-      return true;
+      return Promise.resolve({ success: true });
     });
 
-    const TestComponent = () => {
-      const { handleDropFromOtherWindow } = useCrossWindowDrag({
-        currentWindowId: 1,
-      });
+    const onDragReceived = vi.fn();
 
-      React.useEffect(() => {
-        // Simulate drop from another window
-        handleDropFromOtherWindow();
-      }, [handleDropFromOtherWindow]);
-
-      return <div>Test</div>;
-    };
-
-    render(
-      <CrossWindowDragHandler>
-        <TestComponent />
+    const { container } = render(
+      <CrossWindowDragHandler onDragReceived={onDragReceived}>
+        <div>Test Content</div>
       </CrossWindowDragHandler>
     );
 
+    // Wait for window ID to be fetched
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    // Simulate mouseenter event
+    const containerDiv = container.firstChild as HTMLDivElement;
+    await act(async () => {
+      const mouseEnterEvent = new MouseEvent('mouseenter', {
+        clientX: 100,
+        clientY: 200,
+        bubbles: true,
+      });
+      containerDiv.dispatchEvent(mouseEnterEvent);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
     await waitFor(() => {
-      // Should have called MOVE_TAB_TO_WINDOW
       expect(mockSendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'MOVE_TAB_TO_WINDOW',
-          payload: { tabId: 456, windowId: 1 },
-        }),
-        expect.any(Function)
+        expect.objectContaining({ type: 'GET_DRAG_SESSION' })
       );
     });
+
+    // Should not call onDragReceived for same window drag
+    expect(onDragReceived).not.toHaveBeenCalled();
+  });
+
+  it('should handle BEGIN_CROSS_WINDOW_MOVE error silently', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    mockSendMessage.mockImplementation((message) => {
+      if (message.type === 'GET_DRAG_SESSION') {
+        return Promise.resolve({
+          success: true,
+          data: createMockDragSession({
+            currentWindowId: 2,
+            tabId: 123,
+          }),
+        });
+      }
+      if (message.type === 'BEGIN_CROSS_WINDOW_MOVE') {
+        return Promise.resolve({ success: false, error: 'Tab not found' });
+      }
+      return Promise.resolve({ success: true });
+    });
+
+    const onDragReceived = vi.fn();
+
+    const { container } = render(
+      <CrossWindowDragHandler onDragReceived={onDragReceived}>
+        <div>Test Content</div>
+      </CrossWindowDragHandler>
+    );
+
+    // Wait for window ID to be fetched
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    // Simulate mouseenter event
+    const containerDiv = container.firstChild as HTMLDivElement;
+    await act(async () => {
+      const mouseEnterEvent = new MouseEvent('mouseenter', {
+        clientX: 100,
+        clientY: 200,
+        bubbles: true,
+      });
+      containerDiv.dispatchEvent(mouseEnterEvent);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    // Should not call onDragReceived on error
+    expect(onDragReceived).not.toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 });
