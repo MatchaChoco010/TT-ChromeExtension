@@ -554,6 +554,125 @@ describe('TreeStateManager', () => {
         manager.createGroupWithRealTab(groupTabId, [], 'グループ')
       ).rejects.toThrow('No tabs specified for grouping');
     });
+
+    describe('グループタブの階層決定 (Requirement 3.9, 3.10)', () => {
+      it('すべてのタブが同じ親を持つ場合、グループタブはその親の子として配置される', async () => {
+        const viewId = 'view-1';
+
+        // 親タブを作成
+        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
+        await manager.addTab(parentTab, null, viewId);
+        const parentNode = manager.getNodeByTabId(1);
+
+        // 親タブの子として2つのタブを追加
+        const childTab1 = { id: 2, url: 'https://example.com/child1', title: 'Child1' } as chrome.tabs.Tab;
+        const childTab2 = { id: 3, url: 'https://example.com/child2', title: 'Child2' } as chrome.tabs.Tab;
+        await manager.addTab(childTab1, parentNode!.id, viewId);
+        await manager.addTab(childTab2, parentNode!.id, viewId);
+
+        // 同じ親を持つタブをグループ化
+        const groupTabId = 100;
+        await manager.createGroupWithRealTab(groupTabId, [2, 3], 'グループ');
+
+        // グループノードが親タブの子として配置されていることを確認
+        const groupNode = manager.getNodeByTabId(groupTabId);
+        expect(groupNode?.parentId).toBe(parentNode!.id);
+        expect(groupNode?.depth).toBe(1);
+
+        // グループノードが親の子リストに含まれていることを確認
+        const updatedParent = manager.getNodeByTabId(1);
+        expect(updatedParent?.children.some(c => c.tabId === groupTabId)).toBe(true);
+
+        // 元のタブがグループの子になっていることを確認
+        const child1 = manager.getNodeByTabId(2);
+        const child2 = manager.getNodeByTabId(3);
+        expect(child1?.parentId).toBe(groupNode?.id);
+        expect(child2?.parentId).toBe(groupNode?.id);
+        expect(child1?.depth).toBe(2);
+        expect(child2?.depth).toBe(2);
+      });
+
+      it('タブが異なる親を持つ場合、グループタブはルートレベルに配置される', async () => {
+        const viewId = 'view-1';
+
+        // 2つの親タブを作成
+        const parent1Tab = { id: 1, url: 'https://example.com/parent1', title: 'Parent1' } as chrome.tabs.Tab;
+        const parent2Tab = { id: 2, url: 'https://example.com/parent2', title: 'Parent2' } as chrome.tabs.Tab;
+        await manager.addTab(parent1Tab, null, viewId);
+        await manager.addTab(parent2Tab, null, viewId);
+
+        const parent1Node = manager.getNodeByTabId(1);
+        const parent2Node = manager.getNodeByTabId(2);
+
+        // それぞれの親の子としてタブを追加
+        const child1Tab = { id: 3, url: 'https://example.com/child1', title: 'Child1' } as chrome.tabs.Tab;
+        const child2Tab = { id: 4, url: 'https://example.com/child2', title: 'Child2' } as chrome.tabs.Tab;
+        await manager.addTab(child1Tab, parent1Node!.id, viewId);
+        await manager.addTab(child2Tab, parent2Node!.id, viewId);
+
+        // 異なる親を持つタブをグループ化
+        const groupTabId = 100;
+        await manager.createGroupWithRealTab(groupTabId, [3, 4], 'グループ');
+
+        // グループノードがルートレベルに配置されていることを確認
+        const groupNode = manager.getNodeByTabId(groupTabId);
+        expect(groupNode?.parentId).toBeNull();
+        expect(groupNode?.depth).toBe(0);
+
+        // 元のタブがグループの子になっていることを確認
+        const child1 = manager.getNodeByTabId(3);
+        const child2 = manager.getNodeByTabId(4);
+        expect(child1?.parentId).toBe(groupNode?.id);
+        expect(child2?.parentId).toBe(groupNode?.id);
+        expect(child1?.depth).toBe(1);
+        expect(child2?.depth).toBe(1);
+      });
+
+      it('ルートレベルのタブと子タブを混合してグループ化した場合、グループタブはルートレベルに配置される', async () => {
+        const viewId = 'view-1';
+
+        // 親タブを作成
+        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
+        await manager.addTab(parentTab, null, viewId);
+        const parentNode = manager.getNodeByTabId(1);
+
+        // 親タブの子としてタブを追加
+        const childTab = { id: 2, url: 'https://example.com/child', title: 'Child' } as chrome.tabs.Tab;
+        await manager.addTab(childTab, parentNode!.id, viewId);
+
+        // ルートレベルのタブを追加
+        const rootTab = { id: 3, url: 'https://example.com/root', title: 'Root' } as chrome.tabs.Tab;
+        await manager.addTab(rootTab, null, viewId);
+
+        // 異なる親（nullとparentNode）を持つタブをグループ化
+        const groupTabId = 100;
+        await manager.createGroupWithRealTab(groupTabId, [2, 3], 'グループ');
+
+        // グループノードがルートレベルに配置されていることを確認
+        const groupNode = manager.getNodeByTabId(groupTabId);
+        expect(groupNode?.parentId).toBeNull();
+        expect(groupNode?.depth).toBe(0);
+      });
+
+      it('すべてのタブがルートレベルの場合、グループタブもルートレベルに配置される', async () => {
+        const viewId = 'view-1';
+
+        // ルートレベルのタブを複数作成
+        const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1' } as chrome.tabs.Tab;
+        const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2' } as chrome.tabs.Tab;
+        await manager.addTab(tab1, null, viewId);
+        await manager.addTab(tab2, null, viewId);
+
+        // ルートレベルのタブをグループ化
+        const groupTabId = 100;
+        await manager.createGroupWithRealTab(groupTabId, [1, 2], 'グループ');
+
+        // グループノードがルートレベルに配置されていることを確認
+        const groupNode = manager.getNodeByTabId(groupTabId);
+        expect(groupNode?.parentId).toBeNull();
+        expect(groupNode?.depth).toBe(0);
+      });
+    });
   });
 
   describe('cleanupStaleNodes (Requirement 2.1, 2.2, 2.3)', () => {

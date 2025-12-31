@@ -532,3 +532,90 @@ export async function waitForDragEnd(page: Page, maxWait: number = 2000): Promis
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
   }
 }
+
+/**
+ * Task 6.1: タブをルートレベルに移動（親子関係を解消）
+ *
+ * 子タブをドラッグして、別のタブの上部ギャップ（兄弟として挿入される位置）にドロップする
+ * これにより親子関係が解消され、タブはルートレベルまたは別の親の下に配置される
+ *
+ * Requirement 11.1, 11.3: ドラッグで親子関係を解消した状態が維持されること
+ *
+ * @param page - Side PanelのPage
+ * @param childTabId - 移動する子タブのID
+ * @param targetTabId - ドロップ先のタブのID（このタブの上にギャップドロップする）
+ */
+export async function moveTabToRoot(
+  page: Page,
+  childTabId: number,
+  targetTabId: number
+): Promise<void> {
+  const sourceSelector = `[data-testid="tree-node-${childTabId}"]`;
+  const targetSelector = `[data-testid="tree-node-${targetTabId}"]`;
+
+  // ソース要素とターゲット要素のバウンディングボックスを取得
+  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
+  const targetBox = await getBoundingBox(page, targetSelector, 5000);
+
+  // ソース要素の中央座標
+  const sourceX = sourceBox.x + sourceBox.width / 2;
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+
+  // ターゲット要素の上部ギャップ位置（上部15%）とルートレベルのX座標（左端付近）
+  const targetX = targetBox.x + 30;  // ルートレベルの位置（インデントなし）
+  const targetY = targetBox.y + targetBox.height * 0.15;  // 上部ギャップ
+
+  // バックグラウンドスロットリングを回避するためにページをフォーカス
+  await page.bringToFront();
+  await page.evaluate(() => window.focus());
+
+  // 1. マウスをソース位置に移動
+  await page.mouse.move(sourceX, sourceY, { steps: 3 });
+
+  // 2. マウスボタンを押下
+  await page.mouse.down();
+
+  // 3. 8px以上移動してドラッグを開始
+  await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
+
+  // 4. ドラッグ状態が確立されるまで待機
+  await waitForDragState(page);
+
+  // 5. ターゲット位置（上部ギャップ）に移動
+  await page.mouse.move(targetX, targetY, { steps: 10 });
+
+  // 6. Reactの状態更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+  // 7. マウスをリリースしてドロップ
+  await page.mouse.up();
+
+  // D&D後のDOM更新を待機
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+  // ストレージへの親子関係解消の反映をポーリングで待機
+  await page.evaluate(async (childId) => {
+    interface TreeNode {
+      id: string;
+      tabId: number;
+      parentId: string | null;
+    }
+    interface LocalTreeState {
+      nodes: Record<string, TreeNode>;
+    }
+    for (let i = 0; i < 20; i++) {
+      const result = await chrome.storage.local.get('tree_state');
+      const treeState = result.tree_state as LocalTreeState | undefined;
+      if (treeState?.nodes) {
+        const childNode = Object.values(treeState.nodes).find(
+          (n: TreeNode) => n.tabId === childId
+        );
+        // 子ノードのparentIdがnullになっていることを確認
+        if (childNode && childNode.parentId === null) {
+          return;
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }, childTabId);
+}

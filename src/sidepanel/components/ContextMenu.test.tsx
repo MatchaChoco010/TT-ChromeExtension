@@ -712,8 +712,8 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 6.1-6.4: 単一タブのグループ化機能 (Task 6.1)', () => {
-    it('単一タブ選択時に「タブをグループ化」オプションが表示される', () => {
+  describe('Requirement 3.8: 単一タブ選択時のグループ化無効化 (Task 13.4)', () => {
+    it('単一タブ選択時に「タブをグループ化」オプションが表示されるが無効化（グレーアウト）されている', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
 
@@ -727,11 +727,15 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 単一タブでも「タブをグループ化」オプションが表示されることを確認
-      expect(screen.getByRole('menuitem', { name: /タブをグループ化/i })).toBeInTheDocument();
+      // 単一タブでも「タブをグループ化」オプションが表示されるが無効化されていることを確認
+      const groupItem = screen.getByRole('menuitem', { name: /タブをグループ化/i });
+      expect(groupItem).toBeInTheDocument();
+      expect(groupItem).toBeDisabled();
+      expect(groupItem).toHaveClass('text-gray-500');
+      expect(groupItem).toHaveClass('cursor-not-allowed');
     });
 
-    it('単一タブで「タブをグループ化」をクリックするとgroupアクションが実行される', async () => {
+    it('単一タブで「タブをグループ化」をクリックしてもアクションが実行されない（disabled）', async () => {
       const user = userEvent.setup();
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -749,11 +753,13 @@ describe('ContextMenu', () => {
       const groupItem = screen.getByRole('menuitem', { name: /タブをグループ化/i });
       await user.click(groupItem);
 
-      expect(onAction).toHaveBeenCalledWith('group');
-      expect(onClose).toHaveBeenCalledTimes(1);
+      // 無効化されているのでアクションは実行されない
+      expect(onAction).not.toHaveBeenCalled();
+      // メニューも閉じない
+      expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('単一タブで「タブをグループ化」と「グループに追加」の両方が表示される', () => {
+    it('単一タブで「タブをグループ化」（無効化）と「グループに追加」の両方が表示される', () => {
       const mockGroups = {
         'group_1': { id: 'group_1', name: 'Work', color: '#3b82f6', isExpanded: true },
       };
@@ -774,7 +780,9 @@ describe('ContextMenu', () => {
       );
 
       // 両方のオプションが表示されることを確認
-      expect(screen.getByRole('menuitem', { name: /タブをグループ化/i })).toBeInTheDocument();
+      const groupItem = screen.getByRole('menuitem', { name: /タブをグループ化/i });
+      expect(groupItem).toBeInTheDocument();
+      expect(groupItem).toBeDisabled(); // 無効化されている
       expect(screen.getByText('グループに追加')).toBeInTheDocument();
     });
   });

@@ -65,3 +65,5 @@ playwright-report/
 
 # Claude Token Monitor data
 .claude-monitor/
+
+/memo.md

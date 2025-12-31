@@ -770,6 +770,63 @@ export async function waitForViewSwitcher(
 }
 
 /**
+ * タブが親を持たない（ルートレベル）になるまで待機
+ *
+ * Task 6.1: 親子関係解消の永続化テスト用
+ * Requirement 11.1, 11.3: ドラッグで親子関係を解消した状態が維持されること
+ *
+ * @param context - ブラウザコンテキスト
+ * @param tabId - 待機するタブのID
+ * @param options - ポーリングオプション
+ */
+export async function waitForTabNoParent(
+  context: BrowserContext,
+  tabId: number,
+  options: PollingOptions = {}
+): Promise<void> {
+  const {
+    timeout = DEFAULT_TIMEOUT,
+    interval = 50,
+    timeoutMessage = `Tab ${tabId} still has a parent within timeout`,
+  } = options;
+
+  const serviceWorker = await getServiceWorker(context);
+  const iterations = Math.ceil(timeout / interval);
+
+  const found = await serviceWorker.evaluate(
+    async ({ tabId, iterations, interval }) => {
+      interface TreeNode {
+        parentId: string | null;
+      }
+      interface LocalTreeState {
+        tabToNode: Record<number, string>;
+        nodes: Record<string, TreeNode>;
+      }
+      for (let i = 0; i < iterations; i++) {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as LocalTreeState | undefined;
+        if (treeState?.nodes && treeState?.tabToNode) {
+          const nodeId = treeState.tabToNode[tabId];
+          if (nodeId) {
+            const node = treeState.nodes[nodeId];
+            if (node && node.parentId === null) {
+              return true;
+            }
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+      return false;
+    },
+    { tabId, iterations, interval }
+  );
+
+  if (!found) {
+    throw new Error(timeoutMessage);
+  }
+}
+
+/**
  * 汎用的な条件待機関数
  *
  * 指定された条件関数がtrueを返すまでポーリングで待機する。

@@ -15,6 +15,7 @@ import {
   type DropTarget,
   type TabPosition,
   type HorizontalTabPosition,
+  type DropTargetOptions,
   DropTargetType,
 } from '../components/GapDropDetection';
 
@@ -73,6 +74,12 @@ export interface UseDragDropOptions {
    * 指定されていない場合はcontainerRefを使用（後方互換性維持）
    */
   dragOutBoundaryRef?: React.RefObject<HTMLElement | null>;
+  /**
+   * Task 5.2: サブツリーノードID取得コールバック
+   * Requirement 2.2: 下方向へのドラッグ時、サブツリーサイズを考慮したインデックス調整
+   * ドラッグ中のノードIDからそのサブツリー全体のノードIDを取得する
+   */
+  getSubtreeNodeIds?: (nodeId: string) => string[];
 }
 
 /**
@@ -126,6 +133,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     onExternalDrop,
     // Task 7.2 (tab-tree-bugfix-2): 外部ドロップ判定用の境界参照
     dragOutBoundaryRef,
+    // Task 5.2: サブツリーノードID取得コールバック
+    getSubtreeNodeIds,
   } = options;
 
   const [dragState, setDragState] = useState<DragState>(initialDragState);
@@ -192,8 +201,16 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     );
   }, [containerRef, dragOutBoundaryRef]);
 
+  // Task 5.2: getSubtreeNodeIdsをrefで保持（useCallbackの依存配列を安定化）
+  const getSubtreeNodeIdsRef = useRef(getSubtreeNodeIds);
+  useEffect(() => {
+    getSubtreeNodeIdsRef.current = getSubtreeNodeIds;
+  }, [getSubtreeNodeIds]);
+
   /**
    * 垂直方向のドロップターゲットを計算
+   * Task 5.2: サブツリーサイズを考慮したドロップ位置計算
+   * Requirement 2.2: 下方向へのドラッグ時、サブツリーを除外してインデックス調整
    */
   const calculateVerticalDropTarget = useCallback((_clientX: number, clientY: number): DropTarget | null => {
     const container = containerRef.current;
@@ -224,7 +241,16 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       }
     });
 
-    return calculateDropTarget(mouseY, tabPositions);
+    // Task 5.2: ドラッグ中のノードIDを取得してオプションを構築
+    const currentDragState = dragStateRef.current;
+    const options: DropTargetOptions = {};
+
+    if (currentDragState.draggedItemId && getSubtreeNodeIdsRef.current) {
+      options.draggedNodeId = currentDragState.draggedItemId;
+      options.getSubtreeNodeIds = getSubtreeNodeIdsRef.current;
+    }
+
+    return calculateDropTarget(mouseY, tabPositions, options);
   }, [containerRef]);
 
   /**

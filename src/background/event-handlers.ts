@@ -139,14 +139,19 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     // Get user settings to determine new tab position
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
 
+    // Check if we have a pending parent relationship for this tab
+    const pendingOpenerTabId = pendingTabParents.get(tab.id);
+    const effectiveOpenerTabId = pendingOpenerTabId || tab.openerTabId;
+
     // Task 12.2 (Requirements 9.2, 9.3, 9.4): タブ開き方別の位置ルール適用
     // Task 3.1 (tab-tree-bugfix-2): システムページ判定を追加 (Requirements 17.6, 17.7)
     // タブがどのように開かれたかを判定し、適切な位置ルールを選択
     let newTabPosition: 'child' | 'sibling' | 'end';
 
     // Requirement 17.6: openerTabIdがあってもシステムページの場合は手動タブとして扱う
+    // effectiveOpenerTabIdを使用してpendingTabParentsも考慮する
     const tabUrl = tab.url || '';
-    const isLinkClick = tab.openerTabId && !isSystemPage(tabUrl);
+    const isLinkClick = effectiveOpenerTabId && !isSystemPage(tabUrl);
 
     if (isLinkClick) {
       // Requirement 9.2: リンククリックから開かれたタブ（システムページ以外）
@@ -167,10 +172,6 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     // Determine parent node
     let parentId: string | null = null;
-
-    // Check if we have a pending parent relationship for this tab
-    const pendingOpenerTabId = pendingTabParents.get(tab.id);
-    const effectiveOpenerTabId = pendingOpenerTabId || tab.openerTabId;
 
     // Task 4.2 (tab-tree-bugfix-2): Check if this tab was duplicated
     // If the opener tab is registered as a duplicate source, place this tab as sibling
@@ -210,6 +211,12 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     // Add tab to tree
     await treeStateManager.addTab(tab, parentId, currentViewId);
 
+    // Task 9.1 (comprehensive-bugfix): 親タブの自動展開
+    // Requirement 10.1, 10.2: 新規タブ作成時に親タブが折りたたまれている場合は展開する
+    if (parentId) {
+      await treeStateManager.expandNode(parentId);
+    }
+
     // Task 4.13: Requirement 3.13.1 - バックグラウンドで作成されたタブを未読としてマーク
     // タブがアクティブでない場合（バックグラウンドで読み込まれた場合）、未読としてマーク
     if (!tab.active && tab.id) {
@@ -225,11 +232,32 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
   }
 }
 
+/**
+ * Task 8.1 (comprehensive-bugfix): 空ウィンドウ自動クローズ
+ * Requirements: 5.1, 5.2, 5.3
+ *
+ * ウィンドウ内のタブ数を確認し、タブが残っていなければ自動的に閉じる
+ * 最後のウィンドウは閉じない（ブラウザ終了防止）
+ */
+async function tryCloseEmptyWindow(windowId: number): Promise<void> {
+  try {
+    const tabs = await chrome.tabs.query({ windowId });
+    if (tabs.length > 0) return; // タブが残っている場合は閉じない
+
+    const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    if (allWindows.length <= 1) return; // 最後のウィンドウは閉じない
+
+    await chrome.windows.remove(windowId);
+  } catch {
+    // エラーは無視（ウィンドウが既に閉じられている等）
+  }
+}
+
 export async function handleTabRemoved(
   tabId: number,
   removeInfo: chrome.tabs.TabRemoveInfo,
 ): Promise<void> {
-  void removeInfo; // unused parameter
+  const { windowId, isWindowClosing } = removeInfo;
 
   try {
     // Task 13.1: ドラッグセッションのクリーンアップ
@@ -268,6 +296,19 @@ export async function handleTabRemoved(
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((_error) => {
       // Ignore errors when no listeners are available
     });
+
+    // Task 8.1 (comprehensive-bugfix): 空ウィンドウ自動クローズ
+    // Requirements: 5.1, 5.2, 5.3
+    // ウィンドウ自体が閉じられている場合は処理スキップ
+    if (!isWindowClosing) {
+      // ドラッグセッション中は自動クローズを抑止
+      const dragSession = await dragSessionManager.getSession(0);
+      if (!dragSession || dragSession.sourceWindowId !== windowId) {
+        // ドラッグ中でなければ空ウィンドウを閉じる
+        await tryCloseEmptyWindow(windowId);
+      }
+      // Note: ドラッグ中の場合はTask 8.2でドラッグ完了時にクローズ処理を行う
+    }
   } catch (_error) {
     // Error in handleTabRemoved silently
   }
@@ -487,6 +528,15 @@ function handleMessage(
       // Task 15.1 (tab-tree-bugfix-2): グループ情報取得
       case 'GET_GROUP_INFO':
         handleGetGroupInfo(message.payload.tabId, sendResponse);
+        break;
+
+      // Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー検知
+      case 'NOTIFY_TREE_VIEW_HOVER':
+        handleNotifyTreeViewHover(message.payload.windowId, sendResponse);
+        break;
+
+      case 'NOTIFY_DRAG_OUT':
+        handleNotifyDragOut(sendResponse);
         break;
 
       default:
@@ -894,7 +944,8 @@ async function handleCreateGroup(
 
     // 2. ツリー状態を更新（グループ情報を登録）
     // 注意: loadState()はService Worker起動時に呼ばれているため、ここでは不要
-    const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, 'グループ');
+    // Requirement 3.4: デフォルト名「新しいグループ」を設定
+    const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, '新しいグループ');
 
     // 3. ツリー状態更新完了を待ってからアクティブ化
     await chrome.tabs.update(groupTab.id, { active: true });
@@ -1031,14 +1082,27 @@ async function handleGetDragSession(
 
 /**
  * Task 13.1 (tab-tree-bugfix-2): ドラッグセッション終了
- * Requirements: 6.1, 6.7
+ * Task 8.2 (comprehensive-bugfix): ドラッグ完了時の空ウィンドウ自動クローズ
+ * Requirements: 5.4, 5.5, 6.1, 6.7
  */
 async function handleEndDragSession(
   reason: string | undefined,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
+    // Task 8.2: ドラッグ完了時の空ウィンドウ自動クローズ
+    // Requirements: 5.4, 5.5
+    // セッション終了前にソースウィンドウIDを取得
+    const session = await dragSessionManager.getSession(0);
+    const sourceWindowId = session?.sourceWindowId;
+
     await dragSessionManager.endSession(reason || 'COMPLETED');
+
+    // ドラッグ完了時にソースウィンドウが空なら自動クローズ
+    if (sourceWindowId !== undefined) {
+      await tryCloseEmptyWindow(sourceWindowId);
+    }
+
     sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({
@@ -1058,6 +1122,46 @@ async function handleBeginCrossWindowMove(
 ): Promise<void> {
   try {
     await dragSessionManager.beginCrossWindowMove(targetWindowId);
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー通知
+ * Requirements: 4.4, 4.5
+ * 別ウィンドウのツリービュー領域上にマウスがある場合に呼び出す
+ * バックグラウンドスロットリング回避のため、対象ウィンドウにフォーカスを移動する
+ */
+async function handleNotifyTreeViewHover(
+  windowId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    await dragSessionManager.notifyTreeViewHover(windowId);
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Task 7.2 (comprehensive-bugfix): ドラッグアウト通知
+ * Requirements: 4.4, 4.5
+ * ドラッグ中のタブがツリービュー領域を離れた際に呼び出す
+ */
+function handleNotifyDragOut(
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
+  try {
+    dragSessionManager.notifyDragOut();
     sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({

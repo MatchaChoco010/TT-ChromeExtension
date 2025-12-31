@@ -899,3 +899,57 @@ describe('Task 14.1: 空ウィンドウの自動クローズ', () => {
     expect(windowsRemoveSpy).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー検知
+ * Requirements: 4.4, 4.5
+ */
+describe('Task 7.2: ツリービュー上のホバー検知', () => {
+  beforeEach(() => {
+    chromeMock.clearAllListeners();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    chromeMock.clearAllListeners();
+  });
+
+  it('NOTIFY_TREE_VIEW_HOVER メッセージを受信して成功を返す', async () => {
+    registerMessageListener();
+
+    const message = {
+      type: 'NOTIFY_TREE_VIEW_HOVER',
+      payload: { windowId: 123 },
+    };
+    const sendResponse = vi.fn();
+
+    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
+
+    // 非同期処理を待つ
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // レスポンスが成功であることを確認
+    expect(sendResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true })
+    );
+  });
+
+  it('NOTIFY_DRAG_OUT メッセージを受信して成功を返す', async () => {
+    registerMessageListener();
+
+    const message = {
+      type: 'NOTIFY_DRAG_OUT',
+    };
+    const sendResponse = vi.fn();
+
+    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
+
+    // 非同期処理を待つ
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // レスポンスが成功であることを確認
+    expect(sendResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true })
+    );
+  });
+});

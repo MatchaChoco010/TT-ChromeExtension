@@ -17,6 +17,8 @@ describe('CrossWindowDragHandler Integration', () => {
     updatedAt: Date.now(),
     treeData: [],
     isLocked: false,
+    isOutsideTree: false,
+    currentHoverWindowId: null,
     ...overrides,
   });
 

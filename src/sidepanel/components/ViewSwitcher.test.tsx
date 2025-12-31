@@ -896,6 +896,55 @@ describe('ViewSwitcher', () => {
         expect(screen.queryByTestId('tab-count-badge-view-1')).not.toBeInTheDocument();
       });
     });
+
+    describe('Task 4.1: タブ数バッジの視認性向上 (Requirements 17.1, 17.2)', () => {
+      it('タブ数バッジはmin-w-[20px]で数字が見切れない', () => {
+        const tabCounts = {
+          'view-1': 99,
+          'view-2': 3,
+          'view-3': 100,
+        };
+
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={tabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // バッジがmin-w-[20px]を持つことを確認（16pxから20pxに拡大）
+        const badge = screen.getByTestId('tab-count-badge-view-1');
+        expect(badge).toHaveClass('min-w-[20px]');
+      });
+
+      it('タブ数バッジは右上角ではなく内側に配置される', () => {
+        const tabCounts = {
+          'view-1': 5,
+        };
+
+        render(
+          <ViewSwitcher
+            views={mockViews}
+            currentViewId={mockCurrentViewId}
+            tabCounts={tabCounts}
+            onViewSwitch={mockOnViewSwitch}
+            onViewCreate={mockOnViewCreate}
+            onViewDelete={mockOnViewDelete}
+            onViewUpdate={mockOnViewUpdate}
+          />
+        );
+
+        // バッジが-top-0.5と-right-0.5で内側に配置されることを確認
+        const badge = screen.getByTestId('tab-count-badge-view-1');
+        expect(badge).toHaveClass('-top-0.5');
+        expect(badge).toHaveClass('-right-0.5');
+      });
+    });
   });
 
   describe('Task 3.2: ビューのスクロール切り替え機能', () => {

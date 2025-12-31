@@ -35,13 +35,16 @@ const isStartPageUrl = (url: string): boolean => {
 /**
  * Task 2.2 (Requirement 12.1, 12.2): 新しいタブURLを判定するヘルパー関数
  * Vivaldi/Chromeの新しいタブ関連のURLを検出（スタートページ以外）
+ *
+ * Task 2.3 (Requirement 7.4, 7.5): chrome-extension://URLは新しいタブと判定しない
+ * 拡張機能ページ（settings.html, group.html等）は独自のタイトルを持つため
  */
 const isNewTabUrl = (url: string): boolean => {
   if (!url) return false;
 
   const newTabUrlPatterns = [
     /^chrome:\/\/newtab/,
-    /^chrome-extension:\/\//,
+    // Note: chrome-extension://は削除。拡張機能ページは独自タイトルを持つ
     /^vivaldi:\/\/newtab/,
     /^about:blank$/,
   ];
@@ -176,9 +179,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const { executeAction } = useMenuActions();
 
-  // Task 4.13: 未読状態とカウントを計算
+  // Task 4.13: 未読状態を計算
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
-  const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
+  // Requirement 16.1, 16.2: getUnreadChildCountは使用しない（親タブへの不要なバッジ表示削除）
   // Task 8.5.4: アクティブ状態を計算
   const isActive = activeTabId === node.tabId;
   // Task 2.1: タブ情報を取得
@@ -262,7 +265,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-draggable-item={`draggable-item-${node.id}`}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isDragging ? 'bg-gray-600 ring-2 ring-gray-500 ring-inset is-dragging' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 ring-2 ring-gray-400 ring-inset' : ''}`}
+        className={`relative flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isDragging ? 'bg-gray-600 ring-2 ring-gray-500 ring-inset is-dragging' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 ring-2 ring-gray-400 ring-inset' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
@@ -270,6 +273,8 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         onMouseLeave={handleMouseLeave}
         onMouseDown={handleMouseDown}
       >
+        {/* Task 3.1: 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
+        <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
           <button
@@ -331,25 +336,13 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               {getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`}
             </span>
           </div>
-          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 未読インジケータと閉じるボタン */}
-          {/* Requirement 13.1, 13.2: 未読インジケーターをタブの右端に固定表示 */}
+          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 閉じるボタン */}
+          {/* Requirement 16.1, 16.2: 親タブへの不要なバッジ表示は削除 */}
+          {/* 未読の子タブがある場合でも、親タブに未読子タブ数のバッジを表示しない */}
           <div
             data-testid="right-actions-container"
             className="flex items-center flex-shrink-0 ml-2"
           >
-            {/* Task 4.13: 未読バッジ - タイトル長に関わらず右端に固定 */}
-            <UnreadBadge isUnread={isUnread} showIndicator={true} />
-            {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
-            {hasChildren && unreadChildCount > 0 && (
-              <div
-                data-testid="unread-child-indicator"
-                className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
-              >
-                <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
-                  {unreadChildCount > 99 ? '99+' : unreadChildCount}
-                </span>
-              </div>
-            )}
             {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
             <div
               data-testid="close-button-wrapper"
@@ -448,9 +441,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const { executeAction } = useMenuActions();
 
-  // Task 4.13: 未読状態とカウントを計算
+  // Task 4.13: 未読状態を計算
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
-  const unreadChildCount = getUnreadChildCount ? getUnreadChildCount(node.id) : 0;
+  // Requirement 16.1, 16.2: getUnreadChildCountは使用しない（親タブへの不要なバッジ表示削除）
   // Task 8.5.4: アクティブ状態を計算
   const isActive = activeTabId === node.tabId;
   // Task 2.1: タブ情報を取得
@@ -509,13 +502,15 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-node-id={node.id}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
+        className={`relative flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
+        {/* Task 3.1: 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
+        <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
           <button
@@ -577,25 +572,13 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               {getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`}
             </span>
           </div>
-          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 未読インジケータと閉じるボタン */}
-          {/* Requirement 13.1, 13.2: 未読インジケーターをタブの右端に固定表示 */}
+          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 閉じるボタン */}
+          {/* Requirement 16.1, 16.2: 親タブへの不要なバッジ表示は削除 */}
+          {/* 未読の子タブがある場合でも、親タブに未読子タブ数のバッジを表示しない */}
           <div
             data-testid="right-actions-container"
             className="flex items-center flex-shrink-0 ml-2"
           >
-            {/* Task 4.13: 未読バッジ - タイトル長に関わらず右端に固定 */}
-            <UnreadBadge isUnread={isUnread} showIndicator={true} />
-            {/* Task 4.13: 子孫の未読数（子がいる場合のみ表示） */}
-            {hasChildren && unreadChildCount > 0 && (
-              <div
-                data-testid="unread-child-indicator"
-                className="ml-1 min-w-[20px] h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5"
-              >
-                <span data-testid="unread-count" className="text-xs font-semibold text-white leading-none">
-                  {unreadChildCount > 99 ? '99+' : unreadChildCount}
-                </span>
-              </div>
-            )}
             {/* Task 2.3: 閉じるボタン - 常にDOMに存在し、visible/invisibleで制御してサイズ変化を防止 */}
             <div
               data-testid="close-button-wrapper"
@@ -898,6 +881,42 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     return result;
   }, [filteredNodes]);
 
+  /**
+   * Task 5.2: サブツリーノードID取得コールバック
+   * Requirement 2.2: 下方向へのドラッグ時、サブツリーサイズを考慮したインデックス調整
+   * ノードIDからそのノードと子孫ノードすべてのIDを取得
+   */
+  const getSubtreeNodeIds = useCallback((nodeId: string): string[] => {
+    const result: string[] = [];
+
+    // ノードを探して、そのノードと子孫のIDを収集
+    const findAndCollect = (nodeList: TabNode[]): boolean => {
+      for (const node of nodeList) {
+        if (node.id === nodeId) {
+          // 見つかったノードとその子孫を収集
+          const collectNodeAndDescendants = (n: TabNode) => {
+            result.push(n.id);
+            for (const child of n.children) {
+              collectNodeAndDescendants(child);
+            }
+          };
+          collectNodeAndDescendants(node);
+          return true;
+        }
+        // 子ノードを再帰的に検索
+        if (node.children && node.children.length > 0) {
+          if (findAndCollect(node.children)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    findAndCollect(nodes);
+    return result;
+  }, [nodes]);
+
   // Task 7.1 (tab-tree-bugfix-2): 自前D&D hookを使用
   const {
     dragState,
@@ -908,6 +927,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     items,
     activationDistance: 8,
     direction: 'vertical',
+    // Task 5.2: サブツリーサイズを考慮したドロップ位置計算
+    getSubtreeNodeIds,
     onDragStart: useCallback((itemId: string, _tabId: number) => {
       setGlobalIsDragging(true);
       setActiveNodeId(itemId);
@@ -1028,17 +1049,22 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
       // Gap判定の場合はonSiblingDropを呼び出す
       if (finalDropTarget && finalDropTarget.type === DropTargetType.Gap && onSiblingDrop) {
-        const tabPositions = tabPositionsRef.current;
+        // Task 6.1: ドラッグ中のノードとそのサブツリーを除外したtabPositionsを使用
+        // calculateDropTargetはドラッグノードを除外したeffectiveTabPositionsでgapIndexを計算するため、
+        // aboveNodeId/belowNodeIdの参照も同様に除外リストから取得する必要がある
+        const subtreeIds = getSubtreeNodeIds(itemId);
+        const subtreeSet = new Set(subtreeIds);
+        const effectiveTabPositions = tabPositionsRef.current.filter(pos => !subtreeSet.has(pos.nodeId));
         const gapIndex = finalDropTarget.gapIndex ?? 0;
 
         let aboveNodeId: string | undefined;
         let belowNodeId: string | undefined;
 
-        if (gapIndex > 0 && gapIndex - 1 < tabPositions.length) {
-          aboveNodeId = tabPositions[gapIndex - 1]?.nodeId;
+        if (gapIndex > 0 && gapIndex - 1 < effectiveTabPositions.length) {
+          aboveNodeId = effectiveTabPositions[gapIndex - 1]?.nodeId;
         }
-        if (gapIndex < tabPositions.length) {
-          belowNodeId = tabPositions[gapIndex]?.nodeId;
+        if (gapIndex < effectiveTabPositions.length) {
+          belowNodeId = effectiveTabPositions[gapIndex]?.nodeId;
         }
 
         onSiblingDrop({
@@ -1061,7 +1087,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       }
 
       handleDropTargetChange(null);
-    }, [nodes, onDragEnd, onSiblingDrop, onExternalDrop, handleDropTargetChange]),
+    }, [nodes, onDragEnd, onSiblingDrop, onExternalDrop, handleDropTargetChange, getSubtreeNodeIds]),
     onDragCancel: useCallback(() => {
       setGlobalIsDragging(false);
       setActiveNodeId(null);

@@ -997,13 +997,13 @@ describe('TreeNode', () => {
       expect(screen.getByText('Loaded Page Title')).toBeInTheDocument();
     });
 
-    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - 新規タブのタイトルを「スタートページ」に修正
-    // NewTabButtonで開かれるchrome://vivaldi-webui/startpageのURLに対して「スタートページ」と表示される
-    it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) に対して「スタートページ」と表示されること', () => {
+    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // chrome.tabs.Tab.titleを優先するため、ブラウザが設定したタイトルがそのまま表示される
+    it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) でタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Start Page',
+        title: 'Start Page', // URL形式ではないタイトル → そのまま表示
         url: 'chrome://vivaldi-webui/startpage',
         favIconUrl: undefined,
         status: 'complete',
@@ -1021,8 +1021,8 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByText('スタートページ')).toBeInTheDocument();
-      expect(screen.queryByText('Start Page')).not.toBeInTheDocument();
+      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
+      expect(screen.getByText('Start Page')).toBeInTheDocument();
     });
 
     // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - タイトルがURL形式の場合も対応
@@ -1053,12 +1053,12 @@ describe('TreeNode', () => {
       expect(screen.getByText('スタートページ')).toBeInTheDocument();
     });
 
-    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - vivaldi://スキームにも対応
-    it('vivaldi://startpage URLに対して「スタートページ」と表示されること', () => {
+    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    it('vivaldi://startpage URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Speed Dial',
+        title: 'Speed Dial', // URL形式ではないタイトル → そのまま表示
         url: 'vivaldi://startpage/',
         favIconUrl: undefined,
         status: 'complete',
@@ -1076,14 +1076,16 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByText('スタートページ')).toBeInTheDocument();
+      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
+      expect(screen.getByText('Speed Dial')).toBeInTheDocument();
     });
 
-    it('chrome-extension://内部URLに対して「新しいタブ」と表示されること', () => {
+    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    it('chrome-extension://内部URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
-        title: 'New Tab',
+        title: 'New Tab', // URL形式ではないタイトル → そのまま表示
         url: 'chrome-extension://abcdefg/newtab.html',
         favIconUrl: undefined,
         status: 'complete',
@@ -1101,14 +1103,16 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
+      expect(screen.getByText('New Tab')).toBeInTheDocument();
     });
 
-    it('chrome://newtab URLに対して「新しいタブ」と表示されること', () => {
+    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    it('chrome://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
-        title: 'New Tab',
+        title: 'New Tab', // URL形式ではないタイトル → そのまま表示
         url: 'chrome://newtab/',
         favIconUrl: undefined,
         status: 'complete',
@@ -1126,14 +1130,16 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
+      expect(screen.getByText('New Tab')).toBeInTheDocument();
     });
 
-    it('vivaldi://newtab URLに対して「新しいタブ」と表示されること', () => {
+    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    it('vivaldi://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Speed Dial',
+        title: 'Speed Dial', // URL形式ではないタイトル → そのまま表示
         url: 'vivaldi://newtab/',
         favIconUrl: undefined,
         status: 'complete',
@@ -1151,7 +1157,8 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
+      expect(screen.getByText('Speed Dial')).toBeInTheDocument();
     });
 
     it('通常のURLに対しては元のタイトルがそのまま表示されること', () => {
@@ -1273,11 +1280,13 @@ describe('TreeNode', () => {
       expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
     });
 
-    it('about:blank URLに対して「新しいタブ」と表示されること', () => {
+    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // about:blankはURL形式（スキーム://で始まる）ではないため、そのまま表示される
+    it('about:blank URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
-        title: 'about:blank',
+        title: 'about:blank', // about:スキームはスキーム://形式ではないため、URL形式とは判定されない
         url: 'about:blank',
         favIconUrl: undefined,
         status: 'complete',
@@ -1295,7 +1304,8 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
+      expect(screen.getByText('about:blank')).toBeInTheDocument();
     });
   });
 
@@ -1368,8 +1378,8 @@ describe('TreeNode', () => {
       expect(treeNode).toContainElement(unreadBadge);
     });
 
-    it('未読インジケーターが絶対位置指定で左下に配置されること', () => {
-      const node = createMockNode('node-1', 1);
+    it('未読インジケーターが絶対位置指定で左下に配置されること（depth=0）', () => {
+      const node = createMockNode('node-1', 1, 0); // depth: 0
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1385,10 +1395,35 @@ describe('TreeNode', () => {
       );
 
       const unreadBadge = screen.getByTestId('unread-badge');
-      // 絶対位置指定で左下に配置
+      // 絶対位置指定で左下に配置（depth=0なのでleft=0px）
       expect(unreadBadge).toHaveStyle({
         position: 'absolute',
         left: '0px',
+        bottom: '0px',
+      });
+    });
+
+    it('未読インジケーターがdepthに応じた位置にインデント表示されること（Requirement 9.1, 9.2, 9.3）', () => {
+      const node = createMockNode('node-1', 1, 2); // depth: 2
+      const tab = createMockTab(1, 'Test Tab');
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={true}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const unreadBadge = screen.getByTestId('unread-badge');
+      // depth=2なのでleft=40px (2 * 20px)
+      expect(unreadBadge).toHaveStyle({
+        position: 'absolute',
+        left: '40px',
         bottom: '0px',
       });
     });
@@ -1617,9 +1652,10 @@ describe('TreeNode', () => {
       expect(screen.getByText('ブックマーク')).toBeInTheDocument();
     });
 
-    it('about:blankのタイトルがURL形式の場合「空白ページ」と表示されること', () => {
+    // Task 2.2 (comprehensive-bugfix): about:blankはURL形式でないためそのまま表示
+    it('about:blankのタイトルはURL形式でないためそのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
-      // about:blankはabout:スキームなのでスキーム://ではないため、別のテストで確認
+      // about:blankはabout:スキームなのでスキーム://ではないため、URL形式とは判定されない
       const tab: TabInfo = {
         id: 1,
         title: 'about:blank',
@@ -1640,8 +1676,8 @@ describe('TreeNode', () => {
         />
       );
 
-      // about:blankは既存の「新しいタブ」判定で処理されている
-      expect(screen.getByText('新しいタブ')).toBeInTheDocument();
+      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
+      expect(screen.getByText('about:blank')).toBeInTheDocument();
     });
 
     it('file://のタイトルがURL形式の場合、ファイル名に置き換えられること', () => {
@@ -1771,6 +1807,90 @@ describe('TreeNode', () => {
 
       // マッピングがないのでそのまま表示
       expect(screen.getByText('https://unknown-system-page.com/')).toBeInTheDocument();
+    });
+  });
+
+  describe('拡張機能内部ページのタイトル表示 (Task 2.2 comprehensive-bugfix: Requirement 7.1-7.3)', () => {
+    it('settings.htmlはHTMLのtitleタグで設定された「Settings」がそのまま表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Settings', // HTMLの<title>タグで設定されたタイトル
+        url: 'chrome-extension://abcdefg/settings.html',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // HTMLのtitleタグで設定された「Settings」がそのまま表示される
+      expect(screen.getByText('Settings')).toBeInTheDocument();
+      // 「新しいタブ」に変換されないこと
+      expect(screen.queryByText('新しいタブ')).not.toBeInTheDocument();
+    });
+
+    it('group.htmlはHTMLのtitleタグで設定された「Group」がそのまま表示されること', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Group', // HTMLの<title>タグで設定されたタイトル
+        url: 'chrome-extension://abcdefg/group.html',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // HTMLのtitleタグで設定された「Group」がそのまま表示される
+      expect(screen.getByText('Group')).toBeInTheDocument();
+      // 「新しいタブ」に変換されないこと
+      expect(screen.queryByText('新しいタブ')).not.toBeInTheDocument();
+    });
+
+    it('chrome.tabs.Tab.titleがそのまま表示されること（フォールバック処理なし）', () => {
+      const node = createMockNode('node-1', 1);
+      const tab: TabInfo = {
+        id: 1,
+        title: 'Custom Extension Page', // 拡張機能が設定したカスタムタイトル
+        url: 'chrome-extension://abcdefg/custom.html',
+        favIconUrl: undefined,
+        status: 'complete',
+      };
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      // タイトルがそのまま表示される
+      expect(screen.getByText('Custom Extension Page')).toBeInTheDocument();
     });
   });
 

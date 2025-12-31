@@ -19,8 +19,9 @@
  */
 
 import { test, expect } from './fixtures/extension';
-import type { Page } from '@playwright/test';
+import type { Page, Worker } from '@playwright/test';
 import { COMMON_SELECTORS, COMMON_TIMEOUTS, FORM_INPUTS } from './test-data/common-constants';
+import { waitForCondition } from './utils/polling-utils';
 
 /**
  * 設定ページを新規タブで開くヘルパー関数
@@ -124,6 +125,7 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     sidePanelPage,
     extensionContext,
     extensionId,
+    serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
@@ -133,8 +135,17 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     await fontSizeInput.clear();
     await fontSizeInput.fill('18');
 
-    // 少し待機して設定が保存されるのを確認
-    await settingsPage.waitForTimeout(500);
+    // 設定がストレージに保存されるまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const settings = await serviceWorker.evaluate(async () => {
+          const result = await chrome.storage.local.get('user_settings');
+          return result.user_settings as { fontSize?: number } | undefined;
+        });
+        return settings?.fontSize === 18;
+      },
+      { timeout: 3000, interval: 50, timeoutMessage: 'Font size setting was not saved' }
+    );
 
     // クリーンアップ
     await settingsPage.close();
@@ -186,6 +197,7 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     sidePanelPage,
     extensionContext,
     extensionId,
+    serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
@@ -195,8 +207,17 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     await fontFamilyInput.clear();
     await fontFamilyInput.fill('Consolas, monospace');
 
-    // 少し待機して設定が保存されるのを確認
-    await settingsPage.waitForTimeout(500);
+    // 設定がストレージに保存されるまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const settings = await serviceWorker.evaluate(async () => {
+          const result = await chrome.storage.local.get('user_settings');
+          return result.user_settings as { fontFamily?: string } | undefined;
+        });
+        return settings?.fontFamily?.includes('Consolas') ?? false;
+      },
+      { timeout: 3000, interval: 50, timeoutMessage: 'Font family setting was not saved' }
+    );
 
     // クリーンアップ
     await settingsPage.close();
@@ -214,6 +235,7 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     sidePanelPage,
     extensionContext,
     extensionId,
+    serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
@@ -223,8 +245,17 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     await expect(customCSSTextarea).toBeVisible();
     await customCSSTextarea.fill('.custom-test-class { color: rgb(255, 0, 0); }');
 
-    // 少し待機して設定が保存されるのを確認
-    await settingsPage.waitForTimeout(500);
+    // 設定がストレージに保存されるまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const settings = await serviceWorker.evaluate(async () => {
+          const result = await chrome.storage.local.get('user_settings');
+          return result.user_settings as { customCSS?: string } | undefined;
+        });
+        return settings?.customCSS?.includes('.custom-test-class') ?? false;
+      },
+      { timeout: 3000, interval: 50, timeoutMessage: 'Custom CSS setting was not saved' }
+    );
 
     // クリーンアップ
     await settingsPage.close();
@@ -243,6 +274,7 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     sidePanelPage,
     extensionContext,
     extensionId,
+    serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
@@ -252,8 +284,17 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     await fontSizeInput.clear();
     await fontSizeInput.fill('20');
 
-    // 設定が保存されるまで待機
-    await settingsPage.waitForTimeout(500);
+    // 設定がストレージに保存されるまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const settings = await serviceWorker.evaluate(async () => {
+          const result = await chrome.storage.local.get('user_settings');
+          return result.user_settings as { fontSize?: number } | undefined;
+        });
+        return settings?.fontSize === 20;
+      },
+      { timeout: 3000, interval: 50, timeoutMessage: 'Font size setting was not saved' }
+    );
 
     // 設定ページを閉じる
     await settingsPage.close();
@@ -307,9 +348,11 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
 /**
  * Requirement 7: 設定タブの名前表示
  * 設定ページのタブタイトルが適切に表示されることをテスト
+ *
+ * comprehensive-bugfix Task 2.1: タイトルを英語「Settings」に統一
  */
 test.describe('設定タブの名前表示（Requirement 7）', () => {
-  test('設定ページのタブタイトルに「設定」が含まれる（要件7.1, 7.2）', async ({
+  test('設定ページのタブタイトルが「Settings」である（要件7.1, 7.2）', async ({
     extensionContext,
     extensionId,
   }) => {
@@ -318,10 +361,11 @@ test.describe('設定タブの名前表示（Requirement 7）', () => {
     await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
     await settingsPage.waitForLoadState('domcontentloaded');
 
-    // Assert: タブタイトルが「設定」を含むことを確認（「新しいタブ」ではないこと）
+    // Assert: タブタイトルが「Settings」であることを確認
     const title = await settingsPage.title();
-    expect(title).toContain('設定');
+    expect(title).toBe('Settings');
     expect(title).not.toBe('新しいタブ');
+    expect(title).not.toBe('New Tab');
 
     // クリーンアップ
     await settingsPage.close();
@@ -487,6 +531,7 @@ test.describe('スナップショット自動保存設定', () => {
     sidePanelPage,
     extensionContext,
     extensionId,
+    serviceWorker,
   }) => {
     // Arrange: 設定ページを開く
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
@@ -504,8 +549,17 @@ test.describe('スナップショット自動保存設定', () => {
     await maxSnapshotsInput.clear();
     await maxSnapshotsInput.fill('25');
 
-    // 設定が保存されるまで待機
-    await settingsPage.waitForTimeout(500);
+    // 設定がストレージに保存されるまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const settings = await serviceWorker.evaluate(async () => {
+          const result = await chrome.storage.local.get('user_settings');
+          return result.user_settings as { autoSnapshotInterval?: number; maxSnapshots?: number } | undefined;
+        });
+        return settings?.autoSnapshotInterval === 15 && settings?.maxSnapshots === 25;
+      },
+      { timeout: 3000, interval: 50, timeoutMessage: 'Snapshot settings were not saved' }
+    );
 
     // 設定ページを閉じる
     await settingsPage.close();

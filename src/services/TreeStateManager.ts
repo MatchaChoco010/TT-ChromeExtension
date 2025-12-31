@@ -221,6 +221,26 @@ export class TreeStateManager {
   }
 
   /**
+   * Task 9.1 (comprehensive-bugfix): ノードを展開する
+   * Requirement 10.1, 10.2: 新規タブ作成時に親タブを自動展開
+   *
+   * @param nodeId - ノードID
+   */
+  async expandNode(nodeId: string): Promise<void> {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+
+    // 既に展開されている場合は何もしない
+    if (node.isExpanded) return;
+
+    node.isExpanded = true;
+    this.expandedNodes.add(nodeId);
+
+    // ストレージに永続化
+    await this.persistState();
+  }
+
+  /**
    * 存在しないタブをクリーンアップ (Requirement 2.1, 2.2, 2.3)
    *
    * ブラウザ起動時に、ツリー状態に保存されているが実際には存在しないタブを
@@ -348,6 +368,34 @@ export class TreeStateManager {
     } catch (_error) {
       // Error syncing with Chrome tabs silently
     }
+  }
+
+  /**
+   * サブツリー全体のノード数を取得 (Task 5.1: サブツリーサイズ計算)
+   * Requirement 2.1: サブツリー全体のノード数を正確に計算
+   *
+   * @param tabId - ルートタブのID
+   * @returns サブツリー全体のノード数（ルートを含む）、タブが存在しない場合は0
+   */
+  getSubtreeSize(tabId: number): number {
+    const rootNode = this.getNodeByTabId(tabId);
+    if (!rootNode) {
+      return 0;
+    }
+    return this.countSubtreeNodes(rootNode);
+  }
+
+  /**
+   * ノードとその子孫の数を再帰的にカウント
+   * @param node - カウント開始ノード
+   * @returns ノード数
+   */
+  private countSubtreeNodes(node: TabNode): number {
+    let count = 1; // 自分自身をカウント
+    for (const child of node.children) {
+      count += this.countSubtreeNodes(child);
+    }
+    return count;
   }
 
   /**
@@ -644,16 +692,21 @@ export class TreeStateManager {
   /**
    * Task 15.2: 実タブを使用してグループを作成
    * Requirement 5.1, 5.2, 5.3, 5.6, 5.7: 実際のタブIDを使用したグループ作成
+   * Task 13.3: グループタブの階層決定 (Requirement 3.9, 3.10)
    *
    * chrome.tabs.create()で作成された実際のタブIDを使用してグループノードを作成し、
    * 選択されたタブをその子要素として移動します。
+   *
+   * 階層決定ロジック:
+   * - 選択されたタブがすべて同じ親を持つ場合、グループタブはその親の子として配置
+   * - 選択されたタブが異なる親を持つ場合、グループタブはルートレベルに配置
    *
    * @param groupTabId - chrome.tabs.create()で作成されたグループタブのID（実タブID）
    * @param tabIds - グループ化するタブIDの配列
    * @param groupName - グループ名
    * @returns 作成されたグループノードのID
    */
-  async createGroupWithRealTab(groupTabId: number, tabIds: number[], groupName: string = 'グループ'): Promise<string> {
+  async createGroupWithRealTab(groupTabId: number, tabIds: number[], groupName: string = '新しいグループ'): Promise<string> {
     if (tabIds.length === 0) {
       throw new Error('No tabs specified for grouping');
     }
@@ -668,14 +721,29 @@ export class TreeStateManager {
     // グループノードIDを生成（実タブIDを使用）
     const groupNodeId = `group-${groupTabId}`;
 
+    // Task 13.3: グループタブの階層決定 (Requirement 3.9, 3.10)
+    // すべてのタブが同じ親を持つかチェック
+    const parentIds = new Set<string | null>();
+    for (const tabId of tabIds) {
+      const node = this.getNodeByTabId(tabId);
+      if (node) {
+        parentIds.add(node.parentId);
+      }
+    }
+
+    // 階層決定: すべて同じ親を持つ場合はその親の子として、異なる場合はルートレベルに配置
+    const allSameParent = parentIds.size === 1;
+    const commonParentId = allSameParent ? firstNode.parentId : null;
+    const groupDepth = commonParentId !== null ? (this.nodes.get(commonParentId)?.depth ?? 0) + 1 : 0;
+
     // グループノードを作成
     const groupNode: TabNode = {
       id: groupNodeId,
       tabId: groupTabId,
-      parentId: null,
+      parentId: commonParentId,
       children: [],
       isExpanded: true,
-      depth: 0,
+      depth: groupDepth,
       viewId,
       groupId: groupNodeId, // グループノード自体にgroupIdを設定
     };
@@ -684,6 +752,14 @@ export class TreeStateManager {
     this.nodes.set(groupNodeId, groupNode);
     this.tabToNode.set(groupTabId, groupNodeId);
     this.expandedNodes.add(groupNodeId);
+
+    // 親ノードがある場合は親の子リストに追加
+    if (commonParentId !== null) {
+      const parentNode = this.nodes.get(commonParentId);
+      if (parentNode) {
+        parentNode.children.push(groupNode);
+      }
+    }
 
     // ビューに追加
     const viewNodes = this.views.get(viewId) || [];
@@ -705,7 +781,7 @@ export class TreeStateManager {
 
       // グループの子として追加
       node.parentId = groupNodeId;
-      node.depth = 1;
+      node.depth = groupDepth + 1; // Task 13.3: グループの深さ + 1
       node.groupId = groupNodeId;
       groupNode.children.push(node);
 
@@ -716,7 +792,7 @@ export class TreeStateManager {
     // ストレージに永続化
     await this.persistState();
 
-    // グループ情報をgroupsストレージにも保存
+    // グループ情報をgroupsストレージにも保存（Task 15.2）
     try {
       const result = await chrome.storage.local.get('groups');
       const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
@@ -816,7 +892,7 @@ export class TreeStateManager {
       const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
       existingGroups[groupNodeId] = {
         id: groupNodeId,
-        name: 'グループ',  // デフォルト名
+        name: '新しいグループ',  // Requirement 3.4: デフォルト名
         color: '#f59e0b',  // オレンジ色のデフォルト
         isExpanded: true,
       };
@@ -908,7 +984,8 @@ export class TreeStateManager {
     }
 
     // グループ名をストレージから取得
-    let groupName = 'グループ';
+    // Requirement 3.4: デフォルト名「新しいグループ」
+    let groupName = '新しいグループ';
     try {
       const result = await chrome.storage.local.get('groups');
       const groups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};

@@ -43,6 +43,16 @@ export interface DragSession {
   treeData: TabNode[];
   /** ロック状態（tabs.move中はtrue） */
   isLocked: boolean;
+  /**
+   * Task 7.1: ツリービュー外にドラッグ中かどうか
+   * notifyDragOut()でtrue、notifyTreeViewHover()でfalseに設定
+   */
+  isOutsideTree: boolean;
+  /**
+   * Task 7.1: 現在ホバーしているウィンドウID
+   * notifyTreeViewHover()で更新、重複呼び出し防止に使用
+   */
+  currentHoverWindowId: number | null;
 }
 
 /**
@@ -175,6 +185,8 @@ export class DragSessionManager {
       updatedAt: now,
       treeData,
       isLocked: false,
+      isOutsideTree: false,
+      currentHoverWindowId: null,
     };
 
     // keep-aliveアラームを開始（Service Workerを維持）
@@ -343,6 +355,59 @@ export class DragSessionManager {
         if (typeof chrome !== 'undefined' && chrome.alarms) {
           void chrome.alarms.clear(this.KEEP_ALIVE_ALARM_NAME);
         }
+      }
+    }
+  }
+
+  /**
+   * Task 7.1: ツリービュー領域からのドラッグ離脱を通知
+   * ドラッグ中のタブがツリービュー領域を離れた際に呼び出す
+   *
+   * Requirements: 4.1, 4.4, 4.5
+   */
+  notifyDragOut(): void {
+    if (!this.session) return;
+
+    this.session.isOutsideTree = true;
+    this.session.updatedAt = Date.now();
+    console.log('[DragSession] Drag moved outside tree view');
+  }
+
+  /**
+   * Task 7.1: ツリービュー領域上のホバーを通知
+   * 別ウィンドウのツリービュー領域上にマウスがある場合に呼び出す（mousemoveで継続的に検知）
+   * バックグラウンドスロットリング回避のため、対象ウィンドウにフォーカスを移動する
+   * 重複呼び出しは内部で無視される
+   *
+   * @param windowId ホバー先のウィンドウID
+   * Requirements: 4.1, 4.4, 4.5
+   */
+  async notifyTreeViewHover(windowId: number): Promise<void> {
+    if (!this.session) return;
+
+    // 重複呼び出し防止：既に同じウィンドウを記録済みなら何もしない
+    if (this.session.currentHoverWindowId === windowId) {
+      return;
+    }
+
+    this.session.currentHoverWindowId = windowId;
+    this.session.isOutsideTree = false;
+    this.session.updatedAt = Date.now();
+
+    // バックグラウンドスロットリング回避のためフォーカスを移動
+    // ソースウィンドウと異なる場合のみフォーカス移動を実行
+    if (
+      windowId !== this.session.sourceWindowId &&
+      typeof chrome !== 'undefined' &&
+      chrome.windows
+    ) {
+      try {
+        await chrome.windows.update(windowId, { focused: true });
+        console.log(
+          `[DragSession] Focused window ${windowId} for cross-window drag`,
+        );
+      } catch (_error) {
+        // フォーカス移動に失敗しても続行（ウィンドウが既に閉じられている等）
       }
     }
   }

@@ -46,8 +46,8 @@ async function changeTabPositionSetting(
   const selectId = settingType === 'link' ? '#newTabPositionFromLink' : '#newTabPositionManual';
   const select = settingsPage.locator(selectId);
   await select.selectOption(value);
-  // 設定が保存されるのを待機
-  await settingsPage.waitForTimeout(300);
+  // 選択された値が反映されるまでポーリング待機
+  await expect(select).toHaveValue(value, { timeout: 3000 });
 }
 
 test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () => {
@@ -122,8 +122,24 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
         await chrome.storage.local.set({ tree_state: treeState });
       }, { childTabId: childTabId!, parentTabId });
 
-      // ツリー状態が更新されるのを待つ
-      await sidePanelPage.waitForTimeout(200);
+      // ツリー状態が更新されるのをポーリングで待機
+      await waitForCondition(
+        async () => {
+          const result = await serviceWorker.evaluate(async (params) => {
+            interface TreeNode { parentId: string | null; }
+            interface TreeState { tabToNode: Record<number, string>; nodes: Record<string, TreeNode>; }
+            const storageResult = await chrome.storage.local.get('tree_state');
+            const treeState = storageResult.tree_state as TreeState | undefined;
+            if (!treeState) return false;
+            const childNodeId = treeState.tabToNode[params.childTabId];
+            const parentNodeId = treeState.tabToNode[params.parentTabId];
+            if (!childNodeId || !parentNodeId) return false;
+            return treeState.nodes[childNodeId]?.parentId === parentNodeId;
+          }, { childTabId: childTabId!, parentTabId });
+          return result;
+        },
+        { timeout: 3000, interval: 50, timeoutMessage: 'Tree state was not updated' }
+      );
 
       // Assert: ストレージ内で親子関係が設定されていることを確認
       const result = await serviceWorker.evaluate(async (params) => {
@@ -291,6 +307,268 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
           return result;
         },
         { timeout: 5000, interval: 100, timeoutMessage: 'System page was not treated as manual tab' }
+      );
+    });
+
+    /**
+     * Task 12.2 (comprehensive-bugfix): Requirement 15.3, 15.4
+     * リンクから開いたタブの配置設定「兄弟として配置」の検証
+     * 「sibling」設定時に新規タブが親タブの兄弟として（同じ親の下に）配置される
+     */
+    test('「兄弟として配置」設定でリンクから開いたタブが兄弟として配置される（sibling設定）', async ({
+      extensionContext,
+      serviceWorker,
+      extensionId,
+    }) => {
+      // Arrange: 設定ページを開いて「リンククリックのタブの位置」を「sibling」（兄弟として配置）に設定
+      const settingsPage = await openSettingsPage(extensionContext, extensionId);
+      await changeTabPositionSetting(settingsPage, 'link', 'sibling');
+      await settingsPage.close();
+
+      // 設定がストレージに保存されるまで待機
+      await waitForCondition(
+        async () => {
+          const settings = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('user_settings');
+            return result.user_settings;
+          });
+          return settings?.newTabPositionFromLink === 'sibling';
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'Settings were not saved' }
+      );
+
+      // 親タブを作成
+      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      await waitForTabInTreeState(extensionContext, parentTabId);
+
+      // Act: リンククリックをシミュレート（openerTabIdあり、非システムページ）
+      const newTabId = await serviceWorker.evaluate(async (parentTabId) => {
+        const tab = await chrome.tabs.create({
+          url: 'https://example.org',  // 通常のURLなのでリンククリック扱い
+          openerTabId: parentTabId,
+          active: false,
+        });
+        return tab.id;
+      }, parentTabId);
+
+      expect(newTabId).toBeDefined();
+      await waitForTabInTreeState(extensionContext, newTabId!);
+
+      // Assert: 新しいタブが兄弟として配置されていることを確認
+      // 「兄弟として配置」設定なので、親タブの親（つまり親タブと同じ親ID）を持つ
+      // この場合、parentTabIdはルートなのでparentIdはnullになる
+      await waitForCondition(
+        async () => {
+          const result = await serviceWorker.evaluate(async (evalParams: { parentTabId: number; newTabId: number }) => {
+            interface TreeNode { parentId: string | null; }
+            interface TreeState { tabToNode: Record<number, string>; nodes: Record<string, TreeNode>; }
+            const storageResult = await chrome.storage.local.get('tree_state');
+            const treeState = storageResult.tree_state as TreeState | undefined;
+            if (!treeState) return { success: false, reason: 'no tree state' };
+
+            const parentNodeId = treeState.tabToNode[evalParams.parentTabId];
+            const newTabNodeId = treeState.tabToNode[evalParams.newTabId];
+            if (!parentNodeId || !newTabNodeId) return { success: false, reason: 'nodes not found' };
+
+            const parentNode = treeState.nodes[parentNodeId];
+            const newTabNode = treeState.nodes[newTabNodeId];
+
+            // 兄弟として配置 = 親タブと同じ親を持つ（親タブがルートならnull）
+            return {
+              success: newTabNode?.parentId === parentNode?.parentId,
+              newTabParentId: newTabNode?.parentId,
+              expectedParentId: parentNode?.parentId,
+            };
+          }, { parentTabId, newTabId: newTabId! });
+          return result.success;
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'Link tab was not placed as sibling with sibling setting' }
+      );
+    });
+
+    /**
+     * Task 12.2 (comprehensive-bugfix): Requirement 15.4
+     * ネストした親タブからのリンク配置「兄弟として配置」の検証
+     * ネストした親タブからリンクを開いた場合、新しいタブも同じ親を持つ
+     */
+    test('ネストした親タブから開いたリンクタブが兄弟として配置される（sibling設定）', async ({
+      extensionContext,
+      serviceWorker,
+      extensionId,
+      sidePanelPage,
+    }) => {
+      // Arrange: 設定ページを開いて「リンククリックのタブの位置」を「sibling」に設定
+      const settingsPage = await openSettingsPage(extensionContext, extensionId);
+      await changeTabPositionSetting(settingsPage, 'link', 'sibling');
+      await settingsPage.close();
+
+      // 設定がストレージに保存されるまで待機
+      await waitForCondition(
+        async () => {
+          const settings = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('user_settings');
+            return result.user_settings;
+          });
+          return settings?.newTabPositionFromLink === 'sibling';
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'Settings were not saved' }
+      );
+
+      // グランドペアレント（祖父母）タブを作成
+      const grandparentTabId = await createTab(extensionContext, 'https://grandparent.example.com');
+      await waitForTabInTreeState(extensionContext, grandparentTabId);
+
+      // 親タブを作成（グランドペアレントの子として）
+      // 手動で親子関係を設定
+      const parentTabId = await serviceWorker.evaluate(async (grandparentTabId) => {
+        const tab = await chrome.tabs.create({
+          url: 'https://parent.example.com',
+          openerTabId: grandparentTabId,
+          active: false,
+        });
+        return tab.id;
+      }, grandparentTabId);
+
+      expect(parentTabId).toBeDefined();
+      await waitForTabInTreeState(extensionContext, parentTabId!);
+
+      // リンククリック設定がchildの間にparentTabが作成されたので、手動で設定を反映
+      // 親子関係を設定
+      await serviceWorker.evaluate(async (params) => {
+        interface TreeNode {
+          parentId: string | null;
+          depth: number;
+        }
+        interface TreeState {
+          tabToNode: Record<number, string>;
+          nodes: Record<string, TreeNode>;
+        }
+        const storageResult = await chrome.storage.local.get('tree_state');
+        const treeState = storageResult.tree_state as TreeState | undefined;
+        if (!treeState) return;
+
+        const parentNodeId = treeState.tabToNode[params.parentTabId];
+        const grandparentNodeId = treeState.tabToNode[params.grandparentTabId];
+        if (!parentNodeId || !grandparentNodeId) return;
+
+        // 親子関係を設定
+        treeState.nodes[parentNodeId].parentId = grandparentNodeId;
+        treeState.nodes[parentNodeId].depth = (treeState.nodes[grandparentNodeId].depth || 0) + 1;
+
+        await chrome.storage.local.set({ tree_state: treeState });
+      }, { parentTabId: parentTabId!, grandparentTabId });
+
+      // Act: 親タブからリンククリックで新しいタブを開く
+      const newTabId = await serviceWorker.evaluate(async (parentTabId) => {
+        const tab = await chrome.tabs.create({
+          url: 'https://new.example.com',
+          openerTabId: parentTabId,
+          active: false,
+        });
+        return tab.id;
+      }, parentTabId!);
+
+      expect(newTabId).toBeDefined();
+      await waitForTabInTreeState(extensionContext, newTabId!);
+
+      // Assert: 新しいタブが親タブの兄弟として配置される（グランドペアレントが親になる）
+      await waitForCondition(
+        async () => {
+          const result = await serviceWorker.evaluate(async (evalParams: { parentTabId: number; newTabId: number }) => {
+            interface TreeNode { parentId: string | null; }
+            interface TreeState { tabToNode: Record<number, string>; nodes: Record<string, TreeNode>; }
+            const storageResult = await chrome.storage.local.get('tree_state');
+            const treeState = storageResult.tree_state as TreeState | undefined;
+            if (!treeState) return false;
+
+            const parentNodeId = treeState.tabToNode[evalParams.parentTabId];
+            const newTabNodeId = treeState.tabToNode[evalParams.newTabId];
+            if (!parentNodeId || !newTabNodeId) return false;
+
+            const parentNode = treeState.nodes[parentNodeId];
+            const newTabNode = treeState.nodes[newTabNodeId];
+
+            // 兄弟として配置 = 親タブと同じ親を持つ（グランドペアレント）
+            return newTabNode?.parentId === parentNode?.parentId;
+          }, { parentTabId: parentTabId!, newTabId: newTabId! });
+          return result;
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'Link tab was not placed as sibling of nested parent' }
+      );
+
+      // UIでタブが表示されていることを確認
+      const newTabNode = sidePanelPage.locator(`[data-testid="tree-node-${newTabId}"]`);
+      await expect(newTabNode).toBeVisible({ timeout: 5000 });
+    });
+
+    /**
+     * Task 12.1 (comprehensive-bugfix): Requirement 15.1, 15.2
+     * リンクから開いたタブの配置設定「リストの最後」の検証
+     * 「リストの最後」設定時に新規タブがリストの最後（ルートレベル）に追加される
+     */
+    test('「リストの最後」設定でリンクから開いたタブがルートレベルに配置される', async ({
+      extensionContext,
+      serviceWorker,
+      extensionId,
+    }) => {
+      // Arrange: 設定ページを開いて「リンククリックのタブの位置」を「end」（リストの最後）に設定
+      const settingsPage = await openSettingsPage(extensionContext, extensionId);
+      await changeTabPositionSetting(settingsPage, 'link', 'end');
+      await settingsPage.close();
+
+      // 設定がストレージに保存されるまで待機
+      await waitForCondition(
+        async () => {
+          const settings = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('user_settings');
+            return result.user_settings;
+          });
+          return settings?.newTabPositionFromLink === 'end';
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'Settings were not saved' }
+      );
+
+      // 複数のタブを作成（ツリーに既存タブがある状態を作る）
+      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      await waitForTabInTreeState(extensionContext, parentTabId);
+
+      const siblingTabId = await createTab(extensionContext, 'https://example.net');
+      await waitForTabInTreeState(extensionContext, siblingTabId);
+
+      // Act: リンククリックをシミュレート（openerTabIdあり、非システムページ）
+      const newTabId = await serviceWorker.evaluate(async (parentTabId) => {
+        const tab = await chrome.tabs.create({
+          url: 'https://example.org',  // 通常のURLなのでリンククリック扱い
+          openerTabId: parentTabId,
+          active: false,
+        });
+        return tab.id;
+      }, parentTabId);
+
+      expect(newTabId).toBeDefined();
+      await waitForTabInTreeState(extensionContext, newTabId!);
+
+      // Assert: 新しいタブがルートレベル（親なし）に配置されていることを確認
+      // 「リストの最後」設定なので、親子関係は設定されない
+      await waitForCondition(
+        async () => {
+          const result = await serviceWorker.evaluate(async (tabId) => {
+            interface TreeNode { parentId: string | null; }
+            interface TreeState { tabToNode: Record<number, string>; nodes: Record<string, TreeNode>; }
+            const storageResult = await chrome.storage.local.get('tree_state');
+            const treeState = storageResult.tree_state as TreeState | undefined;
+            if (!treeState) return false;
+
+            const nodeId = treeState.tabToNode[tabId];
+            if (!nodeId) return false;
+
+            const node = treeState.nodes[nodeId];
+            // 親がnull（ルートレベル）であることを確認
+            return node?.parentId === null;
+          }, newTabId!);
+          return result;
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'Link tab was not placed at root level with end setting' }
       );
     });
   });

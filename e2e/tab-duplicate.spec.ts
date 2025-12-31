@@ -112,6 +112,90 @@ test.describe('Task 10.2: タブ複製時の配置', () => {
   });
 
   test.describe('Requirement 10.2: 複製されたタブが元のタブの直下（1つ下）に表示される', () => {
+    test('複製されたタブは複製元タブの直後（インデックス+1）に配置される', async ({
+      extensionContext,
+      sidePanelPage,
+      serviceWorker,
+    }) => {
+      // Arrange: 複数のタブを作成して、間にタブがある状態を作る
+      const tabId1 = await createTab(extensionContext, 'about:blank');
+      await waitForTabInTreeState(extensionContext, tabId1);
+      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+
+      const tabId2 = await createTab(extensionContext, 'about:blank');
+      await waitForTabInTreeState(extensionContext, tabId2);
+      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+
+      const tabId3 = await createTab(extensionContext, 'about:blank');
+      await waitForTabInTreeState(extensionContext, tabId3);
+      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`)).toBeVisible({ timeout: 10000 });
+
+      // バックグラウンドスロットリングを回避
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // 要素のバウンディングボックスが安定するまで待機
+      await sidePanelPage.waitForFunction(
+        (tid) => {
+          const node = document.querySelector(`[data-testid="tree-node-${tid}"]`);
+          if (!node) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        },
+        tabId1,
+        { timeout: 5000 }
+      );
+
+      // Act: tabId1を複製（tabId1の後ろにはtabId2, tabId3がある）
+      const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
+      await tabNode1.click({ button: 'right' });
+
+      await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
+
+      const duplicateItem = sidePanelPage.getByRole('menuitem', { name: 'タブを複製' });
+      await expect(duplicateItem).toBeVisible({ timeout: 3000 });
+      await duplicateItem.click();
+
+      await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
+
+      // 複製されたタブのIDを取得
+      const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
+        const tabs = await chrome.tabs.query({ currentWindow: true });
+        const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
+        return sortedTabs[0]?.id;
+      }, [tabId1, tabId2, tabId3]);
+
+      expect(duplicatedTabId).toBeDefined();
+
+      await waitForTabInTreeState(extensionContext, duplicatedTabId!);
+      await expect(sidePanelPage.locator(`[data-testid="tree-node-${duplicatedTabId}"]`)).toBeVisible({ timeout: 10000 });
+
+      // Assert: DOMの順序を確認（tabId1の直後にduplicatedTabIdがあること）
+      // ツリーノードのDOMの順序を取得
+      const nodeOrder = await sidePanelPage.evaluate(() => {
+        const nodes = Array.from(document.querySelectorAll('[data-testid^="tree-node-"]'));
+        return nodes.map(node => {
+          const testId = node.getAttribute('data-testid');
+          // "tree-node-123" から "123" を抽出
+          return testId ? parseInt(testId.replace('tree-node-', ''), 10) : 0;
+        });
+      });
+
+      // tabId1のインデックスを取得
+      const tabId1Index = nodeOrder.indexOf(tabId1);
+      // 複製タブのインデックスを取得
+      const duplicatedIndex = nodeOrder.indexOf(duplicatedTabId!);
+
+      // 複製タブはtabId1の直後（インデックス+1）にあること
+      expect(duplicatedIndex).toBe(tabId1Index + 1);
+
+      // Cleanup
+      await closeTab(extensionContext, tabId1);
+      await closeTab(extensionContext, tabId2);
+      await closeTab(extensionContext, tabId3);
+      await closeTab(extensionContext, duplicatedTabId!);
+    });
+
     test('複製されたタブは元のタブの直後に配置される', async ({
       extensionContext,
       sidePanelPage,

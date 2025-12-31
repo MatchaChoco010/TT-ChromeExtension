@@ -78,13 +78,20 @@ const SYSTEM_URL_FRIENDLY_NAMES: Record<string, string> = {
 };
 
 /**
- * Task 4.2, 3.2 (Requirement 4.1, 4.2, 4.3, 4.4, 17.1): 表示するタブタイトルを決定するヘルパー関数
- * - Loading状態の場合: 「Loading...」
- * - スタートページURLの場合: 「スタートページ」
- * - 新しいタブURLの場合: 「新しいタブ」
- * - タイトルがURL形式でシステムページの場合: フレンドリー名に置換
- * - file://でタイトルがURL形式の場合: ファイル名に置換
- * - それ以外: 元のタイトル
+ * Task 4.2, 3.2, 2.2 (Requirement 4.1, 4.2, 4.3, 4.4, 7.1-7.3, 8.1-8.2, 17.1): 表示するタブタイトルを決定するヘルパー関数
+ *
+ * 処理優先順位:
+ * 1. Loading状態の場合: 「Loading...」
+ * 2. タイトルがURL形式でない場合: そのまま表示（settings.html等の拡張機能ページを含む）
+ * 3. スタートページURLの場合: 「スタートページ」
+ * 4. 新しいタブURLの場合: 「新しいタブ」
+ * 5. システムページでタイトルがURL形式の場合: フレンドリー名に置換
+ * 6. file://でタイトルがURL形式の場合: ファイル名に置換
+ * 7. それ以外: 元のタイトル
+ *
+ * Requirement 7.1-7.3, 8.1-8.2: chrome.tabs.Tab.titleをそのまま使用することを優先
+ * - settings.htmlやgroup.htmlはHTMLの<title>タグで適切なタイトルを提供
+ * - タイトルが正しく設定されている場合はそのまま表示
  *
  * Requirement 12.1, 12.2: Vivaldi専用URL（chrome://vivaldi-webui/startpage）の場合、
  * 拡張機能にはURLが公開されないことがあるため、タイトルもチェックする
@@ -101,6 +108,13 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
     return 'Loading...';
   }
 
+  // Requirement 7.1-7.3, 8.1-8.2, 17.1: タイトルがURL形式でない場合はそのまま表示
+  // これにより、settings.html（タイトル: "Settings"）やgroup.html（タイトル: "Group"）など、
+  // HTMLの<title>タグで適切なタイトルが設定されているページは正しく表示される
+  if (!isTitleUrlFormat(title)) {
+    return title;
+  }
+
   // Requirement 2.2, 12.1, 12.2: スタートページURLの場合
   // URLをチェック、またはタイトルがURL形式でスタートページパターンの場合もチェック
   if (isStartPageUrl(url) || isStartPageUrl(title)) {
@@ -111,11 +125,6 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
   // URLをチェック、またはタイトルがURL形式で新しいタブパターンの場合もチェック
   if (isNewTabUrl(url) || isNewTabUrl(title)) {
     return '新しいタブ';
-  }
-
-  // Requirement 17.1: タイトルがURL形式でない場合はそのまま表示（例：PDFファイル名）
-  if (!isTitleUrlFormat(title)) {
-    return title;
   }
 
   // Requirement 17.1: タイトルがURL形式の場合、フレンドリー名があれば使用
@@ -252,8 +261,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onMouseLeave={handleMouseLeave}
         onContextMenu={handleRightClick}
       >
-        {/* Task 8.1: 未読インジケーター - 左下角の三角形切り欠き */}
-        <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} />
+        {/* Task 8.1, 3.1: 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
+        <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} depth={node.depth} />
 
         {/* 展開/折りたたみトグルボタン */}
         {hasChildren && (

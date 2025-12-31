@@ -108,6 +108,76 @@ describe('TreeStateManager - Subtree Operations (Task 7.3)', () => {
     });
   });
 
+  describe('getSubtreeSize', () => {
+    it('should return the total number of nodes in the subtree including the root', async () => {
+      // Arrange: Create a tree structure
+      //   tab1
+      //   ├── tab2
+      //   │   ├── tab4
+      //   │   └── tab5
+      //   └── tab3
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
+      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
+      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
+      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
+      const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
+
+      await treeStateManager.addTab(tab1, null, 'view1');
+      const node1 = treeStateManager.getNodeByTabId(1);
+      await treeStateManager.addTab(tab2, node1!.id, 'view1');
+      const node2 = treeStateManager.getNodeByTabId(2);
+      await treeStateManager.addTab(tab3, node1!.id, 'view1');
+      await treeStateManager.addTab(tab4, node2!.id, 'view1');
+      await treeStateManager.addTab(tab5, node2!.id, 'view1');
+
+      // Act & Assert: Check subtree sizes
+      expect(treeStateManager.getSubtreeSize(1)).toBe(5);  // tab1 + tab2 + tab3 + tab4 + tab5
+      expect(treeStateManager.getSubtreeSize(2)).toBe(3);  // tab2 + tab4 + tab5
+      expect(treeStateManager.getSubtreeSize(3)).toBe(1);  // tab3 only
+      expect(treeStateManager.getSubtreeSize(4)).toBe(1);  // tab4 only
+    });
+
+    it('should return 1 for a node without children', async () => {
+      // Arrange: Create a single tab with no children
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
+      await treeStateManager.addTab(tab1, null, 'view1');
+
+      // Act & Assert: Should return 1
+      expect(treeStateManager.getSubtreeSize(1)).toBe(1);
+    });
+
+    it('should return 0 for non-existent tab', () => {
+      // Act & Assert: Should return 0 for non-existent tab
+      expect(treeStateManager.getSubtreeSize(999)).toBe(0);
+    });
+
+    it('should correctly count deeply nested subtrees', async () => {
+      // Arrange: Create a deep tree structure
+      //   tab1
+      //   └── tab2
+      //       └── tab3
+      //           └── tab4
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
+      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
+      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
+      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 3 };
+
+      await treeStateManager.addTab(tab1, null, 'view1');
+      const node1 = treeStateManager.getNodeByTabId(1);
+      await treeStateManager.addTab(tab2, node1!.id, 'view1');
+      const node2 = treeStateManager.getNodeByTabId(2);
+      await treeStateManager.addTab(tab3, node2!.id, 'view1');
+      const node3 = treeStateManager.getNodeByTabId(3);
+      await treeStateManager.addTab(tab4, node3!.id, 'view1');
+
+      // Act & Assert: Check subtree sizes at each level
+      expect(treeStateManager.getSubtreeSize(1)).toBe(4);  // tab1 + tab2 + tab3 + tab4
+      expect(treeStateManager.getSubtreeSize(2)).toBe(3);  // tab2 + tab3 + tab4
+      expect(treeStateManager.getSubtreeSize(3)).toBe(2);  // tab3 + tab4
+      expect(treeStateManager.getSubtreeSize(4)).toBe(1);  // tab4 only
+    });
+  });
+
   describe('moveSubtreeToView', () => {
     it('should move an entire subtree to a different view', async () => {
       // Arrange: Create a tree structure in view1

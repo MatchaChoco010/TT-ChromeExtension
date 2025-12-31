@@ -202,7 +202,10 @@ export type MessageType =
       payload: { targetWindowId: number };
     }
   // Task 15.1 (tab-tree-bugfix-2): グループ情報取得
-  | { type: 'GET_GROUP_INFO'; payload: { tabId: number } };
+  | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
+  // Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー検知
+  | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
+  | { type: 'NOTIFY_DRAG_OUT' };
 
 export type MessageResponse<T> =
   | { success: true; data: T }

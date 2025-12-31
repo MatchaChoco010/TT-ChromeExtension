@@ -36,6 +36,30 @@ Chrome Extension Manifest V3アーキテクチャを採用。Service WorkerとSi
 - **Prettier**: 自動フォーマット（`.ts`, `.tsx`, `.css`対象）
 - **Linting**: `npm run lint`でチェック、`lint:fix`で自動修正
 
+### Error Handling（シンプルさ優先）
+
+**方針**: 保守性を最優先し、過剰なエラーハンドリングは行わない
+
+- **エッジケースの割り切り**: ほとんど発生しない競合状態や異常系に対して、複雑なロジックを追加しない
+- **サイレント無視**: エッジケースでの状態不整合やデータ消失は許容し、エラーを安全に無視する
+- **シンプルな実装**: デバウンス、リトライ、複雑な状態管理より、単純な処理フローを選択
+- **保守性 > 完璧性**: 複雑なエラーハンドリングはコードベースの保守性を大きく低下させる
+
+```typescript
+// ❌ BAD: 過剰なエラーハンドリング
+const pendingState = new Map();
+await debounce(100);
+if (pendingState.get(id)?.isProcessing) return;
+try { ... } catch { retry(3); } finally { cleanup(); }
+
+// ✅ GOOD: シンプルなエラーハンドリング
+try {
+  await doSomething();
+} catch {
+  // エラーは無視（エッジケースは許容）
+}
+```
+
 ### Testing（必須要件）
 - **Vitest**: 高速なユニット/統合テスト
 - **Testing Library**: Reactコンポーネントのユーザー視点テスト

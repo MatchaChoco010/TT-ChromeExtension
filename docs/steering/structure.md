@@ -37,8 +37,14 @@
 **Example**: `GroupPage.tsx`, `index.tsx`
 
 ### Services (`/src/services/`)
-**Purpose**: ビジネスロジック層（スナップショット管理等）
-**Example**: `SnapshotManager.ts`
+**Purpose**: ビジネスロジック層（スナップショット管理、グループ管理、ツリー状態管理等）
+**Key Components**:
+- `TreeStateManager.ts`: タブツリー状態の集中管理と永続化
+- `GroupManager.ts`: タブグループの作成・管理
+- `SnapshotManager.ts`: スナップショットの保存・復元
+- `ViewManager.ts`: ビューの管理
+
+**Example**: `TreeStateManager.ts`, `GroupManager.ts`, `SnapshotManager.ts`
 
 ### Storage (`/src/storage/`)
 **Purpose**: データ永続化の抽象化層（IndexedDB操作）

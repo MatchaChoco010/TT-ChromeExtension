@@ -72,6 +72,24 @@ export interface ContainerBounds {
 }
 
 /**
+ * Task 5.2: ドロップターゲット計算オプション
+ * サブツリーサイズを考慮したドロップ位置計算のためのオプション
+ */
+export interface DropTargetOptions {
+  /** 隙間判定領域の比率（デフォルト: 0.25） */
+  gapThresholdRatio?: number;
+  /** コンテナ境界情報（オプション） */
+  containerBounds?: ContainerBounds;
+  /** ドラッグ中のノードID（このノードとサブツリーをgapIndex計算から除外） */
+  draggedNodeId?: string;
+  /**
+   * ノードIDからそのサブツリー全体のノードIDを取得するコールバック
+   * draggedNodeIdが指定された場合に必要
+   */
+  getSubtreeNodeIds?: (nodeId: string) => string[];
+}
+
+/**
  * デフォルトの隙間判定領域比率
  * タブの高さに対して上下この割合の領域は隙間判定となる
  */
@@ -82,31 +100,57 @@ const DEFAULT_GAP_THRESHOLD_RATIO = 0.25;
  *
  * @param mouseY - マウスのY座標（コンテナ相対）
  * @param tabPositions - タブノードの位置情報配列（上から順）
- * @param gapThresholdRatio - 隙間判定領域の比率（デフォルト: 0.25）
- * @param containerBounds - Task 7.1: コンテナ境界情報（オプション）。指定された場合、境界外ではNoneを返す
+ * @param gapThresholdRatioOrOptions - 隙間判定領域の比率（デフォルト: 0.25）またはオプションオブジェクト
+ * @param containerBounds - Task 7.1: コンテナ境界情報（オプション）。指定された場合、境界外ではNoneを返す（後方互換性のため残す）
  * @returns ドロップターゲット情報
  */
 export function calculateDropTarget(
   mouseY: number,
   tabPositions: TabPosition[],
-  gapThresholdRatio: number = DEFAULT_GAP_THRESHOLD_RATIO,
+  gapThresholdRatioOrOptions: number | DropTargetOptions = DEFAULT_GAP_THRESHOLD_RATIO,
   containerBounds?: ContainerBounds
 ): DropTarget {
-  // タブリストが空の場合
-  if (tabPositions.length === 0) {
+  // Task 5.2: オプションオブジェクトまたは個別パラメータを処理
+  let gapThresholdRatio: number;
+  let bounds: ContainerBounds | undefined;
+  let draggedNodeId: string | undefined;
+  let getSubtreeNodeIds: ((nodeId: string) => string[]) | undefined;
+
+  if (typeof gapThresholdRatioOrOptions === 'object') {
+    gapThresholdRatio = gapThresholdRatioOrOptions.gapThresholdRatio ?? DEFAULT_GAP_THRESHOLD_RATIO;
+    bounds = gapThresholdRatioOrOptions.containerBounds;
+    draggedNodeId = gapThresholdRatioOrOptions.draggedNodeId;
+    getSubtreeNodeIds = gapThresholdRatioOrOptions.getSubtreeNodeIds;
+  } else {
+    gapThresholdRatio = gapThresholdRatioOrOptions;
+    bounds = containerBounds;
+  }
+
+  // Task 5.2: ドラッグ中のノードとそのサブツリーを除外したタブ位置リストを作成
+  let effectiveTabPositions = tabPositions;
+  let draggedSubtreeNodeIds: Set<string> | undefined;
+
+  if (draggedNodeId && getSubtreeNodeIds) {
+    const subtreeIds = getSubtreeNodeIds(draggedNodeId);
+    draggedSubtreeNodeIds = new Set(subtreeIds);
+    effectiveTabPositions = tabPositions.filter(pos => !draggedSubtreeNodeIds!.has(pos.nodeId));
+  }
+
+  // タブリストが空の場合（元のリストまたは有効リスト）
+  if (effectiveTabPositions.length === 0) {
     return { type: DropTargetType.None };
   }
 
   // Task 7.1: コンテナ境界チェック
   // 境界が指定されている場合、マウスがコンテナ外にある場合はNoneを返す
-  if (containerBounds) {
-    if (mouseY < containerBounds.minY || mouseY > containerBounds.maxY) {
+  if (bounds) {
+    if (mouseY < bounds.minY || mouseY > bounds.maxY) {
       return { type: DropTargetType.None };
     }
   }
 
   // Y座標が最初のタブより上の場合
-  const firstTab = tabPositions[0];
+  const firstTab = effectiveTabPositions[0];
   if (mouseY < firstTab.top) {
     return {
       type: DropTargetType.Gap,
@@ -119,11 +163,11 @@ export function calculateDropTarget(
   }
 
   // Y座標が最後のタブより下の場合
-  const lastTab = tabPositions[tabPositions.length - 1];
+  const lastTab = effectiveTabPositions[effectiveTabPositions.length - 1];
   if (mouseY >= lastTab.bottom) {
     return {
       type: DropTargetType.Gap,
-      gapIndex: tabPositions.length,
+      gapIndex: effectiveTabPositions.length,
       adjacentDepths: {
         above: lastTab.depth,
         below: undefined,
@@ -131,9 +175,9 @@ export function calculateDropTarget(
     };
   }
 
-  // 各タブを検索
-  for (let i = 0; i < tabPositions.length; i++) {
-    const tab = tabPositions[i];
+  // 各タブを検索（有効なタブリストを使用）
+  for (let i = 0; i < effectiveTabPositions.length; i++) {
+    const tab = effectiveTabPositions[i];
     const tabHeight = tab.bottom - tab.top;
     const gapThreshold = tabHeight * gapThresholdRatio;
 
@@ -144,7 +188,7 @@ export function calculateDropTarget(
 
       // 上端の隙間領域
       if (relativeY < gapThreshold) {
-        const aboveTab = i > 0 ? tabPositions[i - 1] : undefined;
+        const aboveTab = i > 0 ? effectiveTabPositions[i - 1] : undefined;
         return {
           type: DropTargetType.Gap,
           gapIndex: i,
@@ -157,7 +201,7 @@ export function calculateDropTarget(
 
       // 下端の隙間領域
       if (relativeY >= tabHeight - gapThreshold) {
-        const belowTab = i < tabPositions.length - 1 ? tabPositions[i + 1] : undefined;
+        const belowTab = i < effectiveTabPositions.length - 1 ? effectiveTabPositions[i + 1] : undefined;
         return {
           type: DropTargetType.Gap,
           gapIndex: i + 1,

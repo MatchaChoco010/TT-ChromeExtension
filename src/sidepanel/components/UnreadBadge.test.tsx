@@ -71,4 +71,42 @@ describe('UnreadBadge', () => {
       expect(badge).toHaveAttribute('aria-label', 'Unread');
     });
   });
+
+  describe('depth対応（Requirement 9.1, 9.2, 9.3）', () => {
+    it('depth=0の場合、左端に表示される（インデントなし）', () => {
+      render(<UnreadBadge isUnread={true} showIndicator={true} depth={0} />);
+
+      const badge = screen.getByTestId('unread-badge');
+      expect(badge).toHaveStyle({
+        left: '0px',
+      });
+    });
+
+    it('depth=1の場合、20pxインデントされた位置に表示される', () => {
+      render(<UnreadBadge isUnread={true} showIndicator={true} depth={1} />);
+
+      const badge = screen.getByTestId('unread-badge');
+      expect(badge).toHaveStyle({
+        left: '20px',
+      });
+    });
+
+    it('depth=2の場合、40pxインデントされた位置に表示される', () => {
+      render(<UnreadBadge isUnread={true} showIndicator={true} depth={2} />);
+
+      const badge = screen.getByTestId('unread-badge');
+      expect(badge).toHaveStyle({
+        left: '40px',
+      });
+    });
+
+    it('depthが指定されない場合、デフォルトで左端に表示される', () => {
+      render(<UnreadBadge isUnread={true} showIndicator={true} />);
+
+      const badge = screen.getByTestId('unread-badge');
+      expect(badge).toHaveStyle({
+        left: '0px',
+      });
+    });
+  });
 });

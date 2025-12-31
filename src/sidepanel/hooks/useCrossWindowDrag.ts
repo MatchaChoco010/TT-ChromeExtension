@@ -1,5 +1,6 @@
 /**
  * Task 13.2: useCrossWindowDragフックの実装
+ * Task 7.2 (comprehensive-bugfix): mousemoveによるホバー検知とセッションキャッシュを追加
  *
  * Requirements:
  * - 6.1: 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
@@ -8,8 +9,10 @@
  * - 6.4: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
  * - 6.5: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
  * - 6.7: Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
+ * - 4.4 (Task 7.2): mousemoveイベントでホバー検知し、別ウィンドウへのフォーカス移動を通知
+ * - 4.5 (Task 7.2): バックグラウンドスロットリング回避のためのフォーカス移動
  */
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import type { RefObject } from 'react';
 import type { MessageResponse } from '@/types';
 import type { DragSession } from '@/background/drag-session-manager';
@@ -35,9 +38,10 @@ export interface UseCrossWindowDragProps {
 /**
  * クロスウィンドウドラッグの検知と処理を行うフック
  *
- * mouseenterイベントでドラッグセッションをチェックし、
- * 別ウィンドウからのドラッグの場合、タブ移動を実行して
- * ドラッグ状態を継続させる。
+ * Task 7.2 (comprehensive-bugfix):
+ * - mouseenterイベントでドラッグセッションをチェックし、別ウィンドウからのドラッグの場合はタブ移動を実行
+ * - mousemoveイベントでツリービュー上のホバーを検知し、Service Workerに通知（バックグラウンドスロットリング回避）
+ * - セッション状態のローカルキャッシュを実装（パフォーマンス最適化）
  */
 export function useCrossWindowDrag({
   containerRef,
@@ -45,6 +49,12 @@ export function useCrossWindowDrag({
 }: UseCrossWindowDragProps): void {
   const currentWindowIdRef = useRef<number | null>(null);
   const onDragReceivedRef = useRef(onDragReceived);
+  // Task 7.2: セッション状態のローカルキャッシュ
+  const [cachedSession, setCachedSession] = useState<DragSession | null>(null);
+  // Task 7.2: 重複通知防止のためのウィンドウID記録
+  const lastNotifiedWindowRef = useRef<number | null>(null);
+  // Task 7.2: セッション更新用インターバルID
+  const sessionPollingIntervalRef = useRef<number | null>(null);
 
   // コールバックの更新を同期
   useEffect(() => {
@@ -56,6 +66,46 @@ export function useCrossWindowDrag({
     chrome.windows.getCurrent().then((window) => {
       currentWindowIdRef.current = window.id ?? null;
     });
+  }, []);
+
+  /**
+   * Task 7.2: セッション状態をポーリングで更新
+   * mousemove毎にService Workerに問い合わせるとパフォーマンスが悪いため、
+   * 定期的にセッション状態を取得してキャッシュする
+   */
+  useEffect(() => {
+    const pollSession = async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'GET_DRAG_SESSION',
+        }) as MessageResponse<DragSession | null>;
+
+        if (response.success) {
+          setCachedSession(response.data);
+          // セッションが終了したらlastNotifiedWindowをリセット
+          if (!response.data) {
+            lastNotifiedWindowRef.current = null;
+          }
+        }
+      } catch (_error) {
+        // エラー時はセッションをクリア
+        setCachedSession(null);
+        lastNotifiedWindowRef.current = null;
+      }
+    };
+
+    // 初回取得
+    pollSession();
+
+    // 100msごとにポーリング（ドラッグ中のレスポンスを確保）
+    sessionPollingIntervalRef.current = window.setInterval(pollSession, 100);
+
+    return () => {
+      if (sessionPollingIntervalRef.current !== null) {
+        clearInterval(sessionPollingIntervalRef.current);
+        sessionPollingIntervalRef.current = null;
+      }
+    };
   }, []);
 
   /**
@@ -109,14 +159,60 @@ export function useCrossWindowDrag({
     }
   }, []);
 
+  /**
+   * Task 7.2: mousemoveイベントハンドラ
+   * ツリービュー上のホバーを検知し、Service Workerに通知
+   * バックグラウンドスロットリング回避のためフォーカス移動を実行
+   *
+   * Requirements: 4.4, 4.5
+   */
+  const handleMouseMove = useCallback(async () => {
+    const currentWindowId = currentWindowIdRef.current;
+    if (currentWindowId === null) return;
+
+    // ローカルキャッシュを参照（Service Workerへの問い合わせなし）
+    const session = cachedSession;
+
+    // セッションがない、またはドラッグ中でない場合は何もしない
+    if (!session || session.state === 'idle') {
+      return;
+    }
+
+    // 同じウィンドウからのドラッグは通知不要
+    if (session.sourceWindowId === currentWindowId) {
+      return;
+    }
+
+    // 既に同じウィンドウを通知済みなら何もしない（重複呼び出し防止）
+    if (lastNotifiedWindowRef.current === currentWindowId) {
+      return;
+    }
+
+    // 通知済みウィンドウを記録
+    lastNotifiedWindowRef.current = currentWindowId;
+
+    // Service Workerにホバー通知を送信
+    // notifyTreeViewHover内でウィンドウフォーカスも移動する
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'NOTIFY_TREE_VIEW_HOVER',
+        payload: { windowId: currentWindowId },
+      });
+    } catch (_error) {
+      // 通知失敗は無視（サイレントに処理）
+    }
+  }, [cachedSession]);
+
   // イベントリスナーの設定とクリーンアップ
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     container.addEventListener('mouseenter', handleMouseEnter);
+    container.addEventListener('mousemove', handleMouseMove);
     return () => {
       container.removeEventListener('mouseenter', handleMouseEnter);
+      container.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [containerRef, handleMouseEnter]);
+  }, [containerRef, handleMouseEnter, handleMouseMove]);
 }

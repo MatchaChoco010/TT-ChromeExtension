@@ -225,9 +225,10 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                 data-testid="view-color-circle"
               />
               {/* Task 3.3: タブ数バッジ (Requirements 17.1, 17.2, 17.3) */}
+              {/* Task 4.1: 視認性向上 - min-widthを20pxに拡大、位置を内側に調整 */}
               {tabCount > 0 && (
                 <span
-                  className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center"
+                  className="absolute -top-0.5 -right-0.5 min-w-[20px] h-4 px-1 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center"
                   data-testid={`tab-count-badge-${view.id}`}
                 >
                   {tabCount}

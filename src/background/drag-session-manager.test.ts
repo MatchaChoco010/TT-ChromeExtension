@@ -10,7 +10,21 @@ import { DragSessionManager } from './drag-session-manager';
 import type { TabNode } from '@/types';
 
 // Mock chrome APIs
-const mockChrome = {
+const mockChrome: {
+  alarms: {
+    create: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+    onAlarm: {
+      addListener: ReturnType<typeof vi.fn>;
+    };
+  };
+  tabs: {
+    move: ReturnType<typeof vi.fn>;
+  };
+  windows: {
+    update: ReturnType<typeof vi.fn>;
+  };
+} = {
   alarms: {
     create: vi.fn().mockResolvedValue(undefined),
     clear: vi.fn().mockResolvedValue(undefined),
@@ -20,6 +34,9 @@ const mockChrome = {
   },
   tabs: {
     move: vi.fn(),
+  },
+  windows: {
+    update: vi.fn().mockResolvedValue(undefined),
   },
 };
 
@@ -340,6 +357,86 @@ describe('DragSessionManager', () => {
       manager.stopTimeoutCheck();
       // Should not throw
       expect(true).toBe(true);
+    });
+  });
+
+  describe('notifyDragOut', () => {
+    it('should set isOutsideTree to true when called during active session', async () => {
+      await manager.startSession(1, 100, mockTreeData);
+      manager.notifyDragOut();
+
+      const session = manager.getSessionImmediate();
+      expect(session?.isOutsideTree).toBe(true);
+    });
+
+    it('should do nothing if no session exists', () => {
+      manager.notifyDragOut();
+      // Should not throw
+      expect(true).toBe(true);
+    });
+
+    it('should update timestamp when called', async () => {
+      const session = await manager.startSession(1, 100, mockTreeData);
+      const originalUpdatedAt = session.updatedAt;
+
+      // Wait a bit to ensure timestamp changes
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      manager.notifyDragOut();
+
+      const updatedSession = manager.getSessionImmediate();
+      expect(updatedSession?.updatedAt).toBeGreaterThan(originalUpdatedAt);
+    });
+  });
+
+  describe('notifyTreeViewHover', () => {
+    it('should update currentHoverWindowId when hovering different window', async () => {
+      await manager.startSession(1, 100, mockTreeData);
+      await manager.notifyTreeViewHover(200);
+
+      const session = manager.getSessionImmediate();
+      expect(session?.currentHoverWindowId).toBe(200);
+    });
+
+    it('should call chrome.windows.update to focus the target window', async () => {
+      await manager.startSession(1, 100, mockTreeData);
+      await manager.notifyTreeViewHover(200);
+
+      expect(mockChrome.windows.update).toHaveBeenCalledWith(200, { focused: true });
+    });
+
+    it('should not call chrome.windows.update if same window is already recorded', async () => {
+      await manager.startSession(1, 100, mockTreeData);
+      await manager.notifyTreeViewHover(200);
+      vi.clearAllMocks();
+
+      await manager.notifyTreeViewHover(200);
+
+      expect(mockChrome.windows.update).not.toHaveBeenCalled();
+    });
+
+    it('should set isOutsideTree to false when hovering tree view', async () => {
+      await manager.startSession(1, 100, mockTreeData);
+      manager.notifyDragOut(); // First, mark as outside
+      expect(manager.getSessionImmediate()?.isOutsideTree).toBe(true);
+
+      await manager.notifyTreeViewHover(200);
+
+      expect(manager.getSessionImmediate()?.isOutsideTree).toBe(false);
+    });
+
+    it('should do nothing if no session exists', async () => {
+      await manager.notifyTreeViewHover(200);
+      // Should not throw
+      expect(mockChrome.windows.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow hovering source window without focus change', async () => {
+      await manager.startSession(1, 100, mockTreeData);
+      await manager.notifyTreeViewHover(100); // Same as source window
+
+      // Should still update hover window ID
+      expect(manager.getSessionImmediate()?.currentHoverWindowId).toBe(100);
     });
   });
 

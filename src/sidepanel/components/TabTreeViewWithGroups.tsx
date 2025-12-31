@@ -214,13 +214,15 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         data-node-id={node.id}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
+        className={`relative flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
         style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
+        {/* Task 3.1: 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
+        <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
           <button
@@ -277,13 +279,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
             </span>
           </div>
-          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 未読インジケータと閉じるボタン */}
-          {/* Requirement 13.1, 13.2: 未読インジケーターをタブの右端に固定表示 */}
+          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 閉じるボタン */}
+          {/* Requirement 16.1, 16.2: 親タブへの不要なバッジ表示は削除 */}
           <div
             data-testid="right-actions-container"
             className="flex items-center flex-shrink-0 ml-2"
           >
-            <UnreadBadge isUnread={isUnread} showIndicator={true} />
             {hasChildren && unreadChildCount > 0 && (
               <div
                 data-testid="unread-child-indicator"
