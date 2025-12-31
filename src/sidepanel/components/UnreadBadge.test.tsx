@@ -27,13 +27,26 @@ describe('UnreadBadge', () => {
     });
   });
 
-  describe('バッジのスタイル', () => {
-    it('デフォルトでは小さな青い丸として表示される', () => {
+  describe('バッジのスタイル（Requirement 8.1, 8.2）', () => {
+    it('左下角の三角形切り欠きとして表示される', () => {
       render(<UnreadBadge isUnread={true} showIndicator={true} />);
 
       const badge = screen.getByTestId('unread-badge');
-      expect(badge).toHaveClass('bg-blue-500');
-      expect(badge).toHaveClass('rounded-full');
+      // 三角形切り欠きスタイル（border-based triangle）
+      expect(badge).toHaveStyle({
+        width: '0',
+        height: '0',
+        borderStyle: 'solid',
+      });
+    });
+
+    it('絶対位置指定で配置される', () => {
+      render(<UnreadBadge isUnread={true} showIndicator={true} />);
+
+      const badge = screen.getByTestId('unread-badge');
+      expect(badge).toHaveStyle({
+        position: 'absolute',
+      });
     });
 
     it('カスタムクラスを適用できる', () => {
@@ -50,57 +63,12 @@ describe('UnreadBadge', () => {
     });
   });
 
-  describe('カウント表示', () => {
-    it('countが指定されている場合、カウントを表示する', () => {
-      render(
-        <UnreadBadge isUnread={true} showIndicator={true} count={5} />,
-      );
-
-      const countElement = screen.getByTestId('unread-count');
-      expect(countElement).toHaveTextContent('5');
-    });
-
-    it('countが0の場合、カウントを表示しない', () => {
-      render(
-        <UnreadBadge isUnread={true} showIndicator={true} count={0} />,
-      );
-
-      const countElement = screen.queryByTestId('unread-count');
-      expect(countElement).not.toBeInTheDocument();
-    });
-
-    it('countが未指定の場合、カウントを表示しない', () => {
-      render(<UnreadBadge isUnread={true} showIndicator={true} />);
-
-      const countElement = screen.queryByTestId('unread-count');
-      expect(countElement).not.toBeInTheDocument();
-    });
-
-    it('countが99より大きい場合、"99+"と表示する', () => {
-      render(
-        <UnreadBadge isUnread={true} showIndicator={true} count={150} />,
-      );
-
-      const countElement = screen.getByTestId('unread-count');
-      expect(countElement).toHaveTextContent('99+');
-    });
-  });
-
   describe('アクセシビリティ', () => {
     it('aria-labelが正しく設定される', () => {
       render(<UnreadBadge isUnread={true} showIndicator={true} />);
 
       const badge = screen.getByTestId('unread-badge');
       expect(badge).toHaveAttribute('aria-label', 'Unread');
-    });
-
-    it('カウント表示時にaria-labelが更新される', () => {
-      render(
-        <UnreadBadge isUnread={true} showIndicator={true} count={5} />,
-      );
-
-      const badge = screen.getByTestId('unread-badge');
-      expect(badge).toHaveAttribute('aria-label', 'Unread (5)');
     });
   });
 });

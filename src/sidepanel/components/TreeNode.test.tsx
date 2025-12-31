@@ -1342,8 +1342,8 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('未読インジケーターの右端固定表示 (Task 11.1: Requirement 11.1, 11.2, 11.3, 11.4)', () => {
-    it('未読インジケーターがタブの右端に固定表示されること', () => {
+  describe('未読インジケーターの左下三角形表示 (Task 8.1: Requirement 8.1, 8.2, 8.3)', () => {
+    it('未読インジケーターがタブ要素内に表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, 'Test Tab');
 
@@ -1363,14 +1363,14 @@ describe('TreeNode', () => {
       const unreadBadge = screen.getByTestId('unread-badge');
       expect(unreadBadge).toBeInTheDocument();
 
-      // 未読バッジが右端固定コンテナ内にあること（right-actions-container）
-      const rightActionsContainer = unreadBadge.closest('[data-testid="right-actions-container"]');
-      expect(rightActionsContainer).toBeInTheDocument();
+      // 未読バッジがタブノード要素の直接の子であること
+      const treeNode = screen.getByTestId('tree-node-1');
+      expect(treeNode).toContainElement(unreadBadge);
     });
 
-    it('短いタイトルでも未読インジケーターがタブの右端に表示されること', () => {
+    it('未読インジケーターが絶対位置指定で左下に配置されること', () => {
       const node = createMockNode('node-1', 1);
-      const tab = createMockTab(1, 'A');
+      const tab = createMockTab(1, 'Test Tab');
 
       render(
         <TreeNode
@@ -1385,18 +1385,17 @@ describe('TreeNode', () => {
       );
 
       const unreadBadge = screen.getByTestId('unread-badge');
-      const rightActionsContainer = unreadBadge.closest('[data-testid="right-actions-container"]');
-      expect(rightActionsContainer).toBeInTheDocument();
-      // flex-shrink-0でサイズが維持される
-      expect(rightActionsContainer).toHaveClass('flex-shrink-0');
+      // 絶対位置指定で左下に配置
+      expect(unreadBadge).toHaveStyle({
+        position: 'absolute',
+        left: '0px',
+        bottom: '0px',
+      });
     });
 
-    it('長いタイトルでも未読インジケーターがタブの右端に表示されること', () => {
+    it('未読インジケーターが三角形切り欠き形状であること', () => {
       const node = createMockNode('node-1', 1);
-      const tab = createMockTab(
-        1,
-        'This is a very very very long tab title that extends beyond normal width'
-      );
+      const tab = createMockTab(1, 'Test Tab');
 
       render(
         <TreeNode
@@ -1411,13 +1410,15 @@ describe('TreeNode', () => {
       );
 
       const unreadBadge = screen.getByTestId('unread-badge');
-      const rightActionsContainer = unreadBadge.closest('[data-testid="right-actions-container"]');
-      expect(rightActionsContainer).toBeInTheDocument();
-      // flex-shrink-0でサイズが維持される
-      expect(rightActionsContainer).toHaveClass('flex-shrink-0');
+      // 三角形切り欠きスタイル（border-based triangle）
+      expect(unreadBadge).toHaveStyle({
+        width: '0px',
+        height: '0px',
+        borderStyle: 'solid',
+      });
     });
 
-    it('未読インジケーターがタイトルエリアの外（右端固定コンテナ内）に配置されること', () => {
+    it('未読インジケーターがタイトルエリアの外に配置されること', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, 'Test Tab');
 
@@ -1462,11 +1463,6 @@ describe('TreeNode', () => {
       // 両方が表示される
       expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
-
-      // 両方が同じ右端固定コンテナ内にあること
-      const rightActionsContainer = screen.getByTestId('right-actions-container');
-      expect(rightActionsContainer).toContainElement(screen.getByTestId('unread-badge'));
-      expect(rightActionsContainer).toContainElement(screen.getByTestId('close-button'));
     });
   });
 

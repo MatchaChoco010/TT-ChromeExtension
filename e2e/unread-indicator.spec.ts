@@ -190,17 +190,16 @@ extensionTest.describe('未読インジケータ機能', () => {
 /**
  * 未読インジケーター位置のE2Eテスト (Requirement 11)
  *
- * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6
- * - 未読インジケーターがタブノードの右端に固定表示される
- * - タイトル長に関わらず一定位置に表示される
+ * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 8.1, 8.2, 8.3
+ * - 未読インジケーターがタブノードの左下角に三角形切り欠きとして表示される
+ * - タイトル長に関わらず一定位置（左下角）に表示される
  *
- * 注: 現在の実装ではUnreadBadgeはtab-contentコンテナ内のタイトル領域の後に配置されている。
- * タブノードの右端はclose-button-wrapperが占有しているため、
- * バッジはその左側（タイトル領域内）に表示される。
+ * 注: Task 8.1により、UnreadBadgeはtree-node直下に配置され、
+ * position: absoluteで左下角に固定表示される三角形切り欠きスタイル。
  */
 extensionTest.describe('未読インジケーター位置', () => {
   extensionTest(
-    '未読インジケーターがタブコンテンツ内に表示される',
+    '未読インジケーターがタブノード内の左下角に表示される',
     async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
@@ -224,26 +223,27 @@ extensionTest.describe('未読インジケーター位置', () => {
       // 未読バッジが表示されることを確認
       await assertUnreadBadge(sidePanelPage, bgTabId);
 
-      // タブコンテンツ内に未読バッジが存在することを確認
-      const tabContent = tabNode.locator('[data-testid="tab-content"]');
-      await expect(tabContent).toBeVisible({ timeout: 5000 });
-
-      const unreadBadgeInContent = tabContent.locator('[data-testid="unread-badge"]');
-      await expect(unreadBadgeInContent).toBeVisible({ timeout: 5000 });
+      // 未読バッジがtree-node直下に存在することを確認（Task 8.1: 左下三角形）
+      const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
+      await expect(unreadBadge).toBeVisible({ timeout: 5000 });
 
       // タブノードと未読バッジの位置関係を検証
-      // バッジがtab-content内に適切に配置されていることを確認
-      const tabContentBounds = await tabContent.boundingBox();
-      const badgeBounds = await unreadBadgeInContent.boundingBox();
+      // バッジがタブノードの左下角に配置されていることを確認
+      const tabNodeBounds = await tabNode.boundingBox();
+      const badgeBounds = await unreadBadge.boundingBox();
 
-      expect(tabContentBounds).not.toBeNull();
+      expect(tabNodeBounds).not.toBeNull();
       expect(badgeBounds).not.toBeNull();
-      if (tabContentBounds && badgeBounds) {
-        // バッジがタブコンテンツ内にあることを確認
-        expect(badgeBounds.x).toBeGreaterThanOrEqual(tabContentBounds.x);
-        expect(badgeBounds.x + badgeBounds.width).toBeLessThanOrEqual(
-          tabContentBounds.x + tabContentBounds.width
-        );
+      if (tabNodeBounds && badgeBounds) {
+        // バッジがタブノードの左端に配置されていることを確認（left: 0）
+        // インデントがあるため、相対的な位置を確認
+        expect(badgeBounds.x).toBeGreaterThanOrEqual(tabNodeBounds.x);
+        // バッジがタブノードの下端に配置されていることを確認（bottom: 0）
+        const badgeBottom = badgeBounds.y + badgeBounds.height;
+        const tabNodeBottom = tabNodeBounds.y + tabNodeBounds.height;
+        // 許容誤差内でバッジがタブノードの下端にあることを確認
+        expect(badgeBottom).toBeGreaterThanOrEqual(tabNodeBottom - 2);
+        expect(badgeBottom).toBeLessThanOrEqual(tabNodeBottom + 2);
       }
 
       // クリーンアップ
@@ -329,7 +329,7 @@ extensionTest.describe('未読インジケーター位置', () => {
   );
 
   extensionTest(
-    '未読バッジがタブタイトルの後に表示される',
+    '未読バッジがタブノードの左下に三角形として表示される',
     async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
@@ -353,24 +353,23 @@ extensionTest.describe('未読インジケーター位置', () => {
       // 未読バッジが表示されることを確認
       await assertUnreadBadge(sidePanelPage, bgTabId);
 
-      // タイトル要素を取得
-      const tabTitle = tabNode.locator('[data-testid="tab-title"]');
-      await expect(tabTitle).toBeVisible({ timeout: 5000 });
-
       // 未読バッジを取得
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 5000 });
 
-      // タイトルとバッジの位置を取得
-      const titleBounds = await tabTitle.boundingBox();
+      // タブノードとバッジの位置を取得
+      const tabNodeBounds = await tabNode.boundingBox();
       const badgeBounds = await unreadBadge.boundingBox();
 
-      expect(titleBounds).not.toBeNull();
+      expect(tabNodeBounds).not.toBeNull();
       expect(badgeBounds).not.toBeNull();
-      if (titleBounds && badgeBounds) {
-        // バッジがタイトルの右側（後）に表示されていることを確認
-        // バッジの左端がタイトルの左端より右にあることを確認
-        expect(badgeBounds.x).toBeGreaterThanOrEqual(titleBounds.x);
+      if (tabNodeBounds && badgeBounds) {
+        // Task 8.1: バッジがタブノードの左下角に配置されていることを確認
+        // バッジがタブノードの左端付近にあることを確認（インデント考慮）
+        expect(badgeBounds.x).toBeGreaterThanOrEqual(tabNodeBounds.x);
+        // バッジはタブノードの中央より左にあることを確認（三角形は左下に配置）
+        const tabNodeCenter = tabNodeBounds.x + tabNodeBounds.width / 2;
+        expect(badgeBounds.x + badgeBounds.width).toBeLessThan(tabNodeCenter);
       }
 
       // クリーンアップ
@@ -459,6 +458,263 @@ extensionTest.describe('未読インジケーター位置', () => {
       // クリーンアップ
       await closeTab(extensionContext, longTitleTabId);
       await closeTab(extensionContext, shortTitleTabId);
+    }
+  );
+});
+
+/**
+ * Task 8.2: 未読インジケーターのUI改善E2Eテスト
+ *
+ * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
+ * - 未読インジケーターが左下三角形の形状で表示されること
+ * - タブ要素に重なる形で配置されること
+ * - 既読になったときに非表示になること
+ */
+extensionTest.describe('未読インジケーターUI改善（Task 8.2）', () => {
+  extensionTest(
+    '未読インジケーターが左下三角形の形状で表示される',
+    async ({ extensionContext, sidePanelPage }) => {
+      // アクティブなタブを取得
+      const [initialPage] = extensionContext.pages();
+      await initialPage.waitForLoadState('load');
+
+      // バックグラウンドでタブを作成（active: false）
+      const bgTabId = await createTab(
+        extensionContext,
+        'https://example.com/',
+        undefined,
+        { active: false }
+      );
+
+      // ツリーが表示されるまで待機
+      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // タブノードがDOMに表示されるまで待機
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
+
+      // 未読バッジが表示されることを確認
+      await assertUnreadBadge(sidePanelPage, bgTabId);
+
+      // 未読バッジの位置を確認 - 左下に配置されていること
+      const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
+      await expect(unreadBadge).toBeVisible({ timeout: 5000 });
+
+      // タブノードと未読バッジの位置関係を検証
+      const tabNodeBounds = await tabNode.boundingBox();
+      const badgeBounds = await unreadBadge.boundingBox();
+
+      expect(tabNodeBounds).not.toBeNull();
+      expect(badgeBounds).not.toBeNull();
+
+      if (tabNodeBounds && badgeBounds) {
+        // 三角形の位置が左下角にあることを確認
+        // バッジの左端がタブノードの左端付近にあること（padding分の余裕を考慮して50px以内）
+        const leftEdgeDiff = badgeBounds.x - tabNodeBounds.x;
+        expect(leftEdgeDiff).toBeGreaterThanOrEqual(0);
+        expect(leftEdgeDiff).toBeLessThanOrEqual(50);
+
+        // バッジの下端がタブノードの下端付近にあること（2px以内の誤差を許容）
+        const badgeBottom = badgeBounds.y + badgeBounds.height;
+        const tabNodeBottom = tabNodeBounds.y + tabNodeBounds.height;
+        expect(Math.abs(badgeBottom - tabNodeBottom)).toBeLessThanOrEqual(2);
+      }
+
+      // CSSスタイルの検証 - border-basedの三角形テクニックを確認
+      const badgeStyles = await unreadBadge.evaluate((el) => {
+        const style = window.getComputedStyle(el);
+        return {
+          position: style.position,
+          left: style.left,
+          bottom: style.bottom,
+          borderStyle: style.borderStyle,
+        };
+      });
+
+      // position: absolute, left: 0, bottom: 0 であることを確認
+      expect(badgeStyles.position).toBe('absolute');
+      expect(badgeStyles.left).toBe('0px');
+      expect(badgeStyles.bottom).toBe('0px');
+      // border-basedの三角形テクニックを使用していることを確認
+      expect(badgeStyles.borderStyle).toBe('solid');
+
+      // クリーンアップ
+      await closeTab(extensionContext, bgTabId);
+    }
+  );
+
+  extensionTest(
+    '未読インジケーターがタブ要素に重なる形で配置される',
+    async ({ extensionContext, sidePanelPage }) => {
+      // アクティブなタブを取得
+      const [initialPage] = extensionContext.pages();
+      await initialPage.waitForLoadState('load');
+
+      // バックグラウンドでタブを作成（active: false）
+      const bgTabId = await createTab(
+        extensionContext,
+        'https://example.com/',
+        undefined,
+        { active: false }
+      );
+
+      // ツリーが表示されるまで待機
+      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // タブノードがDOMに表示されるまで待機
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
+
+      // 未読バッジが表示されることを確認
+      await assertUnreadBadge(sidePanelPage, bgTabId);
+
+      // 未読バッジがタブノードの子要素であることを確認
+      const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
+      await expect(unreadBadge).toBeVisible({ timeout: 5000 });
+
+      // タブノードの境界内にバッジが収まっていることを検証
+      const tabNodeBounds = await tabNode.boundingBox();
+      const badgeBounds = await unreadBadge.boundingBox();
+
+      expect(tabNodeBounds).not.toBeNull();
+      expect(badgeBounds).not.toBeNull();
+
+      if (tabNodeBounds && badgeBounds) {
+        // バッジがタブノードの境界内にあることを確認
+        expect(badgeBounds.x).toBeGreaterThanOrEqual(tabNodeBounds.x);
+        expect(badgeBounds.y).toBeGreaterThanOrEqual(tabNodeBounds.y);
+        expect(badgeBounds.x + badgeBounds.width).toBeLessThanOrEqual(
+          tabNodeBounds.x + tabNodeBounds.width
+        );
+        expect(badgeBounds.y + badgeBounds.height).toBeLessThanOrEqual(
+          tabNodeBounds.y + tabNodeBounds.height
+        );
+      }
+
+      // クリーンアップ
+      await closeTab(extensionContext, bgTabId);
+    }
+  );
+
+  extensionTest(
+    '既読になったときに未読インジケーターが非表示になる',
+    async ({ extensionContext, sidePanelPage }) => {
+      // アクティブなタブを取得
+      const [initialPage] = extensionContext.pages();
+      await initialPage.waitForLoadState('load');
+
+      // バックグラウンドでタブを作成（active: false）
+      const bgTabId = await createTab(
+        extensionContext,
+        'https://example.com/',
+        undefined,
+        { active: false }
+      );
+
+      // ツリーが表示されるまで待機
+      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // タブノードがDOMに表示されるまで待機
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
+      await expect(tabNode).toBeVisible({ timeout: 10000 });
+
+      // 未読バッジが表示されることを確認
+      await assertUnreadBadge(sidePanelPage, bgTabId);
+
+      // タブをアクティブ化して既読にする
+      await activateTab(extensionContext, bgTabId);
+
+      // 未読バッジが非表示になることを確認（ポーリング）
+      const unreadBadgeInNode = tabNode.locator('[data-testid="unread-badge"]');
+      await expect(unreadBadgeInNode).toHaveCount(0, { timeout: 10000 });
+
+      // クリーンアップ
+      await closeTab(extensionContext, bgTabId);
+    }
+  );
+
+  extensionTest(
+    '複数タブで未読インジケーターの形状が一貫していること',
+    async ({ extensionContext, sidePanelPage }) => {
+      // アクティブなタブを取得
+      const [initialPage] = extensionContext.pages();
+      await initialPage.waitForLoadState('load');
+
+      // 複数のバックグラウンドタブを作成
+      const bgTabId1 = await createTab(
+        extensionContext,
+        'https://example.com/',
+        undefined,
+        { active: false }
+      );
+      const bgTabId2 = await createTab(
+        extensionContext,
+        'https://example.org/',
+        undefined,
+        { active: false }
+      );
+
+      // ツリーが表示されるまで待機
+      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
+
+      // 両方のタブノードがDOMに表示されるまで待機
+      const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId1}"]`);
+      const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId2}"]`);
+      await expect(tabNode1).toBeVisible({ timeout: 10000 });
+      await expect(tabNode2).toBeVisible({ timeout: 10000 });
+
+      // 両方の未読バッジが表示されることを確認
+      await assertUnreadBadge(sidePanelPage, bgTabId1);
+      await assertUnreadBadge(sidePanelPage, bgTabId2);
+
+      // 両方のバッジを取得
+      const unreadBadge1 = tabNode1.locator('[data-testid="unread-badge"]');
+      const unreadBadge2 = tabNode2.locator('[data-testid="unread-badge"]');
+      await expect(unreadBadge1).toBeVisible({ timeout: 5000 });
+      await expect(unreadBadge2).toBeVisible({ timeout: 5000 });
+
+      // 両方のバッジのサイズが同じであることを確認（三角形形状の一貫性）
+      const badge1Bounds = await unreadBadge1.boundingBox();
+      const badge2Bounds = await unreadBadge2.boundingBox();
+
+      expect(badge1Bounds).not.toBeNull();
+      expect(badge2Bounds).not.toBeNull();
+
+      if (badge1Bounds && badge2Bounds) {
+        // サイズが同じであること（1px以内の誤差を許容）
+        expect(Math.abs(badge1Bounds.width - badge2Bounds.width)).toBeLessThanOrEqual(1);
+        expect(Math.abs(badge1Bounds.height - badge2Bounds.height)).toBeLessThanOrEqual(1);
+      }
+
+      // 両方のバッジのCSSスタイルが一致することを確認
+      const badge1Styles = await unreadBadge1.evaluate((el) => {
+        const style = window.getComputedStyle(el);
+        return {
+          position: style.position,
+          left: style.left,
+          bottom: style.bottom,
+          borderStyle: style.borderStyle,
+        };
+      });
+      const badge2Styles = await unreadBadge2.evaluate((el) => {
+        const style = window.getComputedStyle(el);
+        return {
+          position: style.position,
+          left: style.left,
+          bottom: style.bottom,
+          borderStyle: style.borderStyle,
+        };
+      });
+
+      // CSSスタイルが一致すること
+      expect(badge1Styles.position).toBe(badge2Styles.position);
+      expect(badge1Styles.left).toBe(badge2Styles.left);
+      expect(badge1Styles.bottom).toBe(badge2Styles.bottom);
+      expect(badge1Styles.borderStyle).toBe(badge2Styles.borderStyle);
+
+      // クリーンアップ
+      await closeTab(extensionContext, bgTabId2);
+      await closeTab(extensionContext, bgTabId1);
     }
   );
 });

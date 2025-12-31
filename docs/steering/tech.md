@@ -205,6 +205,7 @@ await page.pause();  // Playwrightインスペクタが開きユーザーが閉�
 - **Path Alias `@/`**: `./src/`へのエイリアスで、深いネストでもインポートパスを簡潔に維持
 - **複数ウィンドウ対応**: TreeStateProviderでwindowIdを取得し、各ウィンドウで自身のタブのみをフィルタリング表示
 - **無彩色UIパレット**: Tailwind CSSの`gray`を`neutral`で上書きし、ダークブルーを排除した無彩色UIを実現
+- **DragSessionManager**: クロスウィンドウドラッグでService Workerを中継点として使用。ドラッグセッション情報（タブID、ウィンドウID、状態）を一元管理し、異なるウィンドウのSide Panel間でドラッグ状態を共有
 
 ---
 _Document standards and patterns, not every dependency_

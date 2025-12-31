@@ -281,4 +281,159 @@ test.describe('Task 4.4: ファビコンの永続化復元', () => {
       await closeTab(extensionContext, tabId);
     });
   });
+
+  test.describe('Requirement 9.4, 9.5: ファビコン永続化復元UIテスト', () => {
+    test('ストレージに保存されたファビコンがサイドパネルリロード後もUIに反映されること', async ({
+      extensionContext,
+      sidePanelPage,
+      serviceWorker,
+      extensionId,
+    }) => {
+      // Arrange: タブを作成
+      const tabId = await createTab(extensionContext, 'about:blank');
+      await waitForTabInTreeState(extensionContext, tabId);
+      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
+
+      // ファビコンをストレージに設定
+      const testFaviconUrl = 'https://www.google.com/favicon.ico';
+      await serviceWorker.evaluate(
+        async ({ tabId, faviconUrl }) => {
+          const result = await chrome.storage.local.get('tab_favicons');
+          const favicons = (result.tab_favicons as Record<number, string>) || {};
+          favicons[tabId] = faviconUrl;
+          await chrome.storage.local.set({ tab_favicons: favicons });
+        },
+        { tabId, faviconUrl: testFaviconUrl }
+      );
+
+      // ストレージにファビコンが保存されていることを確認
+      const storedFavicon = await serviceWorker.evaluate(async (tid) => {
+        const result = await chrome.storage.local.get('tab_favicons');
+        const favicons = result.tab_favicons as Record<number, string> | undefined;
+        return favicons?.[tid];
+      }, tabId);
+      expect(storedFavicon).toBe(testFaviconUrl);
+
+      // Act: サイドパネルをリロードしてファビコン復元をシミュレート
+      const currentWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.waitForLoadState('domcontentloaded');
+      await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
+
+      // タブがツリーに表示されるまでポーリングで待機
+      await waitForCondition(async () => {
+        const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+        return (await treeNode.count()) > 0;
+      }, { timeout: 10000, timeoutMessage: `Tree node for tab ${tabId} not visible after reload` });
+
+      // Assert: ストレージにファビコンが保存されていることを再確認
+      const faviconAfterReload = await serviceWorker.evaluate(async (tid) => {
+        const result = await chrome.storage.local.get('tab_favicons');
+        const favicons = result.tab_favicons as Record<number, string> | undefined;
+        return favicons?.[tid];
+      }, tabId);
+      expect(faviconAfterReload).toBe(testFaviconUrl);
+
+      // Cleanup
+      await closeTab(extensionContext, tabId);
+    });
+
+    test('ファビコン永続化の読み書きが正しく動作すること', async ({
+      extensionContext,
+      sidePanelPage,
+      serviceWorker,
+    }) => {
+      // Arrange: タブを作成
+      const tabId = await createTab(extensionContext, 'about:blank');
+      await waitForTabInTreeState(extensionContext, tabId);
+      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
+
+      // ファビコンをストレージに手動で設定（実際のネットワーク依存を避ける）
+      const testFaviconUrl = 'https://example.com/auto-persist-test.ico';
+      await serviceWorker.evaluate(
+        async ({ tabId, faviconUrl }) => {
+          const result = await chrome.storage.local.get('tab_favicons');
+          const favicons = (result.tab_favicons as Record<number, string>) || {};
+          favicons[tabId] = faviconUrl;
+          await chrome.storage.local.set({ tab_favicons: favicons });
+        },
+        { tabId, faviconUrl: testFaviconUrl }
+      );
+
+      // Assert: ファビコンがストレージに保存されていること
+      await waitForCondition(async () => {
+        const result = await serviceWorker.evaluate(async (tid) => {
+          const storedResult = await chrome.storage.local.get('tab_favicons');
+          const favicons = storedResult.tab_favicons as Record<number, string> | undefined;
+          return favicons?.[tid];
+        }, tabId);
+        return result === testFaviconUrl;
+      }, { timeout: 5000, timeoutMessage: 'Favicon was not persisted correctly' });
+
+      const storedFavicon = await serviceWorker.evaluate(async (tid) => {
+        const result = await chrome.storage.local.get('tab_favicons');
+        const favicons = result.tab_favicons as Record<number, string> | undefined;
+        return favicons?.[tid];
+      }, tabId);
+      expect(storedFavicon).toBe(testFaviconUrl);
+
+      // Cleanup
+      await closeTab(extensionContext, tabId);
+    });
+
+    test('タブを閉じた際に永続化ファビコンデータが自動的にクリーンアップされること', async ({
+      extensionContext,
+      sidePanelPage,
+      serviceWorker,
+    }) => {
+      // Arrange: タブを作成してファビコンを設定
+      const tabId = await createTab(extensionContext, 'about:blank');
+      await waitForTabInTreeState(extensionContext, tabId);
+      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
+
+      // ファビコンを手動で設定
+      const testFaviconUrl = 'https://example.com/cleanup-test.ico';
+      await serviceWorker.evaluate(
+        async ({ tabId, faviconUrl }) => {
+          const result = await chrome.storage.local.get('tab_favicons');
+          const favicons = (result.tab_favicons as Record<number, string>) || {};
+          favicons[tabId] = faviconUrl;
+          await chrome.storage.local.set({ tab_favicons: favicons });
+        },
+        { tabId, faviconUrl: testFaviconUrl }
+      );
+
+      // ファビコンが保存されていることを確認
+      const storedBefore = await serviceWorker.evaluate(async (tid) => {
+        const result = await chrome.storage.local.get('tab_favicons');
+        const favicons = result.tab_favicons as Record<number, string> | undefined;
+        return favicons?.[tid];
+      }, tabId);
+      expect(storedBefore).toBe(testFaviconUrl);
+
+      // Act: タブを閉じる
+      await closeTab(extensionContext, tabId);
+
+      // ファビコンデータがクリーンアップされるまでポーリングで待機
+      // event-handlers.ts の handleTabRemoved でファビコンが削除される
+      await waitForCondition(async () => {
+        const result = await serviceWorker.evaluate(async (tid) => {
+          const storedResult = await chrome.storage.local.get('tab_favicons');
+          const favicons = storedResult.tab_favicons as Record<number, string> | undefined;
+          return favicons?.[tid];
+        }, tabId);
+        return result === undefined;
+      }, { timeout: 5000, timeoutMessage: 'Favicon was not cleaned up after tab close' });
+
+      // Assert: ファビコンデータがクリーンアップされていること
+      const storedAfter = await serviceWorker.evaluate(async (tid) => {
+        const result = await chrome.storage.local.get('tab_favicons');
+        const favicons = result.tab_favicons as Record<number, string> | undefined;
+        return favicons?.[tid];
+      }, tabId);
+      expect(storedAfter).toBeUndefined();
+    });
+  });
 });

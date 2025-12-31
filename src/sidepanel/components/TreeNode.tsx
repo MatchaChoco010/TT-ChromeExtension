@@ -243,7 +243,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
         data-parent-group={node.groupId || ''}
-        className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer select-none ${
+        className={`relative flex items-center p-2 hover:bg-gray-100 cursor-pointer select-none ${
           isActive ? 'bg-gray-200' : ''
         }`}
         style={{ paddingLeft: `${indentSize}px` }}
@@ -252,6 +252,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onMouseLeave={handleMouseLeave}
         onContextMenu={handleRightClick}
       >
+        {/* Task 8.1: 未読インジケーター - 左下角の三角形切り欠き */}
+        <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} />
+
         {/* 展開/折りたたみトグルボタン */}
         {hasChildren && (
           <button
@@ -306,15 +309,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             )}
           </div>
 
-          {/* 右端固定コンテナ - 未読インジケータと閉じるボタン */}
-          {/* Task 11.1: 未読インジケーターをタブの右端に固定表示 */}
+          {/* 右端固定コンテナ - 閉じるボタン */}
           <div
             data-testid="right-actions-container"
             className="flex items-center flex-shrink-0 ml-2"
           >
-            {/* 未読インジケータ - タイトル長に関わらず右端に固定 */}
-            <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} />
-
             {/* 閉じるボタン (ホバー時のみ表示) - 常に右端に固定 */}
             {isHovered && <CloseButton onClose={handleCloseClick} />}
           </div>

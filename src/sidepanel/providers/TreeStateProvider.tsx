@@ -534,6 +534,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   // Task 12.1 (tab-tree-comprehensive-fix): chrome.tabs.onMovedでタブのインデックスを更新
   // ピン留めタブの並び替え同期に必要
   // Requirements: 12.1, 12.2, 12.3, 12.4
+  // Task 2.1 (tree-tab-bugfixes-and-ux-improvements): ツリー状態も再読み込みしてブラウザタブ順序と同期
+  // Requirements: 2.1, 2.2, 2.3
   useEffect(() => {
     const handleTabMoved = async (
       _tabId: number,
@@ -555,6 +557,11 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           }
           return newMap;
         });
+
+        // Task 2.1: ツリー状態を再読み込みしてブラウザタブ順序と同期
+        // ブラウザ側でタブが並び替えられた場合（タブバーでのドラッグ等）に
+        // ツリービューの表示を更新する
+        loadTreeState();
       } catch (_err) {
         // Failed to update tab indices silently
       }
@@ -565,7 +572,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return () => {
       chrome.tabs.onMoved.removeListener(handleTabMoved);
     };
-  }, []);
+  }, [loadTreeState]);
 
   useEffect(() => {
     // chrome.storage.onChanged をリッスン

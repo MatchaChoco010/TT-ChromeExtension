@@ -50,63 +50,6 @@ async function changeTabPositionSetting(
   await settingsPage.waitForTimeout(300);
 }
 
-/**
- * ツリー内でのタブの親子関係を確認するヘルパー関数
- */
-async function verifyParentChildRelationInUI(
-  sidePanelPage: Page,
-  childTabId: number,
-  parentTabId: number
-): Promise<boolean> {
-  // 親ノードを取得
-  const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-  const parentBox = await parentNode.boundingBox();
-
-  // 子ノードを取得
-  const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTabId}"]`);
-  const childBox = await childNode.boundingBox();
-
-  if (!parentBox || !childBox) {
-    return false;
-  }
-
-  // 子タブが親タブの下にあり、インデント（左からのオフセット）が親より大きいことを確認
-  return childBox.y > parentBox.y && childBox.x > parentBox.x;
-}
-
-/**
- * タブがツリーの最後にあることを確認するヘルパー関数
- */
-async function verifyTabAtTreeEnd(
-  sidePanelPage: Page,
-  tabId: number
-): Promise<boolean> {
-  const allNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
-  const nodeCount = await allNodes.count();
-
-  const targetNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-  const targetBox = await targetNode.boundingBox();
-
-  if (!targetBox) {
-    return false;
-  }
-
-  // 他のすべてのノードより下にあることを確認
-  for (let i = 0; i < nodeCount; i++) {
-    const node = allNodes.nth(i);
-    const testId = await node.getAttribute('data-testid');
-
-    if (testId === `tree-node-${tabId}`) continue;
-
-    const nodeBox = await node.boundingBox();
-    if (nodeBox && nodeBox.y > targetBox.y) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () => {
   test.describe('Requirement 17: タブ位置設定の各シナリオ検証', () => {
     // 注意: Chrome拡張機能のonCreatedイベントでは、openerTabIdが渡されない場合がある。
@@ -208,7 +151,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     test('手動で開かれたタブが「手動で開かれたタブの位置」設定に従って配置される（end設定）', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
       extensionId,
     }) => {
       // Arrange: 既存のタブを作成
@@ -254,85 +196,9 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
       );
     });
 
-    // 注意: 現在の実装では、手動タブで「child」設定を使用した場合に
-    // アクティブタブを親として設定するロジックが未実装のため、このテストはスキップ。
-    // 将来的に実装された際にテストを有効化する。
-    test.skip('手動タブ位置を「child」に設定すると現在のタブの子として配置される', async ({
-      extensionContext,
-      serviceWorker,
-      sidePanelPage,
-      extensionId,
-    }) => {
-      // Arrange: アクティブなタブを作成
-      const activeTabId = await createTab(extensionContext, 'https://example.com');
-      await waitForTabInTreeState(extensionContext, activeTabId);
-
-      // タブをアクティブにする
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { active: true });
-      }, activeTabId);
-
-      // 設定ページを開いて「手動で開かれたタブの位置」を「child」に設定
-      const settingsPage = await openSettingsPage(extensionContext, extensionId);
-      await changeTabPositionSetting(settingsPage, 'manual', 'child');
-      await settingsPage.close();
-
-      // アクティブタブを再度アクティブにする（設定ページを閉じた後）
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { active: true });
-      }, activeTabId);
-
-      // 少し待機
-      await sidePanelPage.waitForTimeout(200);
-
-      // Act: 新規タブボタンをクリック
-      const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
-      await expect(newTabButton).toBeVisible({ timeout: 5000 });
-      await newTabButton.click();
-
-      // 新しいタブのIDを取得
-      let newTabId: number | undefined;
-      await waitForCondition(
-        async () => {
-          const tabs = await serviceWorker.evaluate(async () => {
-            return chrome.tabs.query({ active: true });
-          });
-          newTabId = tabs[0]?.id;
-          return newTabId !== undefined && newTabId !== activeTabId;
-        },
-        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
-      );
-
-      expect(newTabId).toBeDefined();
-      await waitForTabInTreeState(extensionContext, newTabId!);
-
-      // Assert: 新しいタブがアクティブタブの子として配置されていることを確認
-      await waitForCondition(
-        async () => {
-          const result = await serviceWorker.evaluate(async (params) => {
-            interface TreeNode { parentId: string | null; }
-            interface TreeState { tabToNode: Record<number, string>; nodes: Record<string, TreeNode>; }
-            const storageResult = await chrome.storage.local.get('tree_state');
-            const treeState = storageResult.tree_state as TreeState | undefined;
-            if (!treeState) return false;
-
-            const childNodeId = treeState.tabToNode[params.newTabId];
-            const parentNodeId = treeState.tabToNode[params.activeTabId];
-            if (!childNodeId || !parentNodeId) return false;
-
-            const childNode = treeState.nodes[childNodeId];
-            return childNode?.parentId === parentNodeId;
-          }, { newTabId: newTabId!, activeTabId });
-          return result;
-        },
-        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not placed as child of active tab' }
-      );
-    });
-
     test('設定変更後に新しいタブが変更された設定に従って配置される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
       extensionId,
     }) => {
       // Arrange: 親となるタブを作成
@@ -381,7 +247,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     test('システムページ（chrome://）はopenerTabIdがあっても手動タブとして扱われる', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
       extensionId,
     }) => {
       // Arrange: 親となるタブを作成
@@ -435,7 +300,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     // このテストはVivaldiブラウザでのみ有効。Chromiumでは空URLまたはエラーページになる。
     // Chromiumでの検証は、URLが設定されようとしていることを確認するにとどめる。
     test('新規タブボタンで作成されたタブのURLがスタートページ関連である', async ({
-      extensionContext,
       serviceWorker,
       sidePanelPage,
     }) => {
@@ -476,16 +340,11 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
         };
       });
 
-      // Assert: pendingUrlまたはurlがVivaldiスタートページURLに設定されていることを確認
+      // Assert: pendingUrlまたはurlが設定されていることを確認
       // Chromiumではchrome://vivaldi-webui/startpageはサポートされていないため、
-      // pendingUrlにこのURLが設定されているか、またはタブが作成されたことを確認
-      // Requirement 12.1, 12.2
-      const hasVivaldiUrl =
-        tabInfo.pendingUrl?.includes('chrome://vivaldi-webui/startpage') ||
-        tabInfo.url?.includes('chrome://vivaldi-webui/startpage');
-
-      // Chromiumではサポートされていないため、タブが正常に作成されたことを確認するにとどめる
+      // タブが正常に作成されたことを確認するにとどめる
       // Vivaldiでは実際のスタートページが開かれる
+      // Requirement 12.1, 12.2
       expect(tabInfo.pendingUrl !== undefined || tabInfo.url !== undefined).toBe(true);
     });
 
@@ -549,7 +408,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     test('デフォルト設定で「リンククリックのタブの位置」は「子」、「手動で開かれたタブの位置」は「リストの最後」', async ({
       extensionContext,
       extensionId,
-      serviceWorker,
     }) => {
       // 設定ページを開く
       const settingsPage = await openSettingsPage(extensionContext, extensionId);

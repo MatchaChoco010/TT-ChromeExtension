@@ -50,48 +50,11 @@ test.describe('headlessモードの設定検証', () => {
   // タイムアウトを60秒に延長
   test.setTimeout(60000);
 
-  // Note: このテストは独自にブラウザコンテキストを起動するため、
-  // 他のテストと競合してService Workerの起動が遅延することがあります。
-  // CI環境での安定性のためスキップします。
-  test.skip('デフォルトでheadlessモードが有効であること', async () => {
-    // HEADED環境変数が設定されていないことを確認
-    expect(process.env.HEADED).toBeUndefined();
-
-    // 拡張機能のパス
-    const pathToExtension = path.join(__dirname, '../dist');
-
-    // headlessモードの判定ロジック
-    const headless = process.env.HEADED !== 'true';
-
-    // headlessがtrueであることを検証
-    expect(headless).toBe(true);
-
-    // ブラウザコンテキストを作成してheadlessモードを確認
-    const context = await chromium.launchPersistentContext('', {
-      headless,
-      args: [
-        headless ? '--headless=new' : '',
-        `--disable-extensions-except=${pathToExtension}`,
-        `--load-extension=${pathToExtension}`,
-      ].filter(Boolean),
-    });
-
-    // コンテキストが正常に作成されることを確認
-    expect(context).toBeDefined();
-
-    // Service Workerの起動を待機（拡張機能が正常にロードされたことを確認）
-    await waitForServiceWorkerReady(context);
-
-    // クリーンアップ
-    await context.close();
-  });
-
   test('HEADED=true環境変数でheadedモードに切り替わること', async () => {
-    // このテストは手動でHEADED=trueを設定して実行する必要があります
-    // CI環境ではスキップされます
+    // このテストはHEADED=trueでのみ実行可能（headedモード専用テスト）
     test.skip(
-      process.env.CI === 'true',
-      'CI環境ではheadedモードのテストはスキップされます'
+      process.env.HEADED !== 'true',
+      'このテストはHEADED=trueでのみ実行可能です'
     );
 
     // 拡張機能のパス

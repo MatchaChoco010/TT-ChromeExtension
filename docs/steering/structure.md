@@ -7,8 +7,12 @@
 ## Directory Patterns
 
 ### Background Logic (`/src/background/`)
-**Purpose**: Service Worker実行環境のコード（タブイベント処理、ツリー同期）
-**Example**: `service-worker.ts`, `event-handlers.ts`, `tree-sync.test.ts`
+**Purpose**: Service Worker実行環境のコード（タブイベント処理、ツリー同期、ウィンドウ間状態管理）
+**Key Components**:
+- `event-handlers.ts`: Chrome APIイベントハンドリング
+- `drag-session-manager.ts`: クロスウィンドウドラッグのセッション管理
+
+**Example**: `service-worker.ts`, `event-handlers.ts`, `drag-session-manager.ts`
 
 ### Side Panel UI (`/src/sidepanel/`)
 **Purpose**: Reactベースのユーザーインターフェース（メインのサイドパネル）

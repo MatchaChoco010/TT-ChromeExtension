@@ -12,6 +12,10 @@
  * - フォントファミリー変更
  * - カスタムCSS設定
  * - 設定の永続化
+ *
+ * Requirement 7: 設定タブの名前表示
+ * - 設定ページのタブタイトルに「設定」と表示される
+ * - 「新しいタブ」ではなく適切な名前が表示される
  */
 
 import { test, expect } from './fixtures/extension';
@@ -297,6 +301,51 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     // Task 9.1: 設定ボタンはサイドパネルから削除された（ポップアップメニューからアクセス）
     const openSettingsButton = sidePanelPage.locator('[data-testid="open-settings-button"]');
     await expect(openSettingsButton).not.toBeVisible();
+  });
+});
+
+/**
+ * Requirement 7: 設定タブの名前表示
+ * 設定ページのタブタイトルが適切に表示されることをテスト
+ */
+test.describe('設定タブの名前表示（Requirement 7）', () => {
+  test('設定ページのタブタイトルに「設定」が含まれる（要件7.1, 7.2）', async ({
+    extensionContext,
+    extensionId,
+  }) => {
+    // Arrange & Act: 設定ページを新規タブで開く
+    const settingsPage = await extensionContext.newPage();
+    await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
+    await settingsPage.waitForLoadState('domcontentloaded');
+
+    // Assert: タブタイトルが「設定」を含むことを確認（「新しいタブ」ではないこと）
+    const title = await settingsPage.title();
+    expect(title).toContain('設定');
+    expect(title).not.toBe('新しいタブ');
+
+    // クリーンアップ
+    await settingsPage.close();
+  });
+
+  test('設定ページのタブタイトルが「新しいタブ」ではない（要件7.2）', async ({
+    extensionContext,
+    extensionId,
+  }) => {
+    // Arrange & Act: 設定ページを開く
+    const settingsPage = await extensionContext.newPage();
+    await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
+    await settingsPage.waitForLoadState('domcontentloaded');
+
+    // Assert: タブタイトルが「新しいタブ」でないことを確認
+    await expect(async () => {
+      const title = await settingsPage.title();
+      expect(title).not.toBe('新しいタブ');
+      expect(title).not.toBe('New Tab');
+      expect(title.length).toBeGreaterThan(0);
+    }).toPass({ timeout: COMMON_TIMEOUTS.short });
+
+    // クリーンアップ
+    await settingsPage.close();
   });
 });
 

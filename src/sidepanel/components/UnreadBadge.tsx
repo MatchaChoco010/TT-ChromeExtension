@@ -5,8 +5,6 @@ interface UnreadBadgeProps {
   isUnread: boolean;
   /** 未読インジケータを表示するかどうか（設定による制御） */
   showIndicator: boolean;
-  /** 未読タブ数（オプション） */
-  count?: number;
   /** カスタムクラス名 */
   className?: string;
 }
@@ -14,13 +12,16 @@ interface UnreadBadgeProps {
 /**
  * UnreadBadge コンポーネント
  *
- * タブの未読状態を示すバッジを表示する
- * Requirements: 7.1, 7.3, 7.4
+ * タブの未読状態を示す三角形切り欠きインジケーターを表示する
+ * Requirements: 8.1, 8.2, 8.3
+ *
+ * - 左下角に小さな三角形の切り欠きとして表示
+ * - タブ要素に重なる形で配置
+ * - 既読状態への変化時に非表示化
  */
 const UnreadBadge: React.FC<UnreadBadgeProps> = ({
   isUnread,
   showIndicator,
-  count,
   className,
 }) => {
   // showIndicatorがfalseの場合、または未読でない場合は何も表示しない
@@ -28,38 +29,29 @@ const UnreadBadge: React.FC<UnreadBadgeProps> = ({
     return null;
   }
 
-  // カウント表示の処理
-  const displayCount =
-    count !== undefined && count > 0
-      ? count > 99
-        ? '99+'
-        : count.toString()
-      : null;
-
-  // aria-labelの生成
-  const ariaLabel = displayCount ? `Unread (${count})` : 'Unread';
-
-  // カウント表示がある場合は拡張スタイル、ない場合はドット
-  const defaultClassName = displayCount
-    ? 'ml-2 min-w-[20px] h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 px-1.5'
-    : 'ml-2 w-2 h-2 bg-blue-500 rounded-full flex-shrink-0';
+  // 三角形切り欠きスタイル（CSS border-based triangle technique）
+  // 左下角に配置される三角形
+  const triangleStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    // 右上を向いた三角形（左下角に配置）
+    // borderWidth: top right bottom left
+    borderWidth: '0 8px 8px 0',
+    borderColor: 'transparent transparent #3b82f6 transparent',
+  };
 
   return (
     <div
       data-testid="unread-badge"
-      className={className || defaultClassName}
-      aria-label={ariaLabel}
+      className={className}
+      style={triangleStyle}
+      aria-label="Unread"
       role="status"
-    >
-      {displayCount && (
-        <span
-          data-testid="unread-count"
-          className="text-xs font-semibold text-white leading-none"
-        >
-          {displayCount}
-        </span>
-      )}
-    </div>
+    />
   );
 };
 

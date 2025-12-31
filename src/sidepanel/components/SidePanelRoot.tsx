@@ -185,6 +185,30 @@ const TreeViewContent: React.FC = () => {
         rootNodes.push(node);
       }
     });
+
+    // Task 2.1 (tree-tab-bugfixes-and-ux-improvements): ブラウザタブのインデックス順でソート
+    // Requirements: 2.1, 2.2, 2.3 - ドラッグ&ドロップでタブを並び替えた際にツリービューも更新
+    // tabInfoMapのindexを使用してソートし、ブラウザタブの表示順序と同期させる
+    rootNodes.sort((a, b) => {
+      const indexA = tabInfoMap[a.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+      const indexB = tabInfoMap[b.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+      return indexA - indexB;
+    });
+
+    // 子ノードも再帰的にソート
+    const sortChildrenRecursively = (node: TabNode): void => {
+      if (node.children.length > 0) {
+        node.children.sort((a, b) => {
+          const indexA = tabInfoMap[a.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+          const indexB = tabInfoMap[b.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+          return indexA - indexB;
+        });
+        node.children.forEach(sortChildrenRecursively);
+      }
+    };
+
+    rootNodes.forEach(sortChildrenRecursively);
+
     return rootNodes;
   };
 
