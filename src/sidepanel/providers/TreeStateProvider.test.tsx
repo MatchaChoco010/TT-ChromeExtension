@@ -2143,9 +2143,10 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
 
     // ブラウザタブの順序が正しく同期されることを確認
-    // リスト末尾なのでindex=-1（末尾に移動）を使用すべき
+    // Task 13.1 (tree-stability-v2): aboveNode(node-3)のindex=2の後なのでindex=3
+    // サブツリー移動に対応するため、明示的なインデックスを使用
     await waitFor(() => {
-      expect(mockChrome.tabs.move).toHaveBeenCalledWith(1, { index: -1 });
+      expect(mockChrome.tabs.move).toHaveBeenCalledWith(1, { index: 3 });
     });
   });
 });

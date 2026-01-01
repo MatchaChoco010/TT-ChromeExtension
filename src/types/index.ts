@@ -256,17 +256,25 @@ export interface DragEndResult {
 }
 
 /**
- * Task 5.3: 兄弟ドロップ情報
+ * Task 5.3: 兄弟ドロップ情報（Gapドロップ専用）
  * Requirements: 8.1, 8.2, 8.3, 8.4
+ *
+ * タブ間の隙間へのドロップ情報を表現。
+ * タブ上へのドロップ（子として配置）はDropTargetType.Tab + onDragEndで別途処理。
+ *
+ * ドロップ位置の判定:
+ * - aboveNodeId === undefined: リスト先頭（最初のタブの上）
+ * - belowNodeId === undefined: リスト末尾（最後のタブの下）
+ * - 両方存在: タブ間の隙間
  */
 export interface SiblingDropInfo {
   /** ドラッグ中のノードID */
   activeNodeId: string;
   /** 挿入先のインデックス（gapIndex） */
   insertIndex: number;
-  /** 上のノードのID（存在しない場合はundefined） */
+  /** 上のノードのID（リスト先頭の場合はundefined） */
   aboveNodeId?: string;
-  /** 下のノードのID（存在しない場合はundefined） */
+  /** 下のノードのID（リスト末尾の場合はundefined） */
   belowNodeId?: string;
 }
 

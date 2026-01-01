@@ -163,18 +163,20 @@ const TreeViewContent: React.FC = () => {
     });
 
     // 親子関係を構築
-    Object.entries(treeState.nodes).forEach(([id, node]) => {
-      // 自分自身がピン留めタブの場合はスキップ
-      if (pinnedTabIdSet.has(node.tabId)) {
+    // Task 14.1 (tree-stability-v2): 元のchildren配列の順序を維持するため、
+    // Object.entriesではなく、各ノードのchildren配列を使用して親子関係を構築
+    Object.entries(treeState.nodes).forEach(([parentId, parentNode]) => {
+      // 親ノードがnodesWithChildrenに存在しない場合はスキップ
+      if (!nodesWithChildren[parentId]) {
         return;
       }
-      // Task 6.2: 現在のウィンドウに属さないタブはスキップ（フィルタリングが有効な場合のみ）
-      // Task 12.3 (tab-tree-bugfix): グループノード（tabId < 0）はフィルタリングから除外
-      if (shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId)) {
-        return;
-      }
-      if (node.parentId && nodesWithChildren[node.parentId]) {
-        nodesWithChildren[node.parentId].children.push(nodesWithChildren[id]);
+      // 元のchildren配列の順序で子ノードを追加
+      for (const child of parentNode.children) {
+        const childId = child.id;
+        // 子ノードがnodesWithChildrenに存在する場合のみ追加
+        if (nodesWithChildren[childId]) {
+          nodesWithChildren[parentId].children.push(nodesWithChildren[childId]);
+        }
       }
     });
 
@@ -195,19 +197,9 @@ const TreeViewContent: React.FC = () => {
       return indexA - indexB;
     });
 
-    // 子ノードも再帰的にソート
-    const sortChildrenRecursively = (node: TabNode): void => {
-      if (node.children.length > 0) {
-        node.children.sort((a, b) => {
-          const indexA = tabInfoMap[a.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
-          const indexB = tabInfoMap[b.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
-          return indexA - indexB;
-        });
-        node.children.forEach(sortChildrenRecursively);
-      }
-    };
-
-    rootNodes.forEach(sortChildrenRecursively);
+    // Task 14.1 (tree-stability-v2): 子ノードはchildren配列の順序を維持するため、
+    // ブラウザタブのインデックスでのソートは行わない
+    // （親子関係構築時に元のchildren配列の順序で追加しているため）
 
     return rootNodes;
   };

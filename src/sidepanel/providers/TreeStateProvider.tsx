@@ -100,14 +100,36 @@ function reconstructChildrenReferences(treeState: TreeState): TreeState {
     };
   });
 
-  // parentId に基づいて children 参照を再構築
-  Object.entries(treeState.nodes).forEach(([id, node]) => {
+  // Task 14.1 (tree-stability-v2): ストレージに保存されたchildren配列の順序を維持して再構築
+  // 2段階で処理: 1. 保存された順序で追加、2. parentIdで関連付けられているが未追加の子を追加
+  const addedChildIds = new Set<string>();
+
+  // 第1段階: 保存されたchildren配列の順序で子を追加
+  Object.entries(treeState.nodes).forEach(([parentId, parentNode]) => {
+    const parent = reconstructedNodes[parentId];
+    if (!parent) return;
+
+    // ストレージから読み込んだchildren配列の順序で子を追加
+    if (parentNode.children && Array.isArray(parentNode.children)) {
+      for (const storedChild of parentNode.children) {
+        if (!storedChild || typeof storedChild !== 'object') continue;
+        const childId = storedChild.id;
+        if (!childId) continue;
+        const child = reconstructedNodes[childId];
+        if (child && child.parentId === parentId) {
+          parent.children.push(child);
+          addedChildIds.add(childId);
+        }
+      }
+    }
+  });
+
+  // 第2段階: parentIdで関連付けられているが、まだ追加されていない子を追加（フォールバック）
+  Object.entries(reconstructedNodes).forEach(([id, node]) => {
+    if (addedChildIds.has(id)) return; // 既に追加済み
     if (node.parentId && reconstructedNodes[node.parentId]) {
       const parent = reconstructedNodes[node.parentId];
-      const child = reconstructedNodes[id];
-      if (child) {
-        parent.children.push(child);
-      }
+      parent.children.push(node);
     }
   });
 
@@ -140,6 +162,93 @@ function reconstructChildrenReferences(treeState: TreeState): TreeState {
     currentViewId,
     nodes: reconstructedNodes,
   };
+}
+
+/**
+ * Task 13.1 (tree-stability-v2): ツリーを深さ優先でフラット化
+ * 親子関係を維持したまま、深さ優先順序でタブIDのリストを返す
+ * ピン留めタブは除外する
+ * ルートノードはtabInfoMapのインデックスでソート（buildTreeと同じ順序）
+ */
+function flattenTreeDFS(
+  nodes: Record<string, TabNode>,
+  currentViewId: string,
+  pinnedTabIds: Set<number>,
+  tabInfoMap: Record<number, { index: number }>
+): number[] {
+  const result: number[] = [];
+
+  // ルートノード（parentId === null）を取得
+  const rootNodes = Object.values(nodes).filter(
+    (node) => node.parentId === null && node.viewId === currentViewId
+  );
+
+  // ルートノードをtabInfoMapのインデックスでソート（buildTreeと同じ順序）
+  rootNodes.sort((a, b) => {
+    const indexA = tabInfoMap[a.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+    const indexB = tabInfoMap[b.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+    return indexA - indexB;
+  });
+
+  // 深さ優先で走査
+  const traverse = (node: TabNode): void => {
+    // ピン留めタブは除外
+    if (!pinnedTabIds.has(node.tabId)) {
+      result.push(node.tabId);
+    }
+    // 子ノードを走査（children配列の順序を維持）
+    for (const child of node.children) {
+      traverse(child);
+    }
+  };
+
+  // ルートノードから開始
+  for (const root of rootNodes) {
+    traverse(root);
+  }
+
+  return result;
+}
+
+/**
+ * Task 13.1 (tree-stability-v2): ツリー構造をChromeタブインデックスに同期
+ * ツリーを深さ優先でフラット化し、各タブのChromeインデックスを更新
+ */
+async function syncTreeToChromeTabs(
+  nodes: Record<string, TabNode>,
+  currentViewId: string,
+  tabInfoMap: Record<number, { index: number; isPinned: boolean }>
+): Promise<void> {
+  // 正しくピン留めタブIDを取得
+  const pinnedSet = new Set<number>();
+  for (const [tabIdStr, info] of Object.entries(tabInfoMap)) {
+    if (info.isPinned) {
+      pinnedSet.add(parseInt(tabIdStr));
+    }
+  }
+
+  // ツリーを深さ優先でフラット化
+  const orderedTabIds = flattenTreeDFS(nodes, currentViewId, pinnedSet, tabInfoMap);
+
+  // ピン留めタブの数を取得（ピン留めタブはインデックス0から始まる）
+  const pinnedCount = pinnedSet.size;
+
+  // 各タブのChromeインデックスを更新
+  // ピン留めタブの後から開始するので、インデックスはpinnedCount + iとなる
+  for (let i = 0; i < orderedTabIds.length; i++) {
+    const tabId = orderedTabIds[i];
+    const expectedIndex = pinnedCount + i;
+    const currentInfo = tabInfoMap[tabId];
+
+    // 現在のインデックスと異なる場合のみ移動
+    if (currentInfo && currentInfo.index !== expectedIndex) {
+      try {
+        await chrome.tabs.move(tabId, { index: expectedIndex });
+      } catch {
+        // タブが存在しない場合などのエラーは無視
+      }
+    }
+  }
 }
 
 interface TreeStateProviderProps {
@@ -754,15 +863,39 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       // activeNodeを更新（新しい親の子として設定）
       const updatedActiveNode = updatedNodes[activeId];
 
+      // Task 14.1 (tree-stability-v2): 子を親の直上にドロップした場合、最後の子として配置
       updatedActiveNode.parentId = overId;
 
-      // 親子関係を再構築（更新後の parentId を基に）
-      Object.entries(updatedNodes).forEach(([id, node]) => {
-        if (node.parentId && updatedNodes[node.parentId]) {
-          const parent = updatedNodes[node.parentId];
-          const child = updatedNodes[id];
-          if (child && !parent.children.some(c => c.id === id)) {
-            parent.children.push(child);
+      // 親子関係を再構築
+      // Task 14.1 (tree-stability-v2): 元のchildren配列の順序を維持しながら再構築
+      Object.entries(treeState.nodes).forEach(([parentId, originalNode]) => {
+        const parent = updatedNodes[parentId];
+        if (!parent) return;
+
+        // 対象の親（overId）の場合は特別処理
+        // activeNodeを除いた子リストを構築し、最後にactiveNodeを追加
+        if (parentId === overId) {
+          for (const originalChild of originalNode.children) {
+            const childId = originalChild.id;
+            const child = updatedNodes[childId];
+            if (child && child.parentId === parentId && childId !== activeId) {
+              parent.children.push(child);
+            }
+          }
+          // activeNodeを最後に追加
+          const activeChild = updatedNodes[activeId];
+          if (activeChild && activeChild.parentId === overId) {
+            parent.children.push(activeChild);
+          }
+        } else {
+          // 他の親の場合: 元のchildren配列の順序を維持
+          for (const originalChild of originalNode.children) {
+            const childId = originalChild.id;
+            const child = updatedNodes[childId];
+            // activeNodeが他の親から移動している場合は除外
+            if (child && child.parentId === parentId) {
+              parent.children.push(child);
+            }
           }
         }
       });
@@ -803,12 +936,20 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
       await updateTreeState(newTreeState);
 
+      // Task 13.1 (tree-stability-v2): ツリー構造をChromeタブインデックスに同期
+      // 親子関係を深さ優先でフラット化した順序でChromeタブを並び替える
+      try {
+        await syncTreeToChromeTabs(updatedNodes, treeState.currentViewId, tabInfoMap);
+      } catch {
+        // 同期に失敗してもツリー状態の更新は維持する
+      }
+
       // Note: We don't send UPDATE_TREE message because:
       // 1. TreeStateProvider directly updates storage
       // 2. Service worker's TreeStateManager will reload from storage when needed
       // 3. Sending UPDATE_TREE would cause duplicate updates and potential race conditions
     },
-    [treeState, updateTreeState]
+    [treeState, updateTreeState, tabInfoMap]
   );
 
   /**
@@ -924,33 +1065,50 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
       await updateTreeState(newTreeState);
 
-      // Task 7.3 (tab-tree-bugfix-2): ブラウザタブの順序をツリー構造と同期
-      // Requirements: 2.1, 2.2, 2.3 - ドロップ位置に対応した正しいインデックスにタブを移動
-      // insertIndexはツリー内のインデックスであり、ブラウザタブのインデックスとは異なる
-      // belowNodeIdのタブのインデックスを使用するか、リスト末尾の場合は-1を使用
+      // Task 13.1 (tree-stability-v2): ドロップ位置からChromeタブインデックスを計算して移動
+      // サブツリー（子タブを含む）を移動する場合、深さ優先順でサブツリー全体を移動
       try {
-        let browserTabIndex: number;
-
-        if (belowNodeId && treeState.nodes[belowNodeId]) {
-          // 下のノードが存在する場合、下のノードのタブのインデックスを取得
-          const belowNode = treeState.nodes[belowNodeId];
+        // ドロップ位置からターゲットChromeインデックスを計算
+        let targetChromeIndex: number;
+        if (belowNodeId && updatedNodes[belowNodeId]) {
+          // belowNodeの位置に挿入（belowNodeの前に配置）
+          const belowNode = updatedNodes[belowNodeId];
           const belowTabInfo = tabInfoMap[belowNode.tabId];
-          if (belowTabInfo) {
-            browserTabIndex = belowTabInfo.index;
-          } else {
-            // tabInfoMapにない場合はchrome.tabs.getでインデックスを取得
-            const tab = await chrome.tabs.get(belowNode.tabId);
-            browserTabIndex = tab.index;
-          }
+          targetChromeIndex = belowTabInfo?.index ?? 0;
+        } else if (aboveNodeId && updatedNodes[aboveNodeId]) {
+          // aboveNodeの後に挿入（リスト末尾）
+          const aboveNode = updatedNodes[aboveNodeId];
+          const aboveTabInfo = tabInfoMap[aboveNode.tabId];
+          targetChromeIndex = (aboveTabInfo?.index ?? 0) + 1;
         } else {
-          // リスト末尾にドロップした場合は-1（末尾に移動）
-          browserTabIndex = -1;
+          // 位置情報がない場合は現在位置を維持
+          targetChromeIndex = tabInfoMap[activeNode.tabId]?.index ?? 0;
         }
 
-        await chrome.tabs.move(activeNode.tabId, { index: browserTabIndex });
-      } catch (_err) {
-        // タブ移動に失敗してもツリー状態の更新は維持する
-        // タブが既に存在しない場合などに発生する可能性がある
+        // サブツリー内のタブIDを深さ優先で収集
+        const collectSubtreeTabIds = (node: TabNode): number[] => {
+          const result: number[] = [node.tabId];
+          for (const child of node.children) {
+            result.push(...collectSubtreeTabIds(child));
+          }
+          return result;
+        };
+        const subtreeTabIds = collectSubtreeTabIds(updatedNodes[activeNodeId]);
+
+        // サブツリー内のタブを順番に移動（深さ優先順で連続配置）
+        for (let i = 0; i < subtreeTabIds.length; i++) {
+          const tabId = subtreeTabIds[i];
+          const currentInfo = tabInfoMap[tabId];
+          if (!currentInfo?.isPinned) {
+            try {
+              await chrome.tabs.move(tabId, { index: targetChromeIndex + i });
+            } catch {
+              // タブが存在しない場合などのエラーは無視
+            }
+          }
+        }
+      } catch {
+        // 同期に失敗してもツリー状態の更新は維持する
       }
     },
     [treeState, updateTreeState, tabInfoMap]

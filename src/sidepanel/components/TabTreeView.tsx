@@ -1190,7 +1190,17 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       return null;
     }
     const gapIndex = dropTarget.gapIndex ?? 0;
-    const tabPositions = tabPositionsRef.current;
+
+    // Task 5.2: ドラッグ中のノードとそのサブツリーを除外
+    // calculateDropTargetと同じロジックでeffectiveTabPositionsを計算し、
+    // gapIndexとY座標の対応を一致させる
+    let tabPositions = tabPositionsRef.current;
+    if (dragState.draggedItemId) {
+      const subtreeIds = getSubtreeNodeIds(dragState.draggedItemId);
+      const subtreeSet = new Set(subtreeIds);
+      tabPositions = tabPositions.filter(pos => !subtreeSet.has(pos.nodeId));
+    }
+
     // gapIndexからY位置を計算
     const topY = calculateIndicatorY(gapIndex, tabPositions);
     return {
@@ -1198,7 +1208,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       depth: dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0,
       topY,
     };
-  }, [dropTarget]);
+  }, [dropTarget, dragState.draggedItemId, getSubtreeNodeIds]);
 
   // Task 4.5: ドラッグ中の横スクロール防止
   // isDraggingがtrueの間はoverflow-x: hiddenを適用

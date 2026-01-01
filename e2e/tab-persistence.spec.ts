@@ -203,49 +203,40 @@ test.describe('Task 2.4: Tab Persistence', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // 1. タブを作成
+      // 1. about:blankタブを作成（タイトルは空）
       const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'https://example.com', active: true });
+        return chrome.tabs.create({ url: 'about:blank', active: true });
       });
       await waitForTabInTreeState(extensionContext, tab.id!);
 
-      // 2. 最初のタイトルが永続化されるまで待機
-      await waitForCondition(
-        async () => {
-          const storedTitle = await serviceWorker.evaluate(async (tabId) => {
-            const result = await chrome.storage.local.get('tab_titles');
-            const titles = result.tab_titles as Record<number, string> | undefined;
-            return titles?.[tabId];
-          }, tab.id!);
-          return storedTitle !== undefined && storedTitle !== '';
-        },
-        { timeout: 10000, interval: 100 }
-      );
-
-      const initialTitle = await serviceWorker.evaluate(async (tabId) => {
-        const result = await chrome.storage.local.get('tab_titles');
-        const titles = result.tab_titles as Record<number, string> | undefined;
-        return titles?.[tabId];
-      }, tab.id!);
+      // 2. 少し待機してから別のページに遷移
+      // about:blankはタイトルが空なので、example.comに遷移すれば確実にタイトルが変わる
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // 3. 別のページに遷移
       await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { url: 'https://example.org' });
+        await chrome.tabs.update(tabId, { url: 'https://example.com' });
       }, tab.id!);
 
-      // 4. タイトルが更新されるまで待機
+      // 4. ページ読み込みとタイトル取得を待機
       await waitForCondition(
         async () => {
           const tabInfo = await serviceWorker.evaluate(async (tabId) => {
             const t = await chrome.tabs.get(tabId);
-            return { title: t.title, url: t.url };
+            return { title: t.title, url: t.url, status: t.status };
           }, tab.id!);
-          return tabInfo.url?.includes('example.org') === true;
+          return (
+            tabInfo.url?.includes('example.com') === true &&
+            tabInfo.status === 'complete' &&
+            tabInfo.title !== undefined &&
+            tabInfo.title !== '' &&
+            tabInfo.title !== 'about:blank'
+          );
         },
         { timeout: 10000, interval: 200 }
       );
 
-      // 5. 新しいタイトルが永続化されるまで待機
+      // 5. 新しいタイトル（Example Domain）が永続化されるまで待機
       await waitForCondition(
         async () => {
           const storedTitle = await serviceWorker.evaluate(async (tabId) => {
@@ -253,10 +244,14 @@ test.describe('Task 2.4: Tab Persistence', () => {
             const titles = result.tab_titles as Record<number, string> | undefined;
             return titles?.[tabId];
           }, tab.id!);
-          // タイトルが変更されたことを確認
-          return storedTitle !== undefined && storedTitle !== initialTitle;
+          // タイトルが永続化されていることを確認（空や about:blank ではない）
+          return (
+            storedTitle !== undefined &&
+            storedTitle !== '' &&
+            storedTitle !== 'about:blank'
+          );
         },
-        { timeout: 5000, interval: 100, timeoutMessage: 'Title was not updated after navigation' }
+        { timeout: 5000, interval: 100, timeoutMessage: 'Title was not persisted after navigation' }
       );
 
       // クリーンアップ
