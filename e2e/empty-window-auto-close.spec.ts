@@ -865,4 +865,187 @@ test.describe('Empty Window Auto Close', () => {
       expect(tabAfterMove).toBeDefined();
     });
   });
+
+  test.describe('Requirement 6.2: Keep window open when only pinned tabs remain', () => {
+    test('should NOT close window when only pinned tabs remain after normal tabs are moved', async ({
+      extensionContext,
+      serviceWorker,
+      sidePanelPage,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create a new window
+      const sourceWindowId = await createWindow(extensionContext);
+      expect(sourceWindowId).toBeGreaterThan(0);
+      expect(sourceWindowId).not.toBe(originalWindowId);
+
+      // Get default tab in source window (this will be our normal tab to move)
+      const defaultTabs = await serviceWorker.evaluate(
+        ({ windowId }) => chrome.tabs.query({ windowId }),
+        { windowId: sourceWindowId }
+      );
+      expect(defaultTabs.length).toBeGreaterThan(0);
+
+      const normalTabToMove = defaultTabs[0].id as number;
+      await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.update(tabId, { url: 'https://example.com/normal' }),
+        { tabId: normalTabToMove }
+      );
+
+      // Create a pinned tab in source window
+      const pinnedTabId = await createTab(extensionContext, 'https://example.com/pinned', { windowId: sourceWindowId });
+      expect(pinnedTabId).toBeGreaterThan(0);
+
+      // Pin the tab
+      await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.update(tabId, { pinned: true }),
+        { tabId: pinnedTabId }
+      );
+
+      // Wait for tabs to appear in tree state
+      await waitForTabInTreeState(extensionContext, normalTabToMove);
+      await waitForTabInTreeState(extensionContext, pinnedTabId);
+
+      // Verify two tabs in source window (1 pinned, 1 normal)
+      await waitForCondition(async () => {
+        const tabs = await serviceWorker.evaluate(
+          ({ windowId }) => chrome.tabs.query({ windowId }),
+          { windowId: sourceWindowId }
+        );
+        const pinnedTabs = tabs.filter((t: chrome.tabs.Tab) => t.pinned);
+        const normalTabs = tabs.filter((t: chrome.tabs.Tab) => !t.pinned);
+        return pinnedTabs.length === 1 && normalTabs.length === 1;
+      }, { timeout: 5000 });
+
+      // Move the normal tab to original window using CREATE_WINDOW_WITH_SUBTREE
+      // This should leave only the pinned tab in source window
+      const result = await sidePanelPage.evaluate(
+        async ({ tabId, sourceWindowId }) => {
+          return new Promise<{ success: boolean; error?: string }>((resolve) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'CREATE_WINDOW_WITH_SUBTREE',
+                payload: { tabId, sourceWindowId },
+              },
+              (response: { success: boolean; error?: string }) => resolve(response)
+            );
+          });
+        },
+        { tabId: normalTabToMove, sourceWindowId }
+      );
+
+      expect(result.success).toBe(true);
+
+      // Wait a bit to ensure any auto-close would have happened
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Verify source window STILL exists (because pinned tab remains)
+      const windowsAfter = await serviceWorker.evaluate(() => {
+        return chrome.windows.getAll();
+      });
+      const sourceWindowStillExists = windowsAfter.some((w: chrome.windows.Window) => w.id === sourceWindowId);
+      expect(sourceWindowStillExists).toBe(true);
+
+      // Verify pinned tab is still in source window
+      const pinnedTabInfo = await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.get(tabId),
+        { tabId: pinnedTabId }
+      );
+      expect(pinnedTabInfo.windowId).toBe(sourceWindowId);
+      expect(pinnedTabInfo.pinned).toBe(true);
+
+      // Verify normal tab was moved
+      const normalTabInfo = await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.get(tabId),
+        { tabId: normalTabToMove }
+      );
+      expect(normalTabInfo.windowId).not.toBe(sourceWindowId);
+    });
+
+    test('should NOT close window when only pinned tabs remain after normal tabs are closed', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // Get original window ID
+      const originalWindow = await serviceWorker.evaluate(() => {
+        return chrome.windows.getCurrent();
+      });
+      const originalWindowId = originalWindow.id as number;
+
+      // Create a new window
+      const sourceWindowId = await createWindow(extensionContext);
+      expect(sourceWindowId).toBeGreaterThan(0);
+      expect(sourceWindowId).not.toBe(originalWindowId);
+
+      // Get default tab in source window (this will be our normal tab to close)
+      const defaultTabs = await serviceWorker.evaluate(
+        ({ windowId }) => chrome.tabs.query({ windowId }),
+        { windowId: sourceWindowId }
+      );
+      expect(defaultTabs.length).toBeGreaterThan(0);
+
+      const normalTabToClose = defaultTabs[0].id as number;
+
+      // Create a pinned tab in source window
+      const pinnedTabId = await createTab(extensionContext, 'https://example.com/pinned', { windowId: sourceWindowId });
+      expect(pinnedTabId).toBeGreaterThan(0);
+
+      // Pin the tab
+      await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.update(tabId, { pinned: true }),
+        { tabId: pinnedTabId }
+      );
+
+      // Wait for tabs to appear in tree state
+      await waitForTabInTreeState(extensionContext, normalTabToClose);
+      await waitForTabInTreeState(extensionContext, pinnedTabId);
+
+      // Verify two tabs in source window (1 pinned, 1 normal)
+      await waitForCondition(async () => {
+        const tabs = await serviceWorker.evaluate(
+          ({ windowId }) => chrome.tabs.query({ windowId }),
+          { windowId: sourceWindowId }
+        );
+        const pinnedTabs = tabs.filter((t: chrome.tabs.Tab) => t.pinned);
+        const normalTabs = tabs.filter((t: chrome.tabs.Tab) => !t.pinned);
+        return pinnedTabs.length === 1 && normalTabs.length === 1;
+      }, { timeout: 5000 });
+
+      // Close the normal tab (this should leave only the pinned tab)
+      await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.remove(tabId),
+        { tabId: normalTabToClose }
+      );
+
+      // Wait a bit to ensure any auto-close would have happened
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Verify source window STILL exists (because pinned tab remains)
+      const windowsAfter = await serviceWorker.evaluate(() => {
+        return chrome.windows.getAll();
+      });
+      const sourceWindowStillExists = windowsAfter.some((w: chrome.windows.Window) => w.id === sourceWindowId);
+      expect(sourceWindowStillExists).toBe(true);
+
+      // Verify pinned tab is still in source window
+      const pinnedTabInfo = await serviceWorker.evaluate(
+        ({ tabId }) => chrome.tabs.get(tabId),
+        { tabId: pinnedTabId }
+      );
+      expect(pinnedTabInfo.windowId).toBe(sourceWindowId);
+      expect(pinnedTabInfo.pinned).toBe(true);
+
+      // Verify only pinned tab remains
+      const remainingTabs = await serviceWorker.evaluate(
+        ({ windowId }) => chrome.tabs.query({ windowId }),
+        { windowId: sourceWindowId }
+      );
+      expect(remainingTabs.length).toBe(1);
+      expect(remainingTabs[0].pinned).toBe(true);
+    });
+  });
 });

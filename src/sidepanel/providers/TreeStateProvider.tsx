@@ -1311,8 +1311,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   /**
    * Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ開始
+   * Task 5.2 (tree-stability-v2): DragSessionManagerを使用するように修正
    * Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
-   * ドラッグ開始時にService Workerにドラッグ状態を設定
+   * ドラッグ開始時にService WorkerにDragSessionを開始
    */
   const handleCrossWindowDragStart = useCallback(async (tabId: number, treeData: TabNode[]) => {
     if (currentWindowId === null) return;
@@ -1320,11 +1321,11 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return new Promise<void>((resolve) => {
       chrome.runtime.sendMessage(
         {
-          type: 'SET_DRAG_STATE',
+          type: 'START_DRAG_SESSION',
           payload: {
             tabId,
+            windowId: currentWindowId,
             treeData,
-            sourceWindowId: currentWindowId,
           },
         },
         () => {
@@ -1336,6 +1337,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   /**
    * Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドロップ処理
+   * Task 5.2 (tree-stability-v2): DragSessionManagerを使用するように修正
    * Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
    * ドロップ時に別ウィンドウからのドラッグかどうかを確認し、タブを移動
    * @returns true if cross-window drop was handled, false otherwise
@@ -1345,17 +1347,17 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
     return new Promise<boolean>((resolve) => {
       chrome.runtime.sendMessage(
-        { type: 'GET_DRAG_STATE' },
-        (response: { success: boolean; data: { tabId: number; sourceWindowId: number } | null }) => {
+        { type: 'GET_DRAG_SESSION' },
+        (response: { success: boolean; data: { tabId: number; sourceWindowId: number; state: string } | null }) => {
           if (!response.success || !response.data) {
             resolve(false);
             return;
           }
 
-          const dragState = response.data;
+          const dragSession = response.data;
 
           // 同じウィンドウからのドラッグは通常のドラッグとして処理
-          if (dragState.sourceWindowId === currentWindowId) {
+          if (dragSession.sourceWindowId === currentWindowId) {
             resolve(false);
             return;
           }
@@ -1364,11 +1366,11 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           chrome.runtime.sendMessage(
             {
               type: 'MOVE_TAB_TO_WINDOW',
-              payload: { tabId: dragState.tabId, windowId: currentWindowId },
+              payload: { tabId: dragSession.tabId, windowId: currentWindowId },
             },
             () => {
-              // ドラッグ状態をクリア
-              chrome.runtime.sendMessage({ type: 'CLEAR_DRAG_STATE' }, () => {
+              // ドラッグセッションを終了
+              chrome.runtime.sendMessage({ type: 'END_DRAG_SESSION', payload: { reason: 'COMPLETED' } }, () => {
                 resolve(true);
               });
             }
@@ -1380,11 +1382,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   /**
    * Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ状態をクリア
-   * ドラッグ終了時にService Workerのドラッグ状態をクリア
+   * Task 5.2 (tree-stability-v2): DragSessionManagerを使用するように修正
+   * ドラッグ終了時にService WorkerのDragSessionを終了
    */
   const clearCrossWindowDragState = useCallback(async () => {
     return new Promise<void>((resolve) => {
-      chrome.runtime.sendMessage({ type: 'CLEAR_DRAG_STATE' }, () => {
+      chrome.runtime.sendMessage({ type: 'END_DRAG_SESSION', payload: { reason: 'CANCELLED' } }, () => {
         resolve();
       });
     });

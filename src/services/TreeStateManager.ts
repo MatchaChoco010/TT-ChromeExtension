@@ -45,11 +45,13 @@ export class TreeStateManager {
    * @param tab - Chrome タブオブジェクト
    * @param parentId - 親ノードID（nullの場合はルートノード）
    * @param viewId - ビューID
+   * @param insertAfterNodeId - このノードの直後に挿入（兄弟配置時に使用、複製タブ用）
    */
   async addTab(
     tab: chrome.tabs.Tab,
     parentId: string | null,
     viewId: string,
+    insertAfterNodeId?: string,
   ): Promise<void> {
     if (!tab.id) {
       throw new Error('Tab ID is required');
@@ -76,15 +78,38 @@ export class TreeStateManager {
     this.expandedNodes.add(nodeId);
 
     // ビューに追加
+    // Task 11.1: ルートレベルでも特定のノードの直後に挿入（複製タブ用）
     const viewNodes = this.views.get(viewId) || [];
-    viewNodes.push(nodeId);
+    if (!parentId && insertAfterNodeId) {
+      // ルートレベルで挿入位置を指定された場合
+      const insertAfterIndex = viewNodes.indexOf(insertAfterNodeId);
+      if (insertAfterIndex !== -1) {
+        viewNodes.splice(insertAfterIndex + 1, 0, nodeId);
+      } else {
+        viewNodes.push(nodeId);
+      }
+    } else {
+      viewNodes.push(nodeId);
+    }
     this.views.set(viewId, viewNodes);
 
     // 親ノードに子として追加
     if (parentId) {
       const parentNode = this.nodes.get(parentId);
       if (parentNode) {
-        parentNode.children.push(newNode);
+        // Task 11.1: 特定のノードの直後に挿入（複製タブ用）
+        if (insertAfterNodeId) {
+          const insertAfterIndex = parentNode.children.findIndex(
+            (child) => child.id === insertAfterNodeId
+          );
+          if (insertAfterIndex !== -1) {
+            parentNode.children.splice(insertAfterIndex + 1, 0, newNode);
+          } else {
+            parentNode.children.push(newNode);
+          }
+        } else {
+          parentNode.children.push(newNode);
+        }
       }
     }
 

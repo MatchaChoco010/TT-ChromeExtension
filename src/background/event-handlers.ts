@@ -184,19 +184,32 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     // Task 3.1: システムページの場合は、effectiveOpenerTabIdがあっても親タブとしては扱わない
     // isLinkClick を使用して親タブを決定する（システムページはリンククリックとして扱わない）
-    // Task 4.2: 複製されたタブの場合は、元のタブの親を引き継いで兄弟として配置
+    // Task 4.2, 11.1: 複製されたタブの場合は、元のタブの親を引き継いで兄弟として配置
+    // Task 11.1: 複製元タブの直後（1個下）に配置
+    let insertAfterNodeId: string | undefined;
     if (isDuplicatedTab && effectiveOpenerTabId) {
       // Requirement 16.1, 16.2, 16.3: 複製タブは元のタブの兄弟として配置
+      // Requirement 11.1, 11.2: 複製タブを複製元タブの1個下の位置に表示
       // 元のタブの親IDを取得して、同じ親の下に配置
       const openerNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (openerNode) {
         parentId = openerNode.parentId;
+        insertAfterNodeId = openerNode.id;
       }
     } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'child') {
       // Find parent node by openerTabId
       const parentNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (parentNode) {
         parentId = parentNode.id;
+      }
+    } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'sibling') {
+      // Task 12 (tree-stability-v2): 「兄弟として配置」設定
+      // Requirement 12.2: リンクから開いたタブをopenerタブの兄弟として配置
+      // openerタブの親と同じ親を持つことで兄弟関係になる
+      const openerNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
+      if (openerNode) {
+        parentId = openerNode.parentId; // openerタブと同じ親を持つ
+        insertAfterNodeId = openerNode.id; // openerタブの直後に配置
       }
     }
 
@@ -208,8 +221,20 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     // Requirement 15.1: 現在アクティブなビューIDを取得し、新しいタブをそのビューに追加
     const currentViewId = await getCurrentViewId();
 
+    // Task 12 (tree-stability-v2): 「リストの最後」設定の場合、タブをブラウザタブバーの末尾に移動
+    // Requirement 12.1: リンクから開いたタブを設定に従ってリストの最後に配置
+    // UIではブラウザタブのインデックス順で表示されるため、タブを物理的に移動する必要がある
+    if (newTabPosition === 'end' && tab.windowId !== undefined) {
+      try {
+        await chrome.tabs.move(tab.id, { index: -1 }); // -1 = 末尾に移動
+      } catch (_moveError) {
+        // タブ移動に失敗してもツリーへの追加は続行
+      }
+    }
+
     // Add tab to tree
-    await treeStateManager.addTab(tab, parentId, currentViewId);
+    // Task 11.1: 複製タブの場合はinsertAfterNodeIdを渡して複製元の直後に配置
+    await treeStateManager.addTab(tab, parentId, currentViewId, insertAfterNodeId);
 
     // Task 9.1 (comprehensive-bugfix): 親タブの自動展開
     // Requirement 10.1, 10.2: 新規タブ作成時に親タブが折りたたまれている場合は展開する
