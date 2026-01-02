@@ -71,11 +71,28 @@ export type StorageChanges = {
   [key: string]: { oldValue: unknown; newValue: unknown };
 };
 
+/**
+ * ツリー構造エントリ
+ * タブの順序とURLを使って、ブラウザ再起動後の親子関係復元に使用
+ */
+export interface TreeStructureEntry {
+  url: string;              // タブのURL
+  parentIndex: number | null; // 親エントリのインデックス（nullはルート）
+  index: number;            // Chromeタブのインデックス（タブバーでの位置）
+  viewId: string;           // ビューID
+  isExpanded: boolean;      // 展開状態
+}
+
 export interface TreeState {
   views: View[];
   currentViewId: string;
   nodes: Record<string, TabNode>;
   tabToNode: Record<number, string>;
+  /**
+   * ツリー構造（順序付き）
+   * ブラウザ再起動時にタブIDが変わっても親子関係を復元するために使用
+   */
+  treeStructure?: TreeStructureEntry[];
 }
 
 /** タブタイトルマップ (tabId -> title) */

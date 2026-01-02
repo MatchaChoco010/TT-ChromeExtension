@@ -1,4 +1,4 @@
-import type { TabNode, TreeState, IStorageService } from '@/types';
+import type { TabNode, TreeState, TreeStructureEntry, IStorageService } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
 /**
@@ -337,6 +337,7 @@ export class TreeStateManager {
 
   /**
    * chrome.tabs APIと同期
+   * ブラウザ再起動時はtreeStructureから親子関係を復元
    */
   async syncWithChromeTabs(): Promise<void> {
     try {
@@ -346,51 +347,203 @@ export class TreeStateManager {
       // Must match TreeStateProvider's default currentViewId
       const defaultViewId = 'default';
 
-      // タブをopenerTabIdの依存関係順にソート（親が先、子が後）
-      // これにより、親タブが必ず子タブより先にTreeに追加される
-      const tabsMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
-      const processedTabs = new Set<number>();
-      const orderedTabs: chrome.tabs.Tab[] = [];
+      // ストレージからtreeStructureを取得
+      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+      const treeStructure = state?.treeStructure;
 
-      const addTabAndChildren = (tab: chrome.tabs.Tab) => {
-        if (!tab.id || processedTabs.has(tab.id)) return;
-
-        // 親がいる場合は、親を先に処理
-        if (tab.openerTabId && tabsMap.has(tab.openerTabId)) {
-          addTabAndChildren(tabsMap.get(tab.openerTabId)!);
-        }
-
-        processedTabs.add(tab.id);
-        orderedTabs.push(tab);
-      };
-
-      // すべてのタブを依存関係順に処理
-      for (const tab of tabs) {
-        if (tab.id) {
-          addTabAndChildren(tab);
-        }
-      }
-
-      // 依存関係順に追加
-      for (const tab of orderedTabs) {
-        if (!tab.id) continue;
-
-        // 既存のノードがない場合のみ追加
-        const existingNode = this.getNodeByTabId(tab.id);
-        if (!existingNode) {
-          // openerTabIdから親を特定
-          const parentNode = tab.openerTabId
-            ? this.getNodeByTabId(tab.openerTabId)
-            : null;
-
-          await this.addTab(tab, parentNode?.id || null, defaultViewId);
-        }
+      // treeStructureがある場合は、それを使って親子関係を復元
+      if (treeStructure && treeStructure.length > 0) {
+        await this.restoreFromTreeStructure(tabs, treeStructure, defaultViewId);
+      } else {
+        // treeStructureがない場合は、従来のopenerTabIdベースの復元
+        await this.syncWithOpenerTabId(tabs, defaultViewId);
       }
 
       // ストレージに永続化
       await this.persistState();
     } catch (_error) {
       // Error syncing with Chrome tabs silently
+    }
+  }
+
+  /**
+   * treeStructureから親子関係を復元
+   * タブのインデックスとURLを使って照合
+   *
+   * 2パス処理：
+   * 1. すべてのタブをルートノードとして追加
+   * 2. 親子関係を設定
+   */
+  private async restoreFromTreeStructure(
+    tabs: chrome.tabs.Tab[],
+    treeStructure: TreeStructureEntry[],
+    defaultViewId: string,
+  ): Promise<void> {
+    // タブをインデックスでソート
+    const sortedTabs = [...tabs].filter(t => t.id).sort((a, b) => a.index - b.index);
+
+    // treeStructureエントリとタブのマッチング
+    // インデックスが同じでURLも一致する場合にマッチ
+    // URLが変わっている場合もインデックスが近ければマッチ
+
+    // まず、treeStructureのインデックスから新しいタブIDへのマッピングを作成
+    const structureIndexToTabId = new Map<number, number>();
+    const matchedTabIds = new Set<number>();
+
+    // 1. 完全一致（インデックスとURL両方）を優先
+    for (let i = 0; i < treeStructure.length; i++) {
+      const entry = treeStructure[i];
+      const matchingTab = sortedTabs.find(
+        t => t.id && !matchedTabIds.has(t.id) && t.index === entry.index && t.url === entry.url
+      );
+      if (matchingTab && matchingTab.id) {
+        structureIndexToTabId.set(i, matchingTab.id);
+        matchedTabIds.add(matchingTab.id);
+      }
+    }
+
+    // 2. インデックス一致（URLは異なる）
+    for (let i = 0; i < treeStructure.length; i++) {
+      if (structureIndexToTabId.has(i)) continue;
+      const entry = treeStructure[i];
+      const matchingTab = sortedTabs.find(
+        t => t.id && !matchedTabIds.has(t.id) && t.index === entry.index
+      );
+      if (matchingTab && matchingTab.id) {
+        structureIndexToTabId.set(i, matchingTab.id);
+        matchedTabIds.add(matchingTab.id);
+      }
+    }
+
+    // 3. URL一致（インデックスは異なる）
+    for (let i = 0; i < treeStructure.length; i++) {
+      if (structureIndexToTabId.has(i)) continue;
+      const entry = treeStructure[i];
+      const matchingTab = sortedTabs.find(
+        t => t.id && !matchedTabIds.has(t.id) && t.url === entry.url
+      );
+      if (matchingTab && matchingTab.id) {
+        structureIndexToTabId.set(i, matchingTab.id);
+        matchedTabIds.add(matchingTab.id);
+      }
+    }
+
+    // パス1: すべてのマッチしたタブをルートノードとして追加
+    for (let i = 0; i < treeStructure.length; i++) {
+      const tabId = structureIndexToTabId.get(i);
+      if (!tabId) continue;
+
+      const tab = tabs.find(t => t.id === tabId);
+      if (!tab || !tab.id) continue;
+
+      const existingNode = this.getNodeByTabId(tab.id);
+      if (existingNode) continue;
+
+      const entry = treeStructure[i];
+
+      // まずルートノードとして追加
+      await this.addTab(tab, null, entry.viewId || defaultViewId);
+
+      // 展開状態を設定
+      const newNode = this.getNodeByTabId(tab.id);
+      if (newNode) {
+        newNode.isExpanded = entry.isExpanded;
+        if (entry.isExpanded) {
+          this.expandedNodes.add(newNode.id);
+        } else {
+          this.expandedNodes.delete(newNode.id);
+        }
+      }
+    }
+
+    // パス2: 親子関係を設定
+    for (let i = 0; i < treeStructure.length; i++) {
+      const entry = treeStructure[i];
+      if (entry.parentIndex === null) continue;
+
+      const tabId = structureIndexToTabId.get(i);
+      const parentTabId = structureIndexToTabId.get(entry.parentIndex);
+      if (!tabId || !parentTabId) continue;
+
+      const childNode = this.getNodeByTabId(tabId);
+      const parentNode = this.getNodeByTabId(parentTabId);
+      if (!childNode || !parentNode) continue;
+
+      // 親子関係を設定
+      childNode.parentId = parentNode.id;
+      childNode.depth = parentNode.depth + 1;
+
+      // 親ノードのchildren配列に追加
+      if (!parentNode.children.some(c => c.id === childNode.id)) {
+        parentNode.children.push(childNode);
+      }
+
+      // 子孫の深さを再帰的に更新
+      this.updateChildrenDepth(childNode);
+    }
+
+    // マッチしなかったタブはルートノードとして追加
+    for (const tab of tabs) {
+      if (!tab.id) continue;
+      if (matchedTabIds.has(tab.id)) continue;
+
+      const existingNode = this.getNodeByTabId(tab.id);
+      if (!existingNode) {
+        // openerTabIdがあればそれを使う
+        const parentNode = tab.openerTabId
+          ? this.getNodeByTabId(tab.openerTabId)
+          : null;
+        await this.addTab(tab, parentNode?.id || null, defaultViewId);
+      }
+    }
+  }
+
+  /**
+   * openerTabIdを使って親子関係を復元（従来の方法）
+   */
+  private async syncWithOpenerTabId(
+    tabs: chrome.tabs.Tab[],
+    defaultViewId: string,
+  ): Promise<void> {
+    // タブをopenerTabIdの依存関係順にソート（親が先、子が後）
+    // これにより、親タブが必ず子タブより先にTreeに追加される
+    const tabsMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
+    const processedTabs = new Set<number>();
+    const orderedTabs: chrome.tabs.Tab[] = [];
+
+    const addTabAndChildren = (tab: chrome.tabs.Tab) => {
+      if (!tab.id || processedTabs.has(tab.id)) return;
+
+      // 親がいる場合は、親を先に処理
+      if (tab.openerTabId && tabsMap.has(tab.openerTabId)) {
+        addTabAndChildren(tabsMap.get(tab.openerTabId)!);
+      }
+
+      processedTabs.add(tab.id);
+      orderedTabs.push(tab);
+    };
+
+    // すべてのタブを依存関係順に処理
+    for (const tab of tabs) {
+      if (tab.id) {
+        addTabAndChildren(tab);
+      }
+    }
+
+    // 依存関係順に追加
+    for (const tab of orderedTabs) {
+      if (!tab.id) continue;
+
+      // 既存のノードがない場合のみ追加
+      const existingNode = this.getNodeByTabId(tab.id);
+      if (!existingNode) {
+        // openerTabIdから親を特定
+        const parentNode = tab.openerTabId
+          ? this.getNodeByTabId(tab.openerTabId)
+          : null;
+
+        await this.addTab(tab, parentNode?.id || null, defaultViewId);
+      }
     }
   }
 
@@ -528,14 +681,61 @@ export class TreeStateManager {
       // ストレージ読み取りに失敗した場合はデフォルト値を使用
     }
 
+    // ツリー構造を順序付きで保存（ブラウザ再起動時の復元用）
+    const treeStructure = await this.buildTreeStructure();
+
     const treeState: TreeState = {
       views: existingViews,
       currentViewId: existingCurrentViewId,
       nodes: nodesRecord,
       tabToNode: tabToNodeRecord,
+      treeStructure,
     };
 
     await this.storageService.set(STORAGE_KEYS.TREE_STATE, treeState);
+  }
+
+  /**
+   * ツリー構造を順序付きで構築
+   * Chromeタブのインデックス順にソートし、親子関係を保持
+   */
+  private async buildTreeStructure(): Promise<TreeStructureEntry[]> {
+    try {
+      const tabs = await chrome.tabs.query({});
+      const tabMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
+
+      // ノードをChromeタブのインデックス順にソート
+      const nodesWithIndex: Array<{ node: TabNode; tab: chrome.tabs.Tab }> = [];
+      this.nodes.forEach((node) => {
+        const tab = tabMap.get(node.tabId);
+        if (tab) {
+          nodesWithIndex.push({ node, tab });
+        }
+      });
+
+      // インデックスでソート
+      nodesWithIndex.sort((a, b) => a.tab.index - b.tab.index);
+
+      // nodeIdからインデックスへのマッピングを作成
+      const nodeIdToIndex = new Map<string, number>();
+      nodesWithIndex.forEach(({ node }, index) => {
+        nodeIdToIndex.set(node.id, index);
+      });
+
+      // TreeStructureEntryの配列を構築
+      const treeStructure: TreeStructureEntry[] = nodesWithIndex.map(({ node, tab }) => ({
+        url: tab.url || '',
+        parentIndex: node.parentId ? (nodeIdToIndex.get(node.parentId) ?? null) : null,
+        index: tab.index,
+        viewId: node.viewId,
+        isExpanded: node.isExpanded,
+      }));
+
+      return treeStructure;
+    } catch {
+      // タブ情報の取得に失敗した場合は空配列を返す
+      return [];
+    }
   }
 
   /**
