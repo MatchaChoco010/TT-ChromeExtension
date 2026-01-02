@@ -42,7 +42,6 @@ test.describe.serial('ExtensionFixture', () => {
     extensionId,
   }) => {
     // Side PanelのURLが正しいことを検証
-    // Task 13.2 (tab-tree-bugfix): windowIdパラメータを含む形式に対応
     // URLのベース部分とパスを検証し、windowIdクエリパラメータを許容する
     const fullUrl = sidePanelPage.url();
     const baseUrl = `chrome-extension://${extensionId}/sidepanel.html`;

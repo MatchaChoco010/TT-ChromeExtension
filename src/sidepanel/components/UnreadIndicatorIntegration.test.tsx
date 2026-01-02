@@ -7,7 +7,6 @@ import type { TabNode, TabInfo, IStorageService } from '@/types';
 /**
  * 統合テスト: UnreadBadge + UnreadTracker + UserSettings
  *
- * Task 10.2 の要件を検証:
  * - TreeNode に未読インジケータ（バッジまたは色変更）を表示
  * - 未読タブ数のカウント表示機能
  * - 設定による未読インジケータの表示/非表示切り替え
@@ -26,7 +25,7 @@ describe('UnreadIndicator 統合テスト', () => {
     };
 
     unreadTracker = new UnreadTracker(mockStorageService);
-    // Requirement 13.1, 13.2, 13.3: 起動完了フラグを設定（テストでは起動後の挙動をシミュレート）
+    // 起動完了フラグを設定（テストでは起動後の挙動をシミュレート）
     unreadTracker.setInitialLoadComplete();
   });
 
@@ -52,7 +51,7 @@ describe('UnreadIndicator 統合テスト', () => {
     status: 'complete',
   });
 
-  describe('Requirement 7.1: 未読タブに未読インジケータを表示', () => {
+  describe('未読タブに未読インジケータを表示', () => {
     it('新しく開かれた未読タブに未読バッジが表示される', async () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, '未読タブ');
@@ -83,7 +82,7 @@ describe('UnreadIndicator 統合テスト', () => {
     });
   });
 
-  describe('Requirement 7.2: タブアクティブ化時に未読インジケータを削除', () => {
+  describe('タブアクティブ化時に未読インジケータを削除', () => {
     it('タブをアクティブにすると未読バッジが削除される', async () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, 'アクティブ化するタブ');
@@ -131,7 +130,7 @@ describe('UnreadIndicator 統合テスト', () => {
     });
   });
 
-  describe('Requirement 7.3: 設定による未読インジケータの表示/非表示切り替え', () => {
+  describe('設定による未読インジケータの表示/非表示切り替え', () => {
     it('showUnreadIndicator=trueの場合、未読バッジが表示される', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, '未読タブ');
@@ -174,7 +173,7 @@ describe('UnreadIndicator 統合テスト', () => {
     });
   });
 
-  describe('Requirement 7.4: 未読タブ数のカウント表示（オプション）', () => {
+  describe('未読タブ数のカウント表示（オプション）', () => {
     it('複数のタブが未読の場合、UnreadTrackerで未読数をカウントできる', async () => {
       await unreadTracker.markAsUnread(1);
       await unreadTracker.markAsUnread(2);

@@ -3,20 +3,19 @@
  *
  * タブ複製時の配置検証 E2E テスト
  *
- * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5
- * - 10.1: 複製されたタブが元のタブの兄弟として配置されること
- * - 10.2: 複製されたタブが元のタブの直下（1つ下）に表示されること
- * - 10.3: 複製されたタブが元のタブの子タブとして配置されないこと
- * - 10.4: E2Eテストで検証可能であり、--repeat-each=10で10回連続成功すること
- * - 10.5: ポーリングベースの状態確定待機を使用してフレーキーでないこと
+ * - 複製されたタブが元のタブの兄弟として配置されること
+ * - 複製されたタブが元のタブの直下（1つ下）に表示されること
+ * - 複製されたタブが元のタブの子タブとして配置されないこと
+ * - E2Eテストで検証可能であり、--repeat-each=10で10回連続成功すること
+ * - ポーリングベースの状態確定待機を使用してフレーキーでないこと
  */
 
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
 import { waitForTabInTreeState, waitForCondition, waitForParentChildRelation } from './utils/polling-utils';
 
-test.describe('Task 10.2: タブ複製時の配置', () => {
-  test.describe('Requirement 10.1: 複製されたタブが元のタブの兄弟として配置される', () => {
+test.describe('タブ複製時の配置', () => {
+  test.describe('複製されたタブが元のタブの兄弟として配置される', () => {
     test('タブを複製すると兄弟タブとして配置される', async ({
       extensionContext,
       sidePanelPage,
@@ -111,7 +110,7 @@ test.describe('Task 10.2: タブ複製時の配置', () => {
     });
   });
 
-  test.describe('Requirement 10.2: 複製されたタブが元のタブの直下（1つ下）に表示される', () => {
+  test.describe('複製されたタブが元のタブの直下（1つ下）に表示される', () => {
     test('複製されたタブは複製元タブの直後（インデックス+1）に配置される', async ({
       extensionContext,
       sidePanelPage,
@@ -286,7 +285,7 @@ test.describe('Task 10.2: タブ複製時の配置', () => {
     });
   });
 
-  test.describe('Requirement 10.3: 複製されたタブが元のタブの子タブとして配置されない', () => {
+  test.describe('複製されたタブが元のタブの子タブとして配置されない', () => {
     test('親タブを持つタブを複製しても、複製タブは子タブにならない', async ({
       extensionContext,
       sidePanelPage,

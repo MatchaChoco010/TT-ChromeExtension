@@ -5,8 +5,6 @@ import type { TreeStateManager } from './TreeStateManager';
 
 /**
  * ViewManager のユニットテスト
- * Task 8.1: ViewManager サービスの実装
- * Requirements: 6.1, 6.2, 6.5
  */
 describe('ViewManager', () => {
   let viewManager: ViewManager;
@@ -34,7 +32,7 @@ describe('ViewManager', () => {
 
   describe('createView', () => {
     it('新しいビューを作成できる', () => {
-      // Requirement 6.2: 新しいビューを作成する
+      // 新しいビューを作成する
       const view = viewManager.createView('Work', '#ff0000');
 
       expect(view).toBeDefined();
@@ -103,7 +101,7 @@ describe('ViewManager', () => {
 
   describe('switchView', () => {
     it('ビューを切り替えられる', () => {
-      // Requirement 6.3: ビュー切り替えUIを操作する
+      // ビュー切り替えUIを操作する
       const view1 = viewManager.createView('Work', '#ff0000');
       const view2 = viewManager.createView('Personal', '#00ff00');
 
@@ -264,8 +262,7 @@ describe('ViewManager', () => {
   });
 
   describe('moveTabToView', () => {
-    // Task 8.4: ビュー間のタブ移動
-    // Requirement 6.5: ユーザーがタブを別のビューに移動する
+    // ユーザーがタブを別のビューに移動する
     it('タブを別のビューに移動できる', async () => {
       const view1 = viewManager.createView('Work', '#ff0000');
       const view2 = viewManager.createView('Personal', '#00ff00');

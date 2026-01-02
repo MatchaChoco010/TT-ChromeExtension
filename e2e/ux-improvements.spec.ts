@@ -1,9 +1,6 @@
 /**
  * UX改善機能のE2Eテスト
  *
- * Task 10.2: 新機能のE2Eテストを追加
- * Requirements: 1.1, 16.1, 18.1, 20.2, 21.1
- *
  * テスト対象:
  * 1. ピン留めタブの閉じるボタン非表示確認
  * 2. ビュースクロール切り替えテスト
@@ -15,7 +12,7 @@ import { createTab, closeTab } from './utils/tab-utils';
 import { waitForViewSwitcher } from './utils/polling-utils';
 
 test.describe('UX改善機能', () => {
-  test.describe('ピン留めタブの閉じるボタン非表示 (Requirement 1.1)', () => {
+  test.describe('ピン留めタブの閉じるボタン非表示', () => {
     test('ピン留めタブには閉じるボタンが表示されない', async ({
       extensionContext,
       serviceWorker,
@@ -109,7 +106,7 @@ test.describe('UX改善機能', () => {
     });
   });
 
-  test.describe('ビュースクロール切り替え (Requirements 16.1, 16.2, 16.3)', () => {
+  test.describe('ビュースクロール切り替え', () => {
     test('ビューリスト上でマウスホイールを下にスクロールすると次のビューに切り替わる', async ({
       sidePanelPage,
     }) => {
@@ -244,9 +241,7 @@ test.describe('UX改善機能', () => {
     });
   });
 
-  // Task 12.2: ビュー移動サブメニューのE2Eテストを有効化
-  // Task 12.1で views/onMoveToView がTabTreeViewに渡されるよう実装済み
-  test.describe('サブメニュー操作 - 別のビューへ移動 (Requirements 18.1, 18.2, 18.3)', () => {
+  test.describe('サブメニュー操作 - 別のビューへ移動', () => {
     test('タブのコンテキストメニューで「別のビューへ移動」にホバーするとサブメニューが表示される', async ({
       extensionContext,
       sidePanelPage,

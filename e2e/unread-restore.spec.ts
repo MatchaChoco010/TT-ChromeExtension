@@ -1,7 +1,6 @@
 /**
  * 未読インジケーター復元時制御のE2Eテスト
  *
- * Requirements: 13.1, 13.2
  * - ブラウザ復元時のタブに未読インジケーターを表示しない
  * - 復元されたタブがアクティブ化された後に非アクティブになった場合、通常の未読判定ルールに従う
  */
@@ -11,7 +10,7 @@ import { createTab, activateTab, closeTab } from './utils/tab-utils';
 
 extensionTest.describe('未読インジケーター復元時制御', () => {
   /**
-   * Requirement 13.1: ブラウザを再起動してタブが復元された場合、復元されたタブに未読インジケーターを表示しないこと
+   * ブラウザを再起動してタブが復元された場合、復元されたタブに未読インジケーターを表示しないこと
    *
    * テスト方法:
    * - Side Panel初期化時点で存在する初期タブに未読バッジが表示されていないことを確認
@@ -70,14 +69,14 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // 初期タブに未読バッジが表示されていないことを確認
-      // Requirements 13.1: ブラウザ起動時の既存タブには未読インジケーターを付けない
+      // ブラウザ起動時の既存タブには未読インジケーターを付けない
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toHaveCount(0);
     }
   );
 
   /**
-   * Requirement 13.2: 復元されたタブがアクティブ化された後に非アクティブになった場合、通常の未読判定ルールに従うこと
+   * 復元されたタブがアクティブ化された後に非アクティブになった場合、通常の未読判定ルールに従うこと
    *
    * テスト方法:
    * 1. 起動完了後にバックグラウンドで新しいタブを作成（未読になるはず）
@@ -109,7 +108,7 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // 起動完了後に作成されたバックグラウンドタブには未読バッジが表示されること
-      // Requirements 13.2: 起動完了後のタブは通常の未読判定ルールに従う
+      // 起動完了後のタブは通常の未読判定ルールに従う
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
 

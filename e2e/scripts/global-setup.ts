@@ -5,8 +5,6 @@ import * as path from 'path';
 /**
  * Playwright Global Setup
  * テスト実行前に拡張機能をビルドする
- *
- * Requirements: 2 - Chrome拡張機能のロードとテスト実行基盤
  */
 async function globalSetup() {
   console.log('🔨 E2Eテスト実行前にビルドを開始します...');

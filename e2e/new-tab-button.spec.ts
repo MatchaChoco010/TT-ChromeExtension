@@ -1,13 +1,10 @@
 /**
  * 新規タブ追加ボタンのE2Eテスト
  *
- * Task 8.2: 新規タブ追加ボタンのE2Eテスト追加
- * Requirements: 8.5, 8.6, 8.7
- *
  * テスト対象:
- * 1. 新規タブ追加ボタンの存在を検証 (Requirement 8.5)
- * 2. ボタンクリックで新規タブが追加されることを検証 (Requirement 8.6)
- * 3. 新規タブがツリー末尾に配置されることを検証 (Requirement 8.7)
+ * 1. 新規タブ追加ボタンの存在を検証
+ * 2. ボタンクリックで新規タブが追加されることを検証
+ * 3. 新規タブがツリー末尾に配置されることを検証
  */
 
 import { test, expect } from './fixtures/extension';
@@ -15,7 +12,7 @@ import { createTab } from './utils/tab-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 
 test.describe('新規タブ追加ボタン', () => {
-  test.describe('Requirement 8.5: 新規タブ追加ボタンの存在', () => {
+  test.describe('新規タブ追加ボタンの存在', () => {
     test('新規タブ追加ボタンがサイドパネルに表示される', async ({
       sidePanelPage,
     }) => {
@@ -57,7 +54,7 @@ test.describe('新規タブ追加ボタン', () => {
     });
   });
 
-  test.describe('Requirement 8.6: ボタンクリックで新規タブが追加される', () => {
+  test.describe('ボタンクリックで新規タブが追加される', () => {
     test('新規タブ追加ボタンをクリックすると新しいタブが作成される', async ({
       extensionContext,
       serviceWorker,
@@ -146,7 +143,7 @@ test.describe('新規タブ追加ボタン', () => {
     });
   });
 
-  test.describe('Requirement 8.7: 新規タブがツリー末尾に配置される', () => {
+  test.describe('新規タブがツリー末尾に配置される', () => {
     test('新規タブはツリーの末尾（最後の位置）に追加される', async ({
       extensionContext,
       serviceWorker,

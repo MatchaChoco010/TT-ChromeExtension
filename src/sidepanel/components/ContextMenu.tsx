@@ -25,11 +25,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const addToGroupButtonRef = useRef<HTMLDivElement>(null);
   const isMultipleSelection = targetTabIds.length > 1;
 
-  // Task 7.2: サブメニューの表示状態（ビュー移動用）
+  // サブメニューの表示状態（ビュー移動用）
   const [isSubMenuOpen, setIsSubMenuOpen] = useState(false);
-  // Task 7.2: サブメニューの親要素の位置（レンダリング中にrefを参照しないよう状態として保持）
+  // サブメニューの親要素の位置（レンダリング中にrefを参照しないよう状態として保持）
   const [subMenuParentRect, setSubMenuParentRect] = useState<DOMRect | null>(null);
-  // Task 12.2 (tab-tree-bugfix): グループ追加サブメニューの表示状態
+  // グループ追加サブメニューの表示状態
   const [isGroupSubMenuOpen, setIsGroupSubMenuOpen] = useState(false);
   const [groupSubMenuParentRect, setGroupSubMenuParentRect] = useState<DOMRect | null>(null);
 
@@ -96,7 +96,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     onClose();
   };
 
-  // Task 7.2: 「別のビューへ移動」サブメニュー用のビューリスト
+  // 「別のビューへ移動」サブメニュー用のビューリスト
   // 現在のビューを除外し、移動先ビューのみを表示
   const availableViews = useMemo((): SubMenuItem[] => {
     if (!views || !currentViewId) return [];
@@ -108,10 +108,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       }));
   }, [views, currentViewId]);
 
-  // Task 7.2: ビューが2つ以上ある場合のみ「別のビューへ移動」を表示
+  // ビューが2つ以上ある場合のみ「別のビューへ移動」を表示
   const showMoveToViewMenu = availableViews.length > 0 && onMoveToView;
 
-  // Task 7.2: サブメニューでビューを選択したときのハンドラ
+  // サブメニューでビューを選択したときのハンドラ
   const handleViewSelect = useCallback((viewId: string) => {
     if (onMoveToView) {
       onMoveToView(viewId, targetTabIds);
@@ -119,7 +119,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }
   }, [onMoveToView, targetTabIds, onClose]);
 
-  // Task 7.2: 「別のビューへ移動」のホバーハンドラ
+  // 「別のビューへ移動」のホバーハンドラ
   const handleMoveToViewMouseEnter = useCallback(() => {
     // ホバー時にrefから位置を取得して状態に保持
     if (moveToViewButtonRef.current) {
@@ -139,7 +139,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     setIsSubMenuOpen(false);
   }, []);
 
-  // Task 12.2 (tab-tree-bugfix): グループ一覧サブメニュー用のアイテムリスト
+  // グループ一覧サブメニュー用のアイテムリスト
   const availableGroups = useMemo((): SubMenuItem[] => {
     if (!groups) return [];
     return Object.values(groups).map(g => ({
@@ -148,10 +148,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }));
   }, [groups]);
 
-  // Task 12.2 (tab-tree-bugfix): グループが存在し、単一タブ選択時のみサブメニューを表示可能
+  // グループが存在し、単一タブ選択時のみサブメニューを表示可能
   const hasAvailableGroups = availableGroups.length > 0;
 
-  // Task 12.2 (tab-tree-bugfix): サブメニューでグループを選択したときのハンドラ
+  // サブメニューでグループを選択したときのハンドラ
   const handleGroupSelect = useCallback((groupId: string) => {
     if (onAddToGroup) {
       onAddToGroup(groupId, targetTabIds);
@@ -159,7 +159,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }
   }, [onAddToGroup, targetTabIds, onClose]);
 
-  // Task 12.2 (tab-tree-bugfix): 「グループに追加」のホバーハンドラ
+  // 「グループに追加」のホバーハンドラ
   const handleAddToGroupMouseEnter = useCallback(() => {
     if (!hasAvailableGroups) return; // グループがない場合はサブメニューを表示しない
     if (addToGroupButtonRef.current) {
@@ -294,10 +294,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           選択されたタブをグループ化
         </button>
       ) : (
-        // Task 13.4 (comprehensive-bugfix): 単一タブ選択時
-        // Requirement 3.8: 単一タブ選択時は「グループ化」オプションを無効化（グレーアウト）
+        // 単一タブ選択時
+        // 単一タブ選択時は「グループ化」オプションを無効化（グレーアウト）
         <>
-          {/* Task 13.4: 単一タブ選択時はグループ化ボタンを無効化（グレーアウト） */}
+          {/* 単一タブ選択時はグループ化ボタンを無効化（グレーアウト） */}
           <button
             role="menuitem"
             className="w-full px-4 py-2 text-left text-sm text-gray-500 cursor-not-allowed"
@@ -306,7 +306,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           >
             タブをグループ化
           </button>
-          {/* Task 12.2 (tab-tree-bugfix): 既存グループへの追加サブメニュー */}
+          {/* 既存グループへの追加サブメニュー */}
           <div
             ref={addToGroupButtonRef}
             className={`relative w-full px-4 py-2 text-left text-sm flex items-center justify-between cursor-default ${
@@ -332,7 +332,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         </>
       )}
 
-      {/* Task 7.2: 別のビューへ移動 (Requirements 18.1, 18.2, 18.3) */}
+      {/* 別のビューへ移動 */}
       {showMoveToViewMenu && (
         <>
           <div className="border-t border-gray-700 my-1" />

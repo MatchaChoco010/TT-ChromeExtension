@@ -1,7 +1,5 @@
 /**
  * ビュー切り替え機能の統合テスト
- * Task 8.5: ビュー切り替えのテスト
- * Requirements: 6.2, 6.3, 6.4
  *
  * このテストは、ViewSwitcher、ViewManager、TreeStateManagerを組み合わせた
  * エンドツーエンドのビュー切り替え機能を検証します。
@@ -84,7 +82,7 @@ const ViewSwitchingTestHarness: React.FC = () => {
   );
 };
 
-describe('Task 8.5: ビュー切り替えの統合テスト', () => {
+describe('ビュー切り替えの統合テスト', () => {
   beforeEach(() => {
     // モックのchrome.storageを設定
     const mockStorageLocal: MockStorageLocal = {
@@ -125,7 +123,7 @@ describe('Task 8.5: ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('1');
       });
 
-      // Task 7.1: ビューがファビコンサイズアイコンボタンとして表示されることを確認
+      // ビューがファビコンサイズアイコンボタンとして表示されることを確認
       // ビュー名はaria-labelで確認（テキスト表示はなくなった）
       expect(screen.getByRole('button', { name: /Switch to New View 1/i })).toBeInTheDocument();
     });
@@ -147,7 +145,7 @@ describe('Task 8.5: ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('3');
       });
 
-      // Task 7.1: すべてのビューがファビコンサイズアイコンボタンとして表示されることを確認
+      // すべてのビューがファビコンサイズアイコンボタンとして表示されることを確認
       // ビュー名はaria-labelで確認（テキスト表示はなくなった）
       expect(screen.getByRole('button', { name: /Switch to New View 1/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Switch to New View 2/i })).toBeInTheDocument();

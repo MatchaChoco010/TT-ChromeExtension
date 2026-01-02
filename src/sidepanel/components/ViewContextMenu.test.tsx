@@ -1,7 +1,6 @@
 /**
  * ViewContextMenu コンポーネントのテスト
- * Task 7.3: ビューボタンの右クリックコンテキストメニューの実装
- * Requirements: 3.3, 3.4
+ * ビューボタンの右クリックコンテキストメニューの実装
  */
 
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -71,7 +70,7 @@ describe('ViewContextMenu', () => {
     });
   });
 
-  describe('Requirement 3.3: 右クリックでコンテキストメニュー表示', () => {
+  describe('右クリックでコンテキストメニュー表示', () => {
     it('メニュー項目が正しい順序で表示される', () => {
       render(
         <ViewContextMenu
@@ -90,7 +89,7 @@ describe('ViewContextMenu', () => {
     });
   });
 
-  describe('Requirement 3.4: ビューの編集オプション', () => {
+  describe('ビューの編集オプション', () => {
     it('ビューの編集をクリックするとonEditが呼ばれる', () => {
       render(
         <ViewContextMenu

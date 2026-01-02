@@ -10,19 +10,19 @@ interface TreeNodeProps {
   tab: TabInfo;
   isUnread: boolean;
   isActive: boolean;
-  isPinned?: boolean; // Task 15.2: ピン留め状態
-  isGrouped?: boolean; // Task 15.2: グループ化状態
-  isDiscarded?: boolean; // Task 4.1 (tab-tree-bugfix): 休止タブ状態（グレーアウト表示）
+  isPinned?: boolean; // ピン留め状態
+  isGrouped?: boolean; // グループ化状態
+  isDiscarded?: boolean; // 休止タブ状態（グレーアウト表示）
   showUnreadIndicator?: boolean;
-  closeWarningThreshold?: number; // Task 11.3: Requirement 8.5 - 警告閾値
+  closeWarningThreshold?: number; // 警告閾値
   onActivate: (tabId: number) => void;
   onToggle: (nodeId: string) => void;
   onClose: (tabId: number, hasChildren: boolean) => void;
-  onContextMenu?: (action: MenuAction, tabIds: number[]) => void; // Task 15.2: コンテキストメニューアクション
+  onContextMenu?: (action: MenuAction, tabIds: number[]) => void; // コンテキストメニューアクション
 }
 
 /**
- * Task 4.2 (Requirement 4.3): スタートページURLを判定するヘルパー関数
+ * スタートページURLを判定するヘルパー関数
  * Vivaldi/Chromeのスタートページ関連のURLを検出
  */
 const isStartPageUrl = (url: string): boolean => {
@@ -37,7 +37,7 @@ const isStartPageUrl = (url: string): boolean => {
 };
 
 /**
- * Task 4.2 (Requirement 4.3): 新しいタブURLを判定するヘルパー関数
+ * 新しいタブURLを判定するヘルパー関数
  * Vivaldi/Chromeの新しいタブ関連のURLを検出（スタートページ以外）
  */
 const isNewTabUrl = (url: string): boolean => {
@@ -54,7 +54,7 @@ const isNewTabUrl = (url: string): boolean => {
 };
 
 /**
- * Task 3.2 (Requirement 17.1): タイトルがURL形式かどうかを判定
+ * タイトルがURL形式かどうかを判定
  * PDFなど、file://でも正しいタイトルが設定されている場合がある
  */
 const isTitleUrlFormat = (title: string): boolean => {
@@ -63,7 +63,7 @@ const isTitleUrlFormat = (title: string): boolean => {
 };
 
 /**
- * Task 3.2 (Requirement 17.1): システムURLのフレンドリー名マッピング
+ * システムURLのフレンドリー名マッピング
  */
 const SYSTEM_URL_FRIENDLY_NAMES: Record<string, string> = {
   'chrome://settings': '設定',
@@ -78,7 +78,7 @@ const SYSTEM_URL_FRIENDLY_NAMES: Record<string, string> = {
 };
 
 /**
- * Task 4.2, 3.2, 2.2 (Requirement 4.1, 4.2, 4.3, 4.4, 7.1-7.3, 8.1-8.2, 17.1): 表示するタブタイトルを決定するヘルパー関数
+ * 表示するタブタイトルを決定するヘルパー関数
  *
  * 処理優先順位:
  * 1. Loading状態の場合: 「Loading...」
@@ -89,58 +89,58 @@ const SYSTEM_URL_FRIENDLY_NAMES: Record<string, string> = {
  * 6. file://でタイトルがURL形式の場合: ファイル名に置換
  * 7. それ以外: 元のタイトル
  *
- * Requirement 7.1-7.3, 8.1-8.2: chrome.tabs.Tab.titleをそのまま使用することを優先
+ * chrome.tabs.Tab.titleをそのまま使用することを優先
  * - settings.htmlやgroup.htmlはHTMLの<title>タグで適切なタイトルを提供
  * - タイトルが正しく設定されている場合はそのまま表示
  *
- * Requirement 12.1, 12.2: Vivaldi専用URL（chrome://vivaldi-webui/startpage）の場合、
+ * Vivaldi専用URL（chrome://vivaldi-webui/startpage）の場合、
  * 拡張機能にはURLが公開されないことがあるため、タイトルもチェックする
  *
- * Requirement 17.1: タイトルがURL形式の場合のみフレンドリー名に置き換え。
+ * タイトルがURL形式の場合のみフレンドリー名に置き換え。
  * PDFなど既にタイトルが設定されている場合はそのまま表示。
  */
 const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 'complete' }): string => {
   const title = tab.title || '';
   const url = tab.url || '';
 
-  // Requirement 4.4: Loading状態の場合
+  // Loading状態の場合
   if (tab.status === 'loading') {
     return 'Loading...';
   }
 
-  // Requirement 7.1-7.3, 8.1-8.2, 17.1: タイトルがURL形式でない場合はそのまま表示
+  // タイトルがURL形式でない場合はそのまま表示
   // これにより、settings.html（タイトル: "Settings"）やgroup.html（タイトル: "Group"）など、
   // HTMLの<title>タグで適切なタイトルが設定されているページは正しく表示される
   if (!isTitleUrlFormat(title)) {
     return title;
   }
 
-  // Requirement 2.2, 12.1, 12.2: スタートページURLの場合
+  // スタートページURLの場合
   // URLをチェック、またはタイトルがURL形式でスタートページパターンの場合もチェック
   if (isStartPageUrl(url) || isStartPageUrl(title)) {
     return 'スタートページ';
   }
 
-  // Requirement 4.3: 新しいタブURLの場合
+  // 新しいタブURLの場合
   // URLをチェック、またはタイトルがURL形式で新しいタブパターンの場合もチェック
   if (isNewTabUrl(url) || isNewTabUrl(title)) {
     return '新しいタブ';
   }
 
-  // Requirement 17.1: タイトルがURL形式の場合、フレンドリー名があれば使用
+  // タイトルがURL形式の場合、フレンドリー名があれば使用
   for (const [urlPattern, friendlyName] of Object.entries(SYSTEM_URL_FRIENDLY_NAMES)) {
     if (url.startsWith(urlPattern)) {
       return friendlyName;
     }
   }
 
-  // Requirement 17.1: file://の場合はファイル名を抽出
+  // file://の場合はファイル名を抽出
   if (url.startsWith('file://') && isTitleUrlFormat(title)) {
     const filename = url.split('/').pop() || title;
     return decodeURIComponent(filename);
   }
 
-  // Requirement 4.1, 4.2: 通常のタイトル
+  // 通常のタイトル
   return title;
 };
 
@@ -148,9 +148,9 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
  * 個別タブノードのUIコンポーネント
  * ファビコン、タイトル、インデント、展開/折りたたみトグルを表示
  *
- * Requirements: 8.3, 8.4 (タブ閉じ時の確認ダイアログ), 8.5 (警告閾値のカスタマイズ), 12.1 (コンテキストメニュー)
- * Task 4.2: 4.1, 4.2, 4.3, 4.4 (タブタイトル表示改善)
- * Task 4.1 (tab-tree-bugfix): 3.1, 3.2 (休止タブのグレーアウト表示)
+ * タブ閉じ時の確認ダイアログ、警告閾値のカスタマイズ、コンテキストメニュー
+ * タブタイトル表示改善
+ * 休止タブのグレーアウト表示
  */
 const TreeNode: React.FC<TreeNodeProps> = ({
   node,
@@ -159,9 +159,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   isActive,
   isPinned = false,
   isGrouped = false,
-  isDiscarded = false, // Task 4.1 (tab-tree-bugfix): 休止タブのグレーアウト表示
+  isDiscarded = false, // 休止タブのグレーアウト表示
   showUnreadIndicator = true,
-  closeWarningThreshold = 3, // Task 11.3: デフォルト閾値は3
+  closeWarningThreshold = 3, // デフォルト閾値は3
   onActivate,
   onToggle,
   onClose,
@@ -169,12 +169,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [contextMenuOpen, setContextMenuOpen] = useState(false); // Task 15.2: コンテキストメニューの表示状態
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 }); // Task 15.2: メニュー表示位置
+  const [contextMenuOpen, setContextMenuOpen] = useState(false); // コンテキストメニューの表示状態
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 }); // メニュー表示位置
   const hasChildren = node.children && node.children.length > 0;
   const indentSize = node.depth * 20 + 8;
 
-  // Task 11.2: サブツリーのタブ数を再帰的に計算（親タブ自身を含む）
+  // サブツリーのタブ数を再帰的に計算（親タブ自身を含む）
   const countTabsInSubtree = (currentNode: TabNode): number => {
     let count = 1; // 親タブ自身
     if (currentNode.children && currentNode.children.length > 0) {
@@ -194,7 +194,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     onToggle(node.id);
   };
 
-  // Task 11.2, 11.3: Requirement 8.3, 8.5 - 折りたたまれたブランチを持つ親タブ閉じ時の確認（閾値チェック）
+  // 折りたたまれたブランチを持つ親タブ閉じ時の確認（閾値チェック）
   const handleCloseClick = () => {
     // 折りたたまれた子ノードがある場合、かつサブツリーのタブ数が閾値以上の場合のみ確認ダイアログを表示
     if (hasChildren && !node.isExpanded) {
@@ -211,7 +211,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     }
   };
 
-  // Task 11.2: Requirement 8.4 - 確認後にタブを閉じる
+  // 確認後にタブを閉じる
   const handleConfirmClose = () => {
     setShowConfirmDialog(false);
     onClose(tab.id, hasChildren);
@@ -229,7 +229,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     setIsHovered(false);
   };
 
-  // Task 15.2: Requirement 12.1 - 右クリック時のコンテキストメニュー表示
+  // 右クリック時のコンテキストメニュー表示
   const handleRightClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -237,7 +237,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     setContextMenuOpen(true);
   };
 
-  // Task 15.2: Requirement 12.3 - コンテキストメニューのアクション実行
+  // コンテキストメニューのアクション実行
   const handleContextMenuAction = (action: MenuAction) => {
     if (onContextMenu) {
       onContextMenu(action, [tab.id]);
@@ -261,7 +261,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onMouseLeave={handleMouseLeave}
         onContextMenu={handleRightClick}
       >
-        {/* Task 8.1, 3.1: 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
+        {/* 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
         <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} depth={node.depth} />
 
         {/* 展開/折りたたみトグルボタン */}
@@ -297,8 +297,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           data-testid="tab-content"
           className="flex-1 flex items-center justify-between min-w-0"
         >
-          {/* タブタイトルエリア - Task 4.2: タイトル表示改善 */}
-          {/* Task 4.1 (tab-tree-bugfix): 休止タブにグレーアウトスタイルを適用 */}
+          {/* タブタイトルエリア - タイトル表示改善 */}
+          {/* 休止タブにグレーアウトスタイルを適用 */}
           <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
             <span
               className={`truncate ${isDiscarded ? 'text-gray-400' : ''}`}
@@ -329,7 +329,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         </div>
       </div>
 
-      {/* Task 11.2: Requirement 8.3, 8.4 - 確認ダイアログ */}
+      {/* 確認ダイアログ */}
       <ConfirmDialog
         isOpen={showConfirmDialog}
         title="タブを閉じる"
@@ -339,7 +339,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onCancel={handleCancelClose}
       />
 
-      {/* Task 15.2: Requirement 12.1 - コンテキストメニュー */}
+      {/* コンテキストメニュー */}
       {contextMenuOpen && (
         <ContextMenu
           targetTabIds={[tab.id]}

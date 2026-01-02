@@ -5,8 +5,7 @@ import '@/test/chrome-mock';
 import type { Group, TabNode, ExtendedTabInfo } from '@/types';
 
 /**
- * Task 11.1: タブグループをツリービュー内に表示するテスト
- * Requirements: 2.1, 2.3
+ * タブグループをツリービュー内に表示するテスト
  *
  * このテストファイルは、タブグループがツリービュー内に統合表示される機能をテストします:
  * - グループノードがタブと同じツリービュー内に表示される
@@ -42,11 +41,11 @@ const createMockTabInfo = (tabId: number): ExtendedTabInfo => ({
   status: 'complete' as const,
   isPinned: false,
   windowId: 1,
-  discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
-  index: tabId, // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブの順序同期
+  discarded: false, // 休止タブ状態
+  index: tabId, // ピン留めタブの順序同期
 });
 
-describe('Task 11.1: タブグループをツリービュー内に表示', () => {
+describe('タブグループをツリービュー内に表示', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -436,15 +435,14 @@ describe('Task 11.1: タブグループをツリービュー内に表示', () =>
 });
 
 /**
- * Task 11.2: タブグループのドラッグ&ドロップ操作テスト
- * Requirements: 2.2
+ * タブグループのドラッグ&ドロップ操作テスト
  *
  * このテストは、タブグループがドラッグ&ドロップで操作できる機能をテストします:
  * - グループを通常のタブと同様にドラッグ可能である
  * - グループをドロップした際にグループ配下のタブも一緒に移動する
  * - グループの階層関係を維持しながら位置変更が可能である
  */
-describe('Task 11.2: タブグループのドラッグ&ドロップ操作', () => {
+describe('タブグループのドラッグ&ドロップ操作', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -488,7 +486,7 @@ describe('Task 11.2: タブグループのドラッグ&ドロップ操作', () =
       // Then: グループノードがドラッグハンドルを持つこと
       const groupNode = screen.getByTestId('group-tree-node-group-1');
       expect(groupNode).toBeInTheDocument();
-      // Task 12.1 (tab-tree-bugfix-2): ドラッグハンドルの存在を確認（data-draggable-item属性の存在）
+      // ドラッグハンドルの存在を確認（data-draggable-item属性の存在）
       const draggableElement = groupNode.querySelector('[data-draggable-item]');
       expect(draggableElement).toBeInTheDocument();
     });

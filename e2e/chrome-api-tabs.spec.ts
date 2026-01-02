@@ -1,8 +1,6 @@
 /**
  * chrome.tabs API統合テスト
  *
- * Requirement 4.1: chrome.tabs API統合
- *
  * このテストスイートでは、以下を検証します:
  * 1. chrome.tabs.create()を呼び出した場合、新しいタブが作成され、ツリーに反映されること
  * 2. chrome.tabs.remove()を呼び出した場合、タブが削除され、ツリーから削除されること

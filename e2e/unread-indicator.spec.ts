@@ -1,7 +1,6 @@
 /**
  * 未読インジケータ機能のE2Eテスト
  *
- * Requirements: 3.13
  * - タブがバックグラウンドで読み込まれた場合、未読バッジが表示される
  * - 未読タブをアクティブにした場合、未読バッジが消える
  * - 親タブの子に未読タブがある場合、親タブにも未読インジケータが表示される
@@ -82,7 +81,7 @@ extensionTest.describe('未読インジケータ機能', () => {
   );
 
   /**
-   * Requirement 16.1, 16.2: 親タブへの不要なバッジ表示削除
+   * 親タブへの不要なバッジ表示削除
    * 未読の子タブがある場合でも、親タブには未読子タブ数を示すバッジを表示しない
    */
   extensionTest(
@@ -122,7 +121,7 @@ extensionTest.describe('未読インジケータ機能', () => {
       // 子タブに未読バッジが表示されることを確認
       await assertUnreadBadge(sidePanelPage, childTabId);
 
-      // Requirement 16.1, 16.2: 親タブに未読子タブ数のバッジが表示されないことを確認
+      // 親タブに未読子タブ数のバッジが表示されないことを確認
       // 親タブノード内にunread-child-indicatorやunread-countが存在しないことを検証
       const parentUnreadChildIndicator = parentNode.locator('[data-testid="unread-child-indicator"]');
       const parentUnreadCount = parentNode.locator('[data-testid="unread-count"]');
@@ -193,13 +192,12 @@ extensionTest.describe('未読インジケータ機能', () => {
 });
 
 /**
- * 未読インジケーター位置のE2Eテスト (Requirement 11)
+ * 未読インジケーター位置のE2Eテスト
  *
- * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 8.1, 8.2, 8.3
  * - 未読インジケーターがタブノードの左下角に三角形切り欠きとして表示される
  * - タイトル長に関わらず一定位置（左下角）に表示される
  *
- * 注: Task 8.1により、UnreadBadgeはtree-node直下に配置され、
+ * 注: UnreadBadgeはtree-node直下に配置され、
  * position: absoluteで左下角に固定表示される三角形切り欠きスタイル。
  */
 extensionTest.describe('未読インジケーター位置', () => {
@@ -228,7 +226,7 @@ extensionTest.describe('未読インジケーター位置', () => {
       // 未読バッジが表示されることを確認
       await assertUnreadBadge(sidePanelPage, bgTabId);
 
-      // 未読バッジがtree-node直下に存在することを確認（Task 8.1: 左下三角形）
+      // 未読バッジがtree-node直下に存在することを確認（左下三角形）
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 5000 });
 
@@ -371,7 +369,7 @@ extensionTest.describe('未読インジケーター位置', () => {
       expect(tabNodeBounds).not.toBeNull();
       expect(badgeBounds).not.toBeNull();
       if (tabNodeBounds && badgeBounds) {
-        // Task 8.1: バッジがタブノードの左下角に配置されていることを確認
+        // バッジがタブノードの左下角に配置されていることを確認
         // バッジがタブノードの左端付近にあることを確認（インデント考慮）
         expect(badgeBounds.x).toBeGreaterThanOrEqual(tabNodeBounds.x);
         // バッジはタブノードの中央より左にあることを確認（三角形は左下に配置）
@@ -385,7 +383,6 @@ extensionTest.describe('未読インジケーター位置', () => {
   );
 
   /**
-   * Task 2.3 (tab-tree-bugfix-2): Requirement 13.1, 13.2
    * 未読インジケーターがタブの右端（tab-contentの右端付近）に固定表示されることを検証
    * タイトルの長さに関わらず、未読インジケーターは同じ水平位置（右端付近）に配置される
    */
@@ -470,14 +467,13 @@ extensionTest.describe('未読インジケーター位置', () => {
 });
 
 /**
- * Task 3.3: 未読インジケーターのdepth対応E2Eテスト
+ * 未読インジケーターのdepth対応E2Eテスト
  *
- * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
  * - 未読インジケーターがタブのdepthを考慮した位置に表示される
  * - ルートレベル（depth=0）では左端に表示
  * - ネストされたタブ（depth>0）ではdepthに応じてインデントされた位置に表示
  */
-extensionTest.describe('未読インジケーターdepth対応（Task 3.3）', () => {
+extensionTest.describe('未読インジケーターdepth対応', () => {
   extensionTest(
     'ルートレベル（depth=0）の未読タブでインジケーターが左端に表示される',
     async ({ extensionContext, sidePanelPage }) => {
@@ -724,14 +720,13 @@ extensionTest.describe('未読インジケーターdepth対応（Task 3.3）', (
 });
 
 /**
- * Task 8.2: 未読インジケーターのUI改善E2Eテスト
+ * 未読インジケーターのUI改善E2Eテスト
  *
- * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
  * - 未読インジケーターが左下三角形の形状で表示されること
  * - タブ要素に重なる形で配置されること
  * - 既読になったときに非表示になること
  */
-extensionTest.describe('未読インジケーターUI改善（Task 8.2）', () => {
+extensionTest.describe('未読インジケーターUI改善', () => {
   extensionTest(
     '未読インジケーターが左下三角形の形状で表示される',
     async ({ extensionContext, sidePanelPage }) => {

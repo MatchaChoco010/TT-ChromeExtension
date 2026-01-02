@@ -4,7 +4,6 @@ import * as path from 'path';
 
 /**
  * ビルドプロセス統合のテスト
- * Requirement 2: Chrome拡張機能のロードとテスト実行基盤
  *
  * Note: このテストスイートはPlaywrightのglobalSetup実行後に実行されます。
  * globalSetupがテスト実行前に拡張機能をビルドするため、dist/ディレクトリと

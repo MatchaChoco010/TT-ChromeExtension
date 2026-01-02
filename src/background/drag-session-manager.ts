@@ -1,8 +1,7 @@
 /**
  * DragSessionManager - Service Worker level drag session management
  *
- * Task 13.1: DragSessionManagerの実装
- * Requirements: 6.1, 6.2, 6.3, 6.6, 6.7
+ * DragSessionManagerの実装
  *
  * クロスウィンドウドラッグのための状態マシンによる排他制御を実装
  */
@@ -44,12 +43,12 @@ export interface DragSession {
   /** ロック状態（tabs.move中はtrue） */
   isLocked: boolean;
   /**
-   * Task 7.1: ツリービュー外にドラッグ中かどうか
+   * ツリービュー外にドラッグ中かどうか
    * notifyDragOut()でtrue、notifyTreeViewHover()でfalseに設定
    */
   isOutsideTree: boolean;
   /**
-   * Task 7.1: 現在ホバーしているウィンドウID
+   * 現在ホバーしているウィンドウID
    * notifyTreeViewHover()で更新、重複呼び出し防止に使用
    */
   currentHoverWindowId: number | null;
@@ -360,10 +359,8 @@ export class DragSessionManager {
   }
 
   /**
-   * Task 7.1: ツリービュー領域からのドラッグ離脱を通知
+   * ツリービュー領域からのドラッグ離脱を通知
    * ドラッグ中のタブがツリービュー領域を離れた際に呼び出す
-   *
-   * Requirements: 4.1, 4.4, 4.5
    */
   notifyDragOut(): void {
     if (!this.session) return;
@@ -374,13 +371,12 @@ export class DragSessionManager {
   }
 
   /**
-   * Task 7.1: ツリービュー領域上のホバーを通知
+   * ツリービュー領域上のホバーを通知
    * 別ウィンドウのツリービュー領域上にマウスがある場合に呼び出す（mousemoveで継続的に検知）
    * バックグラウンドスロットリング回避のため、対象ウィンドウにフォーカスを移動する
    * 重複呼び出しは内部で無視される
    *
    * @param windowId ホバー先のウィンドウID
-   * Requirements: 4.1, 4.4, 4.5
    */
   async notifyTreeViewHover(windowId: number): Promise<void> {
     if (!this.session) return;

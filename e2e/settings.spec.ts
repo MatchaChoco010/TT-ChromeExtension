@@ -3,17 +3,16 @@
  *
  * 設定変更とUI/UXカスタマイゼーションの E2E テスト
  *
- * Task 9.1: サイドパネルから設定ボタンを削除（要件20.1）
- * 設定ページへのアクセスは直接URLまたはポップアップメニュー（Task 9.2）から行う
+ * 設定ページへのアクセスは直接URLまたはポップアップメニューから行う
  *
- * Requirement 3.12: 設定変更とUI/UXカスタマイゼーション
+ * 設定変更とUI/UXカスタマイゼーション
  * - 設定画面はブラウザタブの全幅を利用
  * - フォントサイズ変更
  * - フォントファミリー変更
  * - カスタムCSS設定
  * - 設定の永続化
  *
- * Requirement 7: 設定タブの名前表示
+ * 設定タブの名前表示
  * - 設定ページのタブタイトルに「設定」と表示される
  * - 「新しいタブ」ではなく適切な名前が表示される
  */
@@ -25,10 +24,9 @@ import { waitForCondition } from './utils/polling-utils';
 
 /**
  * 設定ページを新規タブで開くヘルパー関数
- * Task 9.1: サイドパネルから設定ボタンを削除
  *
  * 設定ページのURLに直接アクセスして開く
- * （ポップアップメニュー実装後はそちらからもアクセス可能になる予定）
+ * （ポップアップメニューからもアクセス可能）
  *
  * @param extensionContext - BrowserContext
  * @param extensionId - 拡張機能のID
@@ -50,10 +48,9 @@ async function openSettingsInNewTab(
 }
 
 test.describe('設定変更とUI/UXカスタマイゼーション', () => {
-  test('サイドパネルに設定ボタンが存在しない（要件20.1）', async ({
+  test('サイドパネルに設定ボタンが存在しない', async ({
     sidePanelPage,
   }) => {
-    // Task 9.1: サイドパネルから設定ボタンを削除
     // Arrange: Side Panelが表示されていることを確認
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
@@ -328,8 +325,6 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   test('サイドパネル内には設定パネルが表示されない', async ({
     sidePanelPage,
   }) => {
-    // Task 8.2: サイドパネル内部での設定画面表示を削除
-    // Task 9.1: サイドパネルから設定ボタンも削除（要件20.1）
     // Assert: Side Panelに設定パネル（data-testid="settings-panel"）が存在しない
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
@@ -339,20 +334,20 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     const settingsPanel = sidePanelPage.locator(COMMON_SELECTORS.settingsPanel);
     await expect(settingsPanel).not.toBeVisible();
 
-    // Task 9.1: 設定ボタンはサイドパネルから削除された（ポップアップメニューからアクセス）
+    // 設定ボタンはサイドパネルから削除された（ポップアップメニューからアクセス）
     const openSettingsButton = sidePanelPage.locator('[data-testid="open-settings-button"]');
     await expect(openSettingsButton).not.toBeVisible();
   });
 });
 
 /**
- * Requirement 7: 設定タブの名前表示
+ * 設定タブの名前表示
  * 設定ページのタブタイトルが適切に表示されることをテスト
  *
- * comprehensive-bugfix Task 2.1: タイトルを英語「Settings」に統一
+ * タイトルを英語「Settings」に統一
  */
-test.describe('設定タブの名前表示（Requirement 7）', () => {
-  test('設定ページのタブタイトルが「Settings」である（要件7.1, 7.2）', async ({
+test.describe('設定タブの名前表示', () => {
+  test('設定ページのタブタイトルが「Settings」である', async ({
     extensionContext,
     extensionId,
   }) => {
@@ -371,7 +366,7 @@ test.describe('設定タブの名前表示（Requirement 7）', () => {
     await settingsPage.close();
   });
 
-  test('設定ページのタブタイトルが「新しいタブ」ではない（要件7.2）', async ({
+  test('設定ページのタブタイトルが「新しいタブ」ではない', async ({
     extensionContext,
     extensionId,
   }) => {
@@ -394,9 +389,8 @@ test.describe('設定タブの名前表示（Requirement 7）', () => {
 });
 
 /**
- * Task 12.4: 設定画面のE2Eテストを追加する
+ * スナップショット自動保存設定のE2Eテスト
  * スナップショット自動保存設定が保存・反映されることをテスト
- * Requirements: 6.1, 6.2, 6.3, 6.5
  */
 test.describe('スナップショット自動保存設定', () => {
   test('スナップショット自動保存のトグルが機能する', async ({

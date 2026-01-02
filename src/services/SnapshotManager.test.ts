@@ -11,8 +11,6 @@ import type {
 
 /**
  * SnapshotManager のユニットテスト
- * Task 14.1: SnapshotManager サービスの実装
- * Requirements: 11.1, 11.2, 11.3
  */
 describe('SnapshotManager', () => {
   let snapshotManager: SnapshotManager;
@@ -112,7 +110,7 @@ describe('SnapshotManager', () => {
 
   describe('createSnapshot', () => {
     it('should create a snapshot with current state', async () => {
-      // Requirement 11.1: スナップショットコマンドを実行する
+      // スナップショットコマンドを実行する
       const snapshot = await snapshotManager.createSnapshot('Test Snapshot');
 
       // スナップショットが作成されることを確認
@@ -127,7 +125,7 @@ describe('SnapshotManager', () => {
       expect(snapshot.data.groups).toEqual(testGroups);
       expect(snapshot.data.tabs).toHaveLength(2);
 
-      // Requirement 11.2: タブのURL、タイトル、親子関係、グループ情報を含む
+      // タブのURL、タイトル、親子関係、グループ情報を含む
       // chrome.tabsモックが必要だが、今はタブの構造だけ確認
       expect(snapshot.data.tabs[0]).toHaveProperty('url');
       expect(snapshot.data.tabs[0]).toHaveProperty('title');
@@ -147,7 +145,7 @@ describe('SnapshotManager', () => {
 
   describe('restoreSnapshot', () => {
     it('should restore snapshot from IndexedDB', async () => {
-      // Requirement 11.3: スナップショットをインポートする
+      // スナップショットをインポートする
       const mockSnapshot: Snapshot = {
         id: 'snapshot-123',
         createdAt: new Date('2024-01-01'),

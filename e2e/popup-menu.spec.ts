@@ -1,9 +1,6 @@
 /**
  * ポップアップメニューのE2Eテスト
  *
- * Task 10.2: ポップアップメニューテスト
- * Requirements: 20.2, 20.3, 20.4, 21.1, 21.2, 21.3
- *
  * テスト対象:
  * 1. ポップアップメニューの表示
  * 2. 設定ページを開く機能
@@ -13,7 +10,7 @@
 import { test, expect } from './fixtures/extension';
 
 test.describe('ポップアップメニュー', () => {
-  test.describe('ポップアップメニューの表示 (Requirement 20.2)', () => {
+  test.describe('ポップアップメニューの表示', () => {
     test('ポップアップページが正しく読み込まれる', async ({
       extensionContext,
       extensionId,
@@ -80,7 +77,7 @@ test.describe('ポップアップメニュー', () => {
     });
   });
 
-  test.describe('設定ページを開く機能 (Requirements 20.3, 20.4)', () => {
+  test.describe('設定ページを開く機能', () => {
     test('「設定を開く」ボタンをクリックすると設定ページが開く', async ({
       extensionContext,
       extensionId,
@@ -119,7 +116,7 @@ test.describe('ポップアップメニュー', () => {
     });
   });
 
-  test.describe('スナップショット取得機能 (Requirements 21.1, 21.2, 21.3)', () => {
+  test.describe('スナップショット取得機能', () => {
     test('「スナップショットを取得」ボタンをクリックするとスナップショットが取得される', async ({
       extensionContext,
       extensionId,

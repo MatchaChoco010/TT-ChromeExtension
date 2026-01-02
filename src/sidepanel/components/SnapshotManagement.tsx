@@ -15,8 +15,8 @@ interface SnapshotManagementProps {
 /**
  * スナップショット管理統合コンポーネント
  *
- * Task 14.3: スナップショット履歴管理
- * Requirements: 11.6 - スナップショット一覧表示、削除、エクスポート/インポート、古いスナップショット削除機能
+ * スナップショット履歴管理
+ * スナップショット一覧表示、削除、エクスポート/インポート、古いスナップショット削除機能
  *
  * 機能:
  * - SnapshotManager を使用してスナップショットを管理
@@ -126,7 +126,7 @@ const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
 
   /**
    * 古いスナップショットを削除
-   * Requirements: 11.6 - 最新N件を保持、それ以外を削除
+   * 最新N件を保持、それ以外を削除
    */
   const handleCleanupOldSnapshots = async () => {
     try {

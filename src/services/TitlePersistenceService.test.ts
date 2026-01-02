@@ -4,7 +4,7 @@ import type { IStorageService, StorageSchema } from '@/types';
 
 /**
  * TitlePersistenceService のユニットテスト
- * Requirement 5.1, 5.2, 5.3, 5.4: タブタイトル永続化サービス
+ * タブタイトル永続化サービス
  */
 
 // モックStorageService
@@ -38,7 +38,7 @@ describe('TitlePersistenceService', () => {
   });
 
   describe('saveTitle', () => {
-    it('Requirement 5.1: タブのタイトルが確定した場合、タイトルをストレージに永続化する', async () => {
+    it('タブのタイトルが確定した場合、タイトルをストレージに永続化する', async () => {
       // Arrange
       const tabId = 123;
       const title = 'Test Page Title';
@@ -90,7 +90,7 @@ describe('TitlePersistenceService', () => {
       expect(mockStorage.set).toHaveBeenCalledWith('tab_titles', { [tabId]: 'Final Title' });
     });
 
-    it('Requirement 5.3: タブが再読み込みされ新しいタイトルが取得された場合、永続化データを上書きする', async () => {
+    it('タブが再読み込みされ新しいタイトルが取得された場合、永続化データを上書きする', async () => {
       // Arrange - 既存のタイトルを設定
       service.saveTitle(123, 'Old Title');
       await vi.runAllTimersAsync();
@@ -105,7 +105,7 @@ describe('TitlePersistenceService', () => {
   });
 
   describe('getTitle', () => {
-    it('Requirement 5.2: 永続化されたタイトルを取得できる', async () => {
+    it('永続化されたタイトルを取得できる', async () => {
       // Arrange
       service.saveTitle(123, 'Stored Title');
       await vi.runAllTimersAsync();
@@ -127,7 +127,7 @@ describe('TitlePersistenceService', () => {
   });
 
   describe('getAllTitles', () => {
-    it('Requirement 5.2: すべての永続化タイトルを取得できる', async () => {
+    it('すべての永続化タイトルを取得できる', async () => {
       // Arrange
       service.saveTitle(123, 'Title 1');
       service.saveTitle(456, 'Title 2');
@@ -145,7 +145,7 @@ describe('TitlePersistenceService', () => {
   });
 
   describe('removeTitle', () => {
-    it('Requirement 5.4: タブが閉じられた際に該当タブのタイトルデータを削除する', async () => {
+    it('タブが閉じられた際に該当タブのタイトルデータを削除する', async () => {
       // Arrange
       service.saveTitle(123, 'Title to Remove');
       service.saveTitle(456, 'Title to Keep');
@@ -181,7 +181,7 @@ describe('TitlePersistenceService', () => {
   });
 
   describe('loadFromStorage', () => {
-    it('Requirement 5.2: ブラウザ起動時に永続化されたタイトルを復元する', async () => {
+    it('ブラウザ起動時に永続化されたタイトルを復元する', async () => {
       // Arrange - ストレージに既存データがある状態をシミュレート
       mockStorage.mockData['tab_titles'] = {
         123: 'Persisted Title 1',

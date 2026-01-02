@@ -15,8 +15,6 @@ interface GroupNodeProps {
  * グループノードのUIコンポーネント
  * グループページのカスタマイズ可能なタイトルと色を表示し、
  * グループのクリック時に概要を表示、展開/折りたたみ機能を提供します。
- *
- * Requirements: 5.2, 5.3, 5.4
  */
 const GroupNode: React.FC<GroupNodeProps> = ({
   group,

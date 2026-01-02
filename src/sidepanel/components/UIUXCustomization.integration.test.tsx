@@ -1,11 +1,9 @@
 /**
- * Task 13.4: UI/UXカスタマイズのテスト
+ * UI/UXカスタマイズのテスト
  *
- * このテストは、以下のAcceptance Criteriaを検証します:
- * - Acceptance Criteria 10.2: フォントサイズ変更がすべてのタブアイテムに適用される
- * - Acceptance Criteria 10.5: カスタムCSSが適用されてスタイルがオーバーライドされる
- *
- * Requirements: 10.2, 10.5
+ * このテストは、以下を検証します:
+ * - フォントサイズ変更がすべてのタブアイテムに適用される
+ * - カスタムCSSが適用されてスタイルがオーバーライドされる
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
@@ -16,7 +14,7 @@ import TreeNode from './TreeNode';
 import type { UserSettings, TabNode, TabInfo, StorageChanges } from '@/types';
 import type { StorageChangeListener } from '@/test/test-types';
 
-describe('Task 13.4: UI/UXカスタマイズのインテグレーションテスト', () => {
+describe('UI/UXカスタマイズのインテグレーションテスト', () => {
   let mockGet: ReturnType<typeof vi.fn>;
   let mockSet: ReturnType<typeof vi.fn>;
   let onChangedListeners: StorageChangeListener[] = [];
@@ -74,7 +72,7 @@ describe('Task 13.4: UI/UXカスタマイズのインテグレーションテス
     vi.clearAllMocks();
   });
 
-  describe('Acceptance Criteria 10.2: フォントサイズ変更がすべてのタブアイテムに適用される', () => {
+  describe('フォントサイズ変更がすべてのタブアイテムに適用される', () => {
     it('should apply font size changes to all tab items in the side panel', async () => {
       const initialSettings: UserSettings = {
         fontSize: 14,
@@ -292,7 +290,7 @@ describe('Task 13.4: UI/UXカスタマイズのインテグレーションテス
     });
   });
 
-  describe('Acceptance Criteria 10.5: カスタムCSSが適用されてスタイルがオーバーライドされる', () => {
+  describe('カスタムCSSが適用されてスタイルがオーバーライドされる', () => {
     it('should apply custom CSS and override default styles', async () => {
       const customCSS = `
         .tab-item {

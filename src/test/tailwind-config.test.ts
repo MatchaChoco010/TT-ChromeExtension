@@ -1,6 +1,6 @@
 /**
  * Test for Tailwind CSS configuration
- * Requirement 2.1, 2.2: タブツリー背景色の無彩色化
+ * タブツリー背景色の無彩色化
  * - grayパレットがneutralで上書きされていること
  * - ダークブルーではなく無彩色が適用されること
  */

@@ -1,13 +1,5 @@
 /**
- * Task 16.4 & Task 6.1: 子タブの独立ドラッグ操作テスト
- *
- * Requirements 3.2.1, 3.2.3:
- * - 子タブをドラッグした際に親タブを追従させず、子タブのみ移動可能にする
- * - 子タブを親から切り離して別の位置にドロップ可能にする
- *
- * Requirements 11.1, 11.3 (Task 6.1):
- * - ドラッグで親子関係を解消した状態が維持されること
- * - 元子タブの`parentId`がnullまたは新しい親IDに正しく更新されること
+ * 子タブの独立ドラッグ操作テスト
  *
  * このテストスイートでは、親子関係にあるタブの独立ドラッグ操作を検証します。
  * - 子タブのみをドラッグして別の親の子として移動
@@ -23,7 +15,7 @@ import { createTab, assertTabInTree } from './utils/tab-utils';
 import { moveTabToParent, getParentTabId, getTabDepth, moveTabToRoot } from './utils/drag-drop-utils';
 import { waitForParentChildRelation, waitForTabNoParent } from './utils/polling-utils';
 
-test.describe('Task 16.4: 子タブの独立ドラッグ操作', () => {
+test.describe('子タブの独立ドラッグ操作', () => {
   // タイムアウトを延長
   test.setTimeout(120000);
 
@@ -303,13 +295,12 @@ test.describe('Task 16.4: 子タブの独立ドラッグ操作', () => {
 });
 
 /**
- * Task 6.1: ドラッグによる親子関係解消の確実な反映
+ * ドラッグによる親子関係解消の確実な反映
  *
- * Requirements 11.1, 11.3:
  * - 子タブをドラッグして親タブから取り出し兄弟関係にした場合、親子関係が解消された状態が維持される
  * - ドラッグで解消した親子関係が後続の操作で復活しないこと
  */
-test.describe('Task 6.1: 親子関係解消の永続化', () => {
+test.describe('親子関係解消の永続化', () => {
   // タイムアウトを延長
   test.setTimeout(120000);
 
@@ -522,13 +513,12 @@ test.describe('Task 6.1: 親子関係解消の永続化', () => {
 });
 
 /**
- * Task 6.2: 元子タブからの新規タブ作成
+ * 元子タブからの新規タブ作成
  *
- * Requirement 11.2:
  * - 親子関係解消後の元子タブからリンクを開いた場合、元子タブの子として作成されること
  * - 元親タブの子タブにならないことを検証
  */
-test.describe('Task 6.2: 元子タブからの新規タブ作成', () => {
+test.describe('元子タブからの新規タブ作成', () => {
   // タイムアウトを延長
   test.setTimeout(120000);
 
@@ -719,16 +709,11 @@ test.describe('Task 6.2: 元子タブからの新規タブ作成', () => {
 });
 
 /**
- * Task 6.3: E2Eテスト追加：親子関係解消の永続化
- *
- * Requirements 11.4, 11.5, 11.6:
- * - 親子関係解消の永続化 shall E2Eテストで検証されること
- * - 親子関係E2Eテスト shall 元子タブからの新規タブ作成を含めて検証すること
- * - 親子関係E2Eテスト shall `--repeat-each=10`で安定して通過すること
+ * E2Eテスト追加：親子関係解消の永続化
  *
  * このテストスイートでは、親子関係解消の永続化に関する包括的なテストを追加します。
  */
-test.describe('Task 6.3: 親子関係解消の永続化（包括的テスト）', () => {
+test.describe('親子関係解消の永続化（包括的テスト）', () => {
   // タイムアウトを延長
   test.setTimeout(120000);
 

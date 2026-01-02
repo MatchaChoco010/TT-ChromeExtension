@@ -1,7 +1,7 @@
 /**
- * Task 6.1: useDragDropフックの単体テスト
- * Requirement 3.1.2, 3.1.3: mousedown/mousemove/mouseupイベントでドラッグ操作を処理
- * Requirement 3.1.3: 8px移動検知によるドラッグ開始
+ * useDragDropフックの単体テスト
+ * mousedown/mousemove/mouseupイベントでドラッグ操作を処理
+ * 8px移動検知によるドラッグ開始
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

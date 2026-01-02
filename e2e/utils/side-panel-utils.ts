@@ -2,8 +2,6 @@
  * SidePanelUtils
  *
  * Side Panelの表示、リアルタイム更新検証、スクロール操作の共通ヘルパー関数
- *
- * Requirements: 3.7
  */
 import type { BrowserContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';

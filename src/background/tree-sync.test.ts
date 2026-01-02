@@ -1,6 +1,5 @@
 /**
- * Task 5.4: ツリー同期とリアルタイム更新のテスト
- * Requirements: 1.4, 2.1
+ * ツリー同期とリアルタイム更新のテスト
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -41,7 +40,7 @@ const mockChrome = {
 // グローバルchromeオブジェクトをモック（vi.stubGlobalを使用）
 vi.stubGlobal('chrome', mockChrome);
 
-describe('Task 5.4: ツリー同期とリアルタイム更新', () => {
+describe('ツリー同期とリアルタイム更新', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

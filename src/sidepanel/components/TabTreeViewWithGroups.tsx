@@ -9,8 +9,7 @@ import { useAutoScroll } from '../hooks/useAutoScroll';
 import { DragOverlay } from './DragOverlay';
 
 /**
- * Task 11.1: タブグループをツリービュー内に表示するコンポーネント
- * Requirements: 2.1, 2.3
+ * タブグループをツリービュー内に表示するコンポーネント
  *
  * このコンポーネントは、タブグループを通常のタブと同じツリービュー内に統合して表示します:
  * - グループノードがタブと同じツリービュー内に表示される
@@ -50,9 +49,7 @@ interface GroupTreeNodeProps {
 }
 
 /**
- * Task 11.2: ドラッグ可能なグループツリーノードのprops
- * Requirements: 2.2
- * Task 12.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropへ移行
+ * ドラッグ可能なグループツリーノードのprops
  */
 interface DraggableGroupTreeNodeProps extends GroupTreeNodeProps {
   /** 自前D&D: このグループがドラッグ中かどうか */
@@ -221,7 +218,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Task 3.1: 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
+        {/* 未読インジケーター */}
         <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
         {/* 展開/折りたたみボタン */}
         {hasChildren && (
@@ -265,12 +262,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           </div>
         ) : null}
 
-        {/* タブの内容 - Task 2.3 (tab-tree-bugfix-2): タイトルと右端固定要素を分離 */}
+        {/* タブの内容 */}
         <div
           data-testid="tab-content"
           className="flex-1 flex items-center justify-between min-w-0"
         >
-          {/* タブタイトルエリア - Task 2.3 (tab-tree-bugfix-2): 左側エリア */}
+          {/* タブタイトルエリア */}
           <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
             <span
               className="truncate"
@@ -279,8 +276,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               {getTabInfo ? (tabInfo ? tabInfo.title : 'Loading...') : `Tab ${node.tabId}`}
             </span>
           </div>
-          {/* Task 2.3 (tab-tree-bugfix-2): 右端固定コンテナ - 閉じるボタン */}
-          {/* Requirement 16.1, 16.2: 親タブへの不要なバッジ表示は削除 */}
+          {/* 右端固定コンテナ - 閉じるボタン */}
           <div
             data-testid="right-actions-container"
             className="flex items-center flex-shrink-0 ml-2"
@@ -432,10 +428,7 @@ export const TabTreeViewWithGroups: React.FC<TabTreeViewWithGroupsProps> = ({
 export default TabTreeViewWithGroups;
 
 /**
- * Task 11.2: ドラッグ可能なグループツリーノードコンポーネント
- * Requirements: 2.2
- * Task 12.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropへ移行
- *
+ * ドラッグ可能なグループツリーノードコンポーネント
  * グループをドラッグ可能にして、グループ単位での移動を可能にする
  */
 const DraggableGroupTreeNode: React.FC<DraggableGroupTreeNodeProps> = ({
@@ -533,10 +526,7 @@ const DraggableGroupTreeNode: React.FC<DraggableGroupTreeNodeProps> = ({
 };
 
 /**
- * Task 11.2: ドラッグ可能なタブグループ統合ツリービュー
- * Requirements: 2.2
- * Task 12.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropへ移行
- *
+ * ドラッグ可能なタブグループ統合ツリービュー
  * タブグループとタブをドラッグ&ドロップで並び替え可能にする
  */
 interface DraggableTabTreeViewWithGroupsProps extends TabTreeViewWithGroupsProps {
@@ -594,7 +584,7 @@ export const DraggableTabTreeViewWithGroups: React.FC<DraggableTabTreeViewWithGr
     return { groupedNodes: grouped, ungroupedNodes: ungrouped };
   }, [filteredNodes, groups]);
 
-  // 自前D&D用のアイテムリストを生成
+  // D&D用のアイテムリストを生成
   const items = useMemo(() => {
     const result: Array<{ id: string; tabId: number }> = [];
 
@@ -611,7 +601,6 @@ export const DraggableTabTreeViewWithGroups: React.FC<DraggableTabTreeViewWithGr
     return result;
   }, [groups, ungroupedNodes]);
 
-  // Task 12.1: 自前D&Dフックを使用
   const {
     dragState,
     getItemProps,

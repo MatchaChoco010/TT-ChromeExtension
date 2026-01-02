@@ -3,7 +3,6 @@
  *
  * 選択状態の自動解除機能の E2E テスト
  *
- * Requirements: 15.1, 15.2
  * - 新しいタブが開かれたときにタブ選択状態が解除されること
  * - タブクローズ等の操作時にも選択状態が解除されること
  *
@@ -15,8 +14,8 @@ import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
 import { waitForTabInTreeState, waitForTabRemovedFromTreeState } from './utils/polling-utils';
 
-test.describe('Task 4.1: 選択状態の自動解除', () => {
-  test.describe('Requirement 15.1: 新しいタブが開かれたときにタブ選択状態が解除される', () => {
+test.describe('選択状態の自動解除', () => {
+  test.describe('新しいタブが開かれたときにタブ選択状態が解除される', () => {
     test('新しいタブを開くと複数選択状態が解除される', async ({
       extensionContext,
       sidePanelPage,
@@ -61,7 +60,7 @@ test.describe('Task 4.1: 選択状態の自動解除', () => {
     });
   });
 
-  test.describe('Requirement 15.2: タブクローズ等の操作時にも選択状態が解除される', () => {
+  test.describe('タブクローズ等の操作時にも選択状態が解除される', () => {
     test('タブをクローズすると選択状態が解除される', async ({
       extensionContext,
       sidePanelPage,

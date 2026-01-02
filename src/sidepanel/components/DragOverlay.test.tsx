@@ -1,7 +1,7 @@
 /**
- * Task 6.3: DragOverlayコンポーネントのテスト
+ * DragOverlayコンポーネントのテスト
  *
- * Requirement 3.1.4: ドラッグ中の要素をマウスカーソルに追従させること
+ * ドラッグ中の要素をマウスカーソルに追従させること
  */
 
 import { render, screen } from '@testing-library/react';

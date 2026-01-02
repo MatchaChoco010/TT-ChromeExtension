@@ -1,6 +1,5 @@
 /**
- * Task 6.3: ドラッグ&ドロップによるツリー再構成のテスト
- * Requirements: 3.2, 3.3
+ * ドラッグ&ドロップによるツリー再構成のテスト
  *
  * このテストは以下をカバーします:
  * - タブを別タブの子として配置する処理
@@ -13,7 +12,7 @@ import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider'
 import type { TreeState, DragEndEvent } from '@/types';
 import { getMockChrome } from '@/test/test-types';
 
-describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () => {
+describe('ドラッグ&ドロップによるツリー再構成', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -85,7 +84,6 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
-        // Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
         onCreated: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
@@ -94,20 +92,18 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
-        // Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
         onMoved: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
       },
-      // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
       windows: {
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
       },
     } as unknown as typeof chrome;
   });
 
-  it('タブを別のタブの子として配置できる (Acceptance Criteria 3.2)', async () => {
+  it('タブを別のタブの子として配置できる', async () => {
     // useTreeStateから直接handleDragEndを取得して呼び出すためのコンポーネント
     let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
     let testTreeState: TreeState | null = null;
@@ -173,7 +169,7 @@ describe('Task 6.3: ドラッグ&ドロップによるツリー再構成', () =>
     expect(savedState.nodes['node-2'].depth).toBe(1);
   });
 
-  it('タブを同階層で順序変更できる (Acceptance Criteria 3.3)', async () => {
+  it('タブを同階層で順序変更できる', async () => {
     // 同階層での順序変更のテスト
     // このテストは、タブを別のタブの子として配置する処理を確認する
 

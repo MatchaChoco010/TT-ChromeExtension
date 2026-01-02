@@ -1,16 +1,15 @@
 /**
- * Task 13.2: useCrossWindowDragフックの実装
- * Task 7.2 (comprehensive-bugfix): mousemoveによるホバー検知とセッションキャッシュを追加
+ * useCrossWindowDragフックの実装
+ * mousemoveによるホバー検知とセッションキャッシュを追加
  *
- * Requirements:
- * - 6.1: 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
- * - 6.2: クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
- * - 6.3: クロスウィンドウドラッグはドラッグアウトとして判定されない
- * - 6.4: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
- * - 6.5: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
- * - 6.7: Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
- * - 4.4 (Task 7.2): mousemoveイベントでホバー検知し、別ウィンドウへのフォーカス移動を通知
- * - 4.5 (Task 7.2): バックグラウンドスロットリング回避のためのフォーカス移動
+ * - 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
+ * - クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
+ * - クロスウィンドウドラッグはドラッグアウトとして判定されない
+ * - ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
+ * - ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
+ * - Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
+ * - mousemoveイベントでホバー検知し、別ウィンドウへのフォーカス移動を通知
+ * - バックグラウンドスロットリング回避のためのフォーカス移動
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { RefObject } from 'react';
@@ -38,7 +37,6 @@ export interface UseCrossWindowDragProps {
 /**
  * クロスウィンドウドラッグの検知と処理を行うフック
  *
- * Task 7.2 (comprehensive-bugfix):
  * - mouseenterイベントでドラッグセッションをチェックし、別ウィンドウからのドラッグの場合はタブ移動を実行
  * - mousemoveイベントでツリービュー上のホバーを検知し、Service Workerに通知（バックグラウンドスロットリング回避）
  * - セッション状態のローカルキャッシュを実装（パフォーマンス最適化）
@@ -49,11 +47,11 @@ export function useCrossWindowDrag({
 }: UseCrossWindowDragProps): void {
   const currentWindowIdRef = useRef<number | null>(null);
   const onDragReceivedRef = useRef(onDragReceived);
-  // Task 7.2: セッション状態のローカルキャッシュ
+  // セッション状態のローカルキャッシュ
   const [cachedSession, setCachedSession] = useState<DragSession | null>(null);
-  // Task 7.2: 重複通知防止のためのウィンドウID記録
+  // 重複通知防止のためのウィンドウID記録
   const lastNotifiedWindowRef = useRef<number | null>(null);
-  // Task 7.2: セッション更新用インターバルID
+  // セッション更新用インターバルID
   const sessionPollingIntervalRef = useRef<number | null>(null);
 
   // コールバックの更新を同期
@@ -69,7 +67,7 @@ export function useCrossWindowDrag({
   }, []);
 
   /**
-   * Task 7.2: セッション状態をポーリングで更新
+   * セッション状態をポーリングで更新
    * mousemove毎にService Workerに問い合わせるとパフォーマンスが悪いため、
    * 定期的にセッション状態を取得してキャッシュする
    */
@@ -153,18 +151,16 @@ export function useCrossWindowDrag({
       // 移動成功：ドラッグ状態を継続
       onDragReceivedRef.current(session.tabId, { x: e.clientX, y: e.clientY });
     } catch (error) {
-      // エラー時はサイレントにログを出力（Requirement 6.7）
+      // エラー時はサイレントにログを出力
       console.error('[CrossWindowDrag] Failed to move tab:', error);
       // onDragReceivedは呼ばない（ドラッグをキャンセル）
     }
   }, []);
 
   /**
-   * Task 7.2: mousemoveイベントハンドラ
+   * mousemoveイベントハンドラ
    * ツリービュー上のホバーを検知し、Service Workerに通知
    * バックグラウンドスロットリング回避のためフォーカス移動を実行
-   *
-   * Requirements: 4.4, 4.5
    */
   const handleMouseMove = useCallback(async () => {
     const currentWindowId = currentWindowIdRef.current;

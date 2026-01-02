@@ -1,8 +1,7 @@
 /**
  * ドラッグ&ドロップのホバー自動展開テスト
  *
- * Task 8.8: drag-drop-hover.spec.tsの書き直し（tab-tree-bugfix-2）
- * Requirements: 3.2.1, 3.2.3
+ * drag-drop-hover.spec.tsの書き直し（tab-tree-bugfix-2）
  *
  * このテストスイートでは、ドラッグ中のホバー自動展開機能を検証します。
  * - 折りたたまれた親タブの上にタブをホバーした場合の自動展開

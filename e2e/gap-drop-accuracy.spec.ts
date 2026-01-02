@@ -1,9 +1,6 @@
 /**
  * Gapドロップ精度のE2Eテスト
  *
- * Task 8.10 (tab-tree-bugfix-2): 自前D&D実装用に書き直し
- * Requirements: 3.2.1, 3.2.3
- *
  * このテストスイートでは、タブ間隙間へのドロップ精度を検証します。
  * - タブ間隙間へのドロップで正確な位置に配置されること
  * - 異なる深度の隙間へのドロップを検証
@@ -82,7 +79,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
   // タイムアウトを120秒に設定
   test.setTimeout(120000);
 
-  test.describe('Requirement 3.4: タブ間隙間へのドロップで正確な位置に配置されること', () => {
+  test.describe('タブ間隙間へのドロップで正確な位置に配置されること', () => {
     test('タブをGap領域にドロップすると、ドロップ操作が正常に完了すること', async ({
       extensionContext,
       sidePanelPage,
@@ -191,7 +188,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
     });
   });
 
-  test.describe('Requirement 3.5: 異なる深度の隙間へのドロップを検証', () => {
+  test.describe('異なる深度の隙間へのドロップを検証', () => {
     test('親子関係があるツリーでGapドロップが正しく動作すること', async ({
       extensionContext,
       sidePanelPage,
@@ -297,7 +294,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
     });
   });
 
-  test.describe('Requirement 3.6: テストの安定性', () => {
+  test.describe('テストの安定性', () => {
     test('Gapドロップ後にすべてのタブがUIに表示され続けること', async ({
       extensionContext,
       sidePanelPage,

@@ -1,7 +1,6 @@
 /**
  * SubMenu コンポーネントのテスト
- * Task 7.1: 汎用サブメニューコンポーネントを作成
- * Requirements: 18.1, 18.2
+ * 汎用サブメニューコンポーネントを作成
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -28,7 +27,7 @@ describe('SubMenu', () => {
     toJSON: () => ({}),
   };
 
-  describe('Requirement 18.1: 親メニュー項目ホバーで子メニューを表示', () => {
+  describe('親メニュー項目ホバーで子メニューを表示', () => {
     it('サブメニューが正しく表示される', () => {
       const onSelect = vi.fn();
       const onClose = vi.fn();
@@ -132,7 +131,7 @@ describe('SubMenu', () => {
     });
   });
 
-  describe('Requirement 18.2: 画面端での位置自動調整', () => {
+  describe('画面端での位置自動調整', () => {
     it('デフォルトでは親メニューの右側に表示される', () => {
       const onSelect = vi.fn();
       const onClose = vi.fn();
@@ -321,7 +320,7 @@ describe('SubMenu', () => {
     });
   });
 
-  describe('テキスト選択の無効化 (Task 4.4: Requirement 11.2)', () => {
+  describe('テキスト選択の無効化', () => {
     it('サブメニュー要素にuser-select: noneが適用されていること', () => {
       const onSelect = vi.fn();
       const onClose = vi.fn();

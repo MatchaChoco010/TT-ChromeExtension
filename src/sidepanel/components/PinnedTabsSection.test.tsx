@@ -21,15 +21,15 @@ describe('PinnedTabsSection', () => {
     status: 'complete',
     isPinned,
     windowId: 1,
-    discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
-    index, // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブの順序同期
+    discarded: false, // 休止タブ状態
+    index, // ピン留めタブの順序同期
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('基本的な表示 (Requirements 12.1, 12.2)', () => {
+  describe('基本的な表示', () => {
     it('ピン留めタブをファビコンサイズで横並びに表示すること', () => {
       const pinnedTabIds = [1, 2, 3];
       const tabInfoMap: TabInfoMap = {
@@ -97,7 +97,7 @@ describe('PinnedTabsSection', () => {
     });
   });
 
-  describe('区切り線の表示 (Requirements 12.3, 12.4)', () => {
+  describe('区切り線の表示', () => {
     it('ピン留めタブと通常タブの間に区切り線を表示すること', () => {
       const pinnedTabIds = [1];
       const tabInfoMap: TabInfoMap = {
@@ -119,7 +119,7 @@ describe('PinnedTabsSection', () => {
     });
   });
 
-  describe('非表示条件 (Requirement 12.1)', () => {
+  describe('非表示条件', () => {
     it('ピン留めタブが0件の場合はセクション自体を非表示にすること', () => {
       const pinnedTabIds: number[] = [];
       const tabInfoMap: TabInfoMap = {};
@@ -162,7 +162,7 @@ describe('PinnedTabsSection', () => {
     });
   });
 
-  describe('閉じるボタン - 要件1.1: ピン留めタブには閉じるボタンを表示しない', () => {
+  describe('閉じるボタン - ピン留めタブには閉じるボタンを表示しない', () => {
     it('ピン留めタブにホバーしても閉じるボタンが表示されないこと', async () => {
       const user = userEvent.setup();
       const pinnedTabIds = [1];
@@ -183,7 +183,7 @@ describe('PinnedTabsSection', () => {
       // 初期状態では閉じるボタンは表示されない
       expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
 
-      // ホバーしても閉じるボタンは表示されない（要件1.1）
+      // ホバーしても閉じるボタンは表示されない
       await user.hover(pinnedTab);
       expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
 
@@ -254,7 +254,7 @@ describe('PinnedTabsSection', () => {
     });
   });
 
-  describe('アクティブタブハイライト - Requirements 5.1, 5.2, 5.3, 5.4 (tab-tree-bugfix)', () => {
+  describe('アクティブタブハイライト', () => {
     it('activeTabIdが渡された場合、該当のピン留めタブがハイライト表示されること', () => {
       const pinnedTabIds = [1, 2, 3];
       const tabInfoMap: TabInfoMap = {
@@ -356,7 +356,7 @@ describe('PinnedTabsSection', () => {
     });
   });
 
-  describe('コンテキストメニュー - 要件1.6, 1.7: ピン留め解除', () => {
+  describe('コンテキストメニュー - ピン留め解除', () => {
     const mockOnContextMenu = vi.fn();
 
     it('ピン留めタブを右クリックするとonContextMenuが呼ばれること', async () => {
@@ -404,7 +404,7 @@ describe('PinnedTabsSection', () => {
     });
   });
 
-  describe('ドラッグ＆ドロップ並び替え - Requirements 10.1, 10.2, 10.3, 10.4 (tab-tree-bugfix)', () => {
+  describe('ドラッグ＆ドロップ並び替え', () => {
     const mockOnPinnedTabReorder = vi.fn();
 
     beforeEach(() => {

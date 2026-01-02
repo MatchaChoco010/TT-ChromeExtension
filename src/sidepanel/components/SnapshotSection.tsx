@@ -2,8 +2,7 @@
  * SnapshotSection コンポーネント
  *
  * Side Panel内でスナップショット機能を提供するセクション
- * Task 4.10: スナップショット機能の実装とテスト
- * Requirement 3.10: スナップショット機能
+ * スナップショット機能の実装とテスト
  */
 import React, { useState, useRef, useEffect } from 'react';
 import type { Snapshot, IIndexedDBService, IStorageService } from '@/types';

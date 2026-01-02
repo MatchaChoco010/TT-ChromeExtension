@@ -1,11 +1,5 @@
 /**
  * ThemeProvider テスト
- *
- * Requirements:
- * - 10.4: カスタムCSSファイルのロード機能を提供
- * - 10.5: カスタムCSSを適用してスタイルをオーバーライド
- * - 10.6: カスタムCSSのエラーを検出し、ユーザーに通知
- * - 14.4: Vivaldiのテーマ設定と調和するデフォルトスタイルを提供
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
@@ -29,7 +23,7 @@ const TestComponent: React.FC<{ onThemeLoad?: (settings: UserSettings | null) =>
   return <div data-testid="test-component">Test</div>;
 };
 
-describe('ThemeProvider - Task 13.3', () => {
+describe('ThemeProvider', () => {
   beforeEach(() => {
     // chromeMock をクリア
     vi.clearAllMocks();
@@ -51,7 +45,7 @@ describe('ThemeProvider - Task 13.3', () => {
     vi.clearAllMocks();
   });
 
-  describe('カスタムCSS適用 (Requirement 10.5)', () => {
+  describe('カスタムCSS適用', () => {
     it('カスタムCSSが正しく適用されること', async () => {
       const mockSettings: UserSettings = {
         fontSize: 14,
@@ -115,7 +109,7 @@ describe('ThemeProvider - Task 13.3', () => {
     });
   });
 
-  describe('カスタムCSSエラー検出 (Requirement 10.6)', () => {
+  describe('カスタムCSSエラー検出', () => {
     it('無効なCSSの場合、エラー通知を表示すること', async () => {
       const mockSettings: UserSettings = {
         fontSize: 14,
@@ -234,7 +228,7 @@ describe('ThemeProvider - Task 13.3', () => {
     });
   });
 
-  describe('Vivaldiテーマとの調和 (Requirement 14.4)', () => {
+  describe('Vivaldiテーマとの調和', () => {
     it('Vivaldiのダークテーマと調和するデフォルトスタイルを適用すること', async () => {
       // Vivaldiのダークテーマをシミュレート
       Object.defineProperty(window, 'matchMedia', {

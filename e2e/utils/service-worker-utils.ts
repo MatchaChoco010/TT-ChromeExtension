@@ -2,8 +2,6 @@
  * ServiceWorkerUtils
  *
  * Service Workerとの通信、イベント監視、ライフサイクル検証の共通ヘルパー関数
- *
- * Requirements: 4.5
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 

@@ -291,7 +291,7 @@ describe('TreeNode', () => {
         />
       );
 
-      // Requirement 3.1, 3.2: アクティブタブは青い枠線ではなく背景色で控えめに識別
+      // アクティブタブは青い枠線ではなく背景色で控えめに識別
       expect(treeNodeElement).toHaveClass('bg-gray-200');
       // 青い枠線が表示されないこと
       expect(treeNodeElement).not.toHaveClass('ring-2');
@@ -405,7 +405,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('タブを閉じる機能 (Requirement 8.1, 8.2)', () => {
+  describe('タブを閉じる機能', () => {
     it('マウスホバー時に閉じるボタンが表示されること', async () => {
       const user = userEvent.setup();
       const node = createMockNode('node-1', 1);
@@ -499,7 +499,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('確認ダイアログの統合 (Task 11.2: Requirement 8.3, 8.4)', () => {
+  describe('確認ダイアログの統合', () => {
     it('折りたたまれたブランチを持つ親タブを閉じようとすると確認ダイアログが表示されること', () => {
       const childNode = createMockNode('child-1', 2);
       const node = createMockNode('node-1', 1, 0, [childNode]);
@@ -512,7 +512,7 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          closeWarningThreshold={2} // Task 11.3: 閾値を2に設定（タブ数2なので表示される）
+          closeWarningThreshold={2} // 閾値を2に設定（タブ数2なので表示される）
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
@@ -574,7 +574,7 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          closeWarningThreshold={2} // Task 11.3: 閾値を2に設定（タブ数2なので表示される）
+          closeWarningThreshold={2} // 閾値を2に設定（タブ数2なので表示される）
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
@@ -607,7 +607,7 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          closeWarningThreshold={2} // Task 11.3: 閾値を2に設定（タブ数2なので表示される）
+          closeWarningThreshold={2} // 閾値を2に設定（タブ数2なので表示される）
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
@@ -686,7 +686,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('閉じるボタンの位置 (Task 4.1: Requirement 3.1, 3.2, 3.3)', () => {
+  describe('閉じるボタンの位置', () => {
     it('閉じるボタンがタブの右端に固定配置されていること', async () => {
       const user = userEvent.setup();
       const node = createMockNode('node-1', 1);
@@ -819,7 +819,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('警告閾値によるダイアログ制御 (Task 11.3: Requirement 8.5)', () => {
+  describe('警告閾値によるダイアログ制御', () => {
     it('サブツリーのタブ数が閾値未満の場合は確認ダイアログを表示しないこと', () => {
       // 閾値を5に設定、サブツリーは親+子1つ=2タブ
       const childNode = createMockNode('child-1', 2);
@@ -943,7 +943,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('タブタイトルの表示改善 (Task 4.2: Requirement 4.1, 4.2, 4.3, 4.4)', () => {
+  describe('タブタイトルの表示改善', () => {
     it('Loading状態の場合「Loading...」と表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -997,7 +997,7 @@ describe('TreeNode', () => {
       expect(screen.getByText('Loaded Page Title')).toBeInTheDocument();
     });
 
-    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // タイトルがURL形式でない場合はそのまま表示
     // chrome.tabs.Tab.titleを優先するため、ブラウザが設定したタイトルがそのまま表示される
     it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) でタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
@@ -1025,9 +1025,9 @@ describe('TreeNode', () => {
       expect(screen.getByText('Start Page')).toBeInTheDocument();
     });
 
-    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - タイトルがURL形式の場合も対応
+    // タイトルがURL形式の場合も対応
     it('タイトルがchrome://vivaldi-webui/startpage形式でURLが空の場合も「スタートページ」と表示されること', () => {
-      // Requirement 12.1, 12.2: Chromiumでは拡張機能にvivaldi-webui URLが公開されない場合がある
+      // Chromiumでは拡張機能にvivaldi-webui URLが公開されない場合がある
       // その場合、タイトルがURL形式になることがあるので、タイトルもチェックする
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1053,7 +1053,7 @@ describe('TreeNode', () => {
       expect(screen.getByText('スタートページ')).toBeInTheDocument();
     });
 
-    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // タイトルがURL形式でない場合はそのまま表示
     it('vivaldi://startpage URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1080,7 +1080,7 @@ describe('TreeNode', () => {
       expect(screen.getByText('Speed Dial')).toBeInTheDocument();
     });
 
-    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // タイトルがURL形式でない場合はそのまま表示
     it('chrome-extension://内部URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1107,7 +1107,7 @@ describe('TreeNode', () => {
       expect(screen.getByText('New Tab')).toBeInTheDocument();
     });
 
-    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // タイトルがURL形式でない場合はそのまま表示
     it('chrome://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1134,7 +1134,7 @@ describe('TreeNode', () => {
       expect(screen.getByText('New Tab')).toBeInTheDocument();
     });
 
-    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // タイトルがURL形式でない場合はそのまま表示
     it('vivaldi://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1280,7 +1280,7 @@ describe('TreeNode', () => {
       expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
     });
 
-    // Task 2.2 (comprehensive-bugfix): タイトルがURL形式でない場合はそのまま表示
+    // タイトルがURL形式でない場合はそのまま表示
     // about:blankはURL形式（スキーム://で始まる）ではないため、そのまま表示される
     it('about:blank URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
@@ -1309,7 +1309,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('テキスト選択の無効化 (Task 4.4: Requirement 11.1, 11.2, 11.3)', () => {
+  describe('テキスト選択の無効化', () => {
     it('タブ要素にuser-select: noneが適用されていること', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1);
@@ -1352,7 +1352,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('未読インジケーターの左下三角形表示 (Task 8.1: Requirement 8.1, 8.2, 8.3)', () => {
+  describe('未読インジケーターの左下三角形表示', () => {
     it('未読インジケーターがタブ要素内に表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, 'Test Tab');
@@ -1403,7 +1403,7 @@ describe('TreeNode', () => {
       });
     });
 
-    it('未読インジケーターがdepthに応じた位置にインデント表示されること（Requirement 9.1, 9.2, 9.3）', () => {
+    it('未読インジケーターがdepthに応じた位置にインデント表示されること', () => {
       const node = createMockNode('node-1', 1, 2); // depth: 2
       const tab = createMockTab(1, 'Test Tab');
 
@@ -1501,7 +1501,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('システムページタイトルのフレンドリー表示 (Task 3.2: Requirement 17.1)', () => {
+  describe('システムページタイトルのフレンドリー表示', () => {
     it('chrome://settingsのタイトルがURL形式の場合「設定」と表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1652,7 +1652,7 @@ describe('TreeNode', () => {
       expect(screen.getByText('ブックマーク')).toBeInTheDocument();
     });
 
-    // Task 2.2 (comprehensive-bugfix): about:blankはURL形式でないためそのまま表示
+    // about:blankはURL形式でないためそのまま表示
     it('about:blankのタイトルはURL形式でないためそのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       // about:blankはabout:スキームなのでスキーム://ではないため、URL形式とは判定されない
@@ -1810,7 +1810,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('拡張機能内部ページのタイトル表示 (Task 2.2 comprehensive-bugfix: Requirement 7.1-7.3)', () => {
+  describe('拡張機能内部ページのタイトル表示', () => {
     it('settings.htmlはHTMLのtitleタグで設定された「Settings」がそのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1894,7 +1894,7 @@ describe('TreeNode', () => {
     });
   });
 
-  describe('休止タブのグレーアウト表示 (Task 4.1 tab-tree-bugfix: Requirement 3.1, 3.2)', () => {
+  describe('休止タブのグレーアウト表示', () => {
     it('休止タブの場合、タイトルにグレーアウトスタイルが適用されること', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, 'Discarded Tab');

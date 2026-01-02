@@ -1,7 +1,6 @@
 /**
  * DropIndicator コンポーネントのユニットテスト
- * Task 4.1: DropIndicatorコンポーネントを作成する
- * Requirements: 7.2, 8.4, 16.4
+ * DropIndicatorコンポーネントを作成する
  */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
@@ -131,7 +130,7 @@ describe('DropIndicator', () => {
     });
   });
 
-  describe('topPosition (Task 4.1)', () => {
+  describe('topPosition', () => {
     it('topPositionが指定された場合、正しいY座標にインジケーターが配置される', () => {
       render(<DropIndicator {...defaultProps} topPosition={100} />);
 

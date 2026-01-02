@@ -3,13 +3,12 @@ import { TreeStateManager } from './TreeStateManager';
 import { StorageService } from '@/storage/StorageService';
 
 /**
- * Task 7.3: サブツリー全体の移動
- * Requirements: 4.3, 4.4
+ * サブツリー全体の移動
  *
  * このテストは、親タブとその子孫タブすべてを取得し、
  * ツリー構造を維持したまま別のウィンドウに移動できることを確認します。
  */
-describe('TreeStateManager - Subtree Operations (Task 7.3)', () => {
+describe('TreeStateManager - Subtree Operations', () => {
   let treeStateManager: TreeStateManager;
   let storageService: StorageService;
 

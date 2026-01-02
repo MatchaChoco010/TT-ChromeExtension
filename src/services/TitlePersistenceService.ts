@@ -4,11 +4,11 @@ import { STORAGE_KEYS } from '@/storage/StorageService';
 /**
  * タブタイトル永続化サービス
  *
- * Requirement 5.1-5.4: タブタイトルの永続化と復元を担当
- * - 5.1: タブのタイトルが確定した場合、タイトルをストレージに永続化
- * - 5.2: ブラウザ起動時に永続化されたタイトルを復元して表示
- * - 5.3: タブが再読み込みされ新しいタイトルが取得された場合、永続化データを上書き
- * - 5.4: タブが閉じられた際に該当タブのタイトルデータを削除
+ * タブタイトルの永続化と復元を担当
+ * - タブのタイトルが確定した場合、タイトルをストレージに永続化
+ * - ブラウザ起動時に永続化されたタイトルを復元して表示
+ * - タブが再読み込みされ新しいタイトルが取得された場合、永続化データを上書き
+ * - タブが閉じられた際に該当タブのタイトルデータを削除
  */
 export class TitlePersistenceService {
   /** タイトルマップ（メモリキャッシュ） */
@@ -25,8 +25,8 @@ export class TitlePersistenceService {
   /**
    * タイトルを永続化
    *
-   * Requirement 5.1: タブのタイトルが確定した場合、タイトルをストレージに永続化
-   * Requirement 5.3: タブが再読み込みされた場合、永続化データを上書き
+   * タブのタイトルが確定した場合、タイトルをストレージに永続化
+   * タブが再読み込みされた場合、永続化データを上書き
    *
    * @param tabId - タブID
    * @param title - タイトル
@@ -42,8 +42,6 @@ export class TitlePersistenceService {
   /**
    * 永続化タイトルを取得
    *
-   * Requirement 5.2: 永続化されたタイトルを復元
-   *
    * @param tabId - タブID
    * @returns タイトルまたはundefined
    */
@@ -54,7 +52,7 @@ export class TitlePersistenceService {
   /**
    * 全タイトルを取得（起動時復元用）
    *
-   * Requirement 5.2: ブラウザ起動時に永続化されたタイトルを復元
+   * ブラウザ起動時に永続化されたタイトルを復元
    *
    * @returns タブIDからタイトルへのマップ
    */
@@ -65,7 +63,7 @@ export class TitlePersistenceService {
   /**
    * タイトルを削除
    *
-   * Requirement 5.4: タブが閉じられた際に該当タブのタイトルデータを削除
+   * タブが閉じられた際に該当タブのタイトルデータを削除
    *
    * @param tabId - タブID
    */
@@ -106,7 +104,7 @@ export class TitlePersistenceService {
   /**
    * ストレージからタイトルを読み込み
    *
-   * Requirement 5.2: ブラウザ起動時に永続化されたタイトルを復元
+   * ブラウザ起動時に永続化されたタイトルを復元
    */
   async loadFromStorage(): Promise<void> {
     const storedTitles = await this.storageService.get(STORAGE_KEYS.TAB_TITLES);

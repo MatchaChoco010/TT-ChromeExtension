@@ -1,7 +1,6 @@
 /**
  * IconPicker コンポーネントのテスト
- * Task 8.1: アイコンピッカーコンポーネントのテスト
- * Requirements: 19.1, 19.2, 19.3
+ * アイコンピッカーコンポーネントのテスト
  *
  * TDD: RED phase - テストを先に作成
  */
@@ -223,7 +222,7 @@ describe('IconPicker', () => {
   });
 
   describe('選択確定', () => {
-    it('アイコンをクリックすると即座にonSelectが呼ばれる (Requirement 9.3)', async () => {
+    it('アイコンをクリックすると即座にonSelectが呼ばれる', async () => {
       const user = userEvent.setup();
       render(
         <IconPicker

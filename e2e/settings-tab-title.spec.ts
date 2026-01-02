@@ -3,11 +3,8 @@
  *
  * 設定タブと内部ページのタイトル表示に関するE2Eテスト
  *
- * comprehensive-bugfix Task 2.3: E2Eテスト追加
- *
- * Requirements:
- * - 7.4, 7.5: 設定タブタイトル表示のE2Eテスト要件
- * - 8.4, 8.5: 内部ページタイトル表示のE2Eテスト要件
+ * - 設定タブタイトル表示のE2Eテスト
+ * - 内部ページタイトル表示のE2Eテスト
  */
 
 import { test, expect } from './fixtures/extension';
@@ -17,7 +14,7 @@ import {
   waitForCondition,
 } from './utils/polling-utils';
 
-test.describe('設定タブのタイトル表示（Requirements 7.4, 7.5）', () => {
+test.describe('設定タブのタイトル表示', () => {
   test('設定タブがツリーで「Settings」というタイトルで表示される', async ({
     extensionContext,
     extensionId,
@@ -121,7 +118,7 @@ test.describe('設定タブのタイトル表示（Requirements 7.4, 7.5）', ()
   });
 });
 
-test.describe('内部ページのタイトル表示（Requirements 8.4, 8.5）', () => {
+test.describe('内部ページのタイトル表示', () => {
   test('chrome://versionページがツリーでブラウザのタイトルと同じタイトルで表示される', async ({
     extensionContext,
     sidePanelPage,
@@ -177,7 +174,7 @@ test.describe('内部ページのタイトル表示（Requirements 8.4, 8.5）',
 
         const displayedTitle = await treeNode.locator('[data-testid="tab-title"], [data-testid="discarded-tab-title"]').textContent();
         // タイトルがchrome.tabs.Tab.titleと一致するか確認
-        // Requirement 8.1, 8.2: タブツリーはchrome.tabs.Tab.titleをそのまま使用する
+        // タブツリーはchrome.tabs.Tab.titleをそのまま使用する
         return displayedTitle === tabInfo.title;
       },
       {

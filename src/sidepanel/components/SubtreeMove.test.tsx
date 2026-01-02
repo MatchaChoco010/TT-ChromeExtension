@@ -1,6 +1,5 @@
 /**
- * Task 5.3: 折りたたみ/展開状態でのサブツリー移動テスト
- * Requirements: 2.2, 2.3
+ * 折りたたみ/展開状態でのサブツリー移動テスト
  *
  * このテストスイートでは、親タブのドラッグ時にサブツリー全体が移動することを検証します。
  * - 折りたたまれた親タブのドラッグ時に非表示の子タブも含めて移動
@@ -66,7 +65,7 @@ const getSubtreeNodeIds = (nodeId: string, nodes: TabNode[]): string[] => {
   return result;
 };
 
-describe('Task 5.3: 折りたたみ/展開状態でのサブツリー移動', () => {
+describe('折りたたみ/展開状態でのサブツリー移動', () => {
   describe('getSubtreeNodeIds', () => {
     it('折りたたまれた親タブのすべての子孫IDを収集する', () => {
       // Arrange: 折りたたまれた階層構造

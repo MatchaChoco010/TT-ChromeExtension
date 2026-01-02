@@ -1,6 +1,5 @@
 /**
- * Task 5.3: ドロップ判定領域の改善 - 統合テスト
- * Requirements: 8.1, 8.2, 8.3, 8.4
+ * ドロップ判定領域の改善 - 統合テスト
  *
  * このテストでは、ドロップ判定領域に基づく兄弟/子要素の配置を検証します。
  * - タブの上部25%にドロップ → 上に兄弟として挿入
@@ -14,7 +13,7 @@ import {
   type TabPosition,
 } from './GapDropDetection';
 
-describe('Task 5.3: ドロップ判定領域の改善', () => {
+describe('ドロップ判定領域の改善', () => {
   // テスト用のタブ位置情報（各タブの高さは40px）
   const createTabPositions = (): TabPosition[] => [
     { nodeId: 'node-1', top: 0, bottom: 40, depth: 0 },
@@ -22,7 +21,7 @@ describe('Task 5.3: ドロップ判定領域の改善', () => {
     { nodeId: 'node-3', top: 80, bottom: 120, depth: 0 },
   ];
 
-  describe('Requirements 8.1, 8.2: 上部25%と下部25%は兄弟挿入ゾーン', () => {
+  describe('上部25%と下部25%は兄弟挿入ゾーン', () => {
     it('タブの上部25%領域にドロップすると上に兄弟として挿入するための情報が返される', () => {
       const tabPositions = createTabPositions();
       // タブ2の上部25%領域（タブ2は40-80px、上部25%は40-50px）
@@ -48,7 +47,7 @@ describe('Task 5.3: ドロップ判定領域の改善', () => {
     });
   });
 
-  describe('Requirement 8.2: 中央50%は子要素ゾーン', () => {
+  describe('中央50%は子要素ゾーン', () => {
     it('タブの中央50%領域にドロップすると子要素として配置するための情報が返される', () => {
       const tabPositions = createTabPositions();
       // タブ2の中央50%領域（タブ2は40-80px、中央50%は50-70px）
@@ -60,7 +59,7 @@ describe('Task 5.3: ドロップ判定領域の改善', () => {
     });
   });
 
-  describe('Requirements 8.3, 8.4: 上部/下部ドロップ時の兄弟挿入', () => {
+  describe('上部/下部ドロップ時の兄弟挿入', () => {
     it('最初のタブの上部にドロップすると、リストの最初の位置に兄弟として挿入される', () => {
       const tabPositions = createTabPositions();
       // タブ1の上部25%領域（タブ1は0-40px、上部25%は0-10px）

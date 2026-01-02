@@ -1,13 +1,10 @@
 /**
  * E2E Tests: Empty Window Auto Close
  *
- * Task 16.7 (tab-tree-bugfix-2): 空ウィンドウ自動クローズのE2Eテスト追加
- *
- * Requirements:
- * - 7.1: ドラッグアウトにより全てのタブが移動されたとき、元のウィンドウは自動的に閉じること
- * - 7.2: ウィンドウにタブが残っている場合、ウィンドウは開いたまま維持されること
- * - 7.3: E2Eテストで空ウィンドウの自動クローズを検証すること
- * - 7.4: E2Eテストは --repeat-each=10 で10回連続成功すること
+ * - ドラッグアウトにより全てのタブが移動されたとき、元のウィンドウは自動的に閉じること
+ * - ウィンドウにタブが残っている場合、ウィンドウは開いたまま維持されること
+ * - E2Eテストで空ウィンドウの自動クローズを検証すること
+ * - E2Eテストは --repeat-each=10 で10回連続成功すること
  *
  * Note: Run with `npm run test:e2e`
  */
@@ -21,7 +18,7 @@ import {
 } from './utils/polling-utils';
 
 test.describe('Empty Window Auto Close', () => {
-  test.describe('Requirement 7.1: Auto close window when all tabs moved via drag-out', () => {
+  test.describe('Auto close window when all tabs moved via drag-out', () => {
     test('should auto close window when single tab is dragged out via CREATE_WINDOW_WITH_SUBTREE', async ({
       extensionContext,
       serviceWorker,
@@ -228,7 +225,7 @@ test.describe('Empty Window Auto Close', () => {
     });
   });
 
-  test.describe('Requirement 7.2: Keep window open when tabs remain', () => {
+  test.describe('Keep window open when tabs remain', () => {
     test('should NOT close window when some tabs remain after drag-out', async ({
       extensionContext,
       serviceWorker,
@@ -386,7 +383,7 @@ test.describe('Empty Window Auto Close', () => {
     });
   });
 
-  test.describe('Requirement 5.1: Auto close window when all tabs are closed', () => {
+  test.describe('Auto close window when all tabs are closed', () => {
     test('should auto close window when last tab is closed via chrome.tabs.remove', async ({
       extensionContext,
       serviceWorker,
@@ -579,7 +576,7 @@ test.describe('Empty Window Auto Close', () => {
     });
   });
 
-  test.describe('Requirement 5.4, 5.5: Suppress auto-close during drag and close on drag end', () => {
+  test.describe('Suppress auto-close during drag and close on drag end', () => {
     test('extension auto-close triggered on END_DRAG_SESSION when source window is empty', async ({
       extensionContext,
       serviceWorker,
@@ -866,7 +863,7 @@ test.describe('Empty Window Auto Close', () => {
     });
   });
 
-  test.describe('Requirement 6.2: Keep window open when only pinned tabs remain', () => {
+  test.describe('Keep window open when only pinned tabs remain', () => {
     test('should NOT close window when only pinned tabs remain after normal tabs are moved', async ({
       extensionContext,
       serviceWorker,

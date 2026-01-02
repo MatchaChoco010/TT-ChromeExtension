@@ -1,9 +1,6 @@
 /**
  * ピン留めタブ並び替えのE2Eテスト
  *
- * Task 11.2 (tab-tree-bugfix): ピン留めタブ並び替えのE2Eテスト
- *
- * Requirements: 10.1, 10.2, 10.3, 10.4
  * - ピン留めタブをドラッグ＆ドロップで並び替えできることを検証
  * - 並び替え後のピン留めタブ順序がブラウザと同期していることを検証
  * - ピン留めタブを通常タブセクションにドロップできないことを検証
@@ -15,7 +12,7 @@ test.describe('ピン留めタブの並び替え', () => {
   // ドラッグ操作は時間がかかるためタイムアウトを延長
   test.setTimeout(120000);
 
-  test.describe('ドラッグ＆ドロップによる並び替え (Requirements 10.1, 10.2)', () => {
+  test.describe('ドラッグ＆ドロップによる並び替え', () => {
     test('ピン留めタブをドラッグ＆ドロップで並び替えできる', async ({
       extensionContext,
       serviceWorker,
@@ -126,7 +123,7 @@ test.describe('ピン留めタブの並び替え', () => {
     });
   });
 
-  test.describe('ブラウザとの同期 (Requirement 10.3)', () => {
+  test.describe('ブラウザとの同期', () => {
     test('並び替え後のピン留めタブ順序がブラウザと同期している', async ({
       extensionContext,
       serviceWorker,
@@ -209,7 +206,6 @@ test.describe('ピン留めタブの並び替え', () => {
       expect(finalBrowserOrder[1]).toBe(tabId1);
 
       // UIのピン留めタブの順序もブラウザと同期していることを確認
-      // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブUIの順序同期検証
       // ブラウザの順序と同じ順序でUIに表示されていることを検証
       await expect(async () => {
         const pinnedSection = sidePanelPage.locator('[data-testid="pinned-tabs-section"]');
@@ -245,9 +241,7 @@ test.describe('ピン留めタブの並び替え', () => {
     });
   });
 
-  // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブ順序同期の包括的テスト
-  // Requirements: 12.1, 12.2, 12.3, 12.4
-  test.describe('包括的な順序同期テスト (Requirements 12.1-12.4)', () => {
+  test.describe('包括的な順序同期テスト', () => {
     test('3つ以上のピン留めタブで各位置への移動が正しく同期される', async ({
       extensionContext,
       serviceWorker,
@@ -333,21 +327,21 @@ test.describe('ピン留めタブの並び替え', () => {
         }).toPass({ timeout: 10000 });
       };
 
-      // Requirement 12.2: 1つ目のタブを移動
+      // 1つ目のタブを移動
       // tabId1を末尾に移動: [tabId2, tabId3, tabId1]
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 2 });
       }, tabId1);
       await verifyUIOrder([tabId2, tabId3, tabId1]);
 
-      // Requirement 12.3: 2つ目以降のタブを移動
+      // 2つ目以降のタブを移動
       // tabId3を先頭に移動: [tabId3, tabId2, tabId1]
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 0 });
       }, tabId3);
       await verifyUIOrder([tabId3, tabId2, tabId1]);
 
-      // Requirement 12.4: 任意の位置への移動
+      // 任意の位置への移動
       // tabId1を中間に移動: [tabId3, tabId1, tabId2]
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 1 });
@@ -361,7 +355,7 @@ test.describe('ピン留めタブの並び替え', () => {
     });
   });
 
-  test.describe('ドロップ制限 (Requirement 10.4)', () => {
+  test.describe('ドロップ制限', () => {
     test('ピン留めタブを通常タブセクションにドロップしても通常タブにならない', async ({
       extensionContext,
       serviceWorker,
@@ -510,9 +504,7 @@ test.describe('ピン留めタブの並び替え', () => {
     });
   });
 
-  // Task 12.2 (tab-tree-comprehensive-fix): ピン留めタブ順序同期の詳細E2Eテスト
-  // Requirements: 12.5, 12.6, 12.7, 12.8
-  test.describe('ピン留めタブ順序同期の詳細テスト (Requirements 12.5-12.8)', () => {
+  test.describe('ピン留めタブ順序同期の詳細テスト', () => {
     // ピン留めタブの順序を検証するヘルパー関数
     async function verifyPinnedTabsOrder(
       sidePanelPage: import('@playwright/test').Page,
@@ -612,7 +604,7 @@ test.describe('ピン留めタブの並び替え', () => {
       return tabIds;
     }
 
-    // Requirement 12.7: 1つ目のタブの移動を個別に検証
+    // 1つ目のタブの移動を個別に検証
     test('1つ目のピン留めタブを移動すると正しく同期される', async ({
       extensionContext,
       serviceWorker,
@@ -657,7 +649,7 @@ test.describe('ピン留めタブの並び替え', () => {
       }
     });
 
-    // Requirement 12.7: 2つ目のタブの移動を個別に検証
+    // 2つ目のタブの移動を個別に検証
     test('2つ目のピン留めタブを移動すると正しく同期される', async ({
       extensionContext,
       serviceWorker,
@@ -701,7 +693,7 @@ test.describe('ピン留めタブの並び替え', () => {
       }
     });
 
-    // Requirement 12.7: 3つ目のタブの移動を個別に検証
+    // 3つ目のタブの移動を個別に検証
     test('3つ目のピン留めタブを移動すると正しく同期される', async ({
       extensionContext,
       serviceWorker,
@@ -745,7 +737,7 @@ test.describe('ピン留めタブの並び替え', () => {
       }
     });
 
-    // Requirement 12.6: 4つ以上のピン留めタブでの複雑な移動パターン
+    // 4つ以上のピン留めタブでの複雑な移動パターン
     test('4つのピン留めタブで複雑な移動パターンが正しく同期される', async ({
       extensionContext,
       serviceWorker,
@@ -786,7 +778,7 @@ test.describe('ピン留めタブの並び替え', () => {
       }
     });
 
-    // Requirement 12.5: ブラウザAPIによる移動の検証
+    // ブラウザAPIによる移動の検証
     test('ブラウザのchrome.tabs.moveでピン留めタブを移動するとUIが即座に更新される', async ({
       extensionContext,
       serviceWorker,

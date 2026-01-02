@@ -28,7 +28,7 @@ describe('useMenuActions', () => {
     vi.clearAllMocks();
   });
 
-  describe('Requirement 12.2: メニュー項目の実装', () => {
+  describe('メニュー項目の実装', () => {
     it('closeアクション: 指定されたタブを閉じる', async () => {
       chromeMock.tabs.remove.mockResolvedValue(undefined);
 
@@ -120,7 +120,7 @@ describe('useMenuActions', () => {
     });
   });
 
-  describe('Requirement 12.3: グループ化アクション', () => {
+  describe('グループ化アクション', () => {
     it('groupアクション: 複数タブをグループ化する', async () => {
       chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
@@ -152,7 +152,7 @@ describe('useMenuActions', () => {
     });
   });
 
-  describe('Requirement 12.4: 他のタブを閉じるアクション', () => {
+  describe('他のタブを閉じるアクション', () => {
     it('closeOthersアクション: 選択されたタブ以外を閉じる', async () => {
       chromeMock.tabs.query.mockResolvedValue([
         { id: 1 },

@@ -5,8 +5,7 @@ import { StorageService } from '@/storage/StorageService';
 
 /**
  * ViewManager と TreeStateManager の統合テスト
- * Task 8.4: ビュー間のタブ移動
- * Requirement 6.5: ユーザーがタブを別のビューに移動する
+ * ユーザーがタブを別のビューに移動する
  */
 describe('ViewManager と TreeStateManager の統合テスト', () => {
   let viewManager: ViewManager;

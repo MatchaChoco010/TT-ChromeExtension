@@ -1,9 +1,9 @@
 /**
- * Task 6.2: 自前自動スクロールフック
+ * 自前自動スクロールフック
  *
- * Requirement 3.1: ドラッグ中にマウスが端に近づいたら自動スクロール
- * Requirement 3.2: スクロール可能範囲内のみスクロール（clampToContent: true）
- * Requirement 3: スクロール可能量を超えるスクロールを防止
+ * ドラッグ中にマウスが端に近づいたら自動スクロール
+ * スクロール可能範囲内のみスクロール（clampToContent: true）
+ * スクロール可能量を超えるスクロールを防止
  */
 
 import React, { useCallback, useRef } from 'react';
@@ -93,7 +93,7 @@ export function useAutoScroll(
       const distanceFromBottom = containerRect.bottom - mouseY;
       if (distanceFromBottom < threshold) {
         if (clampToContent) {
-          // スクロール可能範囲内に制限（Requirement 3対応）
+          // スクロール可能範囲内に制限
           const newScrollTop = Math.min(maxScroll, scrollTop + speed);
           container.scrollTop = newScrollTop;
         } else {

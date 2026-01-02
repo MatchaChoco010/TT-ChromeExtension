@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ContextMenu } from './ContextMenu';
 
 describe('ContextMenu', () => {
-  describe('Requirement 12.1: 右クリック時のメニュー表示と位置計算', () => {
+  describe('右クリック時のメニュー表示と位置計算', () => {
     it('指定された位置にコンテキストメニューを表示する', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -71,7 +71,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 12.2: メニュー項目の表示', () => {
+  describe('メニュー項目の表示', () => {
     it('単一タブ選択時に基本的なメニュー項目を表示する', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -142,7 +142,7 @@ describe('ContextMenu', () => {
         />
       );
 
-      // Task 12.2: 単一タブ選択時は「グループに追加」がdivで表示される（サブメニュー付き）
+      // 単一タブ選択時は「グループに追加」がdivで表示される（サブメニュー付き）
       expect(screen.getByText('グループに追加')).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: /グループを解除/i })).not.toBeInTheDocument();
     });
@@ -166,7 +166,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 12.3: メニューアクションの実行', () => {
+  describe('メニューアクションの実行', () => {
     it('閉じるメニューをクリックするとcloseアクションが実行される', async () => {
       const user = userEvent.setup();
       const onAction = vi.fn();
@@ -253,7 +253,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 12.4: 複数タブ選択時のメニュー項目', () => {
+  describe('複数タブ選択時のメニュー項目', () => {
     it('複数タブ選択時に「他のタブを閉じる」メニューが表示される', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -309,7 +309,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 6.1: 複数選択対応操作オプション', () => {
+  describe('複数選択対応操作オプション', () => {
     it('複数タブ選択時に選択されたタブ数が表示される', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -395,13 +395,13 @@ describe('ContextMenu', () => {
         />
       );
 
-      // Task 12.2: 単一タブの場合は「グループに追加」がdivで表示される（サブメニュー付き）
+      // 単一タブの場合は「グループに追加」がdivで表示される（サブメニュー付き）
       expect(screen.getByText('グループに追加')).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: /選択されたタブをグループ化/i })).not.toBeInTheDocument();
     });
   });
 
-  describe('Requirement 4.2: スナップショット取得オプション', () => {
+  describe('スナップショット取得オプション', () => {
     it('ツリービュー右クリックメニューに「スナップショットを取得」オプションが表示される', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -515,7 +515,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('テキスト選択の無効化 (Task 4.4: Requirement 11.2)', () => {
+  describe('テキスト選択の無効化', () => {
     it('コンテキストメニュー要素にuser-select: noneが適用されていること', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -552,7 +552,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 18: 別のビューへ移動サブメニュー (Task 7.2)', () => {
+  describe('別のビューへ移動サブメニュー', () => {
     const mockViews = [
       { id: 'default', name: 'Default', color: '#3b82f6' },
       { id: 'work', name: 'Work', color: '#10b981' },
@@ -712,7 +712,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 3.8: 単一タブ選択時のグループ化無効化 (Task 13.4)', () => {
+  describe('単一タブ選択時のグループ化無効化', () => {
     it('単一タブ選択時に「タブをグループ化」オプションが表示されるが無効化（グレーアウト）されている', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -787,7 +787,7 @@ describe('ContextMenu', () => {
     });
   });
 
-  describe('Requirement 11.3, 11.4: シングルタブのグループ追加機能 (Task 12.2)', () => {
+  describe('シングルタブのグループ追加機能', () => {
     const mockGroups = {
       'group_1': { id: 'group_1', name: 'Work', color: '#3b82f6', isExpanded: true },
       'group_2': { id: 'group_2', name: 'Personal', color: '#10b981', isExpanded: true },

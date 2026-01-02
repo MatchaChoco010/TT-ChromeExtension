@@ -30,8 +30,6 @@ vi.stubGlobal('chrome', chromeMock);
 
 /**
  * SnapshotManager 自動スナップショット機能のユニットテスト
- * Task 14.2: 自動スナップショット機能
- * Requirements: 11.4, 11.5
  */
 describe('SnapshotManager - Auto Snapshot', () => {
   let snapshotManager: SnapshotManager;
@@ -123,7 +121,7 @@ describe('SnapshotManager - Auto Snapshot', () => {
 
   describe('startAutoSnapshot', () => {
     it('should create chrome alarm with correct interval', () => {
-      // Requirement 11.4, 11.5: 定期的な自動スナップショット機能を提供する
+      // 定期的な自動スナップショット機能を提供する
       const intervalMinutes = 10;
 
       snapshotManager.startAutoSnapshot(intervalMinutes);
@@ -153,7 +151,7 @@ describe('SnapshotManager - Auto Snapshot', () => {
       // アラームを発火
       await alarmListener({ name: 'auto-snapshot', scheduledTime: Date.now() });
 
-      // Requirement 11.5: 自動的にスナップショットを保存する
+      // 自動的にスナップショットを保存する
       // スナップショットが作成されることを確認
       expect(mockIndexedDBService.saveSnapshot).toHaveBeenCalled();
 
@@ -289,13 +287,13 @@ describe('SnapshotManager - Auto Snapshot', () => {
   });
 
   /**
-   * Task 9.2: スナップショット自動保存バックグラウンド処理の追加テスト
+   * スナップショット自動保存バックグラウンド処理の追加テスト
    * - maxSnapshots超過時の古いスナップショット自動削除
    * - 設定変更時のアラーム再設定
    */
   describe('startAutoSnapshot with maxSnapshots', () => {
     it('should delete old snapshots when maxSnapshots is exceeded after auto-snapshot', async () => {
-      // Requirement 6.5: 最大保持数を超えた古いスナップショットを自動削除する
+      // 最大保持数を超えた古いスナップショットを自動削除する
       const intervalMinutes = 10;
       const maxSnapshots = 5;
 
@@ -372,7 +370,7 @@ describe('SnapshotManager - Auto Snapshot', () => {
 
   describe('updateAutoSnapshotSettings', () => {
     it('should restart auto-snapshot with new interval', () => {
-      // Requirement 6.4: 設定変更時にアラームを再設定する
+      // 設定変更時にアラームを再設定する
       snapshotManager.startAutoSnapshot(10);
 
       // 設定を変更

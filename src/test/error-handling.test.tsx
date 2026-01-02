@@ -1,5 +1,5 @@
 /**
- * Task 16.4: エラーハンドリングとエッジケースのテスト
+ * エラーハンドリングとエッジケースのテスト
  *
  * このテストファイルは以下のエラーハンドリングをカバー:
  * - タブAPI失敗時の挙動確認
@@ -16,7 +16,7 @@ import { ThemeProvider } from '@/sidepanel/providers/ThemeProvider';
 import type { UserSettings, StorageChanges } from '@/types';
 import type { MockChrome } from '@/test/test-types';
 
-describe('Task 16.4: エラーハンドリングとエッジケース', () => {
+describe('エラーハンドリングとエッジケース', () => {
   describe('タブAPI失敗時の挙動', () => {
     let storageService: StorageService;
     let treeStateManager: TreeStateManager;

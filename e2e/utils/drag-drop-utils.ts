@@ -1,9 +1,7 @@
 /**
- * DragDropUtils - Task 8.1 (tab-tree-bugfix-2)
+ * DragDropUtils
  *
  * 自前D&D実装用のドラッグ&ドロップ操作シミュレーションユーティリティ
- *
- * Requirements: 3.2.1, 3.2.2
  * - dnd-kit固有のセレクタを使用しない
  * - マウスイベントベースのドラッグ操作シミュレーション
  */
@@ -534,12 +532,10 @@ export async function waitForDragEnd(page: Page, maxWait: number = 2000): Promis
 }
 
 /**
- * Task 6.1: タブをルートレベルに移動（親子関係を解消）
+ * タブをルートレベルに移動（親子関係を解消）
  *
  * 子タブをドラッグして、別のタブの上部ギャップ（兄弟として挿入される位置）にドロップする
  * これにより親子関係が解消され、タブはルートレベルまたは別の親の下に配置される
- *
- * Requirement 11.1, 11.3: ドラッグで親子関係を解消した状態が維持されること
  *
  * @param page - Side PanelのPage
  * @param childTabId - 移動する子タブのID

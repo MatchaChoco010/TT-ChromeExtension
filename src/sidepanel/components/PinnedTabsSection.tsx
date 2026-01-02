@@ -7,17 +7,17 @@ interface PinnedTabsSectionProps {
   pinnedTabIds: number[];
   tabInfoMap: TabInfoMap;
   onTabClick: (tabId: number) => void;
-  /** ピン留めタブの右クリック時に呼ばれるコールバック (要件1.6, 1.7) */
+  /** ピン留めタブの右クリック時に呼ばれるコールバック */
   onContextMenu?: (tabId: number, position: { x: number; y: number }) => void;
-  /** Task 6.1 (tab-tree-bugfix): アクティブタブID（ハイライト表示用） */
+  /** アクティブタブID（ハイライト表示用） */
   activeTabId?: number | null;
-  /** Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替えコールバック (Requirements 10.1, 10.2, 10.3, 10.4) */
+  /** ピン留めタブの並び替えコールバック */
   onPinnedTabReorder?: (tabId: number, newIndex: number) => void;
 }
 
 /**
  * ピン留めタブアイテムコンポーネント
- * Task 10.2 (tab-tree-bugfix-2): dnd-kit削除、自前D&D実装に移行
+ * dnd-kit削除、自前D&D実装に移行
  */
 interface PinnedTabItemProps {
   tabId: number;
@@ -82,23 +82,20 @@ const PinnedTabItem: React.FC<PinnedTabItemProps> = ({
           className="w-4 h-4 bg-gray-400 rounded"
         />
       )}
-      {/* 閉じるボタンは表示しない（要件1.1）*/}
+      {/* 閉じるボタンは表示しない */}
     </div>
   );
 };
 
 /**
- * Task 3.1: ピン留めタブセクションコンポーネント
- * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5 (tree-tab-ux-improvements)
- * Task 11.1 (tab-tree-bugfix): ドラッグ＆ドロップ並び替え機能を追加 (Requirements 10.1, 10.2, 10.3, 10.4)
- * Task 10.2 (tab-tree-bugfix-2): dnd-kit削除、自前D&D実装に移行 (Requirements 3.1.1, 3.1.7)
+ * ピン留めタブセクションコンポーネント
  *
  * - ピン留めタブをツリービュー上部に配置
  * - ファビコンサイズで横並びグリッド表示
  * - 通常タブとの間に区切り線
  * - ピン留めタブが0件の場合は非表示
- * - 閉じるボタンは表示しない（要件1.1）
- * - ピン留めタブに対する閉じる操作は無効化（要件1.3）
+ * - 閉じるボタンは表示しない
+ * - ピン留めタブに対する閉じる操作は無効化
  * - ドラッグ＆ドロップによる並び替え機能（自前D&D実装、水平モード）
  */
 const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
@@ -182,7 +179,7 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
 
   /**
    * ドラッグ終了ハンドラ
-   * Task 10.2 (tab-tree-bugfix-2): 自前D&D実装でピン留めタブの順序変更
+   * 自前D&D実装でピン留めタブの順序変更
    */
   const handleDragEnd = useCallback((itemId: string, dropTarget: { type: string; insertIndex?: number } | null) => {
     if (!dropTarget || dropTarget.type !== DropTargetType.HorizontalGap || !onPinnedTabReorder) {
@@ -228,7 +225,7 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
   };
 
   /**
-   * 右クリックハンドラ（要件1.6, 1.7対応）
+   * 右クリックハンドラ
    * ピン留めタブを右クリックした場合にコンテキストメニューを表示するため
    */
   const handleContextMenu = (tabId: number, event: React.MouseEvent) => {
@@ -252,7 +249,7 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
       >
         {validPinnedTabs.map((tabId, index) => {
           const tabInfo = tabInfoMap[tabId];
-          // Task 6.1 (tab-tree-bugfix): アクティブタブの判定
+          // アクティブタブの判定
           const isActive = activeTabId === tabId;
           const itemId = `pinned-${tabId}`;
           const itemProps = isDraggable ? getItemProps(itemId, tabId) : { onMouseDown: () => {}, style: {}, 'data-dragging': false };

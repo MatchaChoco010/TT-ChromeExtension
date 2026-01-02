@@ -1,5 +1,5 @@
 /**
- * Task 16.2: パフォーマンステスト
+ * パフォーマンステスト
  *
  * このテストファイルは以下のパフォーマンス要件を検証します:
  * - 100タブ以上でのレンダリング性能を測定（目標: 500ms以内）
@@ -45,7 +45,7 @@ function generateMockTabs(count: number): TabNode[] {
   return tabs;
 }
 
-describe('Task 16.2: パフォーマンステスト', () => {
+describe('パフォーマンステスト', () => {
   describe('100タブ以上でのレンダリング性能', () => {
     it('100タブのレンダリングが500ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(100);

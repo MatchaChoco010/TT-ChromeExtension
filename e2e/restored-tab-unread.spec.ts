@@ -1,8 +1,7 @@
 /**
  * 復元タブの未読状態E2Eテスト
  *
- * Task 11.1: セッション復元タブの未読除外実装
- * Requirements: 11.1, 11.2, 11.3
+ * セッション復元タブの未読除外実装
  * - ブラウザを開き直したときに復元されたタブに未読インジケーターが付かない
  * - ウィンドウが開いた時点で既存タブを復元タブとして記録する
  * - ウィンドウ初期化後にユーザーが新しいタブを開いたときにのみ未読インジケーターを表示する
@@ -11,9 +10,9 @@ import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
 import { createTab, closeTab, activateTab } from './utils/tab-utils';
 
-extensionTest.describe('Task 11.1: 復元タブの未読状態', () => {
+extensionTest.describe('復元タブの未読状態', () => {
   extensionTest(
-    'Requirement 11.1: ブラウザ起動時に復元されたタブに未読インジケーターが表示されない',
+    'ブラウザ起動時に復元されたタブに未読インジケーターが表示されない',
     async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得（ブラウザ起動時に復元されたタブ）
       const [initialPage] = extensionContext.pages();
@@ -34,7 +33,7 @@ extensionTest.describe('Task 11.1: 復元タブの未読状態', () => {
   );
 
   extensionTest(
-    'Requirement 11.2: 新しいタブをバックグラウンドで開くと未読インジケーターが表示される',
+    '新しいタブをバックグラウンドで開くと未読インジケーターが表示される',
     async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
@@ -69,7 +68,7 @@ extensionTest.describe('Task 11.1: 復元タブの未読状態', () => {
   );
 
   extensionTest(
-    'Requirement 11.3: アクティブ状態で新しいタブを開くと未読インジケーターが表示されない',
+    'アクティブ状態で新しいタブを開くと未読インジケーターが表示されない',
     async ({ extensionContext, sidePanelPage }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
@@ -100,7 +99,7 @@ extensionTest.describe('Task 11.1: 復元タブの未読状態', () => {
   );
 
   extensionTest(
-    'Requirement 11.4: サイドパネルをリロードしても既存タブに未読インジケーターが付かない',
+    'サイドパネルをリロードしても既存タブに未読インジケーターが付かない',
     async ({ extensionContext, sidePanelPage, extensionId, serviceWorker }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();
@@ -152,7 +151,7 @@ extensionTest.describe('Task 11.1: 復元タブの未読状態', () => {
   );
 
   extensionTest(
-    'Requirement 11.5: 未読状態がストレージに正しく永続化される',
+    '未読状態がストレージに正しく永続化される',
     async ({ extensionContext, sidePanelPage, serviceWorker }) => {
       // アクティブなタブを取得
       const [initialPage] = extensionContext.pages();

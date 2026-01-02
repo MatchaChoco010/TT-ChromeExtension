@@ -1,7 +1,6 @@
 /**
  * IconPicker コンポーネント
- * Task 8.1: カスタムアイコン選択UI
- * Requirements: 19.1, 19.2, 19.3
+ * カスタムアイコン選択UI
  *
  * カテゴリ別にアイコンを表示し、選択できるUIを提供します。
  * lucide-reactが使用できない場合はSVGアイコンを直接定義して使用します。
@@ -571,7 +570,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
     setSelectedCategory(categoryId);
   }, []);
 
-  // アイコン選択 - 即座にonSelectを呼び出す (Requirement 9.3: Select button不要)
+  // アイコン選択 - 即座にonSelectを呼び出す (Select button不要)
   const handleIconSelect = useCallback((iconName: string) => {
     setSelectedIcon(iconName);
     setUrlInput(''); // アイコン選択時はURL入力をクリア

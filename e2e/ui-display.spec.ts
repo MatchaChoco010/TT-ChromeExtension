@@ -1,9 +1,6 @@
 /**
  * UI Display E2E Tests
  *
- * Task 3.3: UI表示のE2Eテスト
- * Requirements: 2.1, 2.2
- *
  * テスト対象:
  * 1. フォントサイズ設定がタブタイトルに反映されることを検証
  * 2. スタートページのタイトルがURL表示ではなく適切なタイトルで表示されることを検証
@@ -30,7 +27,7 @@ async function openSettingsInNewTab(
 }
 
 test.describe('UI表示の一貫性', () => {
-  test.describe('フォントサイズ設定の反映 (Requirement 2.1)', () => {
+  test.describe('フォントサイズ設定の反映', () => {
     test('フォントサイズを変更するとタブタイトルのフォントサイズが変更される', async ({
       sidePanelPage,
       extensionContext,
@@ -186,7 +183,7 @@ test.describe('UI表示の一貫性', () => {
     });
   });
 
-  test.describe('スタートページタイトルの表示 (Requirement 2.2)', () => {
+  test.describe('スタートページタイトルの表示', () => {
     test('スタートページURLのタイトル変換ロジックが正しく実装されている', async ({
       sidePanelPage,
       extensionContext,

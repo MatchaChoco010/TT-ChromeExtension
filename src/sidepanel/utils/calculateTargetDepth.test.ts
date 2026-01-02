@@ -1,7 +1,5 @@
 /**
  * calculateTargetDepth ユニットテスト
- * Task 4.2: ドラッグ中のdepth計算ロジックを実装する
- * Requirements: 8.3, 8.4, 8.5
  *
  * マウスX座標からドロップ先のdepthを計算するユーティリティ関数のテスト
  */

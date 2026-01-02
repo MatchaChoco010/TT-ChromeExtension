@@ -21,7 +21,7 @@ describe('SettingsPanel', () => {
     onSettingsChange = vi.fn();
   });
 
-  describe('Requirement 8.5: 警告閾値のカスタマイズ', () => {
+  describe('警告閾値のカスタマイズ', () => {
     it('should display current closeWarningThreshold value', () => {
       render(
         <SettingsPanel
@@ -126,12 +126,7 @@ describe('SettingsPanel', () => {
     });
   });
 
-  /**
-   * Task 3.1 (tab-tree-bugfix-2): 個別のタブ位置設定テスト
-   * Requirement 17.4: 「デフォルトの新しいタブの位置」設定を削除
-   * 代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定
-   */
-  describe('Requirement 17.4: 個別のタブ位置設定', () => {
+  describe('個別のタブ位置設定', () => {
     it('should display link click tab position setting', () => {
       render(
         <SettingsPanel
@@ -292,7 +287,7 @@ describe('SettingsPanel', () => {
     });
   });
 
-  describe('Requirement 10.1, 10.2: フォントサイズ調整', () => {
+  describe('フォントサイズ調整', () => {
     it('should display font size setting', () => {
       render(
         <SettingsPanel
@@ -377,7 +372,7 @@ describe('SettingsPanel', () => {
     });
   });
 
-  describe('Requirement 10.3: フォントファミリー選択', () => {
+  describe('フォントファミリー選択', () => {
     it('should display font family setting', () => {
       render(
         <SettingsPanel
@@ -419,7 +414,7 @@ describe('SettingsPanel', () => {
     });
   });
 
-  describe('Requirement 10.4, 10.5: カスタムCSS機能', () => {
+  describe('カスタムCSS機能', () => {
     it('should display custom CSS textarea', () => {
       render(
         <SettingsPanel
@@ -492,11 +487,7 @@ describe('SettingsPanel', () => {
     });
   });
 
-  /**
-   * Task 9.1: スナップショット自動保存設定セクション
-   * Requirements: 6.1, 6.2, 6.3, 6.5
-   */
-  describe('Requirements 6.1, 6.2, 6.3, 6.5: スナップショット自動保存設定', () => {
+  describe('スナップショット自動保存設定', () => {
     it('should display snapshot settings section', () => {
       render(
         <SettingsPanel

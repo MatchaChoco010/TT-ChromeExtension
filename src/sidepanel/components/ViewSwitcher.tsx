@@ -1,10 +1,5 @@
 /**
  * ViewSwitcher コンポーネント
- * Task 8.2: ViewSwitcher UI コンポーネントの実装
- * Task 7.1: ファビコンサイズアイコンボタンへの改修
- * Task 7.3: ビューボタンの右クリックコンテキストメニューの実装
- * Task 3.2: ビューのスクロール切り替え機能を追加
- * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 6.3, 16.1, 16.2, 16.3
  *
  * サイドパネル上部で複数のビューをファビコンサイズのアイコンボタンで切り替えるUIを提供します。
  * ビューボタンを右クリックするとコンテキストメニューが表示され、編集・削除が可能です。
@@ -22,7 +17,7 @@ export interface ViewSwitcherProps {
   views: View[];
   /** 現在アクティブなビューのID */
   currentViewId: string;
-  /** 各ビューのタブ数 (Task 3.3: Requirements 17.1, 17.2, 17.3) */
+  /** 各ビューのタブ数 */
   tabCounts?: Record<string, number>;
   /** ビュー切り替え時のコールバック */
   onViewSwitch: (viewId: string) => void;
@@ -48,12 +43,9 @@ interface ContextMenuState {
  * サイドパネル上部にファビコンサイズのアイコンボタンを横並びで表示し、
  * ユーザーがビューを切り替えたり、新しいビューを作成したりできるようにします。
  *
- * Task 7.1:
  * - 各ビューはファビコンサイズ(32x32px)のアイコンボタンで表示
  * - アイコンが設定されていない場合はカラーサークルを表示
  * - 鉛筆ボタンによるインライン編集UIは削除
- *
- * Task 7.3:
  * - ビューボタンを右クリックするとコンテキストメニューを表示
  * - メニューから「ビューの編集」を選択するとViewEditModalを開く
  * - メニューから「ビューの削除」を選択するとビューを削除する
@@ -67,10 +59,10 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   onViewDelete,
   onViewUpdate,
 }) => {
-  // Task 7.3: コンテキストメニューの状態
+  // コンテキストメニューの状態
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-  // Task 7.3: モーダルで編集中のビュー
+  // モーダルで編集中のビュー
   const [editingView, setEditingView] = useState<View | null>(null);
 
   // 右クリックハンドラー
@@ -117,7 +109,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
     [onViewUpdate]
   );
 
-  // 即時更新（モーダルを閉じずにビューを更新）- Requirement 9.1, 9.2
+  // 即時更新（モーダルを閉じずにビューを更新）
   const handleImmediateUpdate = useCallback(
     (view: View) => {
       onViewUpdate(view.id, view);
@@ -126,7 +118,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
     [onViewUpdate]
   );
 
-  // Task 3.2: マウスホイールでビュー切り替え
+  // マウスホイールでビュー切り替え
   const handleWheel = useCallback(
     (event: React.WheelEvent) => {
       // deltaYが0の場合は何もしない
@@ -224,8 +216,8 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                 aria-hidden="true"
                 data-testid="view-color-circle"
               />
-              {/* Task 3.3: タブ数バッジ (Requirements 17.1, 17.2, 17.3) */}
-              {/* Task 4.1: 視認性向上 - min-widthを20pxに拡大、位置を内側に調整 */}
+              {/* タブ数バッジ */}
+              {/* 視認性向上 - min-widthを20pxに拡大、位置を内側に調整 */}
               {tabCount > 0 && (
                 <span
                   className="absolute -top-0.5 -right-0.5 min-w-[20px] h-4 px-1 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center"
@@ -264,7 +256,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
       </button>
     </div>
 
-      {/* Task 7.3: コンテキストメニュー */}
+      {/* コンテキストメニュー */}
       {contextMenu && (
         <ViewContextMenu
           view={contextMenu.view}
@@ -276,7 +268,7 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
         />
       )}
 
-      {/* Task 7.3: 編集モーダル */}
+      {/* 編集モーダル */}
       {/* key を使用してviewが変わるたびにコンポーネントを再マウント */}
       <ViewEditModal
         key={editingView?.id ?? 'closed'}

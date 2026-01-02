@@ -11,8 +11,8 @@ interface MockFile {
 }
 
 /**
- * Task 14.3: スナップショット履歴管理 - SnapshotList コンポーネントのテスト
- * Requirements: 11.6 - スナップショット一覧表示、削除、エクスポート/インポート機能
+ * スナップショット履歴管理 - SnapshotList コンポーネントのテスト
+ * スナップショット一覧表示、削除、エクスポート/インポート機能
  */
 describe('SnapshotList Component', () => {
   const mockSnapshots: Snapshot[] = [

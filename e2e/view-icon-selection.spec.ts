@@ -1,9 +1,6 @@
 /**
  * ビューアイコン選択即時反映のE2Eテスト
  *
- * Task 5.1: Phase 0 UI軽微修正のE2Eテスト
- * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
- *
  * テスト対象:
  * - プリセットからアイコン選択時に「Select」ボタン不要で即座に反映
  * - ツリービューパネル上のアイコンも即座に更新
@@ -12,9 +9,9 @@ import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
 import { waitForViewSwitcher } from './utils/polling-utils';
 
-extensionTest.describe('Task 5.1: ビューアイコン選択即時反映', () => {
+extensionTest.describe('ビューアイコン選択即時反映', () => {
   /**
-   * Requirement 9.1, 9.3: プリセットからアイコン選択時に即座に反映
+   * プリセットからアイコン選択時に即座に反映
    */
   extensionTest(
     'プリセットからアイコンを選択すると即座に反映される（Selectボタン不要）',
@@ -89,7 +86,7 @@ extensionTest.describe('Task 5.1: ビューアイコン選択即時反映', () =
   );
 
   /**
-   * Requirement 9.2: ツリービューパネル上のアイコンも即座に更新
+   * ツリービューパネル上のアイコンも即座に更新
    */
   extensionTest(
     'アイコン選択後にツリービューパネル上のビューアイコンが即座に更新される',
@@ -171,7 +168,7 @@ extensionTest.describe('Task 5.1: ビューアイコン選択即時反映', () =
   );
 
   /**
-   * Requirement 9.3: Select」ボタンの押下を必要としない
+   * 「Select」ボタンの押下を必要としない
    * このテストはアイコン選択時に即座にモーダルが閉じることを検証
    */
   extensionTest(

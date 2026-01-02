@@ -1,7 +1,5 @@
 /**
  * GroupPage コンポーネントのテスト
- * Task 15.1: グループタブ専用ページの作成
- * Requirements: 5.4, 5.5, 5.8, 5.9, 5.10
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';

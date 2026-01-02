@@ -21,7 +21,7 @@ const mockTabsOnUpdated = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
-// Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
+// Add onCreated and onRemoved mocks
 const mockTabsOnCreated = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
@@ -30,7 +30,7 @@ const mockTabsOnRemoved = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
-// Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
+// Add onMoved mock for pinned tab reorder sync
 const mockTabsOnMoved = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
@@ -43,7 +43,7 @@ const mockRuntimeOnMessage = {
   removeListener: vi.fn(),
 };
 
-// Task 8.1 (tab-tree-comprehensive-fix): chrome.tabs.create のモック
+// chrome.tabs.create のモック
 const mockTabsCreate = vi.fn();
 
 beforeEach(() => {
@@ -59,17 +59,17 @@ beforeEach(() => {
     tabs: {
       query: mockTabsQuery,
       update: mockTabsUpdate,
-      // Task 8.1 (tab-tree-comprehensive-fix): chrome.tabs.create のモック
+      // chrome.tabs.create のモック
       create: mockTabsCreate,
       onActivated: mockTabsOnActivated,
       onUpdated: mockTabsOnUpdated,
-      // Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
+      // Add onCreated and onRemoved mocks
       onCreated: mockTabsOnCreated,
       onRemoved: mockTabsOnRemoved,
-      // Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
+      // Add onMoved mock for pinned tab reorder sync
       onMoved: mockTabsOnMoved,
     },
-    // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
+    // Add windows.getCurrent mock
     windows: {
       getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
     },
@@ -84,7 +84,7 @@ beforeEach(() => {
   mockStorageSet.mockResolvedValue(undefined);
   mockTabsQuery.mockResolvedValue([]);
   mockTabsUpdate.mockResolvedValue({});
-  // Task 8.1 (tab-tree-comprehensive-fix): chrome.tabs.create のデフォルトレスポンス
+  // chrome.tabs.create のデフォルトレスポンス
   mockTabsCreate.mockResolvedValue({ id: 999, windowId: 1 });
   mockRuntimeSendMessage.mockResolvedValue({ success: true });
 });
@@ -130,7 +130,7 @@ describe('SidePanelRoot', () => {
     });
   });
 
-  it('Task 10.2: Vivaldi-TTヘッダーが削除されていること', async () => {
+  it('Vivaldi-TTヘッダーが削除されていること', async () => {
     await act(async () => {
       render(<SidePanelRoot />);
     });
@@ -138,7 +138,7 @@ describe('SidePanelRoot', () => {
     expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
   });
 
-  it('Task 5.1: ExternalDropZone（新規ウィンドウドロップエリア）が削除されていること', async () => {
+  it('ExternalDropZone（新規ウィンドウドロップエリア）が削除されていること', async () => {
     await act(async () => {
       render(<SidePanelRoot />);
     });
@@ -169,7 +169,7 @@ describe('SidePanelRoot', () => {
     consoleError.mockRestore();
   });
 
-  describe('Task 2.4: タブツリーの水平スクロール禁止 (Requirements 12.1, 12.2)', () => {
+  describe('タブツリーの水平スクロール禁止', () => {
     it('タブツリーコンテナにoverflow-x-hiddenが適用されていること', async () => {
       await act(async () => {
         render(<SidePanelRoot />);
@@ -186,7 +186,7 @@ describe('SidePanelRoot', () => {
     });
   });
 
-  describe('Task 12.1: ビュー情報のTabTreeViewへの受け渡し (Requirements 18.1, 18.2, 18.3)', () => {
+  describe('ビュー情報のTabTreeViewへの受け渡し', () => {
     it('treeStateにビューがある場合、TabTreeViewにviewsとonMoveToViewが渡されること', async () => {
       // ビューを含むtreeStateを設定
       const mockTreeState = {
@@ -227,7 +227,7 @@ describe('SidePanelRoot', () => {
     });
   });
 
-  describe('Task 8.1 (tab-tree-comprehensive-fix): 新規タブ追加ボタン (Requirements 8.1, 8.2, 8.3, 8.4)', () => {
+  describe('新規タブ追加ボタン', () => {
     it('新規タブ追加ボタンがタブツリーの後に表示されること', async () => {
       await act(async () => {
         render(<SidePanelRoot />);

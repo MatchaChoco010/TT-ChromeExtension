@@ -1,6 +1,5 @@
 /**
- * Task 6.4: ドラッグホバー時のブランチ自動展開のテスト
- * Requirements: 3.4
+ * ドラッグホバー時のブランチ自動展開のテスト
  *
  * このテストは以下をカバーします:
  * - ホバー検出とタイマー管理
@@ -10,7 +9,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import TabTreeView from './TabTreeView';
 
-describe('Task 6.4: ドラッグホバー時のブランチ自動展開', () => {
+describe('ドラッグホバー時のブランチ自動展開', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();

@@ -5,7 +5,6 @@ import { join } from 'path';
 /**
  * E2Eテストディレクトリ構造の検証
  *
- * Requirement 5: テスト構造とファイル組織
  * - E2Eテストファイルを`e2e/`ディレクトリ配下に配置する
  * - 共通テストユーティリティを`e2e/utils/`ディレクトリに配置する
  * - Playwrightフィクスチャを`e2e/fixtures/`ディレクトリに配置する

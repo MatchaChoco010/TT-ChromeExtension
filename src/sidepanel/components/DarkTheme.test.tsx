@@ -1,7 +1,5 @@
 /**
  * ダークテーマ統一のテスト
- * Task 10.1: ダークテーマカラースキームを統一する
- * Requirements: 11.1, 11.2, 11.3, 11.4
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -68,7 +66,7 @@ describe('Dark Theme Color Scheme', () => {
     vi.clearAllMocks();
   });
 
-  describe('Requirement 11.1: アクティブタブのハイライト', () => {
+  describe('アクティブタブのハイライト', () => {
     it('should use dark theme colors for active tab highlighting', () => {
       // タブノードコンポーネントのアクティブ状態では
       // bg-blue-100やbg-white等のライト系ではなく
@@ -86,7 +84,7 @@ describe('Dark Theme Color Scheme', () => {
     });
   });
 
-  describe('Requirement 11.2: 不統一な色の排除', () => {
+  describe('不統一な色の排除', () => {
     it('should not use light theme colors like white or bright blue', () => {
       // ダークテーマでは以下の色は使用しない:
       // - bg-white, bg-blue-100, bg-blue-50 (ライト系背景)
@@ -104,7 +102,7 @@ describe('Dark Theme Color Scheme', () => {
     });
   });
 
-  describe('Requirement 11.3: アクティブ/非アクティブタブのコントラスト', () => {
+  describe('アクティブ/非アクティブタブのコントラスト', () => {
     it('should maintain proper contrast between active and inactive tabs', () => {
       // アクティブタブ: より明るいダーク色 (例: bg-gray-600)
       // 非アクティブタブ: より暗いダーク色 (例: bg-gray-800)
@@ -116,7 +114,7 @@ describe('Dark Theme Color Scheme', () => {
     });
   });
 
-  describe('Requirement 11.4: 全UI要素のダークテーマ統一', () => {
+  describe('全UI要素のダークテーマ統一', () => {
     it('should apply dark theme to all UI elements', () => {
       // 以下のUI要素がダークテーマで統一されていること:
       // - タブ (TabTreeView, SortableTreeNodeItem)

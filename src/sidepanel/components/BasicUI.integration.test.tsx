@@ -6,16 +6,14 @@ import TabTreeView from './TabTreeView';
 import type { TabNode } from '@/types';
 
 /**
- * タスク 4.4: 基本UI表示の統合テスト
+ * 基本UI表示の統合テスト
  *
  * このテストは以下の要件を検証します:
  * - サイドパネルが正しく開くことを確認
- * - 現在のウィンドウのタブがツリー表示されることを確認（Acceptance Criteria 1.2）
- * - タブクリックでアクティブ化されることを確認（Acceptance Criteria 1.5）
- *
- * Requirements: 1.2, 1.3, 1.5
+ * - 現在のウィンドウのタブがツリー表示されることを確認
+ * - タブクリックでアクティブ化されることを確認
  */
-describe('基本UI表示の統合テスト (Task 4.4)', () => {
+describe('基本UI表示の統合テスト', () => {
   beforeEach(() => {
     // Chrome APIのモックをリセット
     vi.clearAllMocks();
@@ -83,7 +81,7 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
         { timeout: 3000 }
       );
 
-      // Task 10.2: ヘッダーが削除されたことを確認（Vivaldi-TTタイトルは表示されない）
+      // ヘッダーが削除されたことを確認（Vivaldi-TTタイトルは表示されない）
       expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
     });
 
@@ -309,7 +307,7 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
     });
   });
 
-  describe('Task 5.1: ExternalDropZone削除の確認', () => {
+  describe('ExternalDropZone削除の確認', () => {
     it('ツリービュー表示後もExternalDropZone（新規ウィンドウドロップエリア）が存在しないこと', async () => {
       // モックのストレージデータを設定
       const mockTreeState = {
@@ -352,7 +350,7 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
         { timeout: 3000 }
       );
 
-      // 要件6.1: ExternalDropZone（「ここにドロップして新しいウィンドウで開く」の専用領域）が存在しないことを確認
+      // ExternalDropZone（「ここにドロップして新しいウィンドウで開く」の専用領域）が存在しないことを確認
       expect(screen.queryByTestId('external-drop-zone')).not.toBeInTheDocument();
       expect(screen.queryByText(/新しいウィンドウで開く/)).not.toBeInTheDocument();
     });
@@ -399,7 +397,7 @@ describe('基本UI表示の統合テスト (Task 4.4)', () => {
         { timeout: 3000 }
       );
 
-      // Task 10.2: ヘッダーが削除されたことを確認
+      // ヘッダーが削除されたことを確認
       expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
 
       // この時点でストレージから状態がロードされていることを確認

@@ -7,8 +7,7 @@ import { useMenuActions } from '../hooks/useMenuActions';
 import { chromeMock } from '@/test/chrome-mock';
 
 /**
- * Task 15.2: MenuActions とメニュー項目の実装 - 統合テスト
- * Requirements: 12.2, 12.3, 12.4
+ * MenuActions とメニュー項目の実装 - 統合テスト
  */
 describe('ContextMenu Integration with MenuActions', () => {
   beforeEach(() => {
@@ -16,7 +15,7 @@ describe('ContextMenu Integration with MenuActions', () => {
     chromeMock.clearAllListeners();
   });
 
-  describe('Requirement 12.3: メニューから操作を選択すると対応するアクションが実行される', () => {
+  describe('メニューから操作を選択すると対応するアクションが実行される', () => {
     it('「タブを閉じる」をクリックするとタブが閉じられる', async () => {
       const user = userEvent.setup();
       chromeMock.tabs.remove.mockResolvedValue(undefined);

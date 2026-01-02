@@ -1,9 +1,7 @@
 /**
- * Task 12.2: タブ開き方別の位置ルール適用のテスト
- * Requirements: 9.2, 9.3, 9.4
+ * タブ開き方別の位置ルール適用のテスト
  *
- * Task 3.1 (tab-tree-bugfix-2): システムページ判定の追加
- * Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7
+ * システムページ判定の追加
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { chromeMock } from '@/test/chrome-mock';
@@ -16,7 +14,7 @@ import {
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import type { UserSettings } from '@/types';
 
-describe('Task 12.2: タブ開き方別の位置ルール', () => {
+describe('タブ開き方別の位置ルール', () => {
   beforeEach(async () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
@@ -33,7 +31,7 @@ describe('Task 12.2: タブ開き方別の位置ルール', () => {
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
   });
 
-  describe('Requirement 9.2: リンククリックから開かれたタブ', () => {
+  describe('リンククリックから開かれたタブ', () => {
     it('newTabPositionFromLink が「child」の場合、元のタブの子として配置される', async () => {
       // Arrange: 設定を保存
       const settings: UserSettings = {
@@ -124,7 +122,7 @@ describe('Task 12.2: タブ開き方別の位置ルール', () => {
     });
   });
 
-  describe('Requirement 9.3: 手動で開かれたタブ', () => {
+  describe('手動で開かれたタブ', () => {
     it('newTabPositionManual が「end」の場合、ツリーの最後に配置される', async () => {
       // Arrange
       const settings: UserSettings = {
@@ -160,7 +158,7 @@ describe('Task 12.2: タブ開き方別の位置ルール', () => {
     });
   });
 
-  describe('Requirement 9.4: 後方互換性', () => {
+  describe('後方互換性', () => {
     it('newTabPositionFromLink/Manual がない場合、既存の newTabPosition 設定を使用', async () => {
       // Arrange: 古い設定 (新しいフィールドなし)
       const settings = {
@@ -206,10 +204,9 @@ describe('Task 12.2: タブ開き方別の位置ルール', () => {
 });
 
 /**
- * Task 3.1 (tab-tree-bugfix-2): システムページ判定と新規タブ位置設定の修正
- * Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7
+ * システムページ判定と新規タブ位置設定の修正
  */
-describe('Task 3.1: システムページ判定と新規タブ位置設定', () => {
+describe('システムページ判定と新規タブ位置設定', () => {
   beforeEach(async () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
@@ -258,7 +255,7 @@ describe('Task 3.1: システムページ判定と新規タブ位置設定', () 
     });
   });
 
-  describe('Requirement 17.6: openerTabIdがあってもシステムページの場合は手動タブとして扱う', () => {
+  describe('openerTabIdがあってもシステムページの場合は手動タブとして扱う', () => {
     it('設定画面はopenerTabIdがあっても手動タブとして扱われる (リストの最後に配置)', async () => {
       // Arrange: 設定を保存
       const settings: UserSettings = {
@@ -395,7 +392,7 @@ describe('Task 3.1: システムページ判定と新規タブ位置設定', () 
     });
   });
 
-  describe('Requirement 17.7: 通常のリンククリックは引き続き子タブとして配置', () => {
+  describe('通常のリンククリックは引き続き子タブとして配置', () => {
     it('http/https ページはopenerTabIdがあれば子タブとして配置される', async () => {
       // Arrange
       const settings: UserSettings = {
@@ -443,7 +440,7 @@ describe('Task 3.1: システムページ判定と新規タブ位置設定', () 
     });
   });
 
-  describe('Requirement 17.5: 手動タブ位置が「現在のタブの子」設定でも正しく動作', () => {
+  describe('手動タブ位置が「現在のタブの子」設定でも正しく動作', () => {
     it('手動タブ位置が「child」設定でも、システムページは子として配置されない', async () => {
       // Arrange: 手動タブも child に設定
       const settings: UserSettings = {
@@ -495,7 +492,7 @@ describe('Task 3.1: システムページ判定と新規タブ位置設定', () 
     });
   });
 
-  describe('Requirement 17.3: デフォルト設定の確認', () => {
+  describe('デフォルト設定の確認', () => {
     it('設定が存在しない場合、リンククリックはデフォルトで子タブとして配置', async () => {
       // Arrange: 設定なし
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, null as unknown as UserSettings);

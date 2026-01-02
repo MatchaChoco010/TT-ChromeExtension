@@ -5,22 +5,21 @@ import { STORAGE_KEYS } from '@/storage/StorageService';
  * UnreadTracker
  *
  * タブの未読状態を追跡するサービス
- * Requirements: 7.1, 7.2, 13.1, 13.2, 13.3
  */
 export class UnreadTracker implements IUnreadTracker {
   private unreadTabIds: Set<number> = new Set();
-  /** 起動完了フラグ - Requirements 13.1, 13.2, 13.3 */
+  /** 起動完了フラグ */
   private initialLoadComplete: boolean = false;
 
   constructor(private storageService: IStorageService) {}
 
   /**
    * タブを未読としてマーク
+   * ブラウザ起動時は既存のすべてのタブに未読バッジを表示しない
    * @param tabId - タブID
-   * Requirements 13.1: ブラウザ起動時は既存のすべてのタブに未読バッジを表示しない
    */
   async markAsUnread(tabId: number): Promise<void> {
-    // Requirement 13.1: 起動完了前は未読マークをスキップ
+    // 起動完了前は未読マークをスキップ
     if (!this.initialLoadComplete) {
       return;
     }
@@ -76,7 +75,7 @@ export class UnreadTracker implements IUnreadTracker {
 
   /**
    * 起動完了フラグを設定
-   * Requirement 13.2: ブラウザ起動後に新しいタブが開かれた場合にそのタブに未読バッジを表示する
+   * ブラウザ起動後に新しいタブが開かれた場合にそのタブに未読バッジを表示する
    */
   setInitialLoadComplete(): void {
     this.initialLoadComplete = true;
@@ -84,7 +83,7 @@ export class UnreadTracker implements IUnreadTracker {
 
   /**
    * 起動完了かどうかを取得
-   * Requirement 13.3: 起動完了後に開かれたタブを「新規タブ」として識別する
+   * 起動完了後に開かれたタブを「新規タブ」として識別する
    */
   isInitialLoadComplete(): boolean {
     return this.initialLoadComplete;

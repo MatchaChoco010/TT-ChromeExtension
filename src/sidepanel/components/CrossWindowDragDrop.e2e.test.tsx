@@ -1,11 +1,10 @@
 /**
- * Task 7.4: クロスウィンドウD&Dのテスト
- * Requirements: 4.1, 4.2, 4.3
+ * クロスウィンドウD&Dのテスト
  *
  * このテストは以下の受け入れ基準を検証します:
- * - Acceptance Criteria 4.1: タブを別ウィンドウに移動できること
- * - Acceptance Criteria 4.2: パネル外へのドロップで新しいウィンドウが作成されること
- * - Acceptance Criteria 4.3: 親タブとサブツリーが一緒に移動すること
+ * - タブを別ウィンドウに移動できること
+ * - パネル外へのドロップで新しいウィンドウが作成されること
+ * - 親タブとサブツリーが一緒に移動すること
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -34,7 +33,7 @@ class MockStorageService implements IStorageService {
   }
 }
 
-describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
+describe('Cross-Window Drag and Drop E2E Tests', () => {
   let treeStateManager: TreeStateManager;
   let mockStorageService: MockStorageService;
   let mockSendMessage: ReturnType<typeof vi.fn>;
@@ -82,7 +81,7 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
     } as never;
   });
 
-  describe('Acceptance Criteria 4.1: タブを別ウィンドウに移動できること', () => {
+  describe('タブを別ウィンドウに移動できること', () => {
     it('should move a single tab to another window', async () => {
       // Setup: Create a tab in the tree
       const tab = {
@@ -147,7 +146,7 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
     });
   });
 
-  describe('Acceptance Criteria 4.2: パネル外へのドロップで新しいウィンドウが作成されること', () => {
+  describe('パネル外へのドロップで新しいウィンドウが作成されること', () => {
     it('should create a new window when tab is dropped outside panel', async () => {
       // Setup: Create a tab
       const tab = {
@@ -244,7 +243,7 @@ describe('Task 7.4: Cross-Window Drag and Drop E2E Tests', () => {
     });
   });
 
-  describe('Acceptance Criteria 4.3: 親タブとサブツリーが一緒に移動すること', () => {
+  describe('親タブとサブツリーが一緒に移動すること', () => {
     it('should move parent tab and all children to another window', async () => {
       // Setup: Create a tree structure with parent and nested children
       const parentTab = {

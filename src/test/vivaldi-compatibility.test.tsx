@@ -1,11 +1,11 @@
 /**
- * Task 16.3: Vivaldi互換性テスト
+ * Vivaldi互換性テスト
  *
  * 以下の互換性をテストする:
- * - Requirement 14.1: Vivaldiブラウザ最新版での動作
- * - Requirement 14.2: VivaldiのタブAPIとChrome拡張機能APIの両方との互換性
- * - Requirement 14.4: Vivaldiのテーマ設定と調和するデフォルトスタイル
- * - Requirement 14.5: VivaldiのAPIが利用できない場合の標準Chrome拡張機能APIへのフォールバック
+ * - Vivaldiブラウザ最新版での動作
+ * - VivaldiのタブAPIとChrome拡張機能APIの両方との互換性
+ * - Vivaldiのテーマ設定と調和するデフォルトスタイル
+ * - VivaldiのAPIが利用できない場合の標準Chrome拡張機能APIへのフォールバック
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -29,7 +29,7 @@ declare global {
   }
 }
 
-describe('Task 16.3: Vivaldi互換性テスト', () => {
+describe('Vivaldi互換性テスト', () => {
   // Mock storage - shared across tests but reset in beforeEach
   let mockStorage: MockStorageData = {};
 
@@ -112,7 +112,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
     });
   });
 
-  describe('Requirement 14.1: Vivaldiブラウザでの基本動作', () => {
+  describe('Vivaldiブラウザでの基本動作', () => {
     it('サイドパネルAPIが正常に動作すること', async () => {
       // Arrange
       const mockOpenSidePanel = vi.fn(() => Promise.resolve());
@@ -172,7 +172,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
     });
   });
 
-  describe('Requirement 14.2: VivaldiのタブAPIとChrome拡張機能APIの互換性', () => {
+  describe('VivaldiのタブAPIとChrome拡張機能APIの互換性', () => {
     it('Vivaldi固有のタブプロパティが利用可能な場合、それを活用できること', async () => {
       // Arrange - Vivaldi固有のAPIを模擬
       const vivaldiTabs: VivaldiTabAPI = {
@@ -231,7 +231,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
     });
   });
 
-  describe('Requirement 14.4: Vivaldiのテーマ設定との視覚的調和', () => {
+  describe('Vivaldiのテーマ設定との視覚的調和', () => {
     it('ダークモード時にVivaldi用のダークテーマが適用されること', async () => {
       // Arrange
       Object.defineProperty(window, 'matchMedia', {
@@ -355,7 +355,7 @@ describe('Task 16.3: Vivaldi互換性テスト', () => {
     });
   });
 
-  describe('Requirement 14.5: VivaldiのAPIが利用できない場合のフォールバック', () => {
+  describe('VivaldiのAPIが利用できない場合のフォールバック', () => {
     it('Vivaldi固有APIが存在しない場合、標準Chrome APIにフォールバックすること', async () => {
       // Arrange
       window.vivaldi = undefined;

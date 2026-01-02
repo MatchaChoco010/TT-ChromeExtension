@@ -1,11 +1,11 @@
 /**
- * Task 6.1: 自前ドラッグ&ドロップフック
+ * 自前ドラッグ&ドロップフック
  *
- * Requirement 3.1.2: mousedown/mousemove/mouseupイベントでドラッグ操作を処理
- * Requirement 3.1.3: 8px移動検知によるドラッグ開始（誤操作防止）
- * Requirement 3.1.4: ドラッグ中の要素をマウスカーソルに追従
- * Requirement 3.1.5: GapDropDetection.tsのロジックを流用してドロップ位置を計算
- * Requirement 3.1.6: クロスウィンドウでのドラッグ状態継続を可能に
+ * mousedown/mousemove/mouseupイベントでドラッグ操作を処理
+ * 8px移動検知によるドラッグ開始（誤操作防止）
+ * ドラッグ中の要素をマウスカーソルに追従
+ * GapDropDetection.tsのロジックを流用してドロップ位置を計算
+ * クロスウィンドウでのドラッグ状態継続を可能に
  */
 
 import React, { useCallback, useRef, useState, useEffect } from 'react';
@@ -69,14 +69,14 @@ export interface UseDragDropOptions {
   /** 外部ドロップ（ツリー外へのドラッグ）コールバック */
   onExternalDrop?: (tabId: number) => void;
   /**
-   * Task 7.2 (tab-tree-bugfix-2): 外部ドロップ判定用の境界参照
-   * Requirement 4.2, 4.3: ドラッグアウト判定はサイドパネル全体の境界を基準にする
+   * 外部ドロップ判定用の境界参照
+   * ドラッグアウト判定はサイドパネル全体の境界を基準にする
    * 指定されていない場合はcontainerRefを使用（後方互換性維持）
    */
   dragOutBoundaryRef?: React.RefObject<HTMLElement | null>;
   /**
-   * Task 5.2: サブツリーノードID取得コールバック
-   * Requirement 2.2: 下方向へのドラッグ時、サブツリーサイズを考慮したインデックス調整
+   * サブツリーノードID取得コールバック
+   * 下方向へのドラッグ時、サブツリーサイズを考慮したインデックス調整
    * ドラッグ中のノードIDからそのサブツリー全体のノードIDを取得する
    */
   getSubtreeNodeIds?: (nodeId: string) => string[];
@@ -131,9 +131,9 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     onDragEnd,
     onDragCancel,
     onExternalDrop,
-    // Task 7.2 (tab-tree-bugfix-2): 外部ドロップ判定用の境界参照
+    // 外部ドロップ判定用の境界参照
     dragOutBoundaryRef,
-    // Task 5.2: サブツリーノードID取得コールバック
+    // サブツリーノードID取得コールバック
     getSubtreeNodeIds,
   } = options;
 
@@ -182,8 +182,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   }, [dragState]);
 
   /**
-   * Task 7.2 (tab-tree-bugfix-2): マウス位置が外部ドロップ境界外かどうかを判定
-   * Requirement 4.2, 4.3: ドラッグアウト判定はサイドパネル全体の境界を基準にする
+   * マウス位置が外部ドロップ境界外かどうかを判定
+   * ドラッグアウト判定はサイドパネル全体の境界を基準にする
    * dragOutBoundaryRefが指定されている場合はそちらを使用、
    * 指定されていない場合はcontainerRefを使用（後方互換性維持）
    */
@@ -201,7 +201,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     );
   }, [containerRef, dragOutBoundaryRef]);
 
-  // Task 5.2: getSubtreeNodeIdsをrefで保持（useCallbackの依存配列を安定化）
+  // getSubtreeNodeIdsをrefで保持（useCallbackの依存配列を安定化）
   const getSubtreeNodeIdsRef = useRef(getSubtreeNodeIds);
   useEffect(() => {
     getSubtreeNodeIdsRef.current = getSubtreeNodeIds;
@@ -209,8 +209,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
 
   /**
    * 垂直方向のドロップターゲットを計算
-   * Task 5.2: サブツリーサイズを考慮したドロップ位置計算
-   * Requirement 2.2: 下方向へのドラッグ時、サブツリーを除外してインデックス調整
+   * サブツリーサイズを考慮したドロップ位置計算
+   * 下方向へのドラッグ時、サブツリーを除外してインデックス調整
    */
   const calculateVerticalDropTarget = useCallback((_clientX: number, clientY: number): DropTarget | null => {
     const container = containerRef.current;
@@ -241,7 +241,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       }
     });
 
-    // Task 5.2: ドラッグ中のノードIDを取得してオプションを構築
+    // ドラッグ中のノードIDを取得してオプションを構築
     const currentDragState = dragStateRef.current;
     const options: DropTargetOptions = {};
 
@@ -254,7 +254,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   }, [containerRef]);
 
   /**
-   * Task 10.1: 水平方向のドロップターゲットを計算（ピン留めタブ用）
+   * 水平方向のドロップターゲットを計算（ピン留めタブ用）
    */
   const calculateHorizontalDropTargetFromDOM = useCallback((clientX: number, _clientY: number): DropTarget | null => {
     const container = containerRef.current;
@@ -388,8 +388,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
         return;
       }
 
-      // Task 7.2 (tab-tree-bugfix-2): 外部ドロップ判定
-      // Requirement 4.2, 4.3: ドラッグアウト判定はサイドパネル全体の境界を基準にする
+      // 外部ドロップ判定
+      // ドラッグアウト判定はサイドパネル全体の境界を基準にする
       if (isOutsideDragOutBoundary(e.clientX, e.clientY)) {
         if (currentState.draggedTabId !== null && callbacksRef.current.onExternalDrop) {
           callbacksRef.current.onExternalDrop(currentState.draggedTabId);
@@ -457,7 +457,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
 
   /**
    * プログラマティックにドラッグを開始（クロスウィンドウ用）
-   * Requirement 3.1.6: 8px移動待機をスキップして即座にドラッグ状態を開始
+   * 8px移動待機をスキップして即座にドラッグ状態を開始
    */
   const startDragProgrammatically = useCallback((
     itemId: string,

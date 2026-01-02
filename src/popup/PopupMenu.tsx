@@ -1,8 +1,7 @@
 /**
  * PopupMenuコンポーネント
- * Task 9.2: ポップアップメニューを新規作成
- * Task 9.3: スナップショット取得ボタンを追加
- * Requirements: 20.2, 20.3, 20.4, 21.1, 21.2, 21.3
+ * ポップアップメニューを新規作成
+ * スナップショット取得ボタンを追加
  *
  * ブラウザツールバーの拡張機能アイコンをクリックした際に表示されるポップアップメニュー。
  * 「設定を開く」ボタンと「スナップショットを取得」ボタンを提供する。
@@ -69,7 +68,6 @@ export const PopupMenu: React.FC = () => {
   /**
    * スナップショットを取得
    * Service Workerにメッセージを送信してスナップショットを作成
-   * Requirement 21.1, 21.2, 21.3
    */
   const handleCreateSnapshot = async () => {
     setSnapshotStatus('loading');

@@ -14,7 +14,6 @@ export interface GroupPositionInfo {
  * GroupManager
  *
  * タブグループの作成・編集・削除を管理するサービス
- * Requirements: 3.1, 3.2, 3.8, 5.1, 5.2
  */
 export class GroupManager {
   private groups: Map<string, Group> = new Map();
@@ -23,7 +22,7 @@ export class GroupManager {
 
   /**
    * グループ化が可能かどうかを判定
-   * Requirement 3.8: 単一のタブのみが選択されている場合、「グループ化」オプションを無効化
+   * 単一のタブのみが選択されている場合、「グループ化」オプションを無効化
    *
    * @param selectedCount - 選択されているタブ数
    * @returns グループ化が可能ならtrue（2タブ以上）
@@ -34,7 +33,6 @@ export class GroupManager {
 
   /**
    * グループタブの挿入位置を決定
-   * Requirements: 3.2, 3.9, 3.10
    * - グループタブは選択されたタブの中で最も上にあるタブの位置に挿入
    * - 選択タブがすべて同じ親を持つ場合はその親の子として配置
    * - 選択タブが異なる親を持つ場合はルートレベルに配置

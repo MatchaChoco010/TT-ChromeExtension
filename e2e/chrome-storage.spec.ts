@@ -2,8 +2,7 @@
  * Chrome Storage API E2E Tests
  *
  * chrome.storage APIとの統合を検証するE2Eテスト
- * Task 5.4: chrome.storage API統合の実装とテスト
- * Requirement 4.4: chrome.storage API統合
+ * chrome.storage API統合の実装とテスト
  *
  * テスト対象:
  * - chrome.storage.local.set()で設定を保存
@@ -162,7 +161,7 @@ test.describe('chrome.storage API統合', () => {
       extensionId,
       serviceWorker,
     }) => {
-      // Task 9.1: 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
+      // 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
       const settingsPage = await extensionContext.newPage();
       await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
 
@@ -210,7 +209,7 @@ test.describe('chrome.storage API統合', () => {
       extensionId,
       serviceWorker,
     }) => {
-      // Task 9.1: 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
+      // 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
       const settingsPage = await extensionContext.newPage();
       await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
 

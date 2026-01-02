@@ -1,7 +1,7 @@
 /**
- * Task 6.3: DragOverlayコンポーネント
+ * DragOverlayコンポーネント
  *
- * Requirement 3.1.4: ドラッグ中の要素をマウスカーソルに追従させること
+ * ドラッグ中の要素をマウスカーソルに追従させること
  *
  * ReactDOM.createPortalでbody直下に描画し、
  * コンテナのoverflow:hiddenに影響されないようにする。

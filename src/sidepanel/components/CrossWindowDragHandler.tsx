@@ -9,7 +9,7 @@ interface CrossWindowDragHandlerProps {
 
 /**
  * Component for handling cross-window drag and drop operations
- * Task 13.2: useCrossWindowDragフックを使用したクロスウィンドウドラッグの検知
+ * useCrossWindowDragフックを使用したクロスウィンドウドラッグの検知
  *
  * This component:
  * - Monitors mouseenter events on the container

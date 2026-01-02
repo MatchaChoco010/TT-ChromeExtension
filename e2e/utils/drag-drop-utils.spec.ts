@@ -2,8 +2,6 @@
  * DragDropUtils Tests
  *
  * ドラッグ&ドロップ操作のシミュレーションとドロップ位置検証のテスト
- *
- * Requirements: 3.2, 3.3, 3.4, 3.5
  */
 import { test, expect } from '../fixtures/extension';
 import * as dragDropUtils from './drag-drop-utils';

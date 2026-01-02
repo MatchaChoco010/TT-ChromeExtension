@@ -80,9 +80,7 @@ export class ChromeMock {
     onRemoved: new MockEvent<(windowId: number) => void>(),
     create: vi.fn<(createData?: chrome.windows.CreateData) => Promise<chrome.windows.Window>>(() => Promise.resolve({} as chrome.windows.Window)),
     get: vi.fn<(windowId: number, getInfo?: { populate?: boolean }) => Promise<chrome.windows.Window>>(() => Promise.resolve({} as chrome.windows.Window)),
-    // Task 12.3 (tab-tree-bugfix): getCurrent mock for window filtering
     getCurrent: vi.fn<(getInfo?: { populate?: boolean }) => Promise<chrome.windows.Window>>(() => Promise.resolve({ id: 1 } as chrome.windows.Window)),
-    // Task 14.1: 空ウィンドウ自動クローズ用
     remove: vi.fn<(windowId: number) => Promise<void>>(() => Promise.resolve()),
   };
 

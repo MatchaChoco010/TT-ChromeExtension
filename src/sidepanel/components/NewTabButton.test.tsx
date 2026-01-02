@@ -50,7 +50,7 @@ describe('NewTabButton', () => {
     it('ボタンは「+」アイコンのみを表示し、テキストラベルを表示しないこと', () => {
       render(<NewTabButton />);
       const button = screen.getByTestId('new-tab-button');
-      // Requirement 8.1, 8.2: 「+」アイコンのみ表示、テキストラベルは表示しない
+      // 「+」アイコンのみ表示、テキストラベルは表示しない
       // ボタンのテキストコンテンツは「+」のみであること
       expect(button.textContent?.trim()).toBe('+');
       // 「新規タブ」というテキストが含まれないこと
@@ -83,10 +83,9 @@ describe('NewTabButton', () => {
       );
     });
 
-    // Task 3.3 (tab-tree-bugfix-2): Requirements 11.1, 11.2 - 新規タブのタイトルを「スタートページ」に修正
+    // 新規タブのタイトルを「スタートページ」に修正
     // NewTabButtonがchrome://vivaldi-webui/startpageを開くことで、getDisplayTitleが「スタートページ」を表示
     it('クリック時にVivaldiスタートページが開かれること', async () => {
-      // Requirement 12.1, 12.2: 新規タブでVivaldiスタートページを開く
       const user = userEvent.setup();
       render(<NewTabButton />);
 

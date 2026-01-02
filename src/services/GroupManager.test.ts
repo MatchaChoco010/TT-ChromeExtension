@@ -4,7 +4,6 @@ import type { IStorageService, Group, TabNode } from '@/types';
 
 /**
  * GroupManager ユニットテスト
- * Requirements: 3.1, 3.2, 3.8, 3.9, 3.10, 5.1, 5.2
  */
 describe('GroupManager', () => {
   let groupManager: GroupManager;
@@ -36,13 +35,13 @@ describe('GroupManager', () => {
 
   describe('canCreateGroup', () => {
     it('タブが1つ以下の場合はfalseを返すこと', () => {
-      // Requirement 3.8: 単一のタブのみが選択されている場合、「グループ化」オプションを無効化
+      // 単一のタブのみが選択されている場合、「グループ化」オプションを無効化
       expect(groupManager.canCreateGroup(0)).toBe(false);
       expect(groupManager.canCreateGroup(1)).toBe(false);
     });
 
     it('タブが2つ以上の場合はtrueを返すこと', () => {
-      // Requirement 3.1: 複数のタブを選択してコンテキストメニューから「グループ化」を選択
+      // 複数のタブを選択してコンテキストメニューから「グループ化」を選択
       expect(groupManager.canCreateGroup(2)).toBe(true);
       expect(groupManager.canCreateGroup(3)).toBe(true);
       expect(groupManager.canCreateGroup(10)).toBe(true);
@@ -73,7 +72,7 @@ describe('GroupManager', () => {
     });
 
     it('すべてのノードが同じ親を持つ場合はその親の子として配置すること', () => {
-      // Requirement 3.10: 選択されたタブがすべて同じ親を持つ場合、グループタブはその親の子として配置
+      // 選択されたタブがすべて同じ親を持つ場合、グループタブはその親の子として配置
       const parentId = 'parent-node';
       const nodes = [
         createMockNode('node-1', 1, parentId, 1),
@@ -86,7 +85,7 @@ describe('GroupManager', () => {
     });
 
     it('すべてのノードがルートレベルの場合はルートレベルに配置すること', () => {
-      // Requirement 3.10のバリエーション: すべてルートレベル
+      // すべてルートレベル
       const nodes = [
         createMockNode('node-1', 1, null, 0),
         createMockNode('node-2', 2, null, 0),
@@ -97,7 +96,7 @@ describe('GroupManager', () => {
     });
 
     it('ノードが異なる親を持つ場合はルートレベルに配置すること', () => {
-      // Requirement 3.9: 選択されたタブが異なる親を持つ場合、グループタブはルートレベルに配置
+      // 選択されたタブが異なる親を持つ場合、グループタブはルートレベルに配置
       const nodes = [
         createMockNode('node-1', 1, 'parent-1', 1),
         createMockNode('node-2', 2, 'parent-2', 1),
@@ -109,7 +108,7 @@ describe('GroupManager', () => {
     });
 
     it('一部がルートで一部が子の場合はルートレベルに配置すること', () => {
-      // Requirement 3.9: 異なる親（一方がnull）
+      // 異なる親（一方がnull）
       const nodes = [
         createMockNode('node-1', 1, null, 0),
         createMockNode('node-2', 2, 'parent-1', 1),
@@ -122,7 +121,7 @@ describe('GroupManager', () => {
 
   describe('createGroup', () => {
     it('新しいグループを作成できること', async () => {
-      // Acceptance Criteria 5.1: 新しいグループページを作成し、選択されたタブをその配下に配置する
+      // 新しいグループページを作成し、選択されたタブをその配下に配置する
       const tabIds = [1, 2, 3];
       const name = 'テストグループ';
       const color = '#ff0000';
@@ -160,7 +159,7 @@ describe('GroupManager', () => {
 
   describe('updateGroup', () => {
     it('グループの名前を更新できること', async () => {
-      // Acceptance Criteria 5.2: グループページはカスタマイズ可能なタイトルと色を持つ
+      // グループページはカスタマイズ可能なタイトルと色を持つ
       const group = await groupManager.createGroup([1], '元の名前', '#ff0000');
       const newName = '新しい名前';
 

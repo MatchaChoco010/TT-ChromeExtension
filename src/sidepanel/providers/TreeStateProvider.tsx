@@ -8,14 +8,14 @@ interface TreeStateContextType {
   error: Error | null;
   updateTreeState: (state: TreeState) => void;
   handleDragEnd: (event: DragEndEvent) => Promise<void>;
-  // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
+  // 兄弟としてドロップ（Gapドロップ）時のハンドラ
   handleSiblingDrop: (info: SiblingDropInfo) => Promise<void>;
-  // Task 4.8: ビュー管理機能
+  // ビュー管理機能
   switchView: (viewId: string) => void;
   createView: () => void;
   deleteView: (viewId: string) => void;
   updateView: (viewId: string, updates: Partial<View>) => void;
-  // Task 4.9: グループ管理機能
+  // グループ管理機能
   groups: Record<string, Group>;
   createGroup: (name: string, color: string) => string;
   deleteGroup: (groupId: string) => void;
@@ -24,36 +24,36 @@ interface TreeStateContextType {
   addTabToGroup: (nodeId: string, groupId: string) => void;
   removeTabFromGroup: (nodeId: string) => void;
   getGroupTabCount: (groupId: string) => number;
-  // Task 4.13: 未読状態管理機能
+  // 未読状態管理機能
   unreadTabIds: Set<number>;
   isTabUnread: (tabId: number) => boolean;
   getUnreadCount: () => number;
   getUnreadChildCount: (nodeId: string) => number;
-  // Task 8.5.4: アクティブタブID
+  // アクティブタブID
   activeTabId: number | null;
-  // Task 1.1: タブ情報マップ管理
+  // タブ情報マップ管理
   tabInfoMap: TabInfoMap;
   getTabInfo: (tabId: number) => ExtendedTabInfo | undefined;
-  // Task 1.2: ピン留めタブ専用リスト
+  // ピン留めタブ専用リスト
   pinnedTabIds: number[];
-  // Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え (Requirements 10.1, 10.2, 10.3, 10.4)
+  // ピン留めタブの並び替え
   handlePinnedTabReorder: (tabId: number, newIndex: number) => Promise<void>;
-  // Task 1.3: 複数選択状態管理
+  // 複数選択状態管理
   selectedNodeIds: Set<string>;
   lastSelectedNodeId: string | null;
   selectNode: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
   clearSelection: () => void;
   isNodeSelected: (nodeId: string) => boolean;
-  // Task 12.2: 選択されたすべてのタブIDを取得
+  // 選択されたすべてのタブIDを取得
   getSelectedTabIds: () => number[];
-  // Task 3.3: ビューごとのタブ数 (Requirements 17.1, 17.2, 17.3)
+  // ビューごとのタブ数
   viewTabCounts: Record<string, number>;
-  // Task 7.2: タブをビューに移動 (Requirements 18.1, 18.2, 18.3)
+  // タブをビューに移動
   moveTabsToView: (viewId: string, tabIds: number[]) => void;
-  // Task 6.2: 現在のウィンドウID（複数ウィンドウ対応）
+  // 現在のウィンドウID（複数ウィンドウ対応）
   currentWindowId: number | null;
-  // Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ&ドロップ
-  // Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
+  // クロスウィンドウドラッグ&ドロップ
+  // 別ウィンドウのツリービュー上でのドロップでタブを移動
   handleCrossWindowDragStart: (tabId: number, treeData: TabNode[]) => Promise<void>;
   handleCrossWindowDrop: () => Promise<boolean>;
   clearCrossWindowDragState: () => Promise<void>;
@@ -100,7 +100,7 @@ function reconstructChildrenReferences(treeState: TreeState): TreeState {
     };
   });
 
-  // Task 14.1 (tree-stability-v2): ストレージに保存されたchildren配列の順序を維持して再構築
+  // ストレージに保存されたchildren配列の順序を維持して再構築
   // 2段階で処理: 1. 保存された順序で追加、2. parentIdで関連付けられているが未追加の子を追加
   const addedChildIds = new Set<string>();
 
@@ -148,7 +148,7 @@ function reconstructChildrenReferences(treeState: TreeState): TreeState {
     }
   });
 
-  // Task 4.8: views が存在しない場合はデフォルトビューを追加
+  // views が存在しない場合はデフォルトビューを追加
   const views = treeState.views && treeState.views.length > 0
     ? treeState.views
     : getDefaultViews();
@@ -165,7 +165,7 @@ function reconstructChildrenReferences(treeState: TreeState): TreeState {
 }
 
 /**
- * Task 13.1 (tree-stability-v2): ツリーを深さ優先でフラット化
+ * ツリーを深さ優先でフラット化
  * 親子関係を維持したまま、深さ優先順序でタブIDのリストを返す
  * ピン留めタブは除外する
  * ルートノードはtabInfoMapのインデックスでソート（buildTreeと同じ順序）
@@ -211,7 +211,7 @@ function flattenTreeDFS(
 }
 
 /**
- * Task 13.1 (tree-stability-v2): ツリー構造をChromeタブインデックスに同期
+ * ツリー構造をChromeタブインデックスに同期
  * ツリーを深さ優先でフラット化し、各タブのChromeインデックスを更新
  */
 async function syncTreeToChromeTabs(
@@ -261,23 +261,23 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const [treeState, setTreeState] = useState<TreeState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  // Task 4.9: グループ状態
+  // グループ状態
   const [groups, setGroups] = useState<Record<string, Group>>({});
-  // Task 4.13: 未読タブ状態
+  // 未読タブ状態
   const [unreadTabIds, setUnreadTabIds] = useState<Set<number>>(new Set());
-  // Task 8.5.4: アクティブタブID
+  // アクティブタブID
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
-  // Task 10.2.1: ローカル更新中フラグ（storage.onChangedからの更新をスキップするため）
+  // ローカル更新中フラグ（storage.onChangedからの更新をスキップするため）
   const isLocalUpdateRef = useRef<boolean>(false);
-  // Task 1.1: タブ情報マップ
+  // タブ情報マップ
   const [tabInfoMap, setTabInfoMap] = useState<TabInfoMap>({});
-  // Task 1.3: 複数選択状態
+  // 複数選択状態
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [lastSelectedNodeId, setLastSelectedNodeId] = useState<string | null>(null);
-  // Task 6.2: 現在のウィンドウID（複数ウィンドウ対応）
+  // 現在のウィンドウID（複数ウィンドウ対応）
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
 
-  // Task 4.9: ストレージからグループを読み込む
+  // ストレージからグループを読み込む
   const loadGroups = React.useCallback(async () => {
     try {
       const result = await chrome.storage.local.get('groups');
@@ -289,7 +289,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     }
   }, []);
 
-  // Task 4.13: ストレージから未読タブを読み込む
+  // ストレージから未読タブを読み込む
   const loadUnreadTabs = React.useCallback(async () => {
     try {
       const result = await chrome.storage.local.get(STORAGE_KEYS.UNREAD_TABS);
@@ -301,7 +301,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     }
   }, []);
 
-  // Task 8.5.4: 現在のアクティブタブを読み込む
+  // 現在のアクティブタブを読み込む
   const loadActiveTab = React.useCallback(async () => {
     try {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -313,8 +313,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     }
   }, []);
 
-  // Task 6.2: 現在のウィンドウIDを取得する（複数ウィンドウ対応）
-  // Task 1.1 (tab-tree-bugfix): chrome.windows.getCurrent()を呼び出して確実にウィンドウIDを取得
+  // 現在のウィンドウIDを取得する（複数ウィンドウ対応）
+  // chrome.windows.getCurrent()を呼び出して確実にウィンドウIDを取得
   const loadCurrentWindowId = React.useCallback(async () => {
     try {
       // URLパラメータからウィンドウIDを取得（別ウィンドウ用サイドパネルの場合）
@@ -324,7 +324,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         setCurrentWindowId(parseInt(windowIdParam, 10));
         return;
       }
-      // Task 1.1 (tab-tree-bugfix): chrome.windows.getCurrent()を使用してウィンドウIDを取得
+      // chrome.windows.getCurrent()を使用してウィンドウIDを取得
       // これにより各ウィンドウのサイドパネルで自ウィンドウのタブのみが表示される
       const currentWindow = await chrome.windows.getCurrent();
       if (currentWindow?.id !== undefined) {
@@ -336,19 +336,19 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     }
   }, []);
 
-  // Task 1.1: 全タブ情報を読み込む
-  // Requirement 5.2: 永続化されたタイトルも復元して使用する
-  // Task 2.1 (tab-tree-bugfix): 永続化されたファビコンも復元して使用する
-  // Task 6.2: windowIdを含める（複数ウィンドウ対応）
-  // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
-  // Task 12.1 (tab-tree-comprehensive-fix): indexを含める（ピン留めタブの順序同期）
+  // 全タブ情報を読み込む
+  // 永続化されたタイトルも復元して使用する
+  // 永続化されたファビコンも復元して使用する
+  // windowIdを含める（複数ウィンドウ対応）
+  // discardedを含める（休止タブの視覚的区別）
+  // indexを含める（ピン留めタブの順序同期）
   const loadTabInfoMap = React.useCallback(async () => {
     try {
       // 永続化されたタイトルを取得
       const storedTitlesResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_TITLES);
       const persistedTitles: Record<number, string> = storedTitlesResult[STORAGE_KEYS.TAB_TITLES] || {};
 
-      // Task 2.1 (tab-tree-bugfix): 永続化されたファビコンを取得
+      // 永続化されたファビコンを取得
       const storedFaviconsResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_FAVICONS);
       const persistedFavicons: Record<number, string> = storedFaviconsResult[STORAGE_KEYS.TAB_FAVICONS] || {};
 
@@ -356,13 +356,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       const newTabInfoMap: TabInfoMap = {};
       for (const tab of tabs) {
         if (tab.id !== undefined) {
-          // Requirement 5.2: 永続化されたタイトルがあればそれを使用
+          // 永続化されたタイトルがあればそれを使用
           // タブがローディング中でChromeからのタイトルが空の場合に特に有効
           const persistedTitle = persistedTitles[tab.id];
           const title = tab.title || persistedTitle || '';
 
-          // Task 2.1 (tab-tree-bugfix): 永続化されたファビコンがあればそれを使用
-          // ブラウザ再起動後にタブが読み込まれていない場合に有効
+          // 永続化されたファビコンがあればそれを使用（ブラウザ再起動後に有効）
           const persistedFavicon = persistedFavicons[tab.id];
           const favIconUrl = tab.favIconUrl || persistedFavicon;
 
@@ -373,11 +372,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             favIconUrl,
             status: tab.status === 'loading' ? 'loading' : 'complete',
             isPinned: tab.pinned || false,
-            // Task 6.2: windowIdを含める（複数ウィンドウ対応）
             windowId: tab.windowId,
-            // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
             discarded: tab.discarded || false,
-            // Task 12.1 (tab-tree-comprehensive-fix): indexを含める（ピン留めタブの順序同期）
             index: tab.index,
           };
         }
@@ -388,12 +384,10 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     }
   }, []);
 
-  // Task 1.1: タブ情報を取得するヘルパー
   const getTabInfo = useCallback((tabId: number): ExtendedTabInfo | undefined => {
     return tabInfoMap[tabId];
   }, [tabInfoMap]);
 
-  // Task 4.9: グループをストレージに保存
   const saveGroups = React.useCallback(async (newGroups: Record<string, Group>) => {
     setGroups(newGroups);
     await chrome.storage.local.set({ groups: newGroups });
@@ -465,7 +459,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   useEffect(() => {
     // 初期化時にストレージからツリー状態とグループと未読タブとアクティブタブとタブ情報をロード
-    // Task 6.2: 現在のウィンドウIDも取得（複数ウィンドウ対応）
     const initializeTreeState = async () => {
       setIsLoading(true);
       await Promise.all([loadTreeState(), loadGroups(), loadUnreadTabs(), loadActiveTab(), loadTabInfoMap(), loadCurrentWindowId()]);
@@ -479,9 +472,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     // STATE_UPDATED メッセージをリッスン
     const messageListener = (message: { type: string }) => {
       if (message.type === 'STATE_UPDATED') {
-        // ストレージから最新の状態を再読み込み（未読タブも含む）
-        // Task 12.3 (tab-tree-bugfix): タブ情報も再読み込みして新しいタブをUIに反映
-        // Task 12.3 (tab-tree-bugfix): グループも再読み込みして新しいグループをUIに反映
+        // ストレージから最新の状態を再読み込み
         loadTreeState();
         loadUnreadTabs();
         loadTabInfoMap();
@@ -496,7 +487,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, [loadTreeState, loadUnreadTabs, loadTabInfoMap, loadGroups]);
 
-  // Task 8.5.4: タブのアクティブ化イベントをリッスン
+  // タブのアクティブ化イベントをリッスン
   useEffect(() => {
     const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
       setActiveTabId(activeInfo.tabId);
@@ -513,11 +504,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, []);
 
-  // Task 12.3 (tab-tree-bugfix): chrome.tabs.onCreatedで新しいタブをtabInfoMapに追加
-  // これにより、新しく作成されたタブが即座にUIに反映される
-  // Task 12.1 (tab-tree-comprehensive-fix): indexを含める（ピン留めタブの順序同期）
-  // Task 4.1 (tab-tree-bugfix-2): 新しいタブ作成時に選択状態を解除
-  // Requirements: 15.1, 15.2
+  // chrome.tabs.onCreatedで新しいタブをtabInfoMapに追加
   useEffect(() => {
     const handleTabCreated = (tab: chrome.tabs.Tab) => {
       if (tab.id !== undefined) {
@@ -535,7 +522,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             index: tab.index,
           },
         }));
-        // Task 4.1: 新しいタブが作成されたら選択状態を解除
+        // 新しいタブが作成されたら選択状態を解除
         setSelectedNodeIds(new Set());
         setLastSelectedNodeId(null);
       }
@@ -548,9 +535,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, []);
 
-  // Task 12.3 (tab-tree-bugfix): chrome.tabs.onRemovedでタブをtabInfoMapから削除
-  // Task 4.1 (tab-tree-bugfix-2): タブ削除時に選択状態を解除
-  // Requirements: 15.1, 15.2
+  // chrome.tabs.onRemovedでタブをtabInfoMapから削除
   useEffect(() => {
     const handleTabRemoved = (tabId: number) => {
       setTabInfoMap(prev => {
@@ -558,7 +543,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         delete newMap[tabId];
         return newMap;
       });
-      // Task 4.1: タブが削除されたら選択状態を解除
+      // タブが削除されたら選択状態を解除
       setSelectedNodeIds(new Set());
       setLastSelectedNodeId(null);
     };
@@ -570,12 +555,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, []);
 
-  // Task 1.1: chrome.tabs.onUpdatedでタブ情報を更新
-  // Task 2.1 (tab-tree-bugfix): ファビコン変更時に永続化
-  // Task 6.2: windowIdを含める（複数ウィンドウ対応）
-  // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
-  // Task 9.2 (tab-tree-comprehensive-fix): URL変更時もtabInfoMapを更新（スタートページタイトル表示）
-  // Task 12.1 (tab-tree-comprehensive-fix): indexを含める（ピン留めタブの順序同期）
+  // chrome.tabs.onUpdatedでタブ情報を更新
   useEffect(() => {
     const handleTabUpdated = async (
       tabId: number,
@@ -583,8 +563,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       tab: chrome.tabs.Tab
     ) => {
       // タイトル、ファビコン、URL、ピン状態、discarded状態のいずれかが変更された場合のみ更新
-      // Task 4.1 (tab-tree-bugfix): discardedの変更も監視（休止タブがアクティブ化された場合にグレーアウト解除）
-      // Task 9.2 (tab-tree-comprehensive-fix): URL変更も監視（ページ遷移時のタイトル表示更新に必要）
       // Note: status単体の変更では新規エントリを作成しない（余分なLoadingタブ防止）
       if (changeInfo.title !== undefined || changeInfo.favIconUrl !== undefined || changeInfo.url !== undefined || changeInfo.pinned !== undefined || changeInfo.discarded !== undefined) {
         setTabInfoMap(prev => ({
@@ -596,17 +574,13 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             favIconUrl: tab.favIconUrl ?? prev[tabId]?.favIconUrl,
             status: tab.status === 'loading' ? 'loading' : 'complete',
             isPinned: tab.pinned ?? prev[tabId]?.isPinned ?? false,
-            // Task 6.2: windowIdを含める（複数ウィンドウ対応）
             windowId: tab.windowId,
-            // Task 4.1 (tab-tree-bugfix): discardedを含める（休止タブの視覚的区別）
             discarded: tab.discarded ?? prev[tabId]?.discarded ?? false,
-            // Task 12.1 (tab-tree-comprehensive-fix): indexを含める（ピン留めタブの順序同期）
             index: tab.index,
           },
         }));
 
-        // Task 2.1 (tab-tree-bugfix): ファビコンが変更された場合、永続化データを更新
-        // undefinedの場合は既存の永続化データを維持する
+        // ファビコンが変更された場合、永続化データを更新
         if (changeInfo.favIconUrl !== undefined && changeInfo.favIconUrl !== null && changeInfo.favIconUrl !== '') {
           try {
             const storedResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_FAVICONS);
@@ -618,8 +592,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           }
         }
 
-        // Task 2.2 (tab-tree-bugfix): タイトルが変更された場合、永続化データを更新
-        // undefined/空文字列の場合は既存の永続化データを維持する
+        // タイトルが変更された場合、永続化データを更新
         if (changeInfo.title !== undefined && changeInfo.title !== null && changeInfo.title !== '') {
           try {
             const storedResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_TITLES);
@@ -640,11 +613,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, []);
 
-  // Task 12.1 (tab-tree-comprehensive-fix): chrome.tabs.onMovedでタブのインデックスを更新
-  // ピン留めタブの並び替え同期に必要
-  // Requirements: 12.1, 12.2, 12.3, 12.4
-  // Task 2.1 (tree-tab-bugfixes-and-ux-improvements): ツリー状態も再読み込みしてブラウザタブ順序と同期
-  // Requirements: 2.1, 2.2, 2.3
+  // chrome.tabs.onMovedでタブのインデックスを更新
   useEffect(() => {
     const handleTabMoved = async (
       _tabId: number,
@@ -667,9 +636,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           return newMap;
         });
 
-        // Task 2.1: ツリー状態を再読み込みしてブラウザタブ順序と同期
-        // ブラウザ側でタブが並び替えられた場合（タブバーでのドラッグ等）に
-        // ツリービューの表示を更新する
+        // ツリー状態を再読み込みしてブラウザタブ順序と同期
         loadTreeState();
       } catch (_err) {
         // Failed to update tab indices silently
@@ -688,7 +655,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     const storageListener = (
       changes: { [key: string]: chrome.storage.StorageChange }
     ) => {
-      // Task 10.2.1: ローカル更新中はスキップ（レースコンディション防止）
+      // ローカル更新中はスキップ（レースコンディション防止）
       if (isLocalUpdateRef.current) {
         return;
       }
@@ -709,7 +676,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   const updateTreeState = async (state: TreeState) => {
-    // Task 10.2.1: ローカル更新フラグを設定（storage.onChangedからの更新をスキップするため）
+    // ローカル更新フラグを設定（storage.onChangedからの更新をスキップするため）
     isLocalUpdateRef.current = true;
     try {
       // Update local state first for immediate UI response
@@ -725,8 +692,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   };
 
   /**
-   * Task 4.8: ビュー切り替え
-   * Requirements: 3.8
+   * ビュー切り替え
    */
   const switchView = useCallback((viewId: string) => {
     if (!treeState) return;
@@ -739,8 +705,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState]);
 
   /**
-   * Task 4.8: 新しいビューを作成
-   * Requirements: 3.8
+   * 新しいビューを作成
    */
   const createView = useCallback(() => {
     if (!treeState) return;
@@ -760,8 +725,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState]);
 
   /**
-   * Task 4.8: ビューを削除
-   * Requirements: 3.8
+   * ビューを削除
    */
   const deleteView = useCallback((viewId: string) => {
     if (!treeState) return;
@@ -785,8 +749,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState]);
 
   /**
-   * Task 4.8: ビューを更新（名前、色など）
-   * Requirements: 3.8
+   * ビューを更新（名前、色など）
    */
   const updateView = useCallback((viewId: string, updates: Partial<View>) => {
     if (!treeState) return;
@@ -804,8 +767,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   /**
    * ドラッグ&ドロップイベントハンドラ
-   * タスク 6.3: ドラッグ&ドロップによるツリー再構成
-   * Requirements: 3.2, 3.3
    */
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -863,11 +824,10 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       // activeNodeを更新（新しい親の子として設定）
       const updatedActiveNode = updatedNodes[activeId];
 
-      // Task 14.1 (tree-stability-v2): 子を親の直上にドロップした場合、最後の子として配置
+      // 子を親の直上にドロップした場合、最後の子として配置
       updatedActiveNode.parentId = overId;
 
-      // 親子関係を再構築
-      // Task 14.1 (tree-stability-v2): 元のchildren配列の順序を維持しながら再構築
+      // 親子関係を再構築（元のchildren配列の順序を維持）
       Object.entries(treeState.nodes).forEach(([parentId, originalNode]) => {
         const parent = updatedNodes[parentId];
         if (!parent) return;
@@ -936,8 +896,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
       await updateTreeState(newTreeState);
 
-      // Task 13.1 (tree-stability-v2): ツリー構造をChromeタブインデックスに同期
-      // 親子関係を深さ優先でフラット化した順序でChromeタブを並び替える
+      // ツリー構造をChromeタブインデックスに同期
       try {
         await syncTreeToChromeTabs(updatedNodes, treeState.currentViewId, tabInfoMap);
       } catch {
@@ -953,16 +912,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   );
 
   /**
-   * Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
-   * Requirements: 8.1, 8.2, 8.3, 8.4
-   * Task 8.1 (tab-tree-bugfix): ドロップ位置への正確な挿入
-   * Requirements: 7.1, 7.2 - insertIndexを使用して正しい位置にタブを挿入し、ブラウザタブの順序を同期
+   * 兄弟としてドロップ（Gapドロップ）時のハンドラ
    * タブを兄弟として指定位置に挿入する
    */
   const handleSiblingDrop = useCallback(
     async (info: SiblingDropInfo) => {
-      // Task 7.3: insertIndexはツリー内の位置であり、ブラウザタブのインデックスとは異なるため未使用
-      // belowNodeIdのタブのインデックスを直接取得してブラウザタブを移動する
+      // insertIndexはツリー内の位置であり、ブラウザタブのインデックスとは異なる
       const { activeNodeId, insertIndex: _insertIndex, aboveNodeId, belowNodeId } = info;
 
       if (!treeState) {
@@ -974,11 +929,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         return;
       }
 
-      // Task 3.1 (tab-tree-comprehensive-fix): 挿入先の親ノードと挿入位置を決定
-      // Requirements: 3.1, 3.2, 3.3
-      // 異なる深度のタブ間にドロップした場合は、「下のノードの親」を使用する
-      // これにより、プレースホルダーが示す位置（下のノードの直前）に正しく配置される
-      // 下のノードがない場合（リストの末尾）のみ、上のノードの親を使用
+      // 挿入先の親ノードと挿入位置を決定
+      // 異なる深度のタブ間にドロップした場合は「下のノードの親」を使用する
       let targetParentId: string | null = null;
 
       if (belowNodeId && treeState.nodes[belowNodeId]) {
@@ -1065,8 +1017,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
       await updateTreeState(newTreeState);
 
-      // Task 13.1 (tree-stability-v2): ドロップ位置からChromeタブインデックスを計算して移動
-      // サブツリー（子タブを含む）を移動する場合、深さ優先順でサブツリー全体を移動
+      // ドロップ位置からChromeタブインデックスを計算してサブツリー全体を移動
       try {
         // ドロップ位置からターゲットChromeインデックスを計算
         let targetChromeIndex: number;
@@ -1115,8 +1066,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   );
 
   /**
-   * Task 4.9: 新しいグループを作成
-   * Requirements: 3.9
+   * 新しいグループを作成
    * @returns 作成されたグループのID
    */
   const createGroup = useCallback((name: string, color: string): string => {
@@ -1134,8 +1084,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [groups, saveGroups]);
 
   /**
-   * Task 4.9: グループを削除
-   * Requirements: 3.9
+   * グループを削除
    */
   const deleteGroup = useCallback((groupId: string) => {
     const newGroups = { ...groups };
@@ -1155,8 +1104,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [groups, saveGroups, treeState, updateTreeState]);
 
   /**
-   * Task 4.9: グループを更新（名前、色など）
-   * Requirements: 3.9
+   * グループを更新（名前、色など）
    */
   const updateGroupFn = useCallback((groupId: string, updates: Partial<Group>) => {
     const group = groups[groupId];
@@ -1168,8 +1116,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [groups, saveGroups]);
 
   /**
-   * Task 4.9: グループの展開/折りたたみを切り替え
-   * Requirements: 3.9
+   * グループの展開/折りたたみを切り替え
    */
   const toggleGroupExpanded = useCallback((groupId: string) => {
     const group = groups[groupId];
@@ -1181,8 +1128,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [groups, saveGroups]);
 
   /**
-   * Task 4.9: タブをグループに追加
-   * Requirements: 3.9
+   * タブをグループに追加
    */
   const addTabToGroup = useCallback((nodeId: string, groupId: string) => {
     if (!treeState) return;
@@ -1196,8 +1142,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState, updateTreeState]);
 
   /**
-   * Task 4.9: タブをグループから削除
-   * Requirements: 3.9
+   * タブをグループから削除
    */
   const removeTabFromGroup = useCallback((nodeId: string) => {
     if (!treeState) return;
@@ -1212,8 +1157,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState, updateTreeState]);
 
   /**
-   * Task 4.9: グループ内のタブ数を取得
-   * Requirements: 3.9
+   * グループ内のタブ数を取得
    */
   const getGroupTabCount = useCallback((groupId: string): number => {
     if (!treeState) return 0;
@@ -1224,24 +1168,21 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState]);
 
   /**
-   * Task 4.13: タブが未読かどうかを確認
-   * Requirements: 3.13.1
+   * タブが未読かどうかを確認
    */
   const isTabUnread = useCallback((tabId: number): boolean => {
     return unreadTabIds.has(tabId);
   }, [unreadTabIds]);
 
   /**
-   * Task 4.13: 未読タブの総数を取得
-   * Requirements: 3.13.4
+   * 未読タブの総数を取得
    */
   const getUnreadCount = useCallback((): number => {
     return unreadTabIds.size;
   }, [unreadTabIds]);
 
   /**
-   * Task 4.13: 指定ノードの子孫の未読タブ数を取得
-   * Requirements: 3.13.3
+   * 指定ノードの子孫の未読タブ数を取得
    */
   const getUnreadChildCount = useCallback((nodeId: string): number => {
     if (!treeState) return 0;
@@ -1265,31 +1206,26 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState, unreadTabIds]);
 
   /**
-   * Task 1.2: ピン留めタブIDの配列を算出
+   * ピン留めタブIDの配列を算出
    * tabInfoMapからピン留め状態のタブIDをフィルタリングして配列を返す
-   * Task 6.2: 現在のウィンドウのタブのみをフィルタリング（複数ウィンドウ対応）
-   * Task 12.1 (tab-tree-comprehensive-fix): インデックス順でソート（ピン留めタブの順序同期）
-   * Requirements: 12.1, 12.2, 12.3, 12.4, 14.1, 14.2, 14.3
    */
   const pinnedTabIds = useMemo((): number[] => {
     return Object.values(tabInfoMap)
       .filter(tabInfo => {
-        // Task 6.2: 現在のウィンドウのタブのみ
+        // 現在のウィンドウのタブのみ
         if (currentWindowId !== null && tabInfo.windowId !== currentWindowId) {
           return false;
         }
         return tabInfo.isPinned;
       })
-      // Task 12.1 (tab-tree-comprehensive-fix): インデックス順でソート
       // ブラウザのタブ順序と同期するために、indexでソートする
       .sort((a, b) => a.index - b.index)
       .map(tabInfo => tabInfo.id);
   }, [tabInfoMap, currentWindowId]);
 
   /**
-   * Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え
+   * ピン留めタブの並び替え
    * ドラッグ＆ドロップでピン留めタブの順序を変更し、ブラウザタブと同期する
-   * Requirements: 10.1, 10.2, 10.3, 10.4
    */
   const handlePinnedTabReorder = useCallback(async (tabId: number, newIndex: number): Promise<void> => {
     if (!currentWindowId) return;
@@ -1305,9 +1241,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [currentWindowId]);
 
   /**
-   * Task 1.3: ノードを選択
+   * ノードを選択
    * Shift/Ctrlキーに応じた選択ロジックを提供する
-   * Requirements: 9.1, 9.2
    */
   const selectNode = useCallback((nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => {
     if (!treeState) return;
@@ -1352,8 +1287,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState, lastSelectedNodeId]);
 
   /**
-   * Task 1.3: 選択をすべてクリア
-   * Requirements: 9.1, 9.2
+   * 選択をすべてクリア
    */
   const clearSelection = useCallback(() => {
     setSelectedNodeIds(new Set());
@@ -1361,17 +1295,15 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   /**
-   * Task 1.3: ノードが選択されているかを確認
-   * Requirements: 9.1, 9.2
+   * ノードが選択されているかを確認
    */
   const isNodeSelected = useCallback((nodeId: string): boolean => {
     return selectedNodeIds.has(nodeId);
   }, [selectedNodeIds]);
 
   /**
-   * Task 12.2: 選択されたすべてのタブIDを取得
+   * 選択されたすべてのタブIDを取得
    * 複数選択時にコンテキストメニューで使用
-   * Requirements: 9.3, 9.4, 9.5
    */
   const getSelectedTabIds = useCallback((): number[] => {
     if (!treeState) return [];
@@ -1387,18 +1319,15 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState, selectedNodeIds]);
 
   /**
-   * Task 3.3: ビューごとのタブ数を計算（メモ化）
-   * Requirements: 17.1, 17.2, 17.3
-   * Task 2.1 (tab-tree-comprehensive-fix): 実際に存在するタブのみをカウント
-   * Requirements: 2.1, 2.3 - 不整合タブ削除時にカウントを再計算
+   * ビューごとのタブ数を計算（メモ化）
+   * 実際に存在するタブのみをカウント
    */
   const viewTabCounts = useMemo((): Record<string, number> => {
     if (!treeState) return {};
 
     const counts: Record<string, number> = {};
 
-    // 各ノードをビューIDでグループ化してカウント
-    // Task 2.1: tabInfoMapに存在するタブのみをカウント（不整合タブを除外）
+    // 各ノードをビューIDでグループ化してカウント（tabInfoMapに存在するタブのみ）
     Object.values(treeState.nodes).forEach((node) => {
       // タブが実際に存在するかを確認
       if (tabInfoMap[node.tabId]) {
@@ -1411,8 +1340,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState, tabInfoMap]);
 
   /**
-   * Task 7.2: タブを別のビューに移動
-   * Requirements: 18.1, 18.2, 18.3
+   * タブを別のビューに移動
    */
   const moveTabsToView = useCallback((viewId: string, tabIds: number[]) => {
     if (!treeState) return;
@@ -1468,9 +1396,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [treeState, updateTreeState]);
 
   /**
-   * Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ開始
-   * Task 5.2 (tree-stability-v2): DragSessionManagerを使用するように修正
-   * Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
+   * クロスウィンドウドラッグ開始
    * ドラッグ開始時にService WorkerにDragSessionを開始
    */
   const handleCrossWindowDragStart = useCallback(async (tabId: number, treeData: TabNode[]) => {
@@ -1494,9 +1420,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [currentWindowId]);
 
   /**
-   * Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドロップ処理
-   * Task 5.2 (tree-stability-v2): DragSessionManagerを使用するように修正
-   * Requirement 7.2: 別ウィンドウのツリービュー上でのドロップでタブを移動
+   * クロスウィンドウドロップ処理
    * ドロップ時に別ウィンドウからのドラッグかどうかを確認し、タブを移動
    * @returns true if cross-window drop was handled, false otherwise
    */
@@ -1539,8 +1463,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [currentWindowId]);
 
   /**
-   * Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ状態をクリア
-   * Task 5.2 (tree-stability-v2): DragSessionManagerを使用するように修正
+   * クロスウィンドウドラッグ状態をクリア
    * ドラッグ終了時にService WorkerのDragSessionを終了
    */
   const clearCrossWindowDragState = useCallback(async () => {
@@ -1559,14 +1482,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         error,
         updateTreeState,
         handleDragEnd,
-        // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のハンドラ
         handleSiblingDrop,
-        // Task 4.8: ビュー管理機能
         switchView,
         createView,
         deleteView,
         updateView,
-        // Task 4.9: グループ管理機能
+        // グループ管理機能
         groups,
         createGroup,
         deleteGroup,
@@ -1575,35 +1496,25 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         addTabToGroup,
         removeTabFromGroup,
         getGroupTabCount,
-        // Task 4.13: 未読状態管理機能
+        // 未読状態管理機能
         unreadTabIds,
         isTabUnread,
         getUnreadCount,
         getUnreadChildCount,
-        // Task 8.5.4: アクティブタブID
         activeTabId,
-        // Task 1.1: タブ情報マップ管理
         tabInfoMap,
         getTabInfo,
-        // Task 1.2: ピン留めタブ専用リスト
         pinnedTabIds,
-        // Task 11.1 (tab-tree-bugfix): ピン留めタブの並び替え
         handlePinnedTabReorder,
-        // Task 1.3: 複数選択状態管理
         selectedNodeIds,
         lastSelectedNodeId,
         selectNode,
         clearSelection,
         isNodeSelected,
-        // Task 12.2: 選択されたすべてのタブIDを取得
         getSelectedTabIds,
-        // Task 3.3: ビューごとのタブ数
         viewTabCounts,
-        // Task 7.2: タブをビューに移動
         moveTabsToView,
-        // Task 6.2: 現在のウィンドウID（複数ウィンドウ対応）
         currentWindowId,
-        // Task 7.2 (tab-tree-comprehensive-fix): クロスウィンドウドラッグ&ドロップ
         handleCrossWindowDragStart,
         handleCrossWindowDrop,
         clearCrossWindowDragState,

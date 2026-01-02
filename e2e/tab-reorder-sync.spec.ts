@@ -1,8 +1,7 @@
 /**
  * タブ並び替え同期テスト
  *
- * Task 2.2 (tree-tab-bugfixes-and-ux-improvements): タブ並び替えE2Eテストの追加
- * Requirements: 2.4, 2.5
+ * タブ並び替えE2Eテストの追加
  *
  * このテストスイートでは、タブ並び替え後にブラウザタブとツリービューが
  * 正しく同期されることを検証します：
@@ -50,7 +49,7 @@ test.describe('タブ並び替え同期テスト', () => {
       }, tab3);
 
       // ツリービューが更新されるまでポーリングで待機
-      // Task 2.1の修正により、onMovedイベントでツリー状態が再読み込みされる
+      // onMovedイベントでツリー状態が再読み込みされる
       await waitForCondition(
         async () => {
           const order = await getTabOrder(sidePanelPage);

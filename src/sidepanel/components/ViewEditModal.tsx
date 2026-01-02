@@ -1,8 +1,7 @@
 /**
  * ViewEditModal コンポーネント
- * Task 7.2: ビュー編集モーダルダイアログの実装
- * Task 8.2: IconPicker統合
- * Requirements: 3.4, 19.1, 19.2, 19.3, 19.4
+ * ビュー編集モーダルダイアログの実装
+ * IconPicker統合
  *
  * ビュー名、色、アイコンを編集するためのモーダルダイアログを提供します。
  * モーダルオーバーレイで表示され、保存/キャンセル操作が可能です。
@@ -92,7 +91,7 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
     };
   }, [handleKeyDown]);
 
-  // IconPicker選択ハンドラ - アイコン選択時に即座に反映 (Requirement 9.1, 9.2, 9.3)
+  // IconPicker選択ハンドラ - アイコン選択時に即座に反映
   const handleIconSelect = useCallback((selectedIcon: string) => {
     setIcon(selectedIcon);
     setShowIconPicker(false);

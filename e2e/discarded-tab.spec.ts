@@ -1,9 +1,6 @@
 /**
  * 休止タブ（Discarded Tab）のグレーアウト表示E2Eテスト
  *
- * Requirements: 3.1, 3.2 (Requirement 3: 休止タブの視覚的区別)
- * Task 4.2 (tab-tree-bugfix): 休止タブのE2Eテスト
- *
  * このテストスイートでは、以下を検証します:
  * 1. 休止状態のタブがグレーアウト表示されることを検証
  * 2. 休止タブがアクティブ化された際にグレーアウトが解除されることを検証
@@ -19,9 +16,9 @@ import { test, expect } from './fixtures/extension';
 import { createTab, activateTab } from './utils/tab-utils';
 import { waitForCondition } from './utils/polling-utils';
 
-test.describe('休止タブの視覚的区別（Requirements 3.1, 3.2）', () => {
+test.describe('休止タブの視覚的区別', () => {
   /**
-   * テスト: 休止状態のタブはグレーアウト表示される（Requirement 3.1）
+   * テスト: 休止状態のタブはグレーアウト表示される
    *
    * このテストは、タブを休止状態にした際に、タブタイトルがグレーアウト
    * 表示されることを検証します。
@@ -29,7 +26,7 @@ test.describe('休止タブの視覚的区別（Requirements 3.1, 3.2）', () =>
    * 注意: chrome.tabs.discard() APIがテスト環境で動作しない場合は、
    * テストを早期リターンして成功とみなします。
    */
-  test('休止状態のタブはグレーアウト表示される（Requirement 3.1）', async ({
+  test('休止状態のタブはグレーアウト表示される', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,
@@ -124,7 +121,7 @@ test.describe('休止タブの視覚的区別（Requirements 3.1, 3.2）', () =>
   });
 
   /**
-   * テスト: 休止タブをアクティブ化するとグレーアウトが解除される（Requirement 3.2）
+   * テスト: 休止タブをアクティブ化するとグレーアウトが解除される
    *
    * このテストは、休止状態のタブをアクティブ化した際に、グレーアウト
    * 表示が解除されることを検証します。
@@ -132,7 +129,7 @@ test.describe('休止タブの視覚的区別（Requirements 3.1, 3.2）', () =>
    * 注意: chrome.tabs.discard() APIがテスト環境で動作しない場合は、
    * テストを早期リターンして成功とみなします。
    */
-  test('休止タブをアクティブ化するとグレーアウトが解除される（Requirement 3.2）', async ({
+  test('休止タブをアクティブ化するとグレーアウトが解除される', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,

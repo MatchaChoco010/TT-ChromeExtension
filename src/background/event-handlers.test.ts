@@ -176,7 +176,7 @@ describe('Service Worker - Window Events', () => {
   });
 });
 
-describe('Task 3.1: ビュー切り替え動作の修正', () => {
+describe('ビュー切り替え動作の修正', () => {
   beforeEach(() => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
@@ -186,7 +186,7 @@ describe('Task 3.1: ビュー切り替え動作の修正', () => {
     chromeMock.clearAllListeners();
   });
 
-  it('Requirement 15.1: ビューを切り替えた後に新しいタブを開いた場合、現在アクティブなビューにタブを追加する', async () => {
+  it('ビューを切り替えた後に新しいタブを開いた場合、現在アクティブなビューにタブを追加する', async () => {
     registerTabEventListeners();
 
     // Mock sendMessage
@@ -253,7 +253,7 @@ describe('Task 3.1: ビュー切り替え動作の修正', () => {
     }
   });
 
-  it('Requirement 15.2: ビューを追加した場合、そのビューを永続化する', async () => {
+  it('ビューを追加した場合、そのビューを永続化する', async () => {
     // TreeStateProviderのcreateView関数が呼ばれた場合、ビューが永続化されることをテスト
     // （このテストはTreeStateProvider.test.tsxで既にカバーされているが、確認のため追加）
 
@@ -560,10 +560,9 @@ describe('Service Worker - Messaging', () => {
 });
 
 /**
- * Task 6.2: 複数タブのグループ化機能
- * Requirements: 12.1, 12.2, 12.3
+ * 複数タブのグループ化機能
  */
-describe('Task 6.2: 複数タブのグループ化機能', () => {
+describe('複数タブのグループ化機能', () => {
   beforeEach(() => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
@@ -581,7 +580,6 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
-    // Task 15.2: chrome.tabs.create, chrome.tabs.get, chrome.tabs.update, chrome.runtime.id のモックを設定
     const groupTabId = 100;
     (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: groupTabId,
@@ -660,7 +658,6 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
-    // Task 15.2: chrome.tabs.create, chrome.tabs.get, chrome.tabs.update のモックを設定
     const groupTabId = 100;
     (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: groupTabId,
@@ -739,10 +736,9 @@ describe('Task 6.2: 複数タブのグループ化機能', () => {
 });
 
 /**
- * Task 14.1: 空ウィンドウの自動クローズ
- * Requirements: 7.1, 7.2
+ * 空ウィンドウの自動クローズ
  */
-describe('Task 14.1: 空ウィンドウの自動クローズ', () => {
+describe('空ウィンドウの自動クローズ', () => {
   beforeEach(() => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
@@ -752,7 +748,7 @@ describe('Task 14.1: 空ウィンドウの自動クローズ', () => {
     chromeMock.clearAllListeners();
   });
 
-  it('Requirement 7.1: ドラッグアウトにより全てのタブが移動されたとき、元のウィンドウを自動的に閉じる', async () => {
+  it('ドラッグアウトにより全てのタブが移動されたとき、元のウィンドウを自動的に閉じる', async () => {
     registerMessageListener();
     registerTabEventListeners();
 
@@ -821,7 +817,7 @@ describe('Task 14.1: 空ウィンドウの自動クローズ', () => {
     expect(windowsRemoveSpy).toHaveBeenCalledWith(sourceWindowId);
   });
 
-  it('Requirement 7.2: ウィンドウにタブが残っている場合、ウィンドウは開いたまま維持される', async () => {
+  it('ウィンドウにタブが残っている場合、ウィンドウは開いたまま維持される', async () => {
     registerMessageListener();
     registerTabEventListeners();
 
@@ -901,10 +897,9 @@ describe('Task 14.1: 空ウィンドウの自動クローズ', () => {
 });
 
 /**
- * Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー検知
- * Requirements: 4.4, 4.5
+ * ツリービュー上のホバー検知
  */
-describe('Task 7.2: ツリービュー上のホバー検知', () => {
+describe('ツリービュー上のホバー検知', () => {
   beforeEach(() => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();

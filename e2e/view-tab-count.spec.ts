@@ -1,9 +1,6 @@
 /**
  * ビューのタブカウント正確性 E2Eテスト
  *
- * Task 2.2 (tab-tree-comprehensive-fix): タブカウント更新のE2Eテスト追加
- * Requirements: 2.2, 2.4, 2.5
- *
  * テスト対象:
  * 1. 不整合タブ削除時のカウント再計算
  * 2. タブ追加・削除時のカウント即時更新
@@ -18,8 +15,8 @@ import {
 } from './utils/polling-utils';
 import { createTab, closeTab } from './utils/tab-utils';
 
-test.describe('Task 2.2: ビューのタブカウント正確性', () => {
-  test.describe('Requirement 2.2: タブ追加・削除時のカウント即時更新', () => {
+test.describe('ビューのタブカウント正確性', () => {
+  test.describe('タブ追加・削除時のカウント即時更新', () => {
     test('タブを追加した場合、ViewSwitcherのタブカウントバッジが即座に更新される', async ({
       sidePanelPage,
       extensionContext,
@@ -177,7 +174,7 @@ test.describe('Task 2.2: ビューのタブカウント正確性', () => {
     });
   });
 
-  test.describe('Requirement 2.4-2.5: 不整合タブ削除時のカウント再計算', () => {
+  test.describe('不整合タブ削除時のカウント再計算', () => {
     test('ストレージに不整合タブが存在する場合、クリーンアップ後にカウントが再計算される', async ({
       sidePanelPage,
       extensionContext,
@@ -372,16 +369,15 @@ test.describe('Task 2.2: ビューのタブカウント正確性', () => {
 });
 
 /**
- * Task 4.2 (comprehensive-bugfix): タブ数表示の視認性E2Eテスト
- * Requirements: 17.3, 17.4
+ * タブ数表示の視認性E2Eテスト
  *
  * テスト対象:
  * 1. タブ数バッジが正しく表示されること
  * 2. 数字が見切れないこと（min-width検証）
  * 3. 安定性: --repeat-each=10 で10回連続成功
  */
-test.describe('Task 4.2: タブ数表示の視認性', () => {
-  test.describe('Requirement 17.3: タブ数が正しく表示される', () => {
+test.describe('タブ数表示の視認性', () => {
+  test.describe('タブ数が正しく表示される', () => {
     test('タブ数バッジが表示され、正しい数値を表示する', async ({
       sidePanelPage,
       extensionContext,
@@ -506,7 +502,7 @@ test.describe('Task 4.2: タブ数表示の視認性', () => {
     });
   });
 
-  test.describe('Requirement 17.4: タブ数バッジの視認性', () => {
+  test.describe('タブ数バッジの視認性', () => {
     test('タブ数バッジは適切なサイズで表示される', async ({
       sidePanelPage,
       extensionContext,

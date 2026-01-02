@@ -6,12 +6,11 @@ import type { UserSettings, StorageChanges } from '@/types';
 import type { StorageChangeListener } from '@/test/test-types';
 
 /**
- * Task 13.2: フォントカスタマイズ機能のインテグレーションテスト
- * Requirements: 10.1, 10.2, 10.3
+ * フォントカスタマイズ機能のインテグレーションテスト
  *
  * このテストは、フォント設定の変更がサイドパネル全体に正しく適用されることを確認します。
  */
-describe('Task 13.2: フォントカスタマイズ機能', () => {
+describe('フォントカスタマイズ機能', () => {
   // chrome.storage.local のモック
   const mockGet = vi.fn();
   const mockSet = vi.fn();
@@ -60,7 +59,7 @@ describe('Task 13.2: フォントカスタマイズ機能', () => {
     mockSet.mockClear();
   });
 
-  describe('Requirement 10.1: フォントサイズ調整', () => {
+  describe('フォントサイズ調整', () => {
     it('フォントサイズをカスタムpx値に変更できること', async () => {
       const defaultSettings: UserSettings = {
         fontSize: 14,
@@ -178,7 +177,7 @@ describe('Task 13.2: フォントカスタマイズ機能', () => {
     });
   });
 
-  describe('Requirement 10.2: フォントサイズ変更がすべてのタブアイテムに適用される', () => {
+  describe('フォントサイズ変更がすべてのタブアイテムに適用される', () => {
     it('フォントサイズを変更すると、サイドパネルのすべての要素に反映されること', async () => {
       const initialSettings: UserSettings = {
         fontSize: 14,
@@ -248,7 +247,7 @@ describe('Task 13.2: フォントカスタマイズ機能', () => {
     });
   });
 
-  describe('Requirement 10.3: フォントファミリー選択', () => {
+  describe('フォントファミリー選択', () => {
     it('フォントファミリーを変更できること', async () => {
       const defaultSettings: UserSettings = {
         fontSize: 14,
@@ -352,7 +351,7 @@ describe('Task 13.2: フォントカスタマイズ機能', () => {
     });
   });
 
-  describe('タスク 3.1: タブタイトルへのフォントサイズ反映', () => {
+  describe('タブタイトルへのフォントサイズ反映', () => {
     it('タブタイトルにtext-smクラスが使用されていないこと', async () => {
       // このテストは、タブタイトル要素がTailwindのtext-smクラスを使用せず、
       // CSS変数var(--font-size)を継承することを確認します

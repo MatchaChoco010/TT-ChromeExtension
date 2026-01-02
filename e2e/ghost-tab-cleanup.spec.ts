@@ -1,8 +1,8 @@
 /**
  * Ghost Tab Cleanup E2E Tests
  *
- * Task 5.1: ゴーストタブの自動削除
- * Requirements 4.1, 4.2, 4.3: ブラウザ起動時に存在しないタブを自動削除
+ * ゴーストタブの自動削除
+ * ブラウザ起動時に存在しないタブを自動削除
  *
  * ゴーストタブ = ストレージには存在するがChrome APIに存在しないタブ
  * これらはLoadingのまま消せないタブとして表示される問題を引き起こす
@@ -11,8 +11,8 @@ import { test, expect } from './fixtures/extension';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import './types';
 
-test.describe('Task 5.1: Ghost Tab Cleanup', () => {
-  test.describe('Requirement 4.1: Chrome APIに存在しないタブをツリーから削除', () => {
+test.describe('Ghost Tab Cleanup', () => {
+  test.describe('Chrome APIに存在しないタブをツリーから削除', () => {
     test('ストレージにのみ存在するゴーストタブが起動時にクリーンアップされること', async ({
       extensionContext,
       serviceWorker,
@@ -144,7 +144,7 @@ test.describe('Task 5.1: Ghost Tab Cleanup', () => {
     });
   });
 
-  test.describe('Requirement 4.2: 初期化時にツリー内の全タブIDをChrome APIで検証', () => {
+  test.describe('初期化時にツリー内の全タブIDをChrome APIで検証', () => {
     test('TreeStateManager.cleanupStaleNodesが正しくゴーストタブを削除すること', async ({
       serviceWorker,
     }) => {
@@ -182,7 +182,7 @@ test.describe('Task 5.1: Ghost Tab Cleanup', () => {
     });
   });
 
-  test.describe('Requirement 4.3: Loadingのまま消せないゴーストタブの発生を防止', () => {
+  test.describe('Loadingのまま消せないゴーストタブの発生を防止', () => {
     test('Side Panelに表示されているタブがすべてChrome APIに存在すること', async ({
       sidePanelPage,
       serviceWorker,

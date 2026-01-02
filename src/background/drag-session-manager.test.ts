@@ -1,8 +1,7 @@
 /**
  * DragSessionManager Unit Tests
  *
- * Task 13.1: DragSessionManagerのユニットテスト
- * Requirements: 6.1, 6.2, 6.3, 6.6, 6.7
+ * DragSessionManagerのユニットテスト
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

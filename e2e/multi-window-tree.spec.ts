@@ -1,7 +1,7 @@
 /**
  * E2E Tests: Multi-Window Tab Tree Display Separation
  *
- * Requirement 14.1, 14.2, 14.3: Multi-window support
+ * Multi-window support:
  * - Each window's tab tree should only display tabs from that window
  * - Tab trees should not be shared across all windows
  * - New windows should show their own dedicated tab tree

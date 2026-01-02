@@ -2,8 +2,6 @@
  * IndexedDB Test Fixtures
  *
  * IndexedDB統合E2Eテスト用のテストデータ定義
- * Task 5.3: IndexedDB統合の実装とテスト
- * Requirement 4.3: IndexedDB統合
  */
 
 export interface TreeStateTestData {

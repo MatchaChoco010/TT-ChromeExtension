@@ -13,9 +13,6 @@ import { STORAGE_KEYS } from '@/storage/StorageService';
  * SnapshotManager
  *
  * セッションスナップショットの保存・復元・管理を担当するサービス
- * Task 14.1: SnapshotManager サービスの実装
- * Task 14.2: 自動スナップショット機能
- * Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
  */
 export class SnapshotManager {
   private static readonly SNAPSHOT_ID_PREFIX = 'snapshot-';
@@ -31,8 +28,7 @@ export class SnapshotManager {
 
   /**
    * 現在状態のJSON形式スナップショット作成
-   * Requirement 11.1: スナップショットコマンドを実行する
-   * Requirement 11.2: タブのURL、タイトル、親子関係、グループ情報を含む
+   * スナップショットコマンドを実行し、タブのURL、タイトル、親子関係、グループ情報を含む
    *
    * @param name - スナップショット名
    * @param isAutoSave - 自動保存フラグ（デフォルト: false）
@@ -84,7 +80,7 @@ export class SnapshotManager {
 
   /**
    * スナップショットからのセッション復元
-   * Requirement 11.3: スナップショットをインポートする
+   * スナップショットをインポートする
    *
    * @param snapshotId - 復元するスナップショットのID
    */
@@ -226,8 +222,8 @@ export class SnapshotManager {
 
   /**
    * 自動スナップショット機能を開始
-   * Requirement 11.4, 11.5: 定期的な自動スナップショット機能を提供する
-   * Task 9.2: 最大保持数を超えた古いスナップショットを自動削除する
+   * 定期的な自動スナップショット機能を提供する
+   * 最大保持数を超えた古いスナップショットを自動削除する
    *
    * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
    * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
@@ -257,7 +253,7 @@ export class SnapshotManager {
           const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
           await this.createSnapshot(name, true);
 
-          // Requirement 6.5: 最大保持数を超えた古いスナップショットを自動削除
+          // 最大保持数を超えた古いスナップショットを自動削除
           if (this.currentMaxSnapshots && this.currentMaxSnapshots > 0) {
             try {
               await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
@@ -282,7 +278,7 @@ export class SnapshotManager {
 
   /**
    * 自動スナップショット設定を更新
-   * Requirement 6.4: 設定変更時にアラームを再設定する
+   * 設定変更時にアラームを再設定する
    *
    * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
    * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）

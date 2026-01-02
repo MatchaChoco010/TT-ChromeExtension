@@ -31,13 +31,11 @@ vi.stubGlobal('chrome', chromeMock);
 
 /**
  * SnapshotManager 統合テスト
- * Task 14.4: スナップショット機能のテスト
- * Requirements: 11.1, 11.2, 11.3, 11.5
  *
  * Acceptance Criteria:
- * - スナップショットがJSON形式でエクスポートされることを確認（AC 11.1, 11.2）
- * - スナップショットからタブとツリー構造が復元されることを確認（AC 11.3）
- * - 自動スナップショットが設定間隔で保存されることを確認（AC 11.5）
+ * - スナップショットがJSON形式でエクスポートされることを確認
+ * - スナップショットからタブとツリー構造が復元されることを確認
+ * - 自動スナップショットが設定間隔で保存されることを確認
  */
 describe('SnapshotManager - Integration Tests', () => {
   let snapshotManager: SnapshotManager;
@@ -159,10 +157,10 @@ describe('SnapshotManager - Integration Tests', () => {
     await indexedDBService.deleteOldSnapshots(0);
   });
 
-  describe('JSON Export and Import (AC 11.1, 11.2)', () => {
+  describe('JSON Export and Import', () => {
     it('should export snapshot as JSON format with all required data', async () => {
-      // Acceptance Criteria 11.1: スナップショットがJSON形式でエクスポートされる
-      // Acceptance Criteria 11.2: タブのURL、タイトル、親子関係、グループ情報を含む
+      // スナップショットがJSON形式でエクスポートされる
+      // タブのURL、タイトル、親子関係、グループ情報を含む
 
       // スナップショットを作成
       const snapshot = await snapshotManager.createSnapshot('Export Test');
@@ -262,9 +260,9 @@ describe('SnapshotManager - Integration Tests', () => {
     });
   });
 
-  describe('Snapshot Restoration (AC 11.3)', () => {
+  describe('Snapshot Restoration', () => {
     it('should restore tabs and tree structure from snapshot', async () => {
-      // Acceptance Criteria 11.3: スナップショットからタブとツリー構造が復元される
+      // スナップショットからタブとツリー構造が復元される
 
       // スナップショットを作成
       const snapshot = await snapshotManager.createSnapshot('Restore Test');
@@ -342,9 +340,9 @@ describe('SnapshotManager - Integration Tests', () => {
     });
   });
 
-  describe('Auto-Snapshot Functionality (AC 11.5)', () => {
+  describe('Auto-Snapshot Functionality', () => {
     it('should create auto-snapshots at configured intervals', async () => {
-      // Acceptance Criteria 11.5: 自動スナップショットが設定間隔で保存される
+      // 自動スナップショットが設定間隔で保存される
 
       const intervalMinutes = 10;
 

@@ -1,7 +1,6 @@
 /**
  * DropIndicatorコンポーネント
- * Task 4.1: ドロップ位置とdepthを視覚的に表示する水平線インジケーター
- * Requirements: 7.2 (隙間のハイライト表示), 8.4 (depthの視覚的表示), 16.4 (インジケーターでドロップ先を表示)
+ * ドロップ位置とdepthを視覚的に表示する水平線インジケーター
  */
 import React from 'react';
 

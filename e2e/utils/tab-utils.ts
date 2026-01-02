@@ -2,8 +2,6 @@
  * TabTestUtils
  *
  * タブ操作（作成、削除、アクティブ化、検証）の共通ヘルパー関数
- *
- * Requirements: 3.1, 3.13, 4.1
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 import { expect } from '@playwright/test';

@@ -12,8 +12,6 @@ interface ConfirmDialogProps {
 /**
  * 確認ダイアログコンポーネント
  * グループ閉じ時など、ユーザーの確認が必要な操作で使用されます。
- *
- * Requirements: 5.5 (グループページ閉じ時の確認), 8.3 (タブ閉じ時の警告)
  */
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
@@ -59,7 +57,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         {/* メッセージ */}
         <p className="text-sm text-gray-300 mb-4">{message}</p>
 
-        {/* タブ数表示 (Requirement 8.3: 配下のタブ数を表示) */}
+        {/* タブ数表示 */}
         {tabCount !== undefined && (
           <div
             data-testid="tab-count-display"

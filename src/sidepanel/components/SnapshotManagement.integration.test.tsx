@@ -6,8 +6,8 @@ import type { SnapshotManager } from '@/services/SnapshotManager';
 import type { MockSnapshotManager, MockIndexedDBService } from '@/test/test-types';
 
 /**
- * Task 14.3: スナップショット履歴管理の統合テスト
- * Requirements: 11.6 - 古いスナップショット削除機能（例: 最新10件を保持）
+ * スナップショット履歴管理の統合テスト
+ * 古いスナップショット削除機能（例: 最新10件を保持）
  */
 describe('SnapshotManagement Integration', () => {
   let mockSnapshotManager: MockSnapshotManager;

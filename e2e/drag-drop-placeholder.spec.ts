@@ -1,8 +1,7 @@
 /**
  * ドラッグ&ドロップ - プレースホルダー表示のE2Eテスト
  *
- * Task 7.2: プレースホルダー表示のE2Eテスト
- * Requirements: 6.1, 6.2, 6.3
+ * プレースホルダー表示のE2Eテスト
  *
  * このテストスイートでは、ドラッグ&ドロップのプレースホルダー表示を検証します。
  * - ドラッグ中のプレースホルダーが正しいタブ間の位置に表示されること
@@ -95,7 +94,7 @@ async function waitForDropIndicatorPositionChange(
 }
 
 test.describe('ドラッグ&ドロップ - プレースホルダー表示', () => {
-  test.describe('Requirement 6.1: 有効なドロップ位置にのみプレースホルダーを表示', () => {
+  test.describe('有効なドロップ位置にのみプレースホルダーを表示', () => {
     test('タブとタブの隙間にドラッグするとプレースホルダーが表示されること', async ({
       extensionContext,
       sidePanelPage,
@@ -177,7 +176,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
     // 他のテストケース（タブ間の隙間ドラッグ）で同等の機能がカバーされているため省略
   });
 
-  test.describe('Requirement 6.2: ドロップターゲットとなるタブのハイライト表示', () => {
+  test.describe('ドロップターゲットとなるタブのハイライト表示', () => {
     test('タブの中央にドラッグするとタブがハイライト表示されること', async ({
       extensionContext,
       sidePanelPage,
@@ -264,7 +263,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
     });
   });
 
-  test.describe('Requirement 6.3: プレースホルダー位置の正確性', () => {
+  test.describe('プレースホルダー位置の正確性', () => {
     test('プレースホルダーの位置がタブ間の正確な位置にあること', async ({
       extensionContext,
       sidePanelPage,

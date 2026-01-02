@@ -1,22 +1,8 @@
 /**
  * E2E Tests: Cross-Window Drag and Drop Tab Movement
  *
- * Task 16.1 (tab-tree-bugfix-2): cross-window-drag-drop.spec.ts の書き直し
- * Task 4.2 (tree-tab-bugfixes-and-ux-improvements): クロスウィンドウドラッグE2Eテストの検証
- *
- * Requirements (tab-tree-bugfix-2):
- * - 6.1: 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
- * - 6.2: クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
- * - 6.3: クロスウィンドウドラッグはドラッグアウトとして判定されない
- * - 6.4: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
- * - 6.5: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
- * - 6.7: Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
- * - 6.8: E2Eテストでクロスウィンドウドラッグ機能を検証
- * - 6.9: E2Eテストは --repeat-each=10 で10回連続成功
- *
- * Requirements (tree-tab-bugfixes-and-ux-improvements):
- * - 4.4: クロスウィンドウドラッグ機能のE2Eテスト検証（--repeat-each=10で10回連続成功）
- * - 4.5: ポーリングベースの状態確定待機を使用してフレーキーでないこと
+ * cross-window-drag-drop.spec.ts の書き直し
+ * クロスウィンドウドラッグE2Eテストの検証
  *
  * Note: Run with `npm run test:e2e`
  */

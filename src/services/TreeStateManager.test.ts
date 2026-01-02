@@ -304,7 +304,7 @@ describe('TreeStateManager', () => {
     });
   });
 
-  describe('子タブ処理 (Requirement 2.3)', () => {
+  describe('子タブ処理', () => {
     describe('childTabBehavior: promote', () => {
       it('親タブを閉じると、子タブが親のレベルに昇格する', async () => {
         const viewId = 'view-1';
@@ -432,7 +432,7 @@ describe('TreeStateManager', () => {
     });
   });
 
-  describe('createGroupWithRealTab (Requirement 5.1, 5.2, 5.3, 5.6, 5.7)', () => {
+  describe('createGroupWithRealTab', () => {
     it('実際のタブIDでグループノードを作成できる', async () => {
       const viewId = 'view-1';
 
@@ -555,7 +555,7 @@ describe('TreeStateManager', () => {
       ).rejects.toThrow('No tabs specified for grouping');
     });
 
-    describe('グループタブの階層決定 (Requirement 3.9, 3.10)', () => {
+    describe('グループタブの階層決定', () => {
       it('すべてのタブが同じ親を持つ場合、グループタブはその親の子として配置される', async () => {
         const viewId = 'view-1';
 
@@ -675,7 +675,7 @@ describe('TreeStateManager', () => {
     });
   });
 
-  describe('cleanupStaleNodes (Requirement 2.1, 2.2, 2.3)', () => {
+  describe('cleanupStaleNodes', () => {
     it('ブラウザに存在しないタブをツリーから削除する', async () => {
       const viewId = 'default';
       // ツリーにタブを追加

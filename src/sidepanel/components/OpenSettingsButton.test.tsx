@@ -1,7 +1,6 @@
 /**
  * 設定画面を新規タブで開くボタンのテスト
- * Task 8.2: 設定画面を新規タブで開く機能を実装する
- * Requirements: 5.1, 5.2, 5.4
+ * 設定画面を新規タブで開く機能を実装する
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';

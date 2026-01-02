@@ -1,6 +1,6 @@
 /**
- * Task 10.1: GapDropDetection水平ドロップターゲット計算テスト
- * Task 5.2: サブツリーサイズを考慮したドロップ位置計算テスト
+ * GapDropDetection水平ドロップターゲット計算テスト
+ * サブツリーサイズを考慮したドロップ位置計算テスト
  */
 
 import { describe, it, expect } from 'vitest';
@@ -129,8 +129,8 @@ describe('calculateHorizontalIndicatorX', () => {
 });
 
 /**
- * Task 5.2: calculateDropTargetのサブツリー除外テスト
- * Requirement 2.2: 下方向へのドラッグ時、サブツリーサイズを考慮したインデックス調整
+ * calculateDropTargetのサブツリー除外テスト
+ * 下方向へのドラッグ時、サブツリーサイズを考慮したインデックス調整
  */
 describe('calculateDropTarget with subtree exclusion', () => {
   // テスト用のタブ位置配列

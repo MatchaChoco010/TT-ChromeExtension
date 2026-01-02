@@ -3,8 +3,6 @@
  *
  * Service Workerとの通信、イベント監視、ライフサイクル検証の
  * 共通ヘルパー関数が正しく機能することを検証します。
- *
- * Requirements: 4.5
  */
 import { test, expect } from './fixtures/extension';
 import {

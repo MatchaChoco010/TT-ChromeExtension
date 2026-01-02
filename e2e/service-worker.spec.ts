@@ -7,9 +7,6 @@
  * タブイベント処理時のツリー状態バックグラウンド同期、
  * Service Worker再起動時の状態復元、
  * 長時間非アクティブ後の通信再確立を検証します。
- *
- * Requirements: 4.5
- * Task: 5.5
  */
 import { test, expect } from './fixtures/extension';
 import {
@@ -44,7 +41,7 @@ interface DragState {
 }
 
 test.describe('Service Workerとの通信', () => {
-  test.describe('Requirement 4.5.1: Side PanelからService Workerへのメッセージ送信', () => {
+  test.describe('Side PanelからService Workerへのメッセージ送信', () => {
     test('Side PanelからService Workerにchrome.runtime.sendMessage()でメッセージを送信できること', async ({
       sidePanelPage,
     }) => {
@@ -143,7 +140,7 @@ test.describe('Service Workerとの通信', () => {
     });
   });
 
-  test.describe('Requirement 4.5.2: Service WorkerからSide Panelへのメッセージ送信', () => {
+  test.describe('Service WorkerからSide Panelへのメッセージ送信', () => {
     test('chrome.runtime.onMessageリスナーがSide Panelで正しくメッセージを受信すること', async ({
       sidePanelPage,
       serviceWorker,
@@ -214,7 +211,7 @@ test.describe('Service Workerとの通信', () => {
     });
   });
 
-  test.describe('Requirement 4.5.3: タブイベント処理時のツリー状態バックグラウンド同期', () => {
+  test.describe('タブイベント処理時のツリー状態バックグラウンド同期', () => {
     test('タブ作成時にService WorkerがSTATE_UPDATEDメッセージを送信すること', async ({
       sidePanelPage,
       serviceWorker,
@@ -421,7 +418,7 @@ test.describe('Service Workerとの通信', () => {
     });
   });
 
-  test.describe('Requirement 4.5.4: Service Worker再起動時の状態復元', () => {
+  test.describe('Service Worker再起動時の状態復元', () => {
     test('Service Workerが正常に起動し、状態が復元されること', async ({
       extensionContext,
     }) => {
@@ -463,7 +460,7 @@ test.describe('Service Workerとの通信', () => {
     });
   });
 
-  test.describe('Requirement 4.5.5: 長時間非アクティブ後の通信再確立', () => {
+  test.describe('長時間非アクティブ後の通信再確立', () => {
     test('一定時間経過後もService Workerとの通信が可能であること', async ({
       sidePanelPage,
     }) => {

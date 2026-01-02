@@ -1,6 +1,5 @@
 /**
- * Task 5.4: TreeStateProvider のリアルタイム更新テスト
- * Requirements: 1.4, 2.1
+ * TreeStateProvider のリアルタイム更新テスト
  */
 import React from 'react';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
@@ -188,7 +187,6 @@ describe('TreeStateProvider リアルタイム更新', () => {
     });
   });
 
-  // Task 10.2.1: storage.onChanged handling re-enabled with race condition fix
   it('storage.onChanged イベントを受信したときに状態を更新する', async () => {
     const initialState: TreeState = {
       views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
@@ -250,8 +248,7 @@ describe('TreeStateProvider リアルタイム更新', () => {
 });
 
 /**
- * Task 1.1: TabInfo マップ管理機能のテスト
- * Requirements: 1.1, 1.2, 1.3, 1.4
+ * TabInfo マップ管理機能のテスト
  */
 describe('TreeStateProvider TabInfoMap管理', () => {
   let mockMessageListeners: MessageListener[] = [];
@@ -532,8 +529,7 @@ describe('TreeStateProvider TabInfoMap管理', () => {
 });
 
 /**
- * Task 1.2: ピン留めタブ専用リスト管理機能のテスト
- * Requirements: 12.1
+ * ピン留めタブ専用リスト管理機能のテスト
  */
 describe('TreeStateProvider pinnedTabIds管理', () => {
   let mockMessageListeners: MessageListener[] = [];
@@ -818,8 +814,7 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
 });
 
 /**
- * Task 1.3: 複数選択状態の管理機能のテスト
- * Requirements: 9.1, 9.2
+ * 複数選択状態の管理機能のテスト
  */
 describe('TreeStateProvider 複数選択状態管理', () => {
   let mockMessageListeners: MessageListener[] = [];
@@ -1216,8 +1211,7 @@ describe('TreeStateProvider 複数選択状態管理', () => {
 });
 
 /**
- * Task 5.3: handleSiblingDropのテスト
- * Requirements: 8.1, 8.2, 8.3, 8.4
+ * handleSiblingDropのテスト
  * 兄弟としてドロップ（Gapドロップ）時のハンドラのテスト
  */
 describe('TreeStateProvider handleSiblingDrop', () => {
@@ -1245,7 +1239,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       depth: node.depth,
     }));
 
-    // Task 8.1: 同じ親を持つ兄弟ノードの順序を取得
     // parentId -> [childNodeId1, childNodeId2, ...] の形式でグループ化
     const siblingGroups: Record<string, string[]> = {};
     Object.values(treeState.nodes).forEach((node) => {
@@ -1263,7 +1256,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
         {Object.values(treeState.nodes).map((node) => (
           <div key={node.id} data-testid={`node-${node.id}-parent`}>{node.parentId || 'null'}</div>
         ))}
-        {/* Task 8.1: 兄弟順序の表示 */}
         <div data-testid="sibling-groups">{JSON.stringify(siblingGroups)}</div>
         <div data-testid="root-siblings">{JSON.stringify(siblingGroups['root'] || [])}</div>
       </div>
@@ -1565,8 +1557,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   });
 
   /**
-   * Task 8.1 (tab-tree-bugfix): ドロップ位置への正確な挿入テスト
-   * Requirements: 7.1, 7.2
+   * ドロップ位置への正確な挿入テスト
    * insertIndexを使用して正しい兄弟順序で挿入されることを検証
    */
   it('insertIndexに基づいて正しい位置に挿入される', async () => {
@@ -1620,7 +1611,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
       tree_state: treeStateWithMultipleRoots,
     });
-    // Task 7.3: indexプロパティを追加（belowNodeのインデックスを取得するために必要）
     mockChrome.tabs.query = vi.fn().mockResolvedValue([
       { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true, index: 0 },
       { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false, index: 1 },
@@ -1663,16 +1653,13 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(screen.getByTestId('node-node-4-parent')).toHaveTextContent('null');
     });
 
-    // Task 7.3: ブラウザタブの順序が同期されることを確認
-    // belowNodeId=node-2のタブインデックス（1）の位置に移動
     await waitFor(() => {
       expect(mockChrome.tabs.move).toHaveBeenCalledWith(4, { index: 1 });
     });
   });
 
   /**
-   * Task 3.1 (tab-tree-comprehensive-fix): 異なる深度のタブ間へのドロップテスト
-   * Requirements: 3.1, 3.2, 3.3
+   * 異なる深度のタブ間へのドロップテスト
    * 深度0のタブの下に深度1のタブがある場合、その間にドロップすると
    * 正しい親（下のノードの親）を使用してドロップされることを検証
    */
@@ -1775,7 +1762,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   });
 
   /**
-   * Task 3.1 (tab-tree-comprehensive-fix): 子タブの下への隙間ドロップテスト
+   * 子タブの下への隙間ドロップテスト
    * 親タブの子として正しく配置されることを検証
    */
   it('親タブの子の下にドロップした場合、同じ親の兄弟として配置される', async () => {
@@ -1874,8 +1861,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   });
 
   /**
-   * Task 7.3 (tab-tree-bugfix-2): ピン留めタブを考慮したブラウザタブインデックス計算テスト
-   * Requirements: 2.1, 2.2, 2.3
+   * ピン留めタブを考慮したブラウザタブインデックス計算テスト
    * ピン留めタブが存在する場合、ブラウザタブのインデックスはピン留めタブの数を考慮する必要がある
    */
   it('ピン留めタブが存在する場合、belowNodeのインデックスを使用してタブを移動する', async () => {
@@ -1969,8 +1955,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   });
 
   /**
-   * Task 7.3 (tab-tree-bugfix-2): タブ間ドロップ時の正確なインデックス計算テスト
-   * Requirements: 2.1, 2.2, 2.3
+   * タブ間ドロップ時の正確なインデックス計算テスト
    * タブ間にドロップした場合、belowNodeのインデックスを使用してタブを移動する
    */
   it('タブ間にドロップした場合、belowNodeのブラウザタブインデックスを使用してタブを移動する', async () => {
@@ -2060,8 +2045,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   });
 
   /**
-   * Task 7.3 (tab-tree-bugfix-2): リスト末尾へのドロップテスト
-   * Requirements: 2.1, 2.2, 2.3
+   * リスト末尾へのドロップテスト
    * belowNodeがない場合（リスト末尾へのドロップ）、aboveNodeの次のインデックスを使用
    */
   it('リスト末尾にドロップした場合、正しいインデックスでタブを移動する', async () => {
@@ -2143,8 +2127,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
 
     // ブラウザタブの順序が正しく同期されることを確認
-    // Task 13.1 (tree-stability-v2): aboveNode(node-3)のindex=2の後なのでindex=3
-    // サブツリー移動に対応するため、明示的なインデックスを使用
+    // aboveNode(node-3)のindex=2の後なのでindex=3
     await waitFor(() => {
       expect(mockChrome.tabs.move).toHaveBeenCalledWith(1, { index: 3 });
     });
@@ -2152,8 +2135,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 });
 
 /**
- * Task 1.1 (tab-tree-bugfix): 複数ウィンドウ対応のテスト
- * Requirements: 12.1, 12.2, 12.3
+ * 複数ウィンドウ対応のテスト
  */
 describe('TreeStateProvider 複数ウィンドウ対応', () => {
   let mockMessageListeners: MessageListener[] = [];
@@ -2347,8 +2329,7 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
 });
 
 /**
- * Task 2.1 (tab-tree-bugfix): ファビコン永続化機能のテスト
- * Requirements: 1.1, 1.4
+ * ファビコン永続化機能のテスト
  */
 describe('TreeStateProvider ファビコン永続化', () => {
   let mockMessageListeners: MessageListener[] = [];
@@ -2672,8 +2653,7 @@ describe('TreeStateProvider ファビコン永続化', () => {
 });
 
 /**
- * Task 2.3 (tab-tree-bugfix): 余分なLoadingタブ防止機能のテスト
- * Requirements: 1.2, 1.5
+ * 余分なLoadingタブ防止機能のテスト
  */
 describe('TreeStateProvider 余分なLoadingタブ防止', () => {
   let mockMessageListeners: MessageListener[] = [];
@@ -2920,8 +2900,7 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
 });
 
 /**
- * Task 2.2 (tab-tree-bugfix): タブタイトル永続化更新機能のテスト
- * Requirements: 1.3
+ * タブタイトル永続化更新機能のテスト
  */
 describe('TreeStateProvider タブタイトル永続化更新', () => {
   let mockMessageListeners: MessageListener[] = [];
@@ -3296,8 +3275,7 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
 });
 
 /**
- * Task 2.1 (tab-tree-comprehensive-fix): ビューのタブカウント正確性のテスト
- * Requirements: 2.1, 2.3
+ * ビューのタブカウント正確性のテスト
  * 不整合タブ削除時にviewTabCountsが再計算されることをテスト
  */
 describe('TreeStateProvider viewTabCounts 正確性', () => {

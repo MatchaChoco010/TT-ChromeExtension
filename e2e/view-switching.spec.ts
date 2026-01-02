@@ -1,9 +1,6 @@
 /**
  * ビュー切り替え機能のE2Eテスト
  *
- * Task 4.8: ビュー切り替え機能の実装とテスト
- * Requirements: 3.8
- *
  * テスト対象:
  * 1. "All Tabs"/"Current Window"ビューの切り替え
  * 2. カスタムビューの作成、削除、名前・色変更
@@ -154,7 +151,7 @@ test.describe('ビュー切り替え機能', () => {
   });
 
   test.describe('カスタムビュー編集', () => {
-    // Task 7.3: ビュー編集は右クリックコンテキストメニュー経由で行うようになりました
+    // ビュー編集は右クリックコンテキストメニュー経由で行うようになりました
     test('ビュー名や色を変更した場合、UI上の表示が即座に反映される', async ({
       sidePanelPage,
     }) => {
@@ -171,7 +168,7 @@ test.describe('ビュー切り替え機能', () => {
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
-      // Task 7.3: 右クリックしてコンテキストメニューを開く
+      // 右クリックしてコンテキストメニューを開く
       await newViewButton.click({ button: 'right' });
 
       // コンテキストメニューが表示される
@@ -253,8 +250,8 @@ test.describe('ビュー切り替え機能', () => {
     });
   });
 
-  test.describe('Task 3.1: ビュー切り替え動作の修正', () => {
-    test('Requirement 15.1: ビューを切り替えた後に新しいタブを開いた場合、現在アクティブなビューにタブを追加する', async ({
+  test.describe('ビュー切り替え動作の修正', () => {
+    test('ビューを切り替えた後に新しいタブを開いた場合、現在アクティブなビューにタブを追加する', async ({
       sidePanelPage,
       context,
     }) => {
@@ -296,7 +293,7 @@ test.describe('ビュー切り替え機能', () => {
       }).toPass({ timeout: 15000 });
     });
 
-    test('Requirement 15.2: ビューを追加した場合、ページをリロードしてもビューが永続化されている', async ({
+    test('ビューを追加した場合、ページをリロードしてもビューが永続化されている', async ({
       sidePanelPage,
     }) => {
       await waitForViewSwitcher(sidePanelPage);
@@ -325,7 +322,7 @@ test.describe('ビュー切り替え機能', () => {
       await expect(persistedViewButton).toBeVisible({ timeout: 5000 });
     });
 
-    test('Requirement 15.3: ビューの切り替え状態が正しく管理され、意図せず消えない', async ({
+    test('ビューの切り替え状態が正しく管理され、意図せず消えない', async ({
       sidePanelPage,
     }) => {
       await waitForViewSwitcher(sidePanelPage);
@@ -359,7 +356,7 @@ test.describe('ビュー切り替え機能', () => {
   });
 
   test.describe('ビュー削除', () => {
-    // Task 7.3: ビュー削除は右クリックコンテキストメニュー経由で行うようになりました
+    // ビュー削除は右クリックコンテキストメニュー経由で行うようになりました
     test('ビューを削除した場合、デフォルトビューに自動的に切り替わる', async ({
       sidePanelPage,
     }) => {
@@ -382,7 +379,7 @@ test.describe('ビュー切り替え機能', () => {
       // 新しいビューがアクティブになるまで待機
       await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
-      // Task 7.3: 右クリックしてコンテキストメニューを開く
+      // 右クリックしてコンテキストメニューを開く
       await newViewButton.click({ button: 'right' });
 
       // コンテキストメニューが表示される

@@ -1,23 +1,19 @@
 /**
  * ビューへの新規タブ追加のE2Eテスト
  *
- * Task 6.1: ビュー維持機能の原因調査と修正
- * Task 6.2: ビューへの新規タブ追加E2Eテストの追加
- * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5
- *
  * テスト対象:
- * 1. ビューを開いている状態で新しいタブをそのビューに追加 (Requirement 6.1)
- * 2. 新規タブ追加後もViewSwitcherが現在のビューを維持（ビューが閉じずに維持される） (Requirement 6.2)
- * 3. デフォルトビュー以外のビューでも新規タブが現在ビューに属する (Requirement 6.3)
- * 4. E2Eテストで検証可能であり、--repeat-each=10で10回連続成功 (Requirement 6.4)
- * 5. ポーリングベースの状態確定待機を使用してフレーキーでないこと (Requirement 6.5)
+ * 1. ビューを開いている状態で新しいタブをそのビューに追加
+ * 2. 新規タブ追加後もViewSwitcherが現在のビューを維持（ビューが閉じずに維持される）
+ * 3. デフォルトビュー以外のビューでも新規タブが現在ビューに属する
+ * 4. E2Eテストで検証可能であり、--repeat-each=10で10回連続成功
+ * 5. ポーリングベースの状態確定待機を使用してフレーキーでないこと
  */
 
 import { test, expect } from './fixtures/extension';
 import { waitForViewSwitcher, waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 
 test.describe('ビューへの新規タブ追加', () => {
-  test.describe('Requirement 6.1: ビューを開いている状態で新しいタブをそのビューに追加', () => {
+  test.describe('ビューを開いている状態で新しいタブをそのビューに追加', () => {
     test('カスタムビューを開いている状態で新しいタブを開いた場合、そのビューに追加される', async ({
       extensionContext,
       sidePanelPage,
@@ -84,7 +80,7 @@ test.describe('ビューへの新規タブ追加', () => {
     });
   });
 
-  test.describe('Requirement 6.2: 新規タブ追加後もViewSwitcherが現在のビューを維持（ビューが閉じずに維持される）', () => {
+  test.describe('新規タブ追加後もViewSwitcherが現在のビューを維持（ビューが閉じずに維持される）', () => {
     test('新しいタブを開いた後もビュースイッチャーは同じビューを表示し続ける', async ({
       extensionContext,
       sidePanelPage,
@@ -178,7 +174,7 @@ test.describe('ビューへの新規タブ追加', () => {
     });
   });
 
-  test.describe('Requirement 6.3: デフォルトビュー以外のビューでも新規タブが現在ビューに属する', () => {
+  test.describe('デフォルトビュー以外のビューでも新規タブが現在ビューに属する', () => {
     test('デフォルトビューで新しいタブを開いた場合、デフォルトビューに追加される', async ({
       extensionContext,
       sidePanelPage,
@@ -307,7 +303,7 @@ test.describe('ビューへの新規タブ追加', () => {
     });
   });
 
-  test.describe('Requirement 6.4, 6.5: E2Eテスト検証', () => {
+  test.describe('E2Eテスト検証', () => {
     test('NewTabButtonを使用してカスタムビューに新規タブを追加できる', async ({
       extensionContext,
       sidePanelPage,

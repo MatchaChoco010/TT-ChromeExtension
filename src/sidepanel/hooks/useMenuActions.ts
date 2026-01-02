@@ -10,7 +10,6 @@ export interface MenuActionOptions {
  * useMenuActions
  *
  * コンテキストメニューのアクションを実行するカスタムフック
- * Requirements: 3.11, 12.2, 12.3, 12.4, 4.2
  */
 export const useMenuActions = () => {
   /**
@@ -49,8 +48,8 @@ export const useMenuActions = () => {
           break;
 
         case 'duplicate':
-          // Task 4.2 (tab-tree-bugfix-2): タブを複製（兄弟として配置）
-          // Requirement 16.1, 16.2, 16.3: 複製されたタブを元のタブの兄弟として配置
+          // タブを複製（兄弟として配置）
+          // 複製されたタブを元のタブの兄弟として配置
           for (const tabId of tabIds) {
             // 複製前にService Workerに複製元を登録（onCreatedより先に実行される必要がある）
             await chrome.runtime.sendMessage({

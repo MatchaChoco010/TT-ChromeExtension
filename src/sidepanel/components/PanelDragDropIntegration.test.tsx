@@ -1,11 +1,10 @@
 /**
- * Task 6.5: パネル内D&Dの統合テスト
- * Requirements: 3.2, 3.3, 3.4
+ * パネル内D&Dの統合テスト
  *
  * このテストは以下の実際のユーザーシナリオをカバーします:
- * - Acceptance Criteria 3.2: タブをドラッグして別のタブの子として配置できる
- * - Acceptance Criteria 3.3: タブを同階層で順序変更できる
- * - Acceptance Criteria 3.4: ホバー時にブランチが自動展開される
+ * - タブをドラッグして別のタブの子として配置できる
+ * - タブを同階層で順序変更できる
+ * - ホバー時にブランチが自動展開される
  *
  * 統合テストのシナリオ:
  * 1. ユーザーがタブをドラッグして別のタブの上でドロップし、親子関係を作成
@@ -46,7 +45,7 @@ function IntegrationTestComponent() {
   );
 }
 
-describe('Task 6.5: パネル内D&Dの統合テスト', () => {
+describe('パネル内D&Dの統合テスト', () => {
   let sendMessageMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -143,7 +142,7 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
-        // Task 12.3 (tab-tree-bugfix): Add onCreated and onRemoved mocks
+        // Add onCreated and onRemoved mocks
         onCreated: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
@@ -152,13 +151,13 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
-        // Task 13.1 (tab-tree-comprehensive-fix): Add onMoved mock for pinned tab reorder sync
+        // Add onMoved mock for pinned tab reorder sync
         onMoved: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
       },
-      // Task 12.3 (tab-tree-bugfix): Add windows.getCurrent mock
+      // Add windows.getCurrent mock
       windows: {
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
       },
@@ -166,7 +165,7 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
   });
 
   describe('完全なドラッグ&ドロップワークフロー', () => {
-    it('シナリオ1: タブを子として配置、同階層で移動を連続して実行 (AC 3.2, 3.3)', async () => {
+    it('シナリオ1: タブを子として配置、同階層で移動を連続して実行', async () => {
       // useTreeStateから関数を取得するためのコンポーネント
       let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
       function TestHookComponent() {
@@ -194,7 +193,7 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
-      // ステップ1: タブを別のタブの子として配置 (AC 3.2)
+      // ステップ1: タブを別のタブの子として配置
       const dragEndEvent1 = {
         active: {
           id: 'node-2',
@@ -232,7 +231,7 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
       // モックをリセット
       vi.mocked(chrome.storage.local.set).mockClear();
 
-      // ステップ2: タブを同階層で順序変更 (AC 3.3)
+      // ステップ2: タブを同階層で順序変更
       // node-3をnode-1の子として配置
       const dragEndEvent2 = {
         active: {
@@ -262,7 +261,7 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
       });
     });
 
-    it('Acceptance Criteria 3.2: タブをドラッグして別のタブの子として配置できる', async () => {
+    it('タブをドラッグして別のタブの子として配置できる', async () => {
       let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
 
       function TestHookComponent() {
@@ -318,7 +317,7 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
       });
     });
 
-    it('Acceptance Criteria 3.3: タブを同階層で順序変更できる', async () => {
+    it('タブを同階層で順序変更できる', async () => {
       let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
 
       function TestHookComponent() {
@@ -367,7 +366,7 @@ describe('Task 6.5: パネル内D&Dの統合テスト', () => {
       });
     });
 
-    it('Acceptance Criteria 3.4: ホバー時にブランチが自動展開される (既存テストで確認)', async () => {
+    it('ホバー時にブランチが自動展開される (既存テストで確認)', async () => {
       // このテストは DragHoverAutoExpand.test.tsx で実装されています
       // TabTreeView コンポーネントがドラッグホバー機能をサポートしていることを確認
       render(

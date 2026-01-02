@@ -1,16 +1,15 @@
 /**
- * Task 13.2: useCrossWindowDragフックのテスト
- * Task 7.2 (comprehensive-bugfix): mousemoveによるホバー検知テストを追加
+ * useCrossWindowDragフックのテスト
+ * mousemoveによるホバー検知テストを追加
  *
- * Requirements:
- * - 6.1: 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
- * - 6.2: クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
- * - 6.3: クロスウィンドウドラッグはドラッグアウトとして判定されない
- * - 6.4: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
- * - 6.5: ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
- * - 6.7: Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
- * - 4.4 (Task 7.2): mousemoveイベントでホバー検知し、別ウィンドウへのフォーカス移動を通知
- * - 4.5 (Task 7.2): バックグラウンドスロットリング回避のためのフォーカス移動
+ * - 別ウィンドウでドラッグ中のタブが新しいウィンドウのツリービューにホバーされたとき、タブを新しいウィンドウに移動
+ * - クロスウィンドウドラッグが発生したとき、ドロップ位置に応じてツリーにタブを配置
+ * - クロスウィンドウドラッグはドラッグアウトとして判定されない
+ * - ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、元のウィンドウはタブをタブツリーから削除
+ * - ドラッグ中のタブが新しいウィンドウのツリービューに入ったとき、新しいウィンドウはタブをタブツリーに追加してドラッグ状態で表示
+ * - Service Worker接続エラーが発生した場合、ドラッグ操作はサイレントにキャンセル
+ * - mousemoveイベントでホバー検知し、別ウィンドウへのフォーカス移動を通知
+ * - バックグラウンドスロットリング回避のためのフォーカス移動
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
@@ -413,10 +412,9 @@ describe('useCrossWindowDrag', () => {
   });
 
   /**
-   * Task 7.2 (comprehensive-bugfix): mousemoveイベントによるホバー検知テスト
-   * Requirements: 4.4, 4.5
+   * mousemoveイベントによるホバー検知テスト
    */
-  describe('Task 7.2: mousemove event handling for hover detection', () => {
+  describe('mousemove event handling for hover detection', () => {
     it('should notify tree view hover on mousemove when session is from different window', async () => {
       mockGetCurrent.mockResolvedValue({ id: 1 });
       mockSendMessage.mockImplementation((message) => {

@@ -1,8 +1,7 @@
 /**
  * Tree State Persistence E2E Tests
  *
- * Task 15.2 (comprehensive-bugfix): ツリー状態永続化のE2Eテスト
- * Requirements: 13.4, 13.5, 13.6
+ * ツリー状態永続化のE2Eテスト
  *
  * このテストスイートでは、ツリー状態の永続化と復元を検証します。
  * - 親子関係がストレージに正しく保存されること
@@ -17,11 +16,11 @@ import { createTab, assertTabInTree } from './utils/tab-utils';
 import { moveTabToParent, getParentTabId, getTabDepth } from './utils/drag-drop-utils';
 import { waitForParentChildRelation, waitForCondition, waitForTabInTreeState } from './utils/polling-utils';
 
-test.describe('Task 15.2: ツリー状態永続化', () => {
+test.describe('ツリー状態永続化', () => {
   // タイムアウトを延長（D&D操作があるため）
   test.setTimeout(120000);
 
-  test.describe('Requirement 13.4: 親子関係の永続化', () => {
+  test.describe('親子関係の永続化', () => {
     test('親子関係がストレージに正しく保存されること', async ({
       extensionContext,
       sidePanelPage,
@@ -217,7 +216,7 @@ test.describe('Task 15.2: ツリー状態永続化', () => {
     });
   });
 
-  test.describe('Requirement 13.5: 折りたたみ状態の永続化', () => {
+  test.describe('折りたたみ状態の永続化', () => {
     test('折りたたみ状態がストレージに正しく保存されること', async ({
       extensionContext,
       sidePanelPage,
@@ -469,7 +468,7 @@ test.describe('Task 15.2: ツリー状態永続化', () => {
     });
   });
 
-  test.describe('Requirement 13.6: 統合テスト', () => {
+  test.describe('統合テスト', () => {
     test('親子関係と折りたたみ状態の両方がリロード後に復元されること', async ({
       extensionContext,
       sidePanelPage,

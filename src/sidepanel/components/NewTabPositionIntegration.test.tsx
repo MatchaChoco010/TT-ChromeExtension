@@ -1,10 +1,9 @@
 /**
- * Task 12.3: 新規タブ位置のテスト
- * Requirements: 9.2, 9.3
+ * 新規タブ位置のテスト
  *
  * このテストでは以下を検証します:
- * - 設定が「子として配置」の場合に新規タブが元のタブの子になること (Acceptance Criteria 9.2)
- * - 設定が「リストの最後」の場合に新規タブがツリーの最後に配置されること (Acceptance Criteria 9.3)
+ * - 設定が「子として配置」の場合に新規タブが元のタブの子になること
+ * - 設定が「リストの最後」の場合に新規タブがツリーの最後に配置されること
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -13,7 +12,7 @@ import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
 import { TreeStateManager } from '@/services/TreeStateManager';
 import type { UserSettings } from '@/types';
 
-describe('Task 12.3: 新規タブ位置の統合テスト', () => {
+describe('新規タブ位置の統合テスト', () => {
   // テストごとに新しいインスタンスを作成
   let testStorageService: StorageService;
   let testTreeStateManager: TreeStateManager;
@@ -60,7 +59,7 @@ describe('Task 12.3: 新規タブ位置の統合テスト', () => {
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
   });
 
-  describe('Acceptance Criteria 9.2: 設定が「子として配置」の場合', () => {
+  describe('設定が「子として配置」の場合', () => {
     it('リンクから開かれた新規タブが元のタブの子になる', async () => {
       // Arrange: 設定を「child」に設定
       const settings: UserSettings = {
@@ -183,7 +182,7 @@ describe('Task 12.3: 新規タブ位置の統合テスト', () => {
     });
   });
 
-  describe('Acceptance Criteria 9.3: 設定が「リストの最後」の場合', () => {
+  describe('設定が「リストの最後」の場合', () => {
     it('手動で開かれた新規タブがツリーの最後に配置される', async () => {
       // Arrange: 設定を「end」に設定
       const settings: UserSettings = {

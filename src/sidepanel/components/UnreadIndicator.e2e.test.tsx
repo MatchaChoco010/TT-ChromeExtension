@@ -8,10 +8,10 @@ import type { TabNode, TabInfo } from '@/types';
 import type { MockChrome, MockStorageLocal, MockStorage, MockRuntimeOnMessage } from '@/test/test-types';
 
 /**
- * E2Eテスト: Task 10.3 - 未読インジケータの統合
+ * E2Eテスト: 未読インジケータの統合
  *
- * Acceptance Criteria 7.1: 新規タブに未読インジケータが表示される
- * Acceptance Criteria 7.2: タブアクティブ化で未読インジケータが削除される
+ * - 新規タブに未読インジケータが表示される
+ * - タブアクティブ化で未読インジケータが削除される
  *
  * このテストは、実際のユーザーフローをシミュレートします:
  * 1. 新しいタブが作成される
@@ -21,7 +21,7 @@ import type { MockChrome, MockStorageLocal, MockStorage, MockRuntimeOnMessage } 
  * 5. UnreadTrackerが既読としてマーク
  * 6. TreeNodeから未読バッジが削除される
  */
-describe('Task 10.3: 未読インジケータ E2Eテスト', () => {
+describe('未読インジケータ E2Eテスト', () => {
   let storageService: StorageService;
   let unreadTracker: UnreadTracker;
 
@@ -61,7 +61,7 @@ describe('Task 10.3: 未読インジケータ E2Eテスト', () => {
     storageService = new StorageService();
     unreadTracker = new UnreadTracker(storageService);
     await unreadTracker.loadFromStorage();
-    // Requirement 13.1, 13.2, 13.3: 起動完了フラグを設定（テストでは起動後の挙動をシミュレート）
+    // 起動完了フラグを設定（テストでは起動後の挙動をシミュレート）
     unreadTracker.setInitialLoadComplete();
   });
 
@@ -87,7 +87,7 @@ describe('Task 10.3: 未読インジケータ E2Eテスト', () => {
     status: 'complete',
   });
 
-  describe('Acceptance Criteria 7.1: 新規タブに未読インジケータが表示される', () => {
+  describe('新規タブに未読インジケータが表示される', () => {
     it('新しいタブが作成されると未読バッジが表示される', async () => {
       const tabId = 101;
       const node = createMockNode('node-101', tabId);
@@ -168,7 +168,7 @@ describe('Task 10.3: 未読インジケータ E2Eテスト', () => {
     });
   });
 
-  describe('Acceptance Criteria 7.2: タブアクティブ化で未読インジケータが削除される', () => {
+  describe('タブアクティブ化で未読インジケータが削除される', () => {
     it('タブをクリックしてアクティブ化すると未読バッジが削除される', async () => {
       const user = userEvent.setup();
       const tabId = 301;

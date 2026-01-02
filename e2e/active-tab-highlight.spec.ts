@@ -1,9 +1,6 @@
 /**
  * アクティブタブハイライトのE2Eテスト
  *
- * Task 6.2: アクティブタブハイライトのE2Eテスト
- *
- * Requirements: 5.1, 5.2, 5.3, 5.4
  * - 通常タブがアクティブになった時に該当タブのみがハイライトされることを検証
  * - ピン留めタブがアクティブになった時に該当ピン留めタブのみがハイライトされ、通常タブのハイライトが解除されることを検証
  * - 通常タブとピン留めタブ間でアクティブタブを切り替えた際に、常に1つのタブのみがハイライト状態であることを検証
@@ -12,7 +9,7 @@ import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
 
 test.describe('アクティブタブのハイライト', () => {
-  test.describe('通常タブのハイライト (Requirement 5.1)', () => {
+  test.describe('通常タブのハイライト', () => {
     test('通常タブがアクティブになった時に該当タブのみがハイライトされる', async ({
       extensionContext,
       serviceWorker,
@@ -101,7 +98,7 @@ test.describe('アクティブタブのハイライト', () => {
     });
   });
 
-  test.describe('ピン留めタブのハイライト (Requirement 5.2)', () => {
+  test.describe('ピン留めタブのハイライト', () => {
     test('ピン留めタブがアクティブになった時に該当ピン留めタブのみがハイライトされる', async ({
       extensionContext,
       serviceWorker,
@@ -205,7 +202,7 @@ test.describe('アクティブタブのハイライト', () => {
     });
   });
 
-  test.describe('通常タブとピン留めタブ間のハイライト切替 (Requirement 5.3, 5.4)', () => {
+  test.describe('通常タブとピン留めタブ間のハイライト切替', () => {
     test('通常タブからピン留めタブに切り替えると、通常タブのハイライトが解除され、ピン留めタブがハイライトされる', async ({
       extensionContext,
       serviceWorker,

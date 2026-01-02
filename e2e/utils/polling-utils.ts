@@ -772,9 +772,6 @@ export async function waitForViewSwitcher(
 /**
  * タブが親を持たない（ルートレベル）になるまで待機
  *
- * Task 6.1: 親子関係解消の永続化テスト用
- * Requirement 11.1, 11.3: ドラッグで親子関係を解消した状態が維持されること
- *
  * @param context - ブラウザコンテキスト
  * @param tabId - 待機するタブのID
  * @param options - ポーリングオプション

@@ -1,6 +1,5 @@
 /**
- * Task 4.3: タブとタブ間の隙間ドロップ判定テスト
- * Requirements: 7.1 (タブハイライト), 7.2 (隙間インジケーター), 7.3 (当たり判定)
+ * タブとタブ間の隙間ドロップ判定テスト
  *
  * このテストは以下をカバーします:
  * - ドラッグ中のマウスY座標からタブ上か隙間上かを判定
@@ -14,7 +13,7 @@ import {
   DropTargetType,
 } from './GapDropDetection';
 
-describe('Task 4.3: タブとタブ間の隙間ドロップ判定', () => {
+describe('タブとタブ間の隙間ドロップ判定', () => {
   // テスト用のタブノード位置情報
   // 各タブの高さは40px、隙間判定領域は上下10pxと仮定
   const tabPositions = [
@@ -25,7 +24,7 @@ describe('Task 4.3: タブとタブ間の隙間ドロップ判定', () => {
 
   describe('calculateDropTarget関数', () => {
     describe('タブ中央付近へのホバー（タブドロップ判定）', () => {
-      it('タブの中央付近にホバーするとタブドロップとして判定される (Requirement 7.1)', () => {
+      it('タブの中央付近にホバーするとタブドロップとして判定される', () => {
         // タブ1の中央付近 (20px = タブの真ん中)
         const result = calculateDropTarget(20, tabPositions);
 
@@ -51,7 +50,7 @@ describe('Task 4.3: タブとタブ間の隙間ドロップ判定', () => {
     });
 
     describe('タブ端付近へのホバー（隙間ドロップ判定）', () => {
-      it('タブの上端付近にホバーすると上側の隙間として判定される (Requirement 7.2)', () => {
+      it('タブの上端付近にホバーすると上側の隙間として判定される', () => {
         // タブ1の上端付近 (5px = タブの上端から5px)
         const result = calculateDropTarget(5, tabPositions);
 
@@ -84,7 +83,7 @@ describe('Task 4.3: タブとタブ間の隙間ドロップ判定', () => {
       });
     });
 
-    describe('当たり判定の境界値テスト (Requirement 7.3)', () => {
+    describe('当たり判定の境界値テスト', () => {
       // 隙間判定領域はタブの高さの25%（上下10px）と仮定
       const gapThresholdRatio = 0.25;
 
@@ -178,7 +177,7 @@ describe('Task 4.3: タブとタブ間の隙間ドロップ判定', () => {
       });
     });
 
-    describe('コンテナ境界チェック (Task 7.1)', () => {
+    describe('コンテナ境界チェック', () => {
       it('containerBoundsが指定され、マウスがコンテナ外上側にある場合、Noneを返す', () => {
         // コンテナの境界: 0-120
         const result = calculateDropTarget(-20, tabPositions, 0.25, {

@@ -1,8 +1,7 @@
 /**
  * タブ位置設定のE2Eテスト
  *
- * Task 5.2: タブ位置とタイトル表示のE2Eテスト
- * Requirements: 11.3, 11.4, 12.3, 12.4, 17.8, 17.9
+ * タブ位置とタイトル表示のE2Eテスト
  *
  * テスト対象:
  * 1. タブ位置設定の各シナリオ検証（リンククリック、手動タブ作成、設定変更後の反映）
@@ -50,8 +49,8 @@ async function changeTabPositionSetting(
   await expect(select).toHaveValue(value, { timeout: 3000 });
 }
 
-test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () => {
-  test.describe('Requirement 17: タブ位置設定の各シナリオ検証', () => {
+test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
+  test.describe('タブ位置設定の各シナリオ検証', () => {
     // 注意: Chrome拡張機能のonCreatedイベントでは、openerTabIdが渡されない場合がある。
     // また、tab.urlがイベント時点で空の場合があり、isSystemPage判定に影響する。
     // このテストは現在の実装の動作を検証し、既存のユニットテストで詳細なロジックを確認する。
@@ -311,7 +310,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     });
 
     /**
-     * Task 12.2 (comprehensive-bugfix): Requirement 15.3, 15.4
      * リンクから開いたタブの配置設定「兄弟として配置」の検証
      * 「sibling」設定時に新規タブが親タブの兄弟として（同じ親の下に）配置される
      */
@@ -387,7 +385,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     });
 
     /**
-     * Task 12.2 (comprehensive-bugfix): Requirement 15.4
      * ネストした親タブからのリンク配置「兄弟として配置」の検証
      * ネストした親タブからリンクを開いた場合、新しいタブも同じ親を持つ
      */
@@ -502,7 +499,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     });
 
     /**
-     * Task 12.1 (comprehensive-bugfix): Requirement 15.1, 15.2
      * リンクから開いたタブの配置設定「リストの最後」の検証
      * 「リストの最後」設定時に新規タブがリストの最後（ルートレベル）に追加される
      */
@@ -573,7 +569,7 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
     });
   });
 
-  test.describe('Requirement 11, 12: 新規タブタイトルとURL検証', () => {
+  test.describe('新規タブタイトルとURL検証', () => {
     // 注意: ChromiumではVivaldiスタートページ（chrome://vivaldi-webui/startpage）はサポートされていないため、
     // このテストはVivaldiブラウザでのみ有効。Chromiumでは空URLまたはエラーページになる。
     // Chromiumでの検証は、URLが設定されようとしていることを確認するにとどめる。
@@ -622,7 +618,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
       // Chromiumではchrome://vivaldi-webui/startpageはサポートされていないため、
       // タブが正常に作成されたことを確認するにとどめる
       // Vivaldiでは実際のスタートページが開かれる
-      // Requirement 12.1, 12.2
       expect(tabInfo.pendingUrl !== undefined || tabInfo.url !== undefined).toBe(true);
     });
 
@@ -663,7 +658,6 @@ test.describe('Task 5.2: タブ位置とタイトル表示のE2Eテスト', () =
       }).toPass({ timeout: 10000 });
 
       // Assert: タイトルが「スタートページ」であることを確認
-      // Requirement 11.1, 11.2
       await waitForCondition(
         async () => {
           const tabTitle = sidePanelPage.locator(`[data-testid="tree-node-${newTabId}"] [data-testid="tab-title"]`);

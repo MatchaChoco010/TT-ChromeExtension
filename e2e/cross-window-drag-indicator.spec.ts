@@ -1,16 +1,8 @@
 /**
  * E2E Tests: Cross-Window Drag Indicator Display
  *
- * Task 16.2 (tab-tree-bugfix-2): cross-window-drag-indicator.spec.ts の書き直し
- * Task 4.2 (tree-tab-bugfixes-and-ux-improvements): クロスウィンドウドラッグE2Eテストの検証
- *
- * Requirements (tab-tree-bugfix-2):
- * - 3.2.1: 自前D&D実装に合わせたテスト修正
- * - 3.2.3: --repeat-each=10 で10回連続成功確認
- *
- * Requirements (tree-tab-bugfixes-and-ux-improvements):
- * - 4.4: クロスウィンドウドラッグ機能のE2Eテスト検証（--repeat-each=10で10回連続成功）
- * - 4.5: ポーリングベースの状態確定待機を使用してフレーキーでないこと
+ * cross-window-drag-indicator.spec.ts の書き直し
+ * クロスウィンドウドラッグE2Eテストの検証
  *
  * Tests verify:
  * - Drag session state synchronization via DragSessionManager

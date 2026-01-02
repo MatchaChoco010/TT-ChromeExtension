@@ -4,18 +4,9 @@ import TabTreeView from './TabTreeView';
 import type { TabNode, ExtendedTabInfo } from '@/types';
 
 /**
- * タスク 2.2, 2.3: タブにホバー時の閉じるボタンを実装するテスト
- *
- * Requirements:
- * - 10.1: タブにマウスカーソルをホバーした場合、タブの右側に閉じるボタンを表示する
- * - 10.2: 閉じるボタンをクリックした場合、そのタブを閉じる
- * - 10.3: タブにホバーしていない場合、閉じるボタンを非表示にする
- *
- * Task 2.3 Requirements:
- * - 6.1, 6.2: 閉じるボタンは常にタブの右端に表示される（タイトルの長さに関わらず位置固定）
- * - 7.1, 7.2: ホバー状態の変化でタブサイズが変わらない（visible/invisibleで制御）
+ * タブにホバー時の閉じるボタンを実装するテスト
  */
-describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', () => {
+describe('タブにホバー時の閉じるボタンを実装する', () => {
   let originalChrome: typeof chrome;
   let mockTabsRemove: Mock;
 
@@ -58,8 +49,8 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     status: 'complete',
     isPinned: false,
     windowId: 1,
-    discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
-    index: id, // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブの順序同期
+    discarded: false, // 休止タブ状態
+    index: id, // ピン留めタブの順序同期
   });
 
   const mockGetTabInfo = (nodes: TabNode[]): ((tabId: number) => ExtendedTabInfo | undefined) => {
@@ -70,7 +61,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     return (tabId: number) => tabInfoMap[tabId];
   };
 
-  describe('Requirement 10.1: タブにホバー時に閉じるボタンを表示する', () => {
+  describe('タブにホバー時に閉じるボタンを表示する', () => {
     it('タブノードにマウスをホバーすると、閉じるボタンが表示される', () => {
       const node = createMockNode('node-1', 1);
       const getTabInfo = mockGetTabInfo([node]);
@@ -94,7 +85,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
 
-      // 閉じるボタンが表示される (Requirement 10.1)
+      // 閉じるボタンが表示される
       expect(closeButtonWrapper).toHaveClass('visible');
     });
 
@@ -126,7 +117,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     });
   });
 
-  describe('Requirement 10.2: 閉じるボタンをクリックするとタブを閉じる', () => {
+  describe('閉じるボタンをクリックするとタブを閉じる', () => {
     it('閉じるボタンをクリックすると、chrome.tabs.removeが呼ばれる', async () => {
       const node = createMockNode('node-1', 123);
       const getTabInfo = mockGetTabInfo([node]);
@@ -151,7 +142,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // chrome.tabs.removeが呼ばれる (Requirement 10.2)
+      // chrome.tabs.removeが呼ばれる
       await waitFor(() => {
         expect(mockTabsRemove).toHaveBeenCalledWith(123);
       });
@@ -187,7 +178,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     });
   });
 
-  describe('Requirement 10.3: ホバー解除時に閉じるボタンを非表示にする', () => {
+  describe('ホバー解除時に閉じるボタンを非表示にする', () => {
     it('タブノードからマウスを離すと、閉じるボタンが非表示になる', () => {
       const node = createMockNode('node-1', 1);
       const getTabInfo = mockGetTabInfo([node]);
@@ -212,7 +203,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       // マウスを離す
       fireEvent.mouseLeave(treeNode);
 
-      // 閉じるボタンが非表示になる (Requirement 10.3)
+      // 閉じるボタンが非表示になる
       expect(closeButtonWrapper).toHaveClass('invisible');
     });
 
@@ -284,9 +275,9 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
     });
   });
 
-  // Task 2.3: 閉じるボタンの右端固定とホバー時サイズ安定化のテスト
-  describe('Task 2.3: 閉じるボタンの右端固定とホバー時サイズ安定化', () => {
-    describe('Requirement 6.1, 6.2: 閉じるボタンはタブの右端に固定される', () => {
+  // 閉じるボタンの右端固定とホバー時サイズ安定化のテスト
+  describe('閉じるボタンの右端固定とホバー時サイズ安定化', () => {
+    describe('閉じるボタンはタブの右端に固定される', () => {
       it('閉じるボタンのラッパーはflex-shrink-0クラスを持つ', () => {
         const node = createMockNode('node-1', 1);
         const getTabInfo = mockGetTabInfo([node]);
@@ -326,7 +317,7 @@ describe('Task 2.2: タブにホバー時の閉じるボタンを実装する', 
       });
     });
 
-    describe('Requirement 7.1, 7.2: ホバー時にタブサイズが変わらない', () => {
+    describe('ホバー時にタブサイズが変わらない', () => {
       it('閉じるボタンラッパーは常にDOMに存在し、visible/invisibleで制御される', () => {
         const node = createMockNode('node-1', 1);
         const getTabInfo = mockGetTabInfo([node]);

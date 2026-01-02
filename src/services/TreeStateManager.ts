@@ -5,7 +5,6 @@ import { STORAGE_KEYS } from '@/storage/StorageService';
  * TreeStateManager
  *
  * タブツリー状態の集中管理と永続化を担当するサービス
- * Requirements: 2.1, 2.2, 2.3
  */
 export class TreeStateManager {
   private nodes: Map<string, TabNode> = new Map();
@@ -78,7 +77,7 @@ export class TreeStateManager {
     this.expandedNodes.add(nodeId);
 
     // ビューに追加
-    // Task 11.1: ルートレベルでも特定のノードの直後に挿入（複製タブ用）
+    // ルートレベルでも特定のノードの直後に挿入（複製タブ用）
     const viewNodes = this.views.get(viewId) || [];
     if (!parentId && insertAfterNodeId) {
       // ルートレベルで挿入位置を指定された場合
@@ -97,7 +96,7 @@ export class TreeStateManager {
     if (parentId) {
       const parentNode = this.nodes.get(parentId);
       if (parentNode) {
-        // Task 11.1: 特定のノードの直後に挿入（複製タブ用）
+        // 特定のノードの直後に挿入（複製タブ用）
         if (insertAfterNodeId) {
           const insertAfterIndex = parentNode.children.findIndex(
             (child) => child.id === insertAfterNodeId
@@ -246,8 +245,8 @@ export class TreeStateManager {
   }
 
   /**
-   * Task 9.1 (comprehensive-bugfix): ノードを展開する
-   * Requirement 10.1, 10.2: 新規タブ作成時に親タブを自動展開
+   * ノードを展開する
+   * 新規タブ作成時に親タブを自動展開
    *
    * @param nodeId - ノードID
    */
@@ -266,7 +265,7 @@ export class TreeStateManager {
   }
 
   /**
-   * 存在しないタブをクリーンアップ (Requirement 2.1, 2.2, 2.3)
+   * 存在しないタブをクリーンアップ
    *
    * ブラウザ起動時に、ツリー状態に保存されているが実際には存在しないタブを
    * 自動的に削除します。
@@ -396,8 +395,8 @@ export class TreeStateManager {
   }
 
   /**
-   * サブツリー全体のノード数を取得 (Task 5.1: サブツリーサイズ計算)
-   * Requirement 2.1: サブツリー全体のノード数を正確に計算
+   * サブツリー全体のノード数を取得 (サブツリーサイズ計算)
+   * サブツリー全体のノード数を正確に計算
    *
    * @param tabId - ルートタブのID
    * @returns サブツリー全体のノード数（ルートを含む）、タブが存在しない場合は0
@@ -424,8 +423,8 @@ export class TreeStateManager {
   }
 
   /**
-   * 指定されたタブとそのすべての子孫タブを取得 (Task 7.3: サブツリー全体の移動)
-   * Requirement 4.3: 親タブとそのサブツリー全体を移動
+   * 指定されたタブとそのすべての子孫タブを取得 (サブツリー全体の移動)
+   * 親タブとそのサブツリー全体を移動
    *
    * @param tabId - ルートタブのID
    * @returns サブツリー全体のノード配列（ルートを含む）
@@ -442,8 +441,8 @@ export class TreeStateManager {
   }
 
   /**
-   * サブツリー全体を別のビューに移動 (Task 7.3: サブツリー全体の移動)
-   * Requirement 4.4: クロスウィンドウ移動時にタブのツリー構造を維持
+   * サブツリー全体を別のビューに移動 (サブツリー全体の移動)
+   * クロスウィンドウ移動時にタブのツリー構造を維持
    *
    * @param tabId - ルートタブのID
    * @param newViewId - 移動先のビューID
@@ -492,8 +491,8 @@ export class TreeStateManager {
 
   /**
    * ストレージに状態を永続化
-   * Task 10.1 (tab-tree-comprehensive-fix): 既存のviews, currentViewIdを保持
-   * Requirements: 10.1, 10.2, 10.3 - 新規タブ追加後もビューを維持
+   * 既存のviews, currentViewIdを保持
+   * 新規タブ追加後もビューを維持
    */
   private async persistState(): Promise<void> {
     const nodesRecord: Record<string, TabNode> = {};
@@ -510,7 +509,7 @@ export class TreeStateManager {
       tabToNodeRecord[tabId] = nodeId;
     });
 
-    // Task 10.1: 既存のストレージからviews, currentViewIdを取得して保持
+    // 既存のストレージからviews, currentViewIdを取得して保持
     // これにより、新規タブ追加時にビューがリセットされることを防ぐ
     let existingViews: TreeState['views'] = [];
     let existingCurrentViewId = 'default';
@@ -629,7 +628,7 @@ export class TreeStateManager {
   }
 
   /**
-   * 子タブを親のレベルに昇格させる (Requirement 2.3: promote)
+   * 子タブを親のレベルに昇格させる (promote)
    *
    * 親タブが削除された時、その子タブを親のレベルに昇格させます:
    * - 親がルートノードの場合: 子タブもルートノードになる
@@ -675,7 +674,7 @@ export class TreeStateManager {
   }
 
   /**
-   * 子タブを再帰的に削除 (Requirement 2.3: close_all)
+   * 子タブを再帰的に削除 (close_all)
    *
    * 親タブが削除された時、その子タブとすべての子孫タブを再帰的に削除します。
    * 深さ優先探索で子孫から順に削除していきます。
@@ -715,9 +714,7 @@ export class TreeStateManager {
   }
 
   /**
-   * Task 15.2: 実タブを使用してグループを作成
-   * Requirement 5.1, 5.2, 5.3, 5.6, 5.7: 実際のタブIDを使用したグループ作成
-   * Task 13.3: グループタブの階層決定 (Requirement 3.9, 3.10)
+   * 実タブを使用してグループを作成
    *
    * chrome.tabs.create()で作成された実際のタブIDを使用してグループノードを作成し、
    * 選択されたタブをその子要素として移動します。
@@ -746,7 +743,7 @@ export class TreeStateManager {
     // グループノードIDを生成（実タブIDを使用）
     const groupNodeId = `group-${groupTabId}`;
 
-    // Task 13.3: グループタブの階層決定 (Requirement 3.9, 3.10)
+    // グループタブの階層決定
     // すべてのタブが同じ親を持つかチェック
     const parentIds = new Set<string | null>();
     for (const tabId of tabIds) {
@@ -806,7 +803,7 @@ export class TreeStateManager {
 
       // グループの子として追加
       node.parentId = groupNodeId;
-      node.depth = groupDepth + 1; // Task 13.3: グループの深さ + 1
+      node.depth = groupDepth + 1; // グループの深さ + 1
       node.groupId = groupNodeId;
       groupNode.children.push(node);
 
@@ -817,7 +814,7 @@ export class TreeStateManager {
     // ストレージに永続化
     await this.persistState();
 
-    // グループ情報をgroupsストレージにも保存（Task 15.2）
+    // グループ情報をgroupsストレージにも保存
     try {
       const result = await chrome.storage.local.get('groups');
       const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
@@ -836,8 +833,7 @@ export class TreeStateManager {
   }
 
   /**
-   * Task 6.2: 複数タブからグループを作成（仮想タブID版 - 後方互換性のため残す）
-   * Requirement 12.1, 12.2, 12.3: 複数タブをグループ化
+   * 複数タブからグループを作成（仮想タブID版 - 後方互換性のため残す）
    *
    * 新しいグループ親ノードを作成し、選択されたタブをその子要素として移動します。
    * 注意: この関数は仮想タブIDを使用するため、新しいコードではcreateGroupWithRealTabを使用してください。
@@ -910,14 +906,14 @@ export class TreeStateManager {
     // ストレージに永続化
     await this.persistState();
 
-    // Task 12.3 (tab-tree-bugfix): グループ情報をgroupsストレージにも保存
+    // グループ情報をgroupsストレージにも保存
     // これにより、TreeStateProviderのgroupsステートと同期される
     try {
       const result = await chrome.storage.local.get('groups');
       const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
       existingGroups[groupNodeId] = {
         id: groupNodeId,
-        name: '新しいグループ',  // Requirement 3.4: デフォルト名
+        name: '新しいグループ',  // デフォルト名
         color: '#f59e0b',  // オレンジ色のデフォルト
         isExpanded: true,
       };
@@ -930,8 +926,8 @@ export class TreeStateManager {
   }
 
   /**
-   * Task 6.2: グループを解除
-   * Requirement 12: グループを解除し、子タブをルートレベルに移動
+   * グループを解除
+   * グループを解除し、子タブをルートレベルに移動
    *
    * グループノードを削除し、その子タブをルートレベルに昇格させます。
    *
@@ -986,8 +982,7 @@ export class TreeStateManager {
   }
 
   /**
-   * Task 15.1: グループ情報を取得
-   * Requirements: 5.4, 5.5, 5.8
+   * グループ情報を取得
    *
    * グループタブのタブIDからグループ情報（名前と子タブリスト）を取得します。
    *
@@ -1008,8 +1003,7 @@ export class TreeStateManager {
       throw new Error('Not a group tab');
     }
 
-    // グループ名をストレージから取得
-    // Requirement 3.4: デフォルト名「新しいグループ」
+    // グループ名をストレージから取得（デフォルト名：「新しいグループ」）
     let groupName = '新しいグループ';
     try {
       const result = await chrome.storage.local.get('groups');

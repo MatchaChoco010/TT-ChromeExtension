@@ -1,8 +1,5 @@
 /**
  * PopupMenuコンポーネントのテスト
- * Task 9.2: ポップアップメニューを新規作成
- * Task 9.3: スナップショット取得ボタンを追加
- * Requirements: 20.2, 20.3, 20.4, 21.1, 21.2, 21.3
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

@@ -1,9 +1,6 @@
 /**
  * ピン留めタブセクションのE2Eテスト
  *
- * Task 12.3: ピン留めタブセクションのE2Eテストを追加する
- *
- * Requirements: 12.1, 12.2, 12.3, 12.4
  * - ピン留めタブが上部セクションに横並びで表示されることをテストする
  * - ピン留めタブクリックでタブがアクティブ化することをテストする
  * - ピン留めタブと通常タブの間に区切り線が表示されることをテストする
@@ -12,7 +9,7 @@ import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
 
 test.describe('ピン留めタブセクション', () => {
-  test.describe('基本的な表示 (Requirements 12.1, 12.2)', () => {
+  test.describe('基本的な表示', () => {
     test('ピン留めタブが上部セクションに横並びで表示される', async ({
       extensionContext,
       serviceWorker,
@@ -176,7 +173,7 @@ test.describe('ピン留めタブセクション', () => {
     });
   });
 
-  test.describe('クリック操作 (Requirement 12.2)', () => {
+  test.describe('クリック操作', () => {
     test('ピン留めタブをクリックするとタブがアクティブ化する', async ({
       extensionContext,
       serviceWorker,
@@ -236,7 +233,7 @@ test.describe('ピン留めタブセクション', () => {
     });
   });
 
-  test.describe('区切り線の表示 (Requirements 12.3, 12.4)', () => {
+  test.describe('区切り線の表示', () => {
     test('ピン留めタブと通常タブの間に区切り線が表示される', async ({
       extensionContext,
       serviceWorker,
@@ -294,7 +291,7 @@ test.describe('ピン留めタブセクション', () => {
     });
   });
 
-  test.describe('ピン留めタブとツリービューの統合 (Requirement 10.1)', () => {
+  test.describe('ピン留めタブとツリービューの統合', () => {
     test('ピン留めタブはピン留めセクションにのみ表示され、ツリービューには表示されない', async ({
       extensionContext,
       serviceWorker,
@@ -321,7 +318,7 @@ test.describe('ピン留めタブセクション', () => {
       const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
       await expect(pinnedTab).toBeVisible();
 
-      // 通常のツリービューには表示されないことを確認（要件1.2）
+      // 通常のツリービューには表示されないことを確認
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await expect(treeNode).not.toBeVisible();
 
@@ -330,7 +327,7 @@ test.describe('ピン留めタブセクション', () => {
     });
   });
 
-  test.describe('コンテキストメニュー - ピン留め解除 (Requirements 1.6, 1.7)', () => {
+  test.describe('コンテキストメニュー - ピン留め解除', () => {
     test('ピン留めタブを右クリックするとコンテキストメニューが表示される', async ({
       extensionContext,
       serviceWorker,

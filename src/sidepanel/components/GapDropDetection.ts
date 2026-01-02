@@ -1,6 +1,5 @@
 /**
- * Task 4.3: タブとタブ間の隙間ドロップ判定ユーティリティ
- * Requirements: 7.1 (タブハイライト), 7.2 (隙間インジケーター), 7.3 (当たり判定)
+ * タブとタブ間の隙間ドロップ判定ユーティリティ
  *
  * ドラッグ中のマウスY座標からドロップ先がタブ上か隙間上かを判定し、
  * 適切なビジュアルフィードバックを表示するための情報を提供する
@@ -61,7 +60,7 @@ export interface DropTarget {
 }
 
 /**
- * Task 7.1: コンテナ境界情報
+ * コンテナ境界情報
  * プレースホルダー表示をコンテナ境界内に制限するために使用
  */
 export interface ContainerBounds {
@@ -72,7 +71,7 @@ export interface ContainerBounds {
 }
 
 /**
- * Task 5.2: ドロップターゲット計算オプション
+ * ドロップターゲット計算オプション
  * サブツリーサイズを考慮したドロップ位置計算のためのオプション
  */
 export interface DropTargetOptions {
@@ -101,7 +100,7 @@ const DEFAULT_GAP_THRESHOLD_RATIO = 0.25;
  * @param mouseY - マウスのY座標（コンテナ相対）
  * @param tabPositions - タブノードの位置情報配列（上から順）
  * @param gapThresholdRatioOrOptions - 隙間判定領域の比率（デフォルト: 0.25）またはオプションオブジェクト
- * @param containerBounds - Task 7.1: コンテナ境界情報（オプション）。指定された場合、境界外ではNoneを返す（後方互換性のため残す）
+ * @param containerBounds - コンテナ境界情報（オプション）。指定された場合、境界外ではNoneを返す
  * @returns ドロップターゲット情報
  */
 export function calculateDropTarget(
@@ -110,7 +109,7 @@ export function calculateDropTarget(
   gapThresholdRatioOrOptions: number | DropTargetOptions = DEFAULT_GAP_THRESHOLD_RATIO,
   containerBounds?: ContainerBounds
 ): DropTarget {
-  // Task 5.2: オプションオブジェクトまたは個別パラメータを処理
+  // オプションオブジェクトまたは個別パラメータを処理
   let gapThresholdRatio: number;
   let bounds: ContainerBounds | undefined;
   let draggedNodeId: string | undefined;
@@ -126,7 +125,7 @@ export function calculateDropTarget(
     bounds = containerBounds;
   }
 
-  // Task 5.2: ドラッグ中のノードとそのサブツリーを除外したタブ位置リストを作成
+  // ドラッグ中のノードとそのサブツリーを除外したタブ位置リストを作成
   let effectiveTabPositions = tabPositions;
   let draggedSubtreeNodeIds: Set<string> | undefined;
 
@@ -141,7 +140,7 @@ export function calculateDropTarget(
     return { type: DropTargetType.None };
   }
 
-  // Task 7.1: コンテナ境界チェック
+  // コンテナ境界チェック
   // 境界が指定されている場合、マウスがコンテナ外にある場合はNoneを返す
   if (bounds) {
     if (mouseY < bounds.minY || mouseY > bounds.maxY) {
@@ -257,7 +256,7 @@ export function calculateIndicatorY(
 }
 
 /**
- * Task 10.1: 水平方向のタブ位置情報（ピン留めタブ用）
+ * 水平方向のタブ位置情報（ピン留めタブ用）
  */
 export interface HorizontalTabPosition {
   /** ノードID */
@@ -271,7 +270,7 @@ export interface HorizontalTabPosition {
 }
 
 /**
- * Task 10.1: 水平方向のドロップターゲットを計算する（ピン留めタブ用）
+ * 水平方向のドロップターゲットを計算する（ピン留めタブ用）
  *
  * @param mouseX - マウスのX座標（コンテナ相対）
  * @param tabPositions - タブノードの水平位置情報配列（左から順）
@@ -332,7 +331,7 @@ export function calculateHorizontalDropTarget(
 }
 
 /**
- * Task 10.1: 水平方向のドロップインジケーターのX座標を計算する
+ * 水平方向のドロップインジケーターのX座標を計算する
  *
  * @param insertIndex - 挿入インデックス
  * @param tabPositions - タブノードの水平位置情報配列

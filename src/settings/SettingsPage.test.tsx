@@ -1,7 +1,5 @@
 /**
  * 設定ページのテスト
- * Task 8.1: 設定画面用の新規エントリポイントを作成する
- * Requirements: 5.1, 5.2, 5.3
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
@@ -97,11 +95,7 @@ describe('SettingsPage', () => {
     });
   });
 
-  /**
-   * Task 9.1: スナップショット自動保存設定セクション
-   * Requirements: 6.1, 6.2, 6.3, 6.5
-   */
-  describe('Requirements 6.1, 6.2, 6.3, 6.5: スナップショット自動保存設定', () => {
+  describe('スナップショット自動保存設定', () => {
     it('スナップショット自動保存設定セクションが表示される', async () => {
       render(<SettingsPage />);
 

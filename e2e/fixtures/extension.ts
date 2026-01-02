@@ -370,11 +370,11 @@ export const test = base.extend<ExtensionFixtures>({
    * sidePanelPage フィクスチャ
    * Side Panelページを開いて提供します
    *
-   * Task 1.1 (tab-tree-bugfix): windowIdパラメータを含めてサイドパネルを開く
+   * windowIdパラメータを含めてサイドパネルを開く
    * これにより、サイドパネルは現在のウィンドウのタブのみを表示する
    */
   sidePanelPage: async ({ extensionContext, extensionId, serviceWorker }, use) => {
-    // Task 1.1: 現在のウィンドウIDを取得してURLパラメータとして渡す
+    // 現在のウィンドウIDを取得してURLパラメータとして渡す
     const currentWindow = await serviceWorker.evaluate(() => {
       return chrome.windows.getCurrent();
     });

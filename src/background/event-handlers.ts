@@ -17,7 +17,7 @@ unreadTracker.loadFromStorage().catch((_error) => {
   // Failed to load unread tracker silently
 });
 
-// Initialize title persistence from storage (Requirement 5.2)
+// Initialize title persistence from storage
 titlePersistence.loadFromStorage().catch((_error) => {
   // Failed to load title persistence silently
 });
@@ -33,7 +33,7 @@ let dragState: { tabId: number; treeData: TabNode[]; sourceWindowId: number } | 
 const DEFAULT_VIEW_ID = 'default';
 
 /**
- * Requirement 15.1: 現在アクティブなビューIDを取得する
+ * 現在アクティブなビューIDを取得する
  * ストレージからtree_stateを読み込み、currentViewIdを返す
  * 存在しない場合はデフォルトビューIDを返す
  */
@@ -54,14 +54,13 @@ async function getCurrentViewId(): Promise<string> {
 // This is needed because Chrome doesn't reliably include openerTabId in the onCreated event
 const pendingTabParents = new Map<number, number>();
 
-// Task 4.2 (tab-tree-bugfix-2): Track source tabs for pending duplications
+// Track source tabs for pending duplications
 // Set<sourceTabId>
 // When a tab is duplicated, we want the new tab to be placed as a sibling, not a child
 const pendingDuplicateSources = new Set<number>();
 
 /**
- * Task 3.1 (tab-tree-bugfix-2): システムページ判定
- * Requirements: 17.6, 17.7
+ * システムページ判定
  *
  * システムページ（chrome://, vivaldi://, chrome-extension://, about:）を検出する。
  * これらのページはopenerTabIdがあっても手動タブとして扱われる。
@@ -120,7 +119,7 @@ export function registerMessageListener(): void {
 
 /**
  * Register Chrome alarms listener (for DragSessionManager keep-alive)
- * Task 13.1: chrome.alarmsによるService Worker keep-alive
+ * chrome.alarmsによるService Worker keep-alive
  */
 export function registerAlarmListener(): void {
   chrome.alarms.onAlarm.addListener((alarm) => {
@@ -143,26 +142,25 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     const pendingOpenerTabId = pendingTabParents.get(tab.id);
     const effectiveOpenerTabId = pendingOpenerTabId || tab.openerTabId;
 
-    // Task 12.2 (Requirements 9.2, 9.3, 9.4): タブ開き方別の位置ルール適用
-    // Task 3.1 (tab-tree-bugfix-2): システムページ判定を追加 (Requirements 17.6, 17.7)
+    // タブ開き方別の位置ルールを適用
     // タブがどのように開かれたかを判定し、適切な位置ルールを選択
     let newTabPosition: 'child' | 'sibling' | 'end';
 
-    // Requirement 17.6: openerTabIdがあってもシステムページの場合は手動タブとして扱う
+    // openerTabIdがあってもシステムページの場合は手動タブとして扱う
     // effectiveOpenerTabIdを使用してpendingTabParentsも考慮する
     const tabUrl = tab.url || '';
     const isLinkClick = effectiveOpenerTabId && !isSystemPage(tabUrl);
 
     if (isLinkClick) {
-      // Requirement 9.2: リンククリックから開かれたタブ（システムページ以外）
+      // リンククリックから開かれたタブ（システムページ以外）
       // newTabPositionFromLink が設定されていればそれを使用、なければ既存のnewTabPositionを使用(後方互換性)
       newTabPosition =
         settings?.newTabPositionFromLink !== undefined
           ? settings.newTabPositionFromLink
           : settings?.newTabPosition || 'child';
     } else {
-      // Requirement 9.3: 手動で開かれたタブ(アドレスバー、新規タブボタン、システムページなど)
-      // Requirement 17.3: デフォルト設定は「手動：リストの最後」
+      // 手動で開かれたタブ(アドレスバー、新規タブボタン、システムページなど)
+      // デフォルト設定は「手動：リストの最後」
       // newTabPositionManual が設定されていればそれを使用、なければデフォルト'end'を使用
       newTabPosition =
         settings?.newTabPositionManual !== undefined
@@ -173,7 +171,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     // Determine parent node
     let parentId: string | null = null;
 
-    // Task 4.2 (tab-tree-bugfix-2): Check if this tab was duplicated
+    // Check if this tab was duplicated
     // If the opener tab is registered as a duplicate source, place this tab as sibling
     let isDuplicatedTab = false;
     if (effectiveOpenerTabId && pendingDuplicateSources.has(effectiveOpenerTabId)) {
@@ -182,14 +180,13 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       pendingDuplicateSources.delete(effectiveOpenerTabId);
     }
 
-    // Task 3.1: システムページの場合は、effectiveOpenerTabIdがあっても親タブとしては扱わない
+    // システムページの場合は、effectiveOpenerTabIdがあっても親タブとしては扱わない
     // isLinkClick を使用して親タブを決定する（システムページはリンククリックとして扱わない）
-    // Task 4.2, 11.1: 複製されたタブの場合は、元のタブの親を引き継いで兄弟として配置
-    // Task 11.1: 複製元タブの直後（1個下）に配置
+    // 複製されたタブの場合は、元のタブの親を引き継いで兄弟として配置
+    // 複製元タブの直後（1個下）に配置
     let insertAfterNodeId: string | undefined;
     if (isDuplicatedTab && effectiveOpenerTabId) {
-      // Requirement 16.1, 16.2, 16.3: 複製タブは元のタブの兄弟として配置
-      // Requirement 11.1, 11.2: 複製タブを複製元タブの1個下の位置に表示
+      // 複製タブは元のタブの兄弟として配置し、複製元タブの1個下の位置に表示
       // 元のタブの親IDを取得して、同じ親の下に配置
       const openerNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (openerNode) {
@@ -203,8 +200,8 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
         parentId = parentNode.id;
       }
     } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'sibling') {
-      // Task 12 (tree-stability-v2): 「兄弟として配置」設定
-      // Requirement 12.2: リンクから開いたタブをopenerタブの兄弟として配置
+      // 「兄弟として配置」設定
+      // リンクから開いたタブをopenerタブの兄弟として配置
       // openerタブの親と同じ親を持つことで兄弟関係になる
       const openerNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (openerNode) {
@@ -218,11 +215,10 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       pendingTabParents.delete(tab.id);
     }
 
-    // Requirement 15.1: 現在アクティブなビューIDを取得し、新しいタブをそのビューに追加
+    // 現在アクティブなビューIDを取得し、新しいタブをそのビューに追加
     const currentViewId = await getCurrentViewId();
 
-    // Task 12 (tree-stability-v2): 「リストの最後」設定の場合、タブをブラウザタブバーの末尾に移動
-    // Requirement 12.1: リンクから開いたタブを設定に従ってリストの最後に配置
+    // 「リストの最後」設定の場合、タブをブラウザタブバーの末尾に移動
     // UIではブラウザタブのインデックス順で表示されるため、タブを物理的に移動する必要がある
     if (newTabPosition === 'end' && tab.windowId !== undefined) {
       try {
@@ -233,16 +229,15 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     }
 
     // Add tab to tree
-    // Task 11.1: 複製タブの場合はinsertAfterNodeIdを渡して複製元の直後に配置
+    // 複製タブの場合はinsertAfterNodeIdを渡して複製元の直後に配置
     await treeStateManager.addTab(tab, parentId, currentViewId, insertAfterNodeId);
 
-    // Task 9.1 (comprehensive-bugfix): 親タブの自動展開
-    // Requirement 10.1, 10.2: 新規タブ作成時に親タブが折りたたまれている場合は展開する
+    // 親タブの自動展開（新規タブ作成時に親タブが折りたたまれている場合は展開する）
     if (parentId) {
       await treeStateManager.expandNode(parentId);
     }
 
-    // Task 4.13: Requirement 3.13.1 - バックグラウンドで作成されたタブを未読としてマーク
+    // バックグラウンドで作成されたタブを未読としてマーク
     // タブがアクティブでない場合（バックグラウンドで読み込まれた場合）、未読としてマーク
     if (!tab.active && tab.id) {
       await unreadTracker.markAsUnread(tab.id);
@@ -258,8 +253,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 }
 
 /**
- * Task 8.1 (comprehensive-bugfix): 空ウィンドウ自動クローズ
- * Requirements: 5.1, 5.2, 5.3
+ * 空ウィンドウ自動クローズ
  *
  * ウィンドウ内のタブ数を確認し、タブが残っていなければ自動的に閉じる
  * 最後のウィンドウは閉じない（ブラウザ終了防止）
@@ -285,7 +279,7 @@ export async function handleTabRemoved(
   const { windowId, isWindowClosing } = removeInfo;
 
   try {
-    // Task 13.1: ドラッグセッションのクリーンアップ
+    // ドラッグセッションのクリーンアップ
     // ドラッグ中のタブが削除された場合はセッションを終了
     dragSessionManager.handleTabRemoved(tabId);
 
@@ -296,16 +290,15 @@ export async function handleTabRemoved(
     // Remove tab from tree state
     await treeStateManager.removeTab(tabId, childTabBehavior);
 
-    // Task 4.13: タブが削除された場合、未読状態もクリーンアップ
+    // タブが削除された場合、未読状態もクリーンアップ
     if (unreadTracker.isUnread(tabId)) {
       await unreadTracker.markAsRead(tabId);
     }
 
-    // Requirement 5.4: タブが閉じられた際に該当タブのタイトルデータを削除
+    // タブが閉じられた際に該当タブのタイトルデータを削除
     titlePersistence.removeTitle(tabId);
 
-    // Task 4.4 (tab-tree-bugfix-2): タブが閉じられた際にファビコンの永続化データを削除
-    // Requirements: 14.1, 14.2
+    // タブが閉じられた際にファビコンの永続化データを削除
     try {
       const storedFaviconsResult = await storageService.get(STORAGE_KEYS.TAB_FAVICONS);
       if (storedFaviconsResult) {
@@ -322,9 +315,7 @@ export async function handleTabRemoved(
       // Ignore errors when no listeners are available
     });
 
-    // Task 8.1 (comprehensive-bugfix): 空ウィンドウ自動クローズ
-    // Requirements: 5.1, 5.2, 5.3
-    // ウィンドウ自体が閉じられている場合は処理スキップ
+    // 空ウィンドウ自動クローズ（ウィンドウ自体が閉じられている場合は処理スキップ）
     if (!isWindowClosing) {
       // ドラッグセッション中は自動クローズを抑止
       const dragSession = await dragSessionManager.getSession(0);
@@ -332,7 +323,7 @@ export async function handleTabRemoved(
         // ドラッグ中でなければ空ウィンドウを閉じる
         await tryCloseEmptyWindow(windowId);
       }
-      // Note: ドラッグ中の場合はTask 8.2でドラッグ完了時にクローズ処理を行う
+      // Note: ドラッグ中の場合はドラッグ完了時にクローズ処理を行う
     }
   } catch (_error) {
     // Error in handleTabRemoved silently
@@ -363,13 +354,12 @@ export async function handleTabUpdated(
   tab: chrome.tabs.Tab,
 ): Promise<void> {
   try {
-    // Requirement 5.1, 5.3: タイトルが変更された場合、永続化する
+    // タイトルが変更された場合、永続化する
     if (changeInfo.title !== undefined && tab.title) {
       titlePersistence.saveTitle(tabId, tab.title);
     }
 
-    // Task 4.4 (tab-tree-bugfix-2): ファビコンが変更された場合、永続化する
-    // Requirements: 14.1, 14.2
+    // ファビコンが変更された場合、永続化する
     if (changeInfo.favIconUrl !== undefined && changeInfo.favIconUrl !== null && changeInfo.favIconUrl !== '') {
       try {
         const storedFaviconsResult = await storageService.get(STORAGE_KEYS.TAB_FAVICONS);
@@ -399,8 +389,7 @@ export async function handleTabUpdated(
 }
 
 async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promise<void> {
-
-  // Task 4.13: Requirement 3.13.2 - 未読タブをアクティブにした場合、未読バッジを消す
+  // 未読タブをアクティブにした場合、未読バッジを消す
   try {
     // タブが未読だった場合、既読としてマーク
     if (unreadTracker.isUnread(activeInfo.tabId)) {
@@ -436,7 +425,7 @@ async function handleWindowCreated(window: chrome.windows.Window): Promise<void>
 
 function handleWindowRemoved(windowId: number): void {
   try {
-    // Task 13.1: ドラッグセッションのクリーンアップ
+    // ドラッグセッションのクリーンアップ
     // ウィンドウクローズ時にセッションを終了
     dragSessionManager.handleWindowRemoved(windowId);
 
@@ -491,7 +480,7 @@ function handleMessage(
         break;
 
       case 'CREATE_WINDOW_WITH_SUBTREE':
-        // Task 14.1: sourceWindowIdを渡す（空ウィンドウ自動クローズ用）
+        // sourceWindowIdを渡す（空ウィンドウ自動クローズ用）
         handleCreateWindowWithSubtree(message.payload.tabId, message.payload.sourceWindowId, sendResponse);
         break;
 
@@ -519,7 +508,7 @@ function handleMessage(
         handleSyncTabs(sendResponse);
         break;
 
-      // Task 6.2: グループ化機能
+      // グループ化機能
       case 'CREATE_GROUP':
         handleCreateGroup(message.payload.tabIds, sendResponse);
         break;
@@ -528,12 +517,12 @@ function handleMessage(
         handleDissolveGroup(message.payload.tabIds, sendResponse);
         break;
 
-      // Task 4.2 (tab-tree-bugfix-2): タブ複製時の兄弟配置
+      // タブ複製時の兄弟配置
       case 'REGISTER_DUPLICATE_SOURCE':
         handleRegisterDuplicateSource(message.payload.sourceTabId, sendResponse);
         break;
 
-      // Task 13.1 (tab-tree-bugfix-2): クロスウィンドウドラッグセッション管理
+      // クロスウィンドウドラッグセッション管理
       case 'START_DRAG_SESSION':
         handleStartDragSession(message.payload, sendResponse);
         break;
@@ -550,12 +539,12 @@ function handleMessage(
         handleBeginCrossWindowMove(message.payload.targetWindowId, sendResponse);
         break;
 
-      // Task 15.1 (tab-tree-bugfix-2): グループ情報取得
+      // グループ情報取得
       case 'GET_GROUP_INFO':
         handleGetGroupInfo(message.payload.tabId, sendResponse);
         break;
 
-      // Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー検知
+      // ツリービュー上のホバー検知
       case 'NOTIFY_TREE_VIEW_HOVER':
         handleNotifyTreeViewHover(message.payload.windowId, sendResponse);
         break;
@@ -658,7 +647,7 @@ function handleCloseTab(
 }
 
 /**
- * Requirement 3.11: サブツリーを閉じる
+ * サブツリーを閉じる
  * 対象タブとその全ての子孫タブを閉じる
  */
 async function handleCloseSubtree(
@@ -728,10 +717,9 @@ function handleCreateWindowWithTab(
 }
 
 /**
- * Task 7.3: サブツリー全体で新しいウィンドウを作成
- * Requirement 4.2, 4.3: パネル外へのドロップで新しいウィンドウを作成し、サブツリー全体を移動
- * Task 14.1: ドラッグアウト後の空ウィンドウ自動クローズ
- * Requirements: 7.1, 7.2
+ * サブツリー全体で新しいウィンドウを作成
+ * パネル外へのドロップで新しいウィンドウを作成し、サブツリー全体を移動
+ * ドラッグアウト後の空ウィンドウ自動クローズ
  */
 async function handleCreateWindowWithSubtree(
   tabId: number,
@@ -784,8 +772,7 @@ async function handleCreateWindowWithSubtree(
         }
       }
 
-      // Task 14.1: 空ウィンドウの自動クローズ
-      // Requirements: 7.1, 7.2
+      // 空ウィンドウの自動クローズ
       // sourceWindowIdが指定されている場合、元のウィンドウにタブが残っていなければ閉じる
       if (sourceWindowId !== undefined) {
         try {
@@ -810,8 +797,8 @@ async function handleCreateWindowWithSubtree(
 }
 
 /**
- * Task 7.3: サブツリー全体を別のウィンドウに移動
- * Requirement 4.1, 4.3, 4.4: タブを別ウィンドウに移動し、ツリー構造を維持
+ * サブツリー全体を別のウィンドウに移動
+ * タブを別ウィンドウに移動し、ツリー構造を維持
  */
 async function handleMoveSubtreeToWindow(
   tabId: number,
@@ -910,13 +897,13 @@ async function handleSyncTabs(
 }
 
 /**
- * Task 15.2: グループ作成（実タブ作成版）
- * Requirement 5.1, 5.2, 5.3, 5.6, 5.7: 複数タブが選択されている状態でグループ化を実行
+ * グループ作成（実タブ作成版）
+ * 複数タブが選択されている状態でグループ化を実行
  * - chrome.tabs.create()でグループタブを実際に作成
  * - 選択されたすべてのタブを新しいグループの子要素として移動
  * - グループ化後に親子関係を正しくツリーに反映
  *
- * レースコンディション対策（design.md 解決策1）:
+ * レースコンディション対策:
  * 1. グループタブをバックグラウンドで作成（active: false）
  * 2. ツリー状態を更新（グループ情報を登録）
  * 3. ツリー状態更新完了を待ってからアクティブ化
@@ -969,7 +956,7 @@ async function handleCreateGroup(
 
     // 2. ツリー状態を更新（グループ情報を登録）
     // 注意: loadState()はService Worker起動時に呼ばれているため、ここでは不要
-    // Requirement 3.4: デフォルト名「新しいグループ」を設定
+    // デフォルト名「新しいグループ」を設定
     const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, '新しいグループ');
 
     // 3. ツリー状態更新完了を待ってからアクティブ化
@@ -990,8 +977,8 @@ async function handleCreateGroup(
 }
 
 /**
- * Task 6.2: グループ解除
- * Requirement 12: グループを解除し、子タブをルートレベルに移動
+ * グループ解除
+ * グループを解除し、子タブをルートレベルに移動
  */
 async function handleDissolveGroup(
   tabIds: number[],
@@ -1024,8 +1011,8 @@ async function handleDissolveGroup(
 }
 
 /**
- * Task 4.2 (tab-tree-bugfix-2): 複製元タブの登録
- * Requirement 16.1, 16.2, 16.3: 複製されたタブを元のタブの兄弟として配置するために、
+ * 複製元タブの登録
+ * 複製されたタブを元のタブの兄弟として配置するために、
  * 複製される前に複製元のタブIDを登録する
  */
 function handleRegisterDuplicateSource(
@@ -1046,8 +1033,7 @@ function handleRegisterDuplicateSource(
 }
 
 /**
- * Task 15.1 (tab-tree-bugfix-2): グループ情報取得
- * Requirements: 5.4, 5.5, 5.8
+ * グループ情報取得
  */
 async function handleGetGroupInfo(
   tabId: number,
@@ -1068,8 +1054,7 @@ async function handleGetGroupInfo(
 }
 
 /**
- * Task 13.1 (tab-tree-bugfix-2): ドラッグセッション開始
- * Requirements: 6.1, 6.2, 6.3
+ * ドラッグセッション開始
  */
 async function handleStartDragSession(
   payload: { tabId: number; windowId: number; treeData: TabNode[] },
@@ -1088,8 +1073,7 @@ async function handleStartDragSession(
 }
 
 /**
- * Task 13.1 (tab-tree-bugfix-2): ドラッグセッション取得
- * Requirements: 6.1, 6.2, 6.7
+ * ドラッグセッション取得
  */
 async function handleGetDragSession(
   sendResponse: (response: MessageResponse<unknown>) => void,
@@ -1106,17 +1090,15 @@ async function handleGetDragSession(
 }
 
 /**
- * Task 13.1 (tab-tree-bugfix-2): ドラッグセッション終了
- * Task 8.2 (comprehensive-bugfix): ドラッグ完了時の空ウィンドウ自動クローズ
- * Requirements: 5.4, 5.5, 6.1, 6.7
+ * ドラッグセッション終了
+ * ドラッグ完了時の空ウィンドウ自動クローズ
  */
 async function handleEndDragSession(
   reason: string | undefined,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    // Task 8.2: ドラッグ完了時の空ウィンドウ自動クローズ
-    // Requirements: 5.4, 5.5
+    // ドラッグ完了時の空ウィンドウ自動クローズ
     // セッション終了前にソースウィンドウIDを取得
     const session = await dragSessionManager.getSession(0);
     const sourceWindowId = session?.sourceWindowId;
@@ -1138,8 +1120,7 @@ async function handleEndDragSession(
 }
 
 /**
- * Task 13.1 (tab-tree-bugfix-2): クロスウィンドウ移動開始
- * Requirements: 6.1, 6.2, 6.3, 6.6
+ * クロスウィンドウ移動開始
  */
 async function handleBeginCrossWindowMove(
   targetWindowId: number,
@@ -1157,8 +1138,7 @@ async function handleBeginCrossWindowMove(
 }
 
 /**
- * Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー通知
- * Requirements: 4.4, 4.5
+ * ツリービュー上のホバー通知
  * 別ウィンドウのツリービュー領域上にマウスがある場合に呼び出す
  * バックグラウンドスロットリング回避のため、対象ウィンドウにフォーカスを移動する
  */
@@ -1178,8 +1158,7 @@ async function handleNotifyTreeViewHover(
 }
 
 /**
- * Task 7.2 (comprehensive-bugfix): ドラッグアウト通知
- * Requirements: 4.4, 4.5
+ * ドラッグアウト通知
  * ドラッグ中のタブがツリービュー領域を離れた際に呼び出す
  */
 function handleNotifyDragOut(

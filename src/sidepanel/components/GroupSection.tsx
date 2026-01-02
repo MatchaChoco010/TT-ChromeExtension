@@ -15,8 +15,7 @@ interface GroupSectionProps {
  * グループセクション
  * グループの一覧表示と作成フォームを提供
  *
- * Task 4.9: グループ機能
- * Requirements: 3.9
+ * グループ機能
  */
 const GroupSection: React.FC<GroupSectionProps> = ({
   groups,

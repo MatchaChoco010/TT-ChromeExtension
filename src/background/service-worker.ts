@@ -14,12 +14,12 @@ import { SnapshotManager } from '@/services';
 import { storageService, indexedDBService, STORAGE_KEYS } from '@/storage';
 import type { UserSettings } from '@/types';
 
-// Task 9.2: SnapshotManagerインスタンスを作成
+// SnapshotManagerインスタンスを作成
 const snapshotManager = new SnapshotManager(indexedDBService, storageService);
 
 /**
- * Task 1.1: 古いタブデータをクリーンアップ
- * Requirement 2.1, 2.2, 2.3: ブラウザ起動時に存在しないタブをツリーから削除
+ * 古いタブデータをクリーンアップ
+ * ブラウザ起動時に存在しないタブをツリーから削除
  */
 async function cleanupStaleTabData(): Promise<void> {
   try {
@@ -32,7 +32,7 @@ async function cleanupStaleTabData(): Promise<void> {
     // 存在しないタブをクリーンアップ
     await testTreeStateManager.cleanupStaleNodes(existingTabIds);
 
-    // Requirement 5.4: 存在しないタブのタイトルデータもクリーンアップ
+    // 存在しないタブのタイトルデータもクリーンアップ
     testTitlePersistence.cleanup(existingTabIds);
   } catch (_error) {
     // Failed to cleanup stale tab data silently
@@ -40,8 +40,8 @@ async function cleanupStaleTabData(): Promise<void> {
 }
 
 /**
- * Task 9.2: 自動スナップショット機能を初期化
- * Requirement 6.4: 設定に基づいてアラームを設定する
+ * 自動スナップショット機能を初期化
+ * 設定に基づいてアラームを設定する
  */
 async function initializeAutoSnapshot(): Promise<void> {
   try {
@@ -60,8 +60,8 @@ async function initializeAutoSnapshot(): Promise<void> {
 }
 
 /**
- * Task 9.2: 設定変更を監視し、自動スナップショット設定を再適用
- * Requirement 6.4: 設定変更時にアラームを再設定する
+ * 設定変更を監視し、自動スナップショット設定を再適用
+ * 設定変更時にアラームを再設定する
  */
 function registerSettingsChangeListener(): void {
   storageService.onChange((changes) => {
@@ -81,21 +81,19 @@ chrome.runtime.onInstalled.addListener(async () => {
   // Load state from storage
   await testTreeStateManager.loadState();
 
-  // Task 5.2 (Requirements 5.1, 5.2): 未読状態をクリア
-  // ブラウザ起動時に復元されたタブには未読インジケーターを付けない
+  // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
   await testUnreadTracker.clear();
 
-  // Task 1.1: 古いタブデータをクリーンアップ（ストレージロード後、同期前）
+  // 古いタブデータをクリーンアップ（ストレージロード後、同期前）
   await cleanupStaleTabData();
 
   // Sync with existing Chrome tabs
   await testTreeStateManager.syncWithChromeTabs();
 
-  // Task 9.2: 自動スナップショットを初期化
+  // 自動スナップショットを初期化
   await initializeAutoSnapshot();
 
-  // Task 1.3 (Requirements 13.1, 13.2, 13.3): 起動完了をマーク
-  // ブラウザ起動時の既存タブには未読バッジを表示しない
+  // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
   // 以降に作成されるタブにのみ未読バッジを表示する
   testUnreadTracker.setInitialLoadComplete();
 });
@@ -106,21 +104,19 @@ chrome.runtime.onInstalled.addListener(async () => {
     // Load existing state
     await testTreeStateManager.loadState();
 
-    // Task 5.2 (Requirements 5.1, 5.2): 未読状態をクリア
-    // ブラウザ起動時に復元されたタブには未読インジケーターを付けない
+    // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
     await testUnreadTracker.clear();
 
-    // Task 1.1: 古いタブデータをクリーンアップ（ストレージロード後、同期前）
+    // 古いタブデータをクリーンアップ（ストレージロード後、同期前）
     await cleanupStaleTabData();
 
     // Sync with current Chrome tabs
     await testTreeStateManager.syncWithChromeTabs();
 
-    // Task 9.2: 自動スナップショットを初期化
+    // 自動スナップショットを初期化
     await initializeAutoSnapshot();
 
-    // Task 1.3 (Requirements 13.1, 13.2, 13.3): 起動完了をマーク
-    // ブラウザ起動時の既存タブには未読バッジを表示しない
+    // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
     // 以降に作成されるタブにのみ未読バッジを表示する
     testUnreadTracker.setInitialLoadComplete();
   } catch (_error) {
@@ -133,14 +129,13 @@ registerTabEventListeners();
 registerWindowEventListeners();
 registerMessageListener();
 
-// Task 13.1 (tab-tree-bugfix-2): アラームリスナーを登録（DragSessionManager keep-alive用）
+// アラームリスナーを登録（DragSessionManager keep-alive用）
 registerAlarmListener();
 
-// Task 9.2: 設定変更監視を登録
+// 設定変更監視を登録
 registerSettingsChangeListener();
 
-// Task 8.2: 拡張機能アイコンクリック時に設定画面を開く
-// Requirement 5.4: ブラウザのツールバーにある拡張機能アイコンをクリックした場合、設定画面を開くオプションを含むメニューを表示する
+// 拡張機能アイコンクリック時に設定画面を開く
 chrome.action.onClicked.addListener(async () => {
   try {
     const settingsUrl = chrome.runtime.getURL('settings.html');
@@ -151,8 +146,8 @@ chrome.action.onClicked.addListener(async () => {
 });
 
 /**
- * Task 9.3: ポップアップからスナップショット取得
- * Requirement 21.1, 21.2, 21.3: ポップアップメニューからスナップショットを取得
+ * ポップアップからスナップショット取得
+ * ポップアップメニューからスナップショットを取得
  */
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'CREATE_SNAPSHOT') {

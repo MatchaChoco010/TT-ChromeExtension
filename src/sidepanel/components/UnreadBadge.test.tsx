@@ -27,7 +27,7 @@ describe('UnreadBadge', () => {
     });
   });
 
-  describe('バッジのスタイル（Requirement 8.1, 8.2）', () => {
+  describe('バッジのスタイル', () => {
     it('左下角の三角形切り欠きとして表示される', () => {
       render(<UnreadBadge isUnread={true} showIndicator={true} />);
 
@@ -72,7 +72,7 @@ describe('UnreadBadge', () => {
     });
   });
 
-  describe('depth対応（Requirement 9.1, 9.2, 9.3）', () => {
+  describe('depth対応', () => {
     it('depth=0の場合、左端に表示される（インデントなし）', () => {
       render(<UnreadBadge isUnread={true} showIndicator={true} depth={0} />);
 

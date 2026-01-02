@@ -1,6 +1,6 @@
 /**
- * Task 6.2: useAutoScrollフックの単体テスト
- * Requirement 3.1, 3.2: ドラッグ中の自動スクロールとスクロール制限
+ * useAutoScrollフックの単体テスト
+ * ドラッグ中の自動スクロールとスクロール制限
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -394,7 +394,7 @@ describe('useAutoScroll', () => {
     });
   });
 
-  describe('Requirement 3対応: スクロール可能量を超えるスクロールを防止', () => {
+  describe('スクロール可能量を超えるスクロールを防止', () => {
     it('タブツリー全体の高さを超えてスクロールできない', () => {
       // scrollHeight = 500, clientHeight = 400
       // maxScroll = 500 - 400 = 100

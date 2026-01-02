@@ -9,8 +9,6 @@ interface SettingsPanelProps {
 /**
  * 設定パネルコンポーネント
  * ユーザー設定のカスタマイズUIを提供します。
- *
- * Requirements: 10.1, 10.2, 10.3 (UI/UXカスタマイズ), 8.5 (警告閾値のカスタマイズ)
  */
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   settings,
@@ -21,7 +19,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   ) => {
     const value = parseInt(e.target.value, 10);
 
-    // 1以上の値のみ受け付ける (Requirement 8.5)
+    // 1以上の値のみ受け付ける
     if (value >= 1) {
       onSettingsChange({
         ...settings,
@@ -30,11 +28,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
-  // Task 3.1 (tab-tree-bugfix-2): 「デフォルトの新しいタブの位置」設定を削除
-  // Requirement 17.4: 設定画面から「デフォルトの新しいタブの位置」設定を削除
+  // 「デフォルトの新しいタブの位置」設定を削除
+  // 設定画面から「デフォルトの新しいタブの位置」設定を削除
   // 代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定
 
-  // Task 12.2: タブ開き方別の位置ルール (Requirements 9.2, 9.3, 9.4)
+  // タブ開き方別の位置ルール
   const handleNewTabPositionFromLinkChange = (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
@@ -55,7 +53,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // Task 13.1: フォントサイズ調整 (Requirements 10.1, 10.2)
+  // フォントサイズ調整
   const handleFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
     if (value >= 8 && value <= 72) {
@@ -73,7 +71,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // Task 13.1: フォントファミリー選択 (Requirement 10.3)
+  // フォントファミリー選択
   const handleFontFamilyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onSettingsChange({
       ...settings,
@@ -81,7 +79,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // Task 13.1: カスタムCSS (Requirements 10.4, 10.5)
+  // カスタムCSS
   const handleCustomCSSChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onSettingsChange({
       ...settings,
@@ -89,7 +87,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // Task 9.1: スナップショット自動保存設定 (Requirements 6.1, 6.2, 6.3, 6.5)
+  // スナップショット自動保存設定
   const isAutoSnapshotEnabled = settings.autoSnapshotInterval > 0;
 
   const handleAutoSnapshotToggle = () => {
@@ -136,11 +134,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     <div className="settings-panel p-4 bg-gray-900 text-gray-100">
       <h1 className="text-xl font-bold mb-6 text-gray-100">設定</h1>
 
-      {/* 外観のカスタマイズセクション (Requirements 10.1-10.6) */}
+      {/* 外観のカスタマイズセクション */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-4 text-gray-100">外観のカスタマイズ</h2>
 
-        {/* フォントサイズ設定 (Requirements 10.1, 10.2) */}
+        {/* フォントサイズ設定 */}
         <div className="mb-4">
           <label
             htmlFor="fontSize"
@@ -182,7 +180,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* フォントファミリー設定 (Requirement 10.3) */}
+        {/* フォントファミリー設定 */}
         <div className="mb-4">
           <label
             htmlFor="fontFamily"
@@ -203,7 +201,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* カスタムCSS設定 (Requirements 10.4, 10.5, 10.6) */}
+        {/* カスタムCSS設定 */}
         <div className="mb-4">
           <label
             htmlFor="customCSS"
@@ -229,11 +227,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-4 text-gray-100">タブの動作</h2>
 
-        {/* Task 3.1 (tab-tree-bugfix-2): 「デフォルトの新しいタブの位置」設定を削除
-            Requirement 17.4: 設定画面から「デフォルトの新しいタブの位置」設定を削除
+        {/* 「デフォルトの新しいタブの位置」設定を削除
+            設定画面から「デフォルトの新しいタブの位置」設定を削除
             代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定 */}
 
-        {/* Task 12.2: タブ開き方別の位置ルール (Requirements 9.2, 9.3, 9.4) */}
+        {/* タブ開き方別の位置ルール */}
         <div className="mb-4">
           <label
             htmlFor="newTabPositionFromLink"
@@ -278,7 +276,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* 警告閾値設定 (Requirement 8.5) */}
+        {/* 警告閾値設定 */}
         <div className="mb-4">
           <label
             htmlFor="closeWarningThreshold"
@@ -303,11 +301,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </section>
 
-      {/* Task 9.1: スナップショットの自動保存セクション (Requirements 6.1, 6.2, 6.3, 6.5) */}
+      {/* スナップショットの自動保存セクション */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-4 text-gray-100">スナップショットの自動保存</h2>
 
-        {/* 自動保存有効/無効トグル (Requirement 6.2) */}
+        {/* 自動保存有効/無効トグル */}
         <div className="mb-4">
           <div className="flex items-center justify-between">
             <label
@@ -337,7 +335,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* 自動保存間隔設定 (Requirement 6.3) */}
+        {/* 自動保存間隔設定 */}
         <div className="mb-4">
           <label
             htmlFor="autoSnapshotInterval"
@@ -359,7 +357,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* 最大スナップショット数設定 (Requirement 6.5) */}
+        {/* 最大スナップショット数設定 */}
         <div className="mb-4">
           <label
             htmlFor="maxSnapshots"

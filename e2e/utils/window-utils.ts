@@ -2,8 +2,6 @@
  * WindowTestUtils
  *
  * マルチウィンドウ操作とクロスウィンドウドラッグ&ドロップ検証のヘルパー関数
- *
- * Requirements: 3.6, 4.2
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 export type { Page } from '@playwright/test';

@@ -1,7 +1,6 @@
 /**
  * ViewSwitcher コンポーネントのテスト
- * Task 8.2: ViewSwitcher UI コンポーネントの実装
- * Requirements: 6.3
+ * ViewSwitcher UI コンポーネントの実装
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -39,7 +38,7 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // Task 7.1: ファビコンサイズのアイコンボタンになったため、ビュー名はtitle属性/aria-labelで確認
+      // ファビコンサイズのアイコンボタンになったため、ビュー名はtitle属性/aria-labelで確認
       // すべてのビューのボタンが表示されることを確認
       expect(screen.getByRole('button', { name: 'Switch to Work view' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Switch to Personal view' })).toBeInTheDocument();
@@ -263,7 +262,6 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // Task 7.1: ファビコンサイズのアイコンボタンになったため、ビュー名はtitle属性で確認
       // すべてのビューのボタンが表示されることを確認
       manyViews.forEach((view) => {
         const button = screen.getByRole('button', { name: `Switch to ${view.name} view` });
@@ -273,7 +271,7 @@ describe('ViewSwitcher', () => {
     });
   });
 
-  describe('Requirement 6.3: ビュー切り替えUIを操作する', () => {
+  describe('ビュー切り替えUIを操作する', () => {
     it('ユーザーがビュー切り替えUIを操作すると、選択されたビューに対応するタブツリーが表示される', () => {
       render(
         <ViewSwitcher
@@ -335,8 +333,8 @@ describe('ViewSwitcher', () => {
     });
   });
 
-  describe('Task 7.1: ファビコンサイズアイコンボタンへの改修', () => {
-    describe('Requirement 3.1: ファビコンサイズのボタンでビュー切り替え', () => {
+  describe('ファビコンサイズアイコンボタンへの改修', () => {
+    describe('ファビコンサイズのボタンでビュー切り替え', () => {
       it('各ビューがファビコンサイズのアイコンボタンとして表示される', () => {
         render(
           <ViewSwitcher
@@ -409,7 +407,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Requirement 3.2: ビューごとにファビコンサイズのアイコンを設定可能', () => {
+    describe('ビューごとにファビコンサイズのアイコンを設定可能', () => {
       it('アイコン付きビューとアイコンなしビューが混在する場合、それぞれ適切に表示される', () => {
         const mixedViews: View[] = [
           { id: 'view-1', name: 'With Icon', color: '#ef4444', icon: 'https://example.com/icon1.png' },
@@ -441,7 +439,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Requirement 3.5: 鉛筆ボタンによる編集UIを削除', () => {
+    describe('鉛筆ボタンによる編集UIを削除', () => {
       it('鉛筆ボタン(編集ボタン)が表示されない', () => {
         render(
           <ViewSwitcher
@@ -515,8 +513,8 @@ describe('ViewSwitcher', () => {
     });
   });
 
-  describe('Task 7.3: ビューボタンの右クリックコンテキストメニュー', () => {
-    describe('Requirement 3.3: 右クリックでコンテキストメニュー表示', () => {
+  describe('ビューボタンの右クリックコンテキストメニュー', () => {
+    describe('右クリックでコンテキストメニュー表示', () => {
       it('ビューボタンを右クリックするとコンテキストメニューが表示される', () => {
         render(
           <ViewSwitcher
@@ -573,7 +571,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Requirement 3.4: ビューの編集モーダルを開く', () => {
+    describe('ビューの編集モーダルを開く', () => {
       it('「ビューの編集」をクリックするとモーダルが表示される', () => {
         render(
           <ViewSwitcher
@@ -725,8 +723,8 @@ describe('ViewSwitcher', () => {
     });
   });
 
-  describe('Task 3.3: ビューのタブ数表示機能', () => {
-    describe('Requirement 17.1: 各ビューのファビコン上にタブ数を小さく表示', () => {
+  describe('ビューのタブ数表示機能', () => {
+    describe('各ビューのファビコン上にタブ数を小さく表示', () => {
       it('タブ数バッジが各ビューに表示される', () => {
         const tabCounts = {
           'view-1': 5,
@@ -778,7 +776,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Requirement 17.2: ファビコンのサイズを維持したままタブ数を表示', () => {
+    describe('ファビコンのサイズを維持したままタブ数を表示', () => {
       it('ビューボタンのサイズは変わらない (w-8, h-8)', () => {
         const tabCounts = {
           'view-1': 100,
@@ -830,7 +828,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Requirement 17.3: ビュー内のタブ数が変化した場合、表示を即座に更新', () => {
+    describe('ビュー内のタブ数が変化した場合、表示を即座に更新', () => {
       it('タブ数プロップが変更されると表示が更新される', () => {
         const initialTabCounts = {
           'view-1': 5,
@@ -897,7 +895,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Task 4.1: タブ数バッジの視認性向上 (Requirements 17.1, 17.2)', () => {
+    describe('タブ数バッジの視認性向上', () => {
       it('タブ数バッジはmin-w-[20px]で数字が見切れない', () => {
         const tabCounts = {
           'view-1': 99,
@@ -947,8 +945,8 @@ describe('ViewSwitcher', () => {
     });
   });
 
-  describe('Task 3.2: ビューのスクロール切り替え機能', () => {
-    describe('Requirement 16.1: マウスホイール上スクロールで前のビューに切り替え', () => {
+  describe('ビューのスクロール切り替え機能', () => {
+    describe('マウスホイール上スクロールで前のビューに切り替え', () => {
       it('ビューリスト上でマウスホイールを上にスクロールすると前のビューに切り替わる', () => {
         render(
           <ViewSwitcher
@@ -972,7 +970,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Requirement 16.2: マウスホイール下スクロールで次のビューに切り替え', () => {
+    describe('マウスホイール下スクロールで次のビューに切り替え', () => {
       it('ビューリスト上でマウスホイールを下にスクロールすると次のビューに切り替わる', () => {
         render(
           <ViewSwitcher
@@ -996,7 +994,7 @@ describe('ViewSwitcher', () => {
       });
     });
 
-    describe('Requirement 16.3: 最初/最後のビューでループせずに停止', () => {
+    describe('最初/最後のビューでループせずに停止', () => {
       it('最初のビューで上スクロールしても切り替わらない', () => {
         render(
           <ViewSwitcher

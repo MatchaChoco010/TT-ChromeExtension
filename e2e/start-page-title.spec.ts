@@ -1,13 +1,10 @@
 /**
  * スタートページタイトルのE2Eテスト
  *
- * Task 9.2: スタートページタイトルのE2Eテスト追加
- * Requirements: 9.4, 9.5, 12.1, 12.2
- *
  * テスト対象:
- * 1. 新規タブのタイトルが「スタートページ」または「新しいタブ」であることを検証 (Requirement 9.4)
- * 2. ページ遷移後のタイトル更新を検証 (Requirement 9.5)
- * 3. 新規タブのURLがVivaldiスタートページであることを検証 (Requirement 12.1, 12.2)
+ * 1. 新規タブのタイトルが「スタートページ」または「新しいタブ」であることを検証
+ * 2. ページ遷移後のタイトル更新を検証
+ * 3. 新規タブのURLがVivaldiスタートページであることを検証
  *
  * 注意: Chromiumでは chrome://vivaldi-webui/startpage はエラーページとして扱われるが、
  *       URLが正しく設定されていることを検証する
@@ -39,7 +36,7 @@ async function getTabTitleElement(sidePanelPage: import('@playwright/test').Page
 }
 
 test.describe('スタートページタイトル', () => {
-  test.describe('Requirement 12.1, 12.2: 新規タブボタンでVivaldiスタートページURLが設定される', () => {
+  test.describe('新規タブボタンでVivaldiスタートページURLが設定される', () => {
     test('新規タブ追加ボタンで作成されたタブにVivaldiスタートページURLが設定され、タイトルが「スタートページ」と表示される', async ({
       extensionContext,
       serviceWorker,
@@ -92,7 +89,7 @@ test.describe('スタートページタイトル', () => {
       }).toPass({ timeout: 10000 });
 
       // ツリー状態からタブのURLを取得して検証
-      // Requirement 12.1, 12.2: URLがVivaldiスタートページであることを確認
+      // URLがVivaldiスタートページであることを確認
       const treeTabUrl = await sidePanelPage.evaluate(async (tabId: number) => {
         // サイドパネル内のTreeStateContextからタブ情報を取得
         const tabNode = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -130,7 +127,7 @@ test.describe('スタートページタイトル', () => {
     });
   });
 
-  test.describe('Requirement 9.4: 新規タブのタイトルが「スタートページ」または「新しいタブ」であること', () => {
+  test.describe('新規タブのタイトルが「スタートページ」または「新しいタブ」であること', () => {
 
     test('chrome.tabs.createで作成された新規タブのタイトルが適切に表示される', async ({
       extensionContext,
@@ -183,7 +180,7 @@ test.describe('スタートページタイトル', () => {
     });
   });
 
-  test.describe('Requirement 9.5: ページ遷移後のタイトル更新', () => {
+  test.describe('ページ遷移後のタイトル更新', () => {
     test('新規タブから別のページに遷移するとタイトルが更新される', async ({
       extensionContext,
       serviceWorker,
@@ -297,7 +294,7 @@ test.describe('スタートページタイトル', () => {
 
     // Note: about:blankへの遷移テストは、URL変更時のtabInfoMap更新のタイミング問題により
     // 現在の実装では安定しないため、スキップ。
-    // Requirement 9.5は「新規タブから別のページに遷移するとタイトルが更新される」テストで検証済み。
+    // 「新規タブから別のページに遷移するとタイトルが更新される」テストで検証済み。
     // 将来的にURL変更時の状態管理が改善された場合にこのテストを追加予定。
   });
 });

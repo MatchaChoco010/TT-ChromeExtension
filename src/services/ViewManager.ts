@@ -6,8 +6,6 @@ import type { TreeStateManager } from './TreeStateManager';
  * ViewManager
  *
  * 複数ビュー（仮想ワークスペース）の管理を担当するサービス
- * Task 8.1: ViewManager サービスの実装
- * Requirements: 6.1, 6.2, 6.5
  *
  * 重要: タブは物理的に閉じず、各タブに viewId メタデータを付与して管理
  * UIレイヤーでは currentViewId に一致するタブのみを表示（フィルタリング）
@@ -41,7 +39,6 @@ export class ViewManager {
 
   /**
    * 新しいビューを作成
-   * Requirement 6.2: 新しいビューを作成する
    *
    * @param name - ビュー名
    * @param color - ビューの色（例: #ff0000）
@@ -91,7 +88,6 @@ export class ViewManager {
 
   /**
    * ビューを切り替え
-   * Requirement 6.3: ビュー切り替えUIを操作する
    *
    * @param viewId - 切り替え先のビューID
    */
@@ -109,7 +105,7 @@ export class ViewManager {
 
   /**
    * ビューの情報を更新
-   * Requirement 6.4: 各ビューに名前と色を割り当てる機能を提供する
+   * 各ビューに名前と色を割り当てる機能を提供する
    *
    * @param viewId - 更新するビューのID
    * @param updates - 更新内容
@@ -173,7 +169,7 @@ export class ViewManager {
 
   /**
    * 指定ビューのタブを取得
-   * Requirement 6.5: タブを別のビューに移動する
+   * タブを別のビューに移動する
    *
    * 注意: この実装は TreeStateManager と連携が必要です。
    * 現在は ViewManager 単体では TabNode を管理していないため、
@@ -194,8 +190,8 @@ export class ViewManager {
 
   /**
    * タブを別のビューに移動
-   * Task 8.4: ビュー間のタブ移動
-   * Requirement 6.5: ユーザーがタブを別のビューに移動する
+   * ビュー間のタブ移動
+   * ユーザーがタブを別のビューに移動する
    *
    * @param tabId - 移動するタブのID
    * @param sourceViewId - 移動元のビューID

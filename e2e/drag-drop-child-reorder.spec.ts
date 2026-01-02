@@ -1,7 +1,7 @@
 /**
  * 子タブの並び替え・ドロップ位置E2Eテスト
  *
- * Task 14.1 (tree-stability-v2): 子を親にドロップした場合の挙動テスト
+ * 子を親にドロップした場合の挙動テスト
  *
  * このテストスイートでは、子タブのドラッグ&ドロップ操作を検証します。
  * - 子タブを親の直上にドロップ → 最後の子として配置
@@ -86,7 +86,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
   // タイムアウトを120秒に設定
   test.setTimeout(120000);
 
-  test.describe('Task 14.1: 子を親の直上にドロップ → 最後の子として配置', () => {
+  test.describe('子を親の直上にドロップ → 最後の子として配置', () => {
     test('子タブを親タブの直上にドロップすると、最後の子として配置されること', async ({
       extensionContext,
       sidePanelPage,
@@ -196,7 +196,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
     });
   });
 
-  test.describe('Task 14.1: 子を隙間にドロップ → 兄弟として配置', () => {
+  test.describe('子を隙間にドロップ → 兄弟として配置', () => {
     test('子タブを親の上の隙間にドロップすると、親の兄弟として配置されること', async ({
       extensionContext,
       sidePanelPage,
@@ -411,7 +411,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // Task 14.1: ユーザー報告のシナリオを再現
+      // ユーザー報告のシナリオを再現
       // Tab A (root) - parent
       //   Tab B (child of A)
       //     Tab C (child of B)

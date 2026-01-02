@@ -54,7 +54,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
     loadSettings();
 
-    // Task 13.2: ストレージ変更イベントをリスン
+    // ストレージ変更イベントをリスン
     // 設定が変更されたときにリアルタイムで反映されるようにする
     const handleStorageChange = (changes: {
       [key: string]: chrome.storage.StorageChange;
@@ -83,7 +83,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     const style = document.createElement('style');
     style.id = 'vivaldi-tt-theme';
 
-    // Requirement 14.4: Vivaldiのテーマ設定と調和するデフォルトスタイル
+    // Vivaldiのテーマ設定と調和するデフォルトスタイル
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const vivaldiTheme = isDarkMode
       ? `
@@ -129,7 +129,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       }
     `;
 
-    // Requirement 10.6: カスタムCSSのエラー検出
+    // カスタムCSSのエラー検出
     let hasError = false;
     if (settings.customCSS) {
       try {
@@ -173,7 +173,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
     document.head.appendChild(style);
 
-    // Requirement 10.6: CSSエラー通知の表示/削除
+    // CSSエラー通知の表示/削除
     const existingError = document.getElementById('vivaldi-tt-css-error');
     if (hasError) {
       if (!existingError) {

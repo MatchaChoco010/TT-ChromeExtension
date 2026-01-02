@@ -1,8 +1,8 @@
 /**
  * Tab Persistence E2E Tests
  *
- * Task 2.4: タブ永続化のE2Eテスト
- * Requirements 1.1, 1.2, 1.3, 1.4, 1.5: タブ状態の永続化と復元
+ * タブ永続化のE2Eテスト
+ * タブ状態の永続化と復元
  *
  * このテストスイートでは、以下を検証します:
  * 1. タブ数・タイトル・ファビコンが正確に保存・復元されること
@@ -13,8 +13,8 @@ import { test, expect } from './fixtures/extension';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import './types';
 
-test.describe('Task 2.4: Tab Persistence', () => {
-  test.describe('Requirement 1.1: タブ状態の正確な復元', () => {
+test.describe('Tab Persistence', () => {
+  test.describe('タブ状態の正確な復元', () => {
     test('タブのタイトルがストレージに永続化されること', async ({
       extensionContext,
       serviceWorker,
@@ -105,7 +105,7 @@ test.describe('Task 2.4: Tab Persistence', () => {
     });
   });
 
-  test.describe('Requirement 1.2: 余分なLoadingタブ防止', () => {
+  test.describe('余分なLoadingタブ防止', () => {
     test('ツリーに表示されるタブ数が実際のブラウザタブ数と一致すること', async ({
       extensionContext,
       serviceWorker,
@@ -197,7 +197,7 @@ test.describe('Task 2.4: Tab Persistence', () => {
     });
   });
 
-  test.describe('Requirement 1.3: タイトルの永続化更新', () => {
+  test.describe('タイトルの永続化更新', () => {
     test('タブ内でのページ遷移時にタイトルの永続化データが更新されること', async ({
       extensionContext,
       serviceWorker,
@@ -259,7 +259,7 @@ test.describe('Task 2.4: Tab Persistence', () => {
     });
   });
 
-  test.describe('Requirement 1.4: ファビコンの永続化更新', () => {
+  test.describe('ファビコンの永続化更新', () => {
     test('ファビコンが変更された際に永続化データが更新されること（直接設定）', async ({
       extensionContext,
       serviceWorker,
@@ -318,7 +318,7 @@ test.describe('Task 2.4: Tab Persistence', () => {
     });
   });
 
-  test.describe('Requirement 1.5: 不整合データ削除', () => {
+  test.describe('不整合データ削除', () => {
     test('タブを閉じた際にタイトルの永続化データが削除されること', async ({
       extensionContext,
       serviceWorker,

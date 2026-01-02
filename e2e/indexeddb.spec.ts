@@ -2,8 +2,7 @@
  * IndexedDB E2E Tests
  *
  * IndexedDB統合を検証するE2Eテスト
- * Task 5.3: IndexedDB統合の実装とテスト
- * Requirement 4.3: IndexedDB統合
+ * IndexedDB統合の実装とテスト
  *
  * テスト対象:
  * - ツリー状態のIndexedDB保存・読み込み機能

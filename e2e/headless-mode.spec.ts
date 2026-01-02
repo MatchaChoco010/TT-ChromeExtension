@@ -1,8 +1,6 @@
 /**
  * headlessモードのデフォルト設定の検証テスト
  *
- * Requirements: 1.4, 1.5, 6.1, 6.6, 8.5, 8.6
- *
  * このテストは、Playwrightがデフォルトでheadlessモードで実行され、
  * 環境変数HEADED=trueによりheadedモードに切り替えられることを検証します。
  */

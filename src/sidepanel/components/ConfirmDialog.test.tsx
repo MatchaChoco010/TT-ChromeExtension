@@ -139,7 +139,7 @@ describe('ConfirmDialog', () => {
     expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
   });
 
-  // Task 11.2: Requirement 8.3 - 配下のタブ数を表示
+  // 配下のタブ数を表示
   it('should display tab count when tabCount is provided', () => {
     render(
       <ConfirmDialog
@@ -158,7 +158,7 @@ describe('ConfirmDialog', () => {
     expect(screen.getByTestId('tab-count-display')).toHaveTextContent('5');
   });
 
-  // Task 11.2: Requirement 8.3 - タブ数が1の場合
+  // タブ数が1の場合
   it('should display correct singular form when tabCount is 1', () => {
     render(
       <ConfirmDialog
@@ -175,7 +175,7 @@ describe('ConfirmDialog', () => {
     expect(screen.getByTestId('tab-count-display')).toHaveTextContent('1');
   });
 
-  // Task 11.2: Requirement 8.3 - tabCountが提供されない場合は表示しない
+  // tabCountが提供されない場合は表示しない
   it('should not display tab count when tabCount is not provided', () => {
     render(
       <ConfirmDialog

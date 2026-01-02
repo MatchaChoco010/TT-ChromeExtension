@@ -14,11 +14,6 @@ interface NewTabButtonProps {
 /**
  * 新規タブ追加ボタンコンポーネント
  * タブツリーの末尾に表示され、クリックで新しいタブを作成する
- *
- * Requirement 8.1: タブツリービューは全てのタブの最後に新規タブ追加ボタンを表示する
- * Requirement 8.2: 新規タブ追加ボタンはツリービューの横幅いっぱいの幅を持つ
- * Requirement 8.3: クリック時に新しいタブをツリーの末尾に追加する
- * Requirement 8.4: クリック時に新しいタブをブラウザでアクティブにする
  */
 const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
   /**
@@ -30,8 +25,8 @@ const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
     e.stopPropagation();
 
     try {
-      // Requirement 8.4: 新しいタブをアクティブにする
-      // Requirement 12.1, 12.2: Vivaldiスタートページを開く
+      // 新しいタブをアクティブにする
+      // Vivaldiスタートページを開く
       await chrome.tabs.create({
         active: true,
         url: 'chrome://vivaldi-webui/startpage',

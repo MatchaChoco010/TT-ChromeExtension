@@ -3,7 +3,6 @@
  *
  * ファビコンの永続化と復元の検証 E2E テスト
  *
- * Requirements: 14.1, 14.2, 14.3, 14.4
  * - ブラウザが再起動された際にファビコンが永続化データから復元されて表示されること
  * - タブがロードされていない状態でも永続化されていた画像を表示すること
  */
@@ -12,8 +11,8 @@ import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 
-test.describe('Task 4.4: ファビコンの永続化復元', () => {
-  test.describe('Requirement 14.1: ブラウザ再起動後にファビコンが永続化データから復元される', () => {
+test.describe('ファビコンの永続化復元', () => {
+  test.describe('ブラウザ再起動後にファビコンが永続化データから復元される', () => {
     test('ストレージに保存されたファビコンがUIに反映されること', async ({
       extensionContext,
       sidePanelPage,
@@ -84,7 +83,7 @@ test.describe('Task 4.4: ファビコンの永続化復元', () => {
     });
   });
 
-  test.describe('Requirement 14.2: タブがロードされていない状態でも永続化されていた画像を表示', () => {
+  test.describe('タブがロードされていない状態でも永続化されていた画像を表示', () => {
     test('discardされたタブでも永続化ファビコンが表示されること', async ({
       extensionContext,
       sidePanelPage,
@@ -125,7 +124,7 @@ test.describe('Task 4.4: ファビコンの永続化復元', () => {
     });
   });
 
-  test.describe('Requirement 14.3, 14.4: ファビコン永続化と復元のE2Eテスト検証', () => {
+  test.describe('ファビコン永続化と復元のE2Eテスト検証', () => {
     test('複数タブのファビコンが正しく永続化されること', async ({
       extensionContext,
       sidePanelPage,
@@ -282,7 +281,7 @@ test.describe('Task 4.4: ファビコンの永続化復元', () => {
     });
   });
 
-  test.describe('Requirement 9.1, 9.2, 9.3: ファビコン永続化復元と表示', () => {
+  test.describe('ファビコン永続化復元と表示', () => {
     test('永続化されたファビコンがUI上のimgタグに正しく表示されること', async ({
       extensionContext,
       sidePanelPage,
@@ -478,7 +477,7 @@ test.describe('Task 4.4: ファビコンの永続化復元', () => {
     });
   });
 
-  test.describe('Requirement 9.4, 9.5: ファビコン永続化復元UIテスト', () => {
+  test.describe('ファビコン永続化復元UIテスト', () => {
     test('ストレージに保存されたファビコンがサイドパネルリロード後もUIに反映されること', async ({
       extensionContext,
       sidePanelPage,

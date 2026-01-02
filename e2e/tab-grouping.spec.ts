@@ -3,18 +3,13 @@
  *
  * タブグループ化機能の E2E テスト
  *
- * Task 12.3 (tab-tree-bugfix): グループ化機能のE2Eテスト
- * Requirements: 11.1, 11.2, 11.3, 11.4
  * - 複数タブを選択してグループ化した際にグループ親タブが作成されることを検証
  * - グループ親タブが専用のタブとして表示されることを検証
  * - 単一タブをグループに追加できることを検証
- *
- * Task 6.2 (tab-tree-comprehensive-fix): グループ化機能のE2Eテスト追加
- * Requirements: 6.5, 6.6, 6.7, 6.8
- * - 6.5: コンテキストメニューからのグループ化操作を検証
- * - 6.6: 単一タブのグループ化を検証
- * - 6.7: 複数タブ選択時のグループ化を検証
- * - 6.8: グループ化後の親子関係を検証
+ * - コンテキストメニューからのグループ化操作を検証
+ * - 単一タブのグループ化を検証
+ * - 複数タブ選択時のグループ化を検証
+ * - グループ化後の親子関係を検証
  */
 
 import { test, expect } from './fixtures/extension';
@@ -50,9 +45,9 @@ async function waitForTabInUI(
 test.describe('タブグループ化機能', () => {
   test.describe('複数タブのグループ化', () => {
     /**
-     * Requirement 11.1, 6.5, 6.7: 複数タブを選択してコンテキストメニューからグループ化
+     * 複数タブを選択してコンテキストメニューからグループ化
      */
-    test('Requirement 11.1, 6.5, 6.7: 複数タブを選択してグループ化した際にグループ親タブが作成される', async ({
+    test('複数タブを選択してグループ化した際にグループ親タブが作成される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -134,9 +129,9 @@ test.describe('タブグループ化機能', () => {
     });
 
     /**
-     * Requirement 11.2: グループ親タブの表示スタイル検証
+     * グループ親タブの表示スタイル検証
      */
-    test('Requirement 11.2: グループ親タブが専用のタブとして表示される', async ({
+    test('グループ親タブが専用のタブとして表示される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -213,13 +208,12 @@ test.describe('タブグループ化機能', () => {
 
   test.describe('複数タブ選択によるグループ化の追加テスト', () => {
     /**
-     * Requirement 6.1-6.4, 6.5, 6.7, 6.8 (Task 6.1, 6.2):
-     * - 6.5: コンテキストメニューからのグループ化操作を検証
-     * - 6.7: 複数タブのグループ化を検証
-     * - 6.8: グループ化後の親子関係を検証
-     * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+     * - コンテキストメニューからのグループ化操作を検証
+     * - 複数タブのグループ化を検証
+     * - グループ化後の親子関係を検証
+     * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
      */
-    test('Requirement 6.1-6.4, 6.5, 6.7, 6.8: 複数タブを新しいグループにグループ化できる', async ({
+    test('複数タブを新しいグループにグループ化できる', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -320,10 +314,10 @@ test.describe('タブグループ化機能', () => {
     });
 
     /**
-     * Requirement 6.4 (Task 6.1): グループのデフォルト名設定検証
-     * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+     * グループのデフォルト名設定検証
+     * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
      */
-    test('Requirement 3.4: 複数タブのグループ化時にデフォルト名「新しいグループ」が設定される', async ({
+    test('複数タブのグループ化時にデフォルト名「新しいグループ」が設定される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -366,7 +360,7 @@ test.describe('タブグループ化機能', () => {
       await groupMenuItem.click();
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-      // Assert: グループ名が「新しいグループ」であることを確認 (Requirement 3.4)
+      // Assert: グループ名が「新しいグループ」であることを確認
       await waitForCondition(
         async () => {
           const groups = await serviceWorker.evaluate(async () => {
@@ -387,7 +381,7 @@ test.describe('タブグループ化機能', () => {
   });
 
   test.describe('単一タブのグループ追加', () => {
-    test('Requirement 11.3, 11.4: 単一タブをグループに追加できる', async ({
+    test('単一タブをグループに追加できる', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -547,7 +541,7 @@ test.describe('タブグループ化機能', () => {
       await closeTab(extensionContext, tabId3);
     });
 
-    test('Requirement 11.4: 利用可能なグループがない場合はメニュー項目が無効化される', async ({
+    test('利用可能なグループがない場合はメニュー項目が無効化される', async ({
       extensionContext,
       sidePanelPage,
     }) => {
@@ -602,20 +596,19 @@ test.describe('タブグループ化機能', () => {
   });
 
   /**
-   * Task 16.6 (tab-tree-bugfix-2): 実タブグループ化機能のE2Eテスト追加
-   * Requirements: 5.11, 5.12, 5.13, 5.14
-   * - 5.11: グループタブのURLが拡張機能専用ページであることを検証
-   * - 5.12: グループ化後に親タブの存在を検証
-   * - 5.13: グループ化後の親子関係を検証
-   * - 5.14: テストが安定して10回連続成功すること
-   * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+   * 実タブグループ化機能のE2Eテスト
+   * - グループタブのURLが拡張機能専用ページであることを検証
+   * - グループ化後に親タブの存在を検証
+   * - グループ化後の親子関係を検証
+   * - テストが安定して10回連続成功すること
+   * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
    */
-  test.describe('実タブグループ化機能（Task 16.6）', () => {
+  test.describe('実タブグループ化機能', () => {
     /**
-     * Requirement 5.11: グループタブのURLがchrome-extension://であることを検証
-     * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+     * グループタブのURLがchrome-extension://であることを検証
+     * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
      */
-    test('Requirement 5.11: グループ化するとchrome-extension://スキームのグループタブが作成される', async ({
+    test('グループ化するとchrome-extension://スキームのグループタブが作成される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -705,10 +698,10 @@ test.describe('タブグループ化機能', () => {
     });
 
     /**
-     * Requirement 5.12: グループ化後に親タブ（グループタブ）が存在することを検証
-     * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+     * グループ化後に親タブ（グループタブ）が存在することを検証
+     * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
      */
-    test('Requirement 5.12: グループ化後にグループ親タブが実際のブラウザタブとして存在する', async ({
+    test('グループ化後にグループ親タブが実際のブラウザタブとして存在する', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -795,10 +788,10 @@ test.describe('タブグループ化機能', () => {
     });
 
     /**
-     * Requirement 5.13: グループ化後の親子関係を検証
-     * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+     * グループ化後の親子関係を検証
+     * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
      */
-    test('Requirement 5.13: グループ化後にタブがグループタブの子として配置される', async ({
+    test('グループ化後にタブがグループタブの子として配置される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -894,7 +887,7 @@ test.describe('タブグループ化機能', () => {
 
     /**
      * 複数タブのグループ化で実タブが作成されることを検証
-     * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+     * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
      */
     test('複数タブをグループ化すると実タブのグループ親が作成される', async ({
       extensionContext,
@@ -983,8 +976,7 @@ test.describe('タブグループ化機能', () => {
 
     /**
      * グループノードがストレージに正しく保存されることを検証
-     * Note: UI表示のテストはTask 15.4で対応（isGroupNode関数の更新が必要）
-     * Note: 要件3.8により単一タブのグループ化は無効化されるため、複数タブで検証
+     * Note: 単一タブのグループ化は無効化されるため、複数タブで検証
      */
     test('グループ化後にグループノードがストレージに正しく保存される', async ({
       extensionContext,
@@ -1073,17 +1065,16 @@ test.describe('タブグループ化機能', () => {
   });
 
   /**
-   * Task 13.5 (comprehensive-bugfix): タブグループ化機能の追加E2Eテスト
-   * Requirements: 3.11, 3.12, 3.13
-   * - 3.11: グループ化機能はE2Eテストで検証されること
-   * - 3.12: グループタブの生成と正しい位置への挿入、子タブの順序維持、グループタブの展開状態、単一タブ選択時のメニュー無効化を検証すること
-   * - 3.13: `--repeat-each=10`で安定して通過すること
+   * タブグループ化機能の追加E2Eテスト
+   * - グループ化機能はE2Eテストで検証されること
+   * - グループタブの生成と正しい位置への挿入、子タブの順序維持、グループタブの展開状態、単一タブ選択時のメニュー無効化を検証すること
+   * - `--repeat-each=10`で安定して通過すること
    */
-  test.describe('タブグループ化 追加検証（Task 13.5）', () => {
+  test.describe('タブグループ化 追加検証', () => {
     /**
-     * Requirement 3.8, 3.12: 単一タブ選択時に「グループ化」オプションが無効化（グレーアウト）されること
+     * 単一タブ選択時に「グループ化」オプションが無効化（グレーアウト）されること
      */
-    test('Requirement 3.8, 3.12: 単一タブ選択時にグループ化オプションがグレーアウトされる', async ({
+    test('単一タブ選択時にグループ化オプションがグレーアウトされる', async ({
       extensionContext,
       sidePanelPage,
     }) => {
@@ -1130,9 +1121,9 @@ test.describe('タブグループ化機能', () => {
     });
 
     /**
-     * Requirement 3.7, 3.12: グループ化後にグループタブが展開状態であること
+     * グループ化後にグループタブが展開状態であること
      */
-    test('Requirement 3.7, 3.12: グループ化後にグループタブは展開状態である', async ({
+    test('グループ化後にグループタブは展開状態である', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -1221,9 +1212,9 @@ test.describe('タブグループ化機能', () => {
     });
 
     /**
-     * Requirement 3.6, 3.12: グループ化後に子タブの順序が維持されること
+     * グループ化後に子タブの順序が維持されること
      */
-    test('Requirement 3.6, 3.12: グループ化後に子タブの元の順序が維持される', async ({
+    test('グループ化後に子タブの元の順序が維持される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
@@ -1334,11 +1325,11 @@ test.describe('タブグループ化機能', () => {
     });
 
     /**
-     * Requirement 3.2, 3.12: グループタブが生成され、子タブがその子として配置されること
+     * グループタブが生成され、子タブがその子として配置されること
      * Note: 現在の実装ではグループタブはビューの末尾に追加されます。
      * 位置の最適化は将来の改善として対応予定です。
      */
-    test('Requirement 3.2, 3.12: グループタブが生成され子タブが正しく配置される', async ({
+    test('グループタブが生成され子タブが正しく配置される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,

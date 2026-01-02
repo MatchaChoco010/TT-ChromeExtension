@@ -8,7 +8,7 @@ export interface TabNode {
   isExpanded: boolean;
   depth: number;
   viewId: string;
-  // Task 4.9: グループ機能
+  // グループ機能
   groupId?: string;
 }
 
@@ -20,10 +20,10 @@ export interface TabInfo {
   status: 'loading' | 'complete';
 }
 
-// Task 1.1: 拡張タブ情報（ピン状態を含む）
-// Task 6.2: windowIdを追加（複数ウィンドウ対応）
-// Task 4.1 (tab-tree-bugfix): discardedを追加（休止タブの視覚的区別）
-// Task 12.1 (tab-tree-comprehensive-fix): indexを追加（ピン留めタブの順序同期）
+// 拡張タブ情報（ピン状態を含む）
+// windowIdを追加（複数ウィンドウ対応）
+// discardedを追加（休止タブの視覚的区別）
+// indexを追加（ピン留めタブの順序同期）
 export interface ExtendedTabInfo extends TabInfo {
   isPinned: boolean;
   windowId: number;
@@ -31,7 +31,7 @@ export interface ExtendedTabInfo extends TabInfo {
   index: number; // タブのインデックス（ピン留めタブの順序同期に使用）
 }
 
-// Task 1.1: タブ情報マップ
+// タブ情報マップ
 export interface TabInfoMap {
   [tabId: number]: ExtendedTabInfo;
 }
@@ -58,11 +58,11 @@ export interface UserSettings {
   closeWarningThreshold: number;
   showUnreadIndicator: boolean;
   autoSnapshotInterval: number; // minutes, 0 = disabled
-  childTabBehavior: 'promote' | 'close_all'; // Requirement 2.3: 親タブ閉じ時の子タブ処理方法
-  // Task 12.2 (Requirements 9.2, 9.3, 9.4): タブ開き方別の位置ルール
+  childTabBehavior: 'promote' | 'close_all'; // 親タブ閉じ時の子タブ処理方法
+  // タブ開き方別の位置ルール
   newTabPositionFromLink?: 'child' | 'sibling' | 'end'; // リンククリックから開かれたタブ
   newTabPositionManual?: 'child' | 'sibling' | 'end'; // 手動で開かれたタブ(アドレスバー、新規タブボタンなど)
-  // Task 9.1 (Requirement 6.5): スナップショット最大保持数
+  // スナップショット最大保持数
   maxSnapshots?: number; // デフォルト: 10
 }
 
@@ -81,7 +81,7 @@ export interface TreeState {
 /** タブタイトルマップ (tabId -> title) */
 export type TabTitlesMap = Record<number, string>;
 
-/** Task 2.1 (tab-tree-bugfix): ファビコンマップ (tabId -> favIconUrl) */
+/** ファビコンマップ (tabId -> favIconUrl) */
 export type TabFaviconsMap = Record<number, string>;
 
 export interface StorageSchema {
@@ -89,9 +89,9 @@ export interface StorageSchema {
   user_settings: UserSettings;
   unread_tabs: number[];
   groups: Record<string, Group>;
-  /** Requirement 5.1-5.4: タブタイトル永続化 */
+  /** タブタイトル永続化 */
   tab_titles: TabTitlesMap;
-  /** Task 2.1 (tab-tree-bugfix): ファビコン永続化 */
+  /** ファビコン永続化 */
   tab_favicons: TabFaviconsMap;
 }
 
@@ -142,9 +142,9 @@ export interface IUnreadTracker {
   getUnreadCount(): number;
   loadFromStorage(): Promise<void>;
   clear(): Promise<void>;
-  /** Requirement 13.2: 起動完了フラグを設定 */
+  /** 起動完了フラグを設定 */
   setInitialLoadComplete(): void;
-  /** Requirement 13.3: 起動完了かどうかを取得 */
+  /** 起動完了かどうかを取得 */
   isInitialLoadComplete(): boolean;
 }
 
@@ -165,7 +165,7 @@ export type MessageType =
     }
   | {
       type: 'CREATE_WINDOW_WITH_SUBTREE';
-      // Task 14.1: sourceWindowIdを追加（空ウィンドウ自動クローズ用）
+      // sourceWindowIdを追加（空ウィンドウ自動クローズ用）
       payload: { tabId: number; sourceWindowId?: number };
     }
   | {
@@ -183,14 +183,14 @@ export type MessageType =
   | { type: 'CLEAR_DRAG_STATE' }
   | { type: 'SYNC_TABS' }
   | { type: 'STATE_UPDATED' }
-  // Task 6.2: グループ化機能
+  // グループ化機能
   | { type: 'CREATE_GROUP'; payload: { tabIds: number[] } }
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
-  // Task 9.3: ポップアップからスナップショット取得
+  // ポップアップからスナップショット取得
   | { type: 'CREATE_SNAPSHOT' }
-  // Task 4.2 (tab-tree-bugfix-2): タブ複製時の兄弟配置
+  // タブ複製時の兄弟配置
   | { type: 'REGISTER_DUPLICATE_SOURCE'; payload: { sourceTabId: number } }
-  // Task 13.1 (tab-tree-bugfix-2): クロスウィンドウドラッグセッション管理
+  // クロスウィンドウドラッグセッション管理
   | {
       type: 'START_DRAG_SESSION';
       payload: { tabId: number; windowId: number; treeData: TabNode[] };
@@ -201,9 +201,9 @@ export type MessageType =
       type: 'BEGIN_CROSS_WINDOW_MOVE';
       payload: { targetWindowId: number };
     }
-  // Task 15.1 (tab-tree-bugfix-2): グループ情報取得
+  // グループ情報取得
   | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
-  // Task 7.2 (comprehensive-bugfix): ツリービュー上のホバー検知
+  // ツリービュー上のホバー検知
   | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
   | { type: 'NOTIFY_DRAG_OUT' };
 
@@ -212,8 +212,7 @@ export type MessageResponse<T> =
   | { success: false; error: string };
 
 // Drag and Drop types - 自前D&D実装用の型定義
-// Task 17.1 (tab-tree-bugfix-2): dnd-kitを削除し自前の型を使用
-// Requirements: 3.1.1, 3.1.7
+// dnd-kitを削除し自前の型を使用
 
 /**
  * ドラッグ開始イベント
@@ -256,8 +255,7 @@ export interface DragEndResult {
 }
 
 /**
- * Task 5.3: 兄弟ドロップ情報（Gapドロップ専用）
- * Requirements: 8.1, 8.2, 8.3, 8.4
+ * 兄弟ドロップ情報（Gapドロップ専用）
  *
  * タブ間の隙間へのドロップ情報を表現。
  * タブ上へのドロップ（子として配置）はDropTargetType.Tab + onDragEndで別途処理。
@@ -285,39 +283,39 @@ export interface TabTreeViewProps {
   onToggleExpand: (nodeId: string) => void;
   onDragEnd?: (event: DragEndEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
-  // Task 5.2: ドラッグ開始/終了コールバック（外部ドロップ連携用）
+  // ドラッグ開始/終了コールバック（外部ドロップ連携用）
   onDragStart?: (event: DragStartEvent) => void;
   onDragCancel?: () => void;
-  // Task 5.3: 兄弟としてドロップ（Gapドロップ）時のコールバック
+  // 兄弟としてドロップ（Gapドロップ）時のコールバック
   onSiblingDrop?: (info: SiblingDropInfo) => Promise<void>;
-  // Task 4.13: 未読状態管理
+  // 未読状態管理
   isTabUnread?: (tabId: number) => boolean;
   getUnreadChildCount?: (nodeId: string) => number;
-  // Task 8.5.4: アクティブタブID
+  // アクティブタブID
   activeTabId?: number;
-  // Task 2.1: タブ情報取得関数
+  // タブ情報取得関数
   getTabInfo?: (tabId: number) => ExtendedTabInfo | undefined;
-  // Task 2.3: 選択状態管理（複数選択対応）
+  // 選択状態管理（複数選択対応）
   isNodeSelected?: (nodeId: string) => boolean;
   onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
-  // Task 12.2: 選択されたすべてのタブIDを取得する関数
+  // 選択されたすべてのタブIDを取得する関数
   getSelectedTabIds?: () => number[];
-  // Task 6.2: スナップショット取得コールバック
+  // スナップショット取得コールバック
   onSnapshot?: () => Promise<void>;
-  // Task 6.1: グループ機能をツリー内に統合表示
+  // グループ機能をツリー内に統合表示
   groups?: Record<string, Group>;
   onGroupToggle?: (groupId: string) => void;
-  // Task 12.2 (tab-tree-bugfix): タブをグループに追加するコールバック
+  // タブをグループに追加するコールバック
   onAddToGroup?: (groupId: string, tabIds: number[]) => void;
-  // Task 7.2: ビュー移動サブメニュー用 (Requirements 18.1, 18.2, 18.3)
+  // ビュー移動サブメニュー用
   views?: View[];
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
-  // Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)
+  // ツリー外ドロップで新規ウィンドウ作成
   onExternalDrop?: (tabId: number) => void;
-  // Task 10.1: ツリービュー外へのドロップ検知 (Requirements 9.1, 9.4)
+  // ツリービュー外へのドロップ検知
   // ドラッグ中にマウスがツリービュー外に移動したかどうかを通知するコールバック
   onOutsideTreeChange?: (isOutside: boolean) => void;
-  // Task 7.2 (tab-tree-bugfix-2): サイドパネル境界参照 (Requirement 4.2, 4.3)
+  // サイドパネル境界参照
   // ドラッグアウト判定はサイドパネル全体の境界を基準にする
   sidePanelRef?: React.RefObject<HTMLElement | null>;
 }
@@ -346,19 +344,19 @@ export interface ContextMenuProps {
   isGrouped?: boolean;
   hasChildren?: boolean;
   tabUrl?: string;
-  /** Task 7.2: ビュー移動サブメニュー用 - 全ビューリスト */
+  /** ビュー移動サブメニュー用 - 全ビューリスト */
   views?: View[];
-  /** Task 7.2: 現在のビューID（サブメニューで除外する） */
+  /** 現在のビューID（サブメニューで除外する） */
   currentViewId?: string;
-  /** Task 7.2: タブをビューに移動するコールバック */
+  /** タブをビューに移動するコールバック */
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
-  /** Task 12.2 (tab-tree-bugfix): グループ一覧（シングルタブのグループ追加用） */
+  /** グループ一覧（シングルタブのグループ追加用） */
   groups?: Record<string, Group>;
-  /** Task 12.2 (tab-tree-bugfix): タブをグループに追加するコールバック */
+  /** タブをグループに追加するコールバック */
   onAddToGroup?: (groupId: string, tabIds: number[]) => void;
 }
 
-// SubMenu types (Task 7.1: Requirements 18.1, 18.2)
+// SubMenu types
 
 /**
  * サブメニュー項目
@@ -374,7 +372,6 @@ export interface SubMenuItem {
 
 /**
  * SubMenuコンポーネントのProps
- * Task 7.1: 汎用サブメニューコンポーネント
  */
 export interface SubMenuProps {
   /** サブメニューのラベル */

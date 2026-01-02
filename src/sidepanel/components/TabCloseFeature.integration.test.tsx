@@ -5,15 +5,14 @@ import TreeNode from './TreeNode';
 import type { TabNode, TabInfo } from '@/types';
 
 /**
- * タスク 11.4: タブ閉じる機能のテスト
+ * タブ閉じる機能のテスト
  *
  * 統合テスト: TreeNode + CloseButton + ConfirmDialog + UserSettings
  *
- * Requirements:
- * - 8.1: マウスホバー時に閉じるボタンが表示される
- * - 8.3: 折りたたまれたブランチを持つ親タブ閉じ時に確認ダイアログが表示される
+ * - マウスホバー時に閉じるボタンが表示される
+ * - 折りたたまれたブランチを持つ親タブ閉じ時に確認ダイアログが表示される
  */
-describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
+describe('タブ閉じる機能の統合テスト', () => {
   let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
@@ -44,7 +43,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
     status: 'complete',
   });
 
-  describe('Requirement 8.1: マウスホバー時に閉じるボタンが表示される', () => {
+  describe('マウスホバー時に閉じるボタンが表示される', () => {
     it('タブノードにマウスをホバーすると、閉じるボタンが表示される', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, 'ホバーするタブ');
@@ -70,7 +69,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
       // マウスをホバー
       fireEvent.mouseEnter(treeNode);
 
-      // 閉じるボタンが表示される (Acceptance Criteria 8.1)
+      // 閉じるボタンが表示される
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
     });
 
@@ -131,12 +130,12 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // onCloseコールバックが呼ばれる (Acceptance Criteria 8.2)
+      // onCloseコールバックが呼ばれる
       expect(onClose).toHaveBeenCalledWith(1, false);
     });
   });
 
-  describe('Requirement 8.3: 折りたたまれたブランチを持つ親タブ閉じ時に確認ダイアログが表示される', () => {
+  describe('折りたたまれたブランチを持つ親タブ閉じ時に確認ダイアログが表示される', () => {
     it('折りたたまれた子タブを持つ親タブを閉じようとすると、確認ダイアログが表示される', () => {
       // 子タブを持つ親ノード（折りたたまれている）
       const childNode1 = createMockNode('child-1', 2, 1);
@@ -175,7 +174,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // 確認ダイアログが表示される (Acceptance Criteria 8.3)
+      // 確認ダイアログが表示される
       expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
 
       // タブ数が表示される（親タブ1 + 子タブ2 = 3個）
@@ -224,7 +223,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
       const confirmButton = screen.getByTestId('confirm-button');
       await user.click(confirmButton);
 
-      // onCloseコールバックが呼ばれる (Acceptance Criteria 8.4)
+      // onCloseコールバックが呼ばれる
       expect(onClose).toHaveBeenCalledWith(1, true);
 
       // ダイアログが閉じられる
@@ -319,7 +318,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
     });
   });
 
-  describe('Requirement 8.5: 警告閾値のカスタマイズ', () => {
+  describe('警告閾値のカスタマイズ', () => {
     it('サブツリーのタブ数が閾値未満の場合、確認ダイアログは表示されない', () => {
       const childNode = createMockNode('child-1', 2, 1);
       const parentNode = createMockNode(
@@ -398,7 +397,7 @@ describe('Task 11.4: タブ閉じる機能の統合テスト', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // 確認ダイアログが表示される (Acceptance Criteria 8.5)
+      // 確認ダイアログが表示される
       expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
 
       // 正しいタブ数が表示される

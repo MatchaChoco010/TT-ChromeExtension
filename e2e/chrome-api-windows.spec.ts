@@ -1,8 +1,6 @@
 /**
  * chrome.windows API統合テスト
  *
- * Requirement 4.2: chrome.windows API統合
- *
  * このテストスイートでは、以下を検証します:
  * 1. chrome.windows.create()で新しいウィンドウを作成した場合、新しいウィンドウコンテキストが確立されることを検証する
  * 2. chrome.windows.remove()でウィンドウを閉じた場合、ウィンドウ内の全タブがツリーから削除されることを検証する

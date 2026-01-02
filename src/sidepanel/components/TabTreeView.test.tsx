@@ -185,7 +185,7 @@ describe('TabTreeView', () => {
     expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
   });
 
-  describe('SortableTree Integration (Task 6.2)', () => {
+  describe('SortableTree Integration', () => {
     it('ドラッグ可能なアイテムとしてノードをレンダリングできること', () => {
       const node = createMockNode('node-1', 1, 'default');
 
@@ -199,7 +199,7 @@ describe('TabTreeView', () => {
         />
       );
 
-      // Task 7.1 (tab-tree-bugfix-2): ドラッグ可能なアイテムには data-draggable-item 属性がある
+      // ドラッグ可能なアイテムには data-draggable-item 属性がある
       const draggableItem = screen.getByTestId('tree-node-1');
       expect(draggableItem).toHaveAttribute(
         'data-draggable-item',
@@ -224,7 +224,7 @@ describe('TabTreeView', () => {
       const nodeElement = screen.getByTestId('tree-node-1');
       // ドラッグ可能なアイテムが存在すること
       expect(nodeElement).toBeInTheDocument();
-      // Task 7.1 (tab-tree-bugfix-2): 自前D&D実装に変更
+      // 自前D&D実装に変更
       expect(nodeElement).toHaveAttribute(
         'data-draggable-item',
         'draggable-item-node-1'
@@ -245,7 +245,7 @@ describe('TabTreeView', () => {
         />
       );
 
-      // Task 7.1 (tab-tree-bugfix-2): ドラッグ可能なアイテムが2つ存在することを確認
+      // ドラッグ可能なアイテムが2つ存在することを確認
       const draggableItem1 = screen.getByTestId('tree-node-1');
       const draggableItem2 = screen.getByTestId('tree-node-2');
 
@@ -260,7 +260,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 2.1: タブ情報表示 (Requirements 1.1, 1.2, 1.3, 1.4)', () => {
+  describe('タブ情報表示', () => {
     const createMockTabInfo = (
       tabId: number,
       title: string,
@@ -273,8 +273,8 @@ describe('TabTreeView', () => {
       status: 'complete',
       isPinned: false,
       windowId: 1,
-      discarded: false, // Task 4.1 (tab-tree-bugfix): 休止タブ状態
-      index: tabId, // Task 12.1 (tab-tree-comprehensive-fix): ピン留めタブの順序同期
+      discarded: false, // 休止タブ状態
+      index: tabId, // ピン留めタブの順序同期
     });
 
     const mockGetTabInfo = vi.fn();
@@ -283,7 +283,7 @@ describe('TabTreeView', () => {
       mockGetTabInfo.mockReset();
     });
 
-    it('Requirement 1.1, 1.2: タブのタイトルとしてページタイトルを表示すること', () => {
+    it('タブのタイトルとしてページタイトルを表示すること', () => {
       const node = createMockNode('node-1', 1, 'default');
       const tabInfo = createMockTabInfo(1, 'Example Page Title');
       mockGetTabInfo.mockReturnValue(tabInfo);
@@ -303,7 +303,7 @@ describe('TabTreeView', () => {
       expect(screen.queryByText('Tab 1')).not.toBeInTheDocument();
     });
 
-    it('Requirement 1.3: タブの左側にファビコンを表示すること', () => {
+    it('タブの左側にファビコンを表示すること', () => {
       const node = createMockNode('node-1', 1, 'default');
       const tabInfo = createMockTabInfo(1, 'Example Page', 'https://example.com/favicon.ico');
       mockGetTabInfo.mockReturnValue(tabInfo);
@@ -323,7 +323,7 @@ describe('TabTreeView', () => {
       expect(favicon).toHaveAttribute('src', 'https://example.com/favicon.ico');
     });
 
-    it('Requirement 1.4: ファビコンが取得できない場合、デフォルトアイコンを表示すること', () => {
+    it('ファビコンが取得できない場合、デフォルトアイコンを表示すること', () => {
       const node = createMockNode('node-1', 1, 'default');
       const tabInfo = createMockTabInfo(1, 'Example Page', undefined);
       mockGetTabInfo.mockReturnValue(tabInfo);
@@ -424,7 +424,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 2.3: 選択状態の視覚的フィードバック (Requirements 9.1, 9.2)', () => {
+  describe('選択状態の視覚的フィードバック', () => {
     const mockOnSelect = vi.fn();
     const mockIsNodeSelected = vi.fn();
 
@@ -449,7 +449,7 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      // Task 2.2: 選択されたノードには控えめな背景色が適用される（青い枠線ではない）
+      // 選択されたノードには控えめな背景色が適用される（青い枠線ではない）
       expect(nodeElement).toHaveClass('bg-gray-500');
       // 青い枠線が使用されていないこと
       expect(nodeElement).not.toHaveClass('ring-2');
@@ -572,7 +572,7 @@ describe('TabTreeView', () => {
       const nodeElement2 = screen.getByTestId('tree-node-2');
       const nodeElement3 = screen.getByTestId('tree-node-3');
 
-      // Task 2.2: node-1とnode-3は選択されているので bg-gray-500 がある
+      // node-1とnode-3は選択されているので bg-gray-500 がある
       expect(nodeElement1).toHaveClass('bg-gray-500');
       expect(nodeElement3).toHaveClass('bg-gray-500');
       // node-2は選択されていないので bg-gray-500 がない
@@ -635,12 +635,12 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      // Task 2.2: 選択状態は背景色で表示される
+      // 選択状態は背景色で表示される
       expect(nodeElement).toHaveClass('bg-gray-500');
     });
   });
 
-  describe('Task 4.5: ドラッグ中の横スクロール防止 (Requirements 14.1, 14.2, 14.3)', () => {
+  describe('ドラッグ中の横スクロール防止', () => {
     it('ドラッグ中にコンテナにoverflow-x: hiddenが適用されること', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
@@ -703,7 +703,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 5.2: ドラッグ時のスクロール制御 (Requirements 7.1, 7.2)', () => {
+  describe('ドラッグ時のスクロール制御', () => {
     it('ドラッグコンテナにautoScroll設定が適用されていること', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
@@ -768,8 +768,8 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 9.1 (tab-tree-bugfix): ドラッグ中のスクロール範囲制限 (Requirements 8.1, 8.2, 8.3)', () => {
-    it('Requirement 8.1: ツリービューコンテナにoverflow-y-autoが適用されていること', () => {
+  describe('ドラッグ中のスクロール範囲制限', () => {
+    it('ツリービューコンテナにoverflow-y-autoが適用されていること', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -790,7 +790,7 @@ describe('TabTreeView', () => {
       expect(container).toBeInTheDocument();
     });
 
-    it('Requirement 8.2: ドラッグ中にコンテナにoverflow-x-hiddenが適用されること', () => {
+    it('ドラッグ中にコンテナにoverflow-x-hiddenが適用されること', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -813,7 +813,7 @@ describe('TabTreeView', () => {
       expect(container).not.toHaveClass('overflow-x-hidden');
     });
 
-    it('Requirement 8.3: autoScroll設定が横スクロールを無効化する設定を持つこと', () => {
+    it('autoScroll設定が横スクロールを無効化する設定を持つこと', () => {
       // autoScroll設定のx閾値が0または無効化されていることを確認
       // 実装ではAUTO_SCROLL_CONFIGのthreshold.xを0に設定
       const node = createMockNode('node-1', 1, 'default');
@@ -858,7 +858,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 4.4: ドラッグ中のタブ位置固定 (Requirements 16.1, 16.2, 16.3, 16.4)', () => {
+  describe('ドラッグ中のタブ位置固定', () => {
     it('ドラッグ可能な状態でタブツリービューがレンダリングされること', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
@@ -895,7 +895,7 @@ describe('TabTreeView', () => {
         />
       );
 
-      // Task 7.1 (tab-tree-bugfix-2): 自前D&D実装に変更
+      // 自前D&D実装に変更
       const nodeElement = screen.getByTestId('tree-node-1');
       expect(nodeElement).toHaveAttribute('data-draggable-item', 'draggable-item-node-1');
     });
@@ -919,8 +919,8 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 5.4: ドラッグ中のタブサイズ安定化 (Requirements 14.1, 14.2, 14.3)', () => {
-    it('Requirement 14.1: ドラッグ中に他のタブのtransformが無効化されていること', () => {
+  describe('ドラッグ中のタブサイズ安定化', () => {
+    it('ドラッグ中に他のタブのtransformが無効化されていること', () => {
       // 自前D&D実装では、ドラッグ中の他タブの移動は行わない設計
       // ドロップ位置のみインジケーターで表示される
       const nodes = [
@@ -949,7 +949,7 @@ describe('TabTreeView', () => {
       expect(container).not.toHaveClass('is-dragging');
     });
 
-    it('Requirement 14.2: ドラッグ中でも他のタブのホバー時にサイズが変更されないこと', () => {
+    it('ドラッグ中でも他のタブのホバー時にサイズが変更されないこと', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -974,7 +974,7 @@ describe('TabTreeView', () => {
       expect(node2).toHaveClass('p-2');
     });
 
-    it('Requirement 14.3: ドラッグ開始時のタブレイアウトが維持されること', () => {
+    it('ドラッグ開始時のタブレイアウトが維持されること', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -1004,7 +1004,7 @@ describe('TabTreeView', () => {
     });
 
     it('自前D&D実装によりリアルタイム並べ替えが無効化されていること', () => {
-      // Task 7.1 (tab-tree-bugfix-2): dnd-kitからuseDragDropに移行
+      // dnd-kitからuseDragDropに移行
       // 自前実装では他タブの位置変更が発生しないため、サイズが安定する
       const node = createMockNode('node-1', 1, 'default');
 
@@ -1018,14 +1018,14 @@ describe('TabTreeView', () => {
         />
       );
 
-      // Task 7.1 (tab-tree-bugfix-2): ドラッグ可能なアイテムが正しくレンダリングされていること
+      // ドラッグ可能なアイテムが正しくレンダリングされていること
       const draggableItem = screen.getByTestId('tree-node-1');
       expect(draggableItem).toHaveAttribute('data-draggable-item');
     });
   });
 
-  describe('Task 4.2: 親子関係を作るドロップ時のタブサイズ固定 (Requirements 9.1, 9.2)', () => {
-    it('Requirement 9.1: ドラッグハイライト状態でも他のタブのサイズが変更されないこと', () => {
+  describe('親子関係を作るドロップ時のタブサイズ固定', () => {
+    it('ドラッグハイライト状態でも他のタブのサイズが変更されないこと', () => {
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -1058,7 +1058,7 @@ describe('TabTreeView', () => {
       expect(node3).toHaveClass('flex', 'items-center');
     });
 
-    it('Requirement 9.2: 親子関係ドロップ時にドラッグハイライトされたタブのサイズが維持されること', () => {
+    it('親子関係ドロップ時にドラッグハイライトされたタブのサイズが維持されること', () => {
       // ドラッグハイライト時にborder-2が追加されても、
       // 元のpadding構造が維持されてサイズが変わらないことを確認
       const nodes = [
@@ -1117,7 +1117,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 12.1: ビュー移動サブメニュー用のプロパティ (Requirements 18.1, 18.2, 18.3)', () => {
+  describe('ビュー移動サブメニュー用のプロパティ', () => {
     it('viewsとonMoveToViewプロパティを受け取れること', () => {
       const node = createMockNode('node-1', 1, 'default');
       const mockViews = [
@@ -1157,8 +1157,8 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 5.1 (tab-tree-bugfix): テキスト選択禁止 (Requirements 4.1, 4.2)', () => {
-    it('Requirement 4.1: ツリービュー全体にselect-noneクラスが適用されていること', () => {
+  describe('テキスト選択禁止', () => {
+    it('ツリービュー全体にselect-noneクラスが適用されていること', () => {
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -1176,7 +1176,7 @@ describe('TabTreeView', () => {
       expect(treeView).toHaveClass('select-none');
     });
 
-    it('Requirement 4.1: タブノード要素にselect-noneクラスが適用されていること', () => {
+    it('タブノード要素にselect-noneクラスが適用されていること', () => {
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -1194,7 +1194,7 @@ describe('TabTreeView', () => {
       expect(nodeElement).toHaveClass('select-none');
     });
 
-    it('Requirement 4.1: 非ドラッグ可能なタブノードにもselect-noneクラスが適用されていること', () => {
+    it('非ドラッグ可能なタブノードにもselect-noneクラスが適用されていること', () => {
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -1212,7 +1212,7 @@ describe('TabTreeView', () => {
       expect(nodeElement).toHaveClass('select-none');
     });
 
-    it('Requirement 4.2: 子ノードを含む全てのノードにselect-noneクラスが適用されていること', () => {
+    it('子ノードを含む全てのノードにselect-noneクラスが適用されていること', () => {
       const childNode = createMockNode('child-1', 2, 'default', 'parent-1');
       const parentNode = createMockNode('parent-1', 1, 'default', null, [childNode]);
 
@@ -1236,7 +1236,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 4.3: ツリー外ドロップで新規ウィンドウ作成 (Requirements 13.1, 13.2)', () => {
+  describe('ツリー外ドロップで新規ウィンドウ作成', () => {
     it('onExternalDropコールバックを受け取れること', () => {
       const node = createMockNode('node-1', 1, 'default');
       const mockOnExternalDrop = vi.fn();
@@ -1272,7 +1272,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 10.1: ツリービュー外へのドロップ検知 (Requirements 9.1, 9.4)', () => {
+  describe('ツリービュー外へのドロップ検知', () => {
     it('ドラッグ中にonOutsideTreeChangeコールバックが提供された場合、状態変化を通知できること', () => {
       const node = createMockNode('node-1', 1, 'default');
       const mockOnOutsideTreeChange = vi.fn();
@@ -1308,7 +1308,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 10.2: ツリービュー外へのドロップ処理 (Requirements 9.2, 9.3)', () => {
+  describe('ツリービュー外へのドロップ処理', () => {
     it('onExternalDropとonOutsideTreeChangeを同時に設定できること', () => {
       const node = createMockNode('node-1', 1, 'default');
       const mockOnExternalDrop = vi.fn();
@@ -1353,7 +1353,7 @@ describe('TabTreeView', () => {
     });
   });
 
-  describe('Task 12.1: グループノードのレンダリング (Requirements 11.1, 11.2)', () => {
+  describe('グループノードのレンダリング', () => {
     const mockGetTabInfo = vi.fn();
 
     beforeEach(() => {
@@ -1380,7 +1380,7 @@ describe('TabTreeView', () => {
       groupId: id, // グループノード自体にgroupIdを設定
     });
 
-    it('Requirement 11.1: グループノード（group-で始まるID、負のtabId）がグループヘッダーとして表示されること', () => {
+    it('グループノード（group-で始まるID、負のtabId）がグループヘッダーとして表示されること', () => {
       // TreeStateManager.createGroupFromTabsで作成されるグループノードを模擬
       const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
       const childNode1: TabNode = {
@@ -1419,7 +1419,7 @@ describe('TabTreeView', () => {
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
 
-    it('Requirement 11.2: グループヘッダーが通常のタブとは異なる専用の表示スタイルを持つこと', () => {
+    it('グループヘッダーが通常のタブとは異なる専用の表示スタイルを持つこと', () => {
       const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
 
       mockGetTabInfo.mockReturnValue(undefined);

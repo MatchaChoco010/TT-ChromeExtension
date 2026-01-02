@@ -1,7 +1,6 @@
 /**
  * ViewEditModal コンポーネントのテスト
- * Task 7.2: ビュー編集モーダルダイアログの実装
- * Requirements: 3.4
+ * ビュー編集モーダルダイアログの実装
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -552,7 +551,7 @@ describe('ViewEditModal', () => {
     });
   });
 
-  describe('Task 8.2: IconPicker統合', () => {
+  describe('IconPicker統合', () => {
     it('アイコン選択ボタンが表示される', () => {
       render(
         <ViewEditModal
@@ -743,7 +742,7 @@ describe('ViewEditModal', () => {
     });
   });
 
-  describe('Requirement 3.4: ビュー編集用のモーダルダイアログ', () => {
+  describe('ビュー編集用のモーダルダイアログ', () => {
     it('ビュー編集モーダルでビュー名・色・アイコンを編集できる', () => {
       render(
         <ViewEditModal
