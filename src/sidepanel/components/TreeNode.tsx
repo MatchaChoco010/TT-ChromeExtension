@@ -264,16 +264,19 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         {/* 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
         <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} depth={node.depth} />
 
-        {/* 展開/折りたたみトグルボタン */}
-        {hasChildren && (
+        {/* 展開/折りたたみトグルボタン - サイズ縮小版 */}
+        {/* 子がある場合はボタン、ない場合は同じ幅のプレースホルダー */}
+        {hasChildren ? (
           <button
             data-testid="expand-button"
             onClick={handleToggleClick}
-            className="mr-2 w-4 h-4 flex items-center justify-center text-gray-600"
+            className="mr-1 w-3 h-3 flex items-center justify-center text-gray-600 text-[10px] leading-none"
             aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
           >
             {node.isExpanded ? '▼' : '▶'}
           </button>
+        ) : (
+          <div className="mr-1 w-3 h-3 flex-shrink-0" />
         )}
 
         {/* ファビコン */}

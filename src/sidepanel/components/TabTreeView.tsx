@@ -275,8 +275,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       >
         {/* 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
         <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
-        {/* 展開/折りたたみボタン */}
-        {hasChildren && (
+        {/* 展開/折りたたみボタン - サイズ縮小版 */}
+        {/* 子がある場合はボタン、ない場合は同じ幅のプレースホルダー */}
+        {hasChildren ? (
           <button
             data-testid="expand-button"
             onClick={(e) => {
@@ -285,11 +286,13 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            className="mr-2 w-4 h-4 flex items-center justify-center"
+            className="mr-1 w-3 h-3 flex items-center justify-center text-[10px] leading-none"
             aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
           >
             {node.isExpanded ? '▼' : '▶'}
           </button>
+        ) : (
+          <div className="mr-1 w-3 h-3 flex-shrink-0" />
         )}
 
         {/* ファビコン表示 */}
@@ -504,8 +507,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       >
         {/* 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
         <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
-        {/* 展開/折りたたみボタン */}
-        {hasChildren && (
+        {/* 展開/折りたたみボタン - サイズ縮小版 */}
+        {/* 子がある場合はボタン、ない場合は同じ幅のプレースホルダー */}
+        {hasChildren ? (
           <button
             data-testid="expand-button"
             onClick={(e) => {
@@ -514,11 +518,13 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            className="mr-2 w-4 h-4 flex items-center justify-center"
+            className="mr-1 w-3 h-3 flex items-center justify-center text-[10px] leading-none"
             aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
           >
             {node.isExpanded ? '▼' : '▶'}
           </button>
+        ) : (
+          <div className="mr-1 w-3 h-3 flex-shrink-0" />
         )}
 
         {/* ファビコン表示 */}

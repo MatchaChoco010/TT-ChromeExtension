@@ -974,16 +974,64 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       const updatedActiveNode = updatedNodes[activeNodeId];
       updatedActiveNode.parentId = targetParentId;
 
-      // 親子関係を再構築（更新後の parentId を基に）
-      Object.entries(updatedNodes).forEach(([id, node]) => {
-        if (node.parentId && updatedNodes[node.parentId]) {
-          const parent = updatedNodes[node.parentId];
-          const child = updatedNodes[id];
-          if (child && !parent.children.some(c => c.id === id)) {
+      // 親子関係を再構築（元のchildren配列の順序を維持しつつ、activeNodeを正しい位置に挿入）
+      // Step 1: 元のchildren配列からactiveNodeを除いた状態で再構築
+      Object.entries(treeState.nodes).forEach(([parentId, originalNode]) => {
+        const parent = updatedNodes[parentId];
+        if (!parent) return;
+
+        // 元のchildren配列の順序を維持
+        for (const originalChild of originalNode.children) {
+          const childId = originalChild.id;
+          // activeNodeは後で正しい位置に挿入するのでスキップ
+          if (childId === activeNodeId) continue;
+          const child = updatedNodes[childId];
+          // 元の親と同じ親を持つ子のみ追加（activeNodeの移動による変更は除く）
+          if (child && child.parentId === parentId) {
             parent.children.push(child);
           }
         }
       });
+
+      // Step 2: activeNodeを正しい位置に挿入
+      if (targetParentId) {
+        // 親がいる場合
+        const targetParent = updatedNodes[targetParentId];
+        if (targetParent) {
+          // belowNodeIdがある場合、その前に挿入
+          if (belowNodeId) {
+            const belowNode = updatedNodes[belowNodeId];
+            // belowNodeが同じ親を持つ場合のみ
+            if (belowNode && belowNode.parentId === targetParentId) {
+              const insertIndex = targetParent.children.findIndex(c => c.id === belowNodeId);
+              if (insertIndex !== -1) {
+                targetParent.children.splice(insertIndex, 0, updatedActiveNode);
+              } else {
+                targetParent.children.push(updatedActiveNode);
+              }
+            } else {
+              // belowNodeが同じ親を持たない場合（リスト末尾）
+              targetParent.children.push(updatedActiveNode);
+            }
+          } else if (aboveNodeId) {
+            // aboveNodeIdしかない場合（リスト末尾）、その後に挿入
+            const aboveNode = updatedNodes[aboveNodeId];
+            if (aboveNode && aboveNode.parentId === targetParentId) {
+              const insertIndex = targetParent.children.findIndex(c => c.id === aboveNodeId);
+              if (insertIndex !== -1) {
+                targetParent.children.splice(insertIndex + 1, 0, updatedActiveNode);
+              } else {
+                targetParent.children.push(updatedActiveNode);
+              }
+            } else {
+              targetParent.children.push(updatedActiveNode);
+            }
+          } else {
+            targetParent.children.push(updatedActiveNode);
+          }
+        }
+      }
+      // ルートレベルの場合、親子関係は不要（親がnull）
 
       // 深さを再計算
       const calculateDepth = (nodeId: string, visited: Set<string> = new Set()): number => {
