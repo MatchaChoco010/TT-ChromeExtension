@@ -129,10 +129,26 @@ export function registerAlarmListener(): void {
   dragSessionManager.startTimeoutCheck();
 }
 
+/**
+ * グループタブ判定
+ *
+ * グループタブ（group.htmlを開くタブ）を検出する。
+ * グループタブはhandleTabCreatedではスキップし、createGroupWithRealTabで処理される。
+ */
+function isGroupTabUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.includes('/group.html');
+}
+
 // Tab event handlers
 export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
   if (!tab.id) return;
+
+  // グループタブはcreateGroupWithRealTabで処理されるため、ここではスキップ
+  if (isGroupTabUrl(tab.url) || isGroupTabUrl(tab.pendingUrl)) {
+    return;
+  }
 
   try {
     // IMPORTANT: Load the latest state from storage before adding a new tab
@@ -987,7 +1003,8 @@ async function handleCreateGroup(
     await chrome.tabs.update(groupTab.id, { url: groupPageUrl });
 
     // 2. ツリー状態を更新（グループ情報を登録）
-    // 注意: loadState()はService Worker起動時に呼ばれているため、ここでは不要
+    // Side Panelが直接ストレージを更新する可能性があるため、最新の状態をロード
+    await treeStateManager.loadState();
     // デフォルト名「新しいグループ」を設定
     const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, '新しいグループ');
 
@@ -1025,6 +1042,8 @@ async function handleDissolveGroup(
       return;
     }
 
+    // Side Panelが直接ストレージを更新する可能性があるため、最新の状態をロード
+    await treeStateManager.loadState();
     // 最初のtabIdに対応するノードを見つけ、それがグループノードなら解除
     await treeStateManager.dissolveGroup(tabIds[0]);
 

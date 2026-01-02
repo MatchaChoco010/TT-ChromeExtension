@@ -32,15 +32,18 @@ async function getTabNodeBoundingBox(
 }
 
 /**
- * ストレージから子タブの順序を取得
+ * UIから子タブの順序を取得（Y座標ベース）
+ *
+ * ストレージにはchildrenが空配列で保存されるため、
+ * UI上のY座標から子タブの表示順序を取得する
  */
 async function getChildOrder(page: Page, parentTabId: number): Promise<number[]> {
-  return await page.evaluate(async (parentId) => {
+  // まずストレージから親子関係を取得
+  const childTabIds = await page.evaluate(async (parentId) => {
     interface TreeNode {
       id: string;
       tabId: number;
       parentId: string | null;
-      children: TreeNode[];
     }
     interface LocalTreeState {
       nodes: Record<string, TreeNode>;
@@ -54,12 +57,33 @@ async function getChildOrder(page: Page, parentTabId: number): Promise<number[]>
     const parentNodeId = treeState.tabToNode[parentId];
     if (!parentNodeId) return [];
 
-    const parentNode = treeState.nodes[parentNodeId];
-    if (!parentNode) return [];
+    // parentIdがparentNodeIdのノードを全て取得
+    const childNodes: TreeNode[] = [];
+    for (const node of Object.values(treeState.nodes)) {
+      if (node.parentId === parentNodeId) {
+        childNodes.push(node);
+      }
+    }
 
-    // 子ノードのtabIdを順序通りに取得
-    return parentNode.children.map(child => child.tabId);
+    return childNodes.map(node => node.tabId);
   }, parentTabId);
+
+  if (childTabIds.length === 0) return [];
+
+  // UIからY座標を取得して順序を決定
+  const positions: { tabId: number; y: number }[] = [];
+  for (const tabId of childTabIds) {
+    try {
+      const box = await getTabNodeBoundingBox(page, tabId);
+      positions.push({ tabId, y: box.y });
+    } catch {
+      // タブが見つからない場合はスキップ
+    }
+  }
+
+  // Y座標でソートして順序を取得
+  positions.sort((a, b) => a.y - b.y);
+  return positions.map(p => p.tabId);
 }
 
 /**

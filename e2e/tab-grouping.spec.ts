@@ -14,7 +14,7 @@
 
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, refreshSidePanel } from './utils/tab-utils';
-import { waitForCondition } from './utils/polling-utils';
+import { waitForCondition, waitForTabDepthInUI } from './utils/polling-utils';
 
 /**
  * タブが作成された後、UIに表示されるまで待機するヘルパー関数
@@ -122,6 +122,10 @@ test.describe('タブグループ化機能', () => {
       // グループノードのdata-testidは group-header-{groupId} の形式
       const groupNode = sidePanelPage.locator('[data-testid^="group-header-"]');
       await expect(groupNode.first()).toBeVisible({ timeout: 5000 });
+
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
+      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
@@ -282,6 +286,10 @@ test.describe('タブグループ化機能', () => {
       // UIにグループノードが表示されていることを確認
       const groupNode = sidePanelPage.locator('[data-testid^="group-header-"]');
       await expect(groupNode.first()).toBeVisible({ timeout: 5000 });
+
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
+      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
 
       // 元のタブがグループの子として配置されていることを確認
       await waitForCondition(
@@ -873,6 +881,10 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Parent-child relationship was not established correctly' }
       );
 
+      // UIで子タブの深さが正しく表示されていることを確認（depth=1）
+      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
+      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+
       // クリーンアップ
       if (groupTabId) {
         await serviceWorker.evaluate(async (tabId) => {
@@ -1199,6 +1211,10 @@ test.describe('タブグループ化機能', () => {
       await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 5000 });
       await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 5000 });
 
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
+      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+
       // クリーンアップ
       if (groupTabId) {
         await serviceWorker.evaluate(async (tabId) => {
@@ -1311,6 +1327,11 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Child tab order was not maintained after grouping' }
       );
 
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
+      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+      await waitForTabDepthInUI(sidePanelPage, tabId3, 1, { timeout: 5000 });
+
       // クリーンアップ
       if (groupTabId) {
         await serviceWorker.evaluate(async (tabId) => {
@@ -1416,6 +1437,10 @@ test.describe('タブグループ化機能', () => {
         },
         { timeout: 15000, timeoutMessage: 'Group tab was not created with children correctly' }
       );
+
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
+      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
 
       // クリーンアップ
       if (groupTabId) {
