@@ -1,0 +1,373 @@
+/**
+ * ドラッグ&ドロップ - プレースホルダー位置精度のE2Eテスト
+ *
+ * このテストスイートでは、ドラッグ中のプレースホルダー（ドロップインジケーター）が
+ * 正しい位置に表示されることを検証します。
+ *
+ * 特に以下のケースをテストします：
+ * 1. サブツリーを持つタブをドラッグ中に、サブツリーの上の隙間にホバーした場合、
+ *    プレースホルダーがサブツリーの中央ではなく、正しい隙間の位置に表示されること
+ * 2. タブBをドラッグ中にタブAとタブBの間にホバーした場合、
+ *    プレースホルダーがタブBの中央ではなく、タブAとタブBの間に表示されること
+ *
+ * Note: ヘッドレスモードで実行すること（npm run test:e2e）
+ */
+import { test, expect } from './fixtures/extension';
+import { createTab, assertTabInTree } from './utils/tab-utils';
+import { startDrag, dropTab, moveTabToParent } from './utils/drag-drop-utils';
+import { waitForCondition } from './utils/polling-utils';
+import type { Page, Worker } from '@playwright/test';
+
+/**
+ * タブノードのバウンディングボックスを取得
+ */
+async function getTabNodeBoundingBox(
+  page: Page,
+  tabId: number
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  const node = page.locator(`[data-testid="tree-node-${tabId}"]`).first();
+  await node.waitFor({ state: 'visible', timeout: 5000 });
+  const box = await node.boundingBox();
+  if (!box) {
+    throw new Error(`Tab node ${tabId} bounding box not found`);
+  }
+  return box;
+}
+
+/**
+ * ドロップインジケーターのバウンディングボックスを取得
+ */
+async function getDropIndicatorBoundingBox(
+  page: Page
+): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  const indicator = page.locator('[data-testid="drop-indicator"]');
+  const isVisible = await indicator.isVisible().catch(() => false);
+  if (!isVisible) {
+    return null;
+  }
+  const box = await indicator.boundingBox();
+  return box;
+}
+
+/**
+ * ドロップインジケーターが表示されるまでポーリングで待機
+ */
+async function waitForDropIndicatorVisible(
+  page: Page,
+  timeout: number = 5000
+): Promise<void> {
+  await waitForCondition(
+    async () => {
+      const indicator = page.locator('[data-testid="drop-indicator"]');
+      return await indicator.isVisible().catch(() => false);
+    },
+    { timeout, interval: 100, timeoutMessage: 'Drop indicator did not become visible' }
+  );
+}
+
+/**
+ * ストレージにすべてのタブが存在するまで待機
+ */
+async function waitForAllTabsInStorage(
+  serviceWorker: Worker,
+  tabIds: number[]
+): Promise<void> {
+  await serviceWorker.evaluate(async (ids: number[]) => {
+    for (let i = 0; i < 30; i++) {
+      const result = await chrome.storage.local.get('tree_state');
+      const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+      if (treeState?.tabToNode) {
+        const allTabsExist = ids.every(id => treeState.tabToNode?.[id]);
+        if (allTabsExist) {
+          return;
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }, tabIds);
+}
+
+test.describe('ドラッグ&ドロップ - プレースホルダー位置精度', () => {
+  // タイムアウトを120秒に設定
+  test.setTimeout(120000);
+
+  test.describe('サブツリーをドラッグ中のプレースホルダー位置', () => {
+    test('サブツリーを持つタブをドラッグ中に、サブツリーの上の隙間にホバーするとプレースホルダーが正しい位置に表示されること', async ({
+      extensionContext,
+      sidePanelPage,
+      serviceWorker,
+    }) => {
+      // 準備: 親タブとサブツリーを持つタブを作成
+      // タブX -> 親タブ（サブツリーなし）
+      // タブA -> 親タブ（サブツリーあり）
+      //   タブB -> タブAの子
+      //     タブC -> タブBの子
+      // タブY -> 親タブ（サブツリーなし）
+
+      const tabX = await createTab(extensionContext, 'https://example.com');
+      const tabA = await createTab(extensionContext, 'https://www.iana.org');
+      const tabB = await createTab(extensionContext, 'https://www.w3.org');
+      const tabC = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tabY = await createTab(extensionContext, 'https://httpbin.org');
+
+      // タブがツリーに表示されるまで待機
+      await assertTabInTree(sidePanelPage, tabX, 'Example');
+      await assertTabInTree(sidePanelPage, tabA);
+      await assertTabInTree(sidePanelPage, tabB);
+      await assertTabInTree(sidePanelPage, tabC);
+      await assertTabInTree(sidePanelPage, tabY);
+
+      // 親子関係を構築: B -> Aの子、C -> Bの子
+      await moveTabToParent(sidePanelPage, tabB, tabA, serviceWorker);
+      await waitForAllTabsInStorage(serviceWorker, [tabX, tabA, tabB, tabC, tabY]);
+
+      // 親タブを展開
+      const tabANode = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`).first();
+      const expandButtonA = tabANode.locator('[data-testid="expand-button"]');
+      if (await expandButtonA.count() > 0) {
+        const isExpanded = await tabANode.getAttribute('data-expanded');
+        if (isExpanded !== 'true') {
+          await expandButtonA.click();
+        }
+      }
+
+      await moveTabToParent(sidePanelPage, tabC, tabB, serviceWorker);
+      await waitForAllTabsInStorage(serviceWorker, [tabX, tabA, tabB, tabC, tabY]);
+
+      // タブBを展開
+      const tabBNode = sidePanelPage.locator(`[data-testid="tree-node-${tabB}"]`).first();
+      const expandButtonB = tabBNode.locator('[data-testid="expand-button"]');
+      if (await expandButtonB.count() > 0) {
+        const isExpanded = await tabBNode.getAttribute('data-expanded');
+        if (isExpanded !== 'true') {
+          await expandButtonB.click();
+        }
+      }
+
+      // ページをフォーカス
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // タブAをドラッグ開始
+      await startDrag(sidePanelPage, tabA);
+
+      // タブXの位置を取得
+      const tabXBox = await getTabNodeBoundingBox(sidePanelPage, tabX);
+
+      // タブXの下端付近（タブXとタブAの間の隙間）にマウスを移動
+      const gapY = tabXBox.y + tabXBox.height * 0.85;
+      await sidePanelPage.mouse.move(tabXBox.x + tabXBox.width / 2, gapY, { steps: 10 });
+
+      // プレースホルダー表示をポーリングで待機
+      await waitForDropIndicatorVisible(sidePanelPage);
+
+      // ドロップインジケーターの位置を取得
+      const indicatorBox = await getDropIndicatorBoundingBox(sidePanelPage);
+      expect(indicatorBox).not.toBeNull();
+
+      if (indicatorBox) {
+        // タブYの位置を取得して、プレースホルダーがサブツリーの中央ではなく
+        // タブXの近くに表示されていることを確認
+        const tabYBox = await getTabNodeBoundingBox(sidePanelPage, tabY);
+
+        // プレースホルダーのY座標がタブXの下端付近にあること
+        // （タブYの上端よりもタブXの下端に近いこと）
+        const distanceFromTabX = Math.abs(indicatorBox.y - tabXBox.y - tabXBox.height);
+        const distanceFromTabY = Math.abs(indicatorBox.y - tabYBox.y);
+
+        // プレースホルダーはタブXの近くにあるべき
+        expect(distanceFromTabX).toBeLessThan(distanceFromTabY);
+      }
+
+      // ドロップを実行
+      await dropTab(sidePanelPage);
+    });
+  });
+
+  test.describe('ドラッグ中のタブの隣接位置へのドロップ', () => {
+    test('タブBをドラッグ中にタブAとタブBの間にホバーするとプレースホルダーがタブAとタブBの間に表示されること', async ({
+      extensionContext,
+      sidePanelPage,
+    }) => {
+      // 準備: 3つのタブを作成
+      // タブA
+      // タブB <- ドラッグするタブ
+      // タブC
+      const tabA = await createTab(extensionContext, 'https://example.com');
+      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+
+      // タブがツリーに表示されるまで待機
+      await assertTabInTree(sidePanelPage, tabA, 'Example');
+      await assertTabInTree(sidePanelPage, tabB);
+      await assertTabInTree(sidePanelPage, tabC);
+
+      // ページをフォーカス
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // タブBをドラッグ開始
+      await startDrag(sidePanelPage, tabB);
+
+      // タブAとタブBの間にマウスを移動
+      const tabABox = await getTabNodeBoundingBox(sidePanelPage, tabA);
+      const tabBBox = await getTabNodeBoundingBox(sidePanelPage, tabB);
+
+      // タブAの下端付近（タブAとタブBの間の隙間）にマウスを移動
+      const gapY = tabABox.y + tabABox.height * 0.85;
+      await sidePanelPage.mouse.move(tabABox.x + tabABox.width / 2, gapY, { steps: 10 });
+
+      // プレースホルダー表示をポーリングで待機
+      await waitForDropIndicatorVisible(sidePanelPage);
+
+      // ドロップインジケーターの位置を取得
+      const indicatorBox = await getDropIndicatorBoundingBox(sidePanelPage);
+      expect(indicatorBox).not.toBeNull();
+
+      if (indicatorBox) {
+        // プレースホルダーのY座標がタブAの下端とタブBの上端の間にあること
+        // （タブBの中央ではなく、タブAとタブBの間にあること）
+        const expectedY = (tabABox.y + tabABox.height + tabBBox.y) / 2;
+        const tolerance = tabABox.height; // 許容誤差: タブの高さ以内
+
+        // プレースホルダーがタブAとタブBの間（期待される位置の近く）にあること
+        expect(Math.abs(indicatorBox.y - expectedY)).toBeLessThanOrEqual(tolerance);
+
+        // プレースホルダーがタブBの中央（y + height/2）付近にないことを確認
+        const tabBCenterY = tabBBox.y + tabBBox.height / 2;
+        const distanceFromCenter = Math.abs(indicatorBox.y - tabBCenterY);
+
+        // タブBの中央からの距離がタブの高さの25%以上離れていること
+        expect(distanceFromCenter).toBeGreaterThan(tabBBox.height * 0.25);
+      }
+
+      // ドロップを実行
+      await dropTab(sidePanelPage);
+    });
+
+    test('タブBをドラッグ中にタブBとタブCの間にホバーするとプレースホルダーがタブBとタブCの間に表示されること', async ({
+      extensionContext,
+      sidePanelPage,
+    }) => {
+      // 準備: 3つのタブを作成
+      // タブA
+      // タブB <- ドラッグするタブ
+      // タブC
+      const tabA = await createTab(extensionContext, 'https://example.com');
+      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+
+      // タブがツリーに表示されるまで待機
+      await assertTabInTree(sidePanelPage, tabA, 'Example');
+      await assertTabInTree(sidePanelPage, tabB);
+      await assertTabInTree(sidePanelPage, tabC);
+
+      // ページをフォーカス
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // タブBをドラッグ開始
+      await startDrag(sidePanelPage, tabB);
+
+      // タブBとタブCの間にマウスを移動
+      const tabBBox = await getTabNodeBoundingBox(sidePanelPage, tabB);
+      const tabCBox = await getTabNodeBoundingBox(sidePanelPage, tabC);
+
+      // タブCの上端付近（タブBとタブCの間の隙間）にマウスを移動
+      const gapY = tabCBox.y + tabCBox.height * 0.15;
+      await sidePanelPage.mouse.move(tabCBox.x + tabCBox.width / 2, gapY, { steps: 10 });
+
+      // プレースホルダー表示をポーリングで待機
+      await waitForDropIndicatorVisible(sidePanelPage);
+
+      // ドロップインジケーターの位置を取得
+      const indicatorBox = await getDropIndicatorBoundingBox(sidePanelPage);
+      expect(indicatorBox).not.toBeNull();
+
+      if (indicatorBox) {
+        // プレースホルダーのY座標がタブBの下端とタブCの上端の間にあること
+        const expectedY = (tabBBox.y + tabBBox.height + tabCBox.y) / 2;
+        const tolerance = tabBBox.height; // 許容誤差: タブの高さ以内
+
+        // プレースホルダーがタブBとタブCの間（期待される位置の近く）にあること
+        expect(Math.abs(indicatorBox.y - expectedY)).toBeLessThanOrEqual(tolerance);
+
+        // プレースホルダーがタブBの中央（y + height/2）付近にないことを確認
+        const tabBCenterY = tabBBox.y + tabBBox.height / 2;
+        const distanceFromCenter = Math.abs(indicatorBox.y - tabBCenterY);
+
+        // タブBの中央からの距離がタブの高さの25%以上離れていること
+        expect(distanceFromCenter).toBeGreaterThan(tabBBox.height * 0.25);
+      }
+
+      // ドロップを実行
+      await dropTab(sidePanelPage);
+    });
+  });
+
+  test.describe('複数の隙間を連続でホバーした場合のプレースホルダー位置', () => {
+    test('ドラッグ中に複数の隙間をホバーするとプレースホルダーが正しく追従すること', async ({
+      extensionContext,
+      sidePanelPage,
+    }) => {
+      // 準備: 4つのタブを作成
+      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+
+      // タブがツリーに表示されるまで待機
+      await assertTabInTree(sidePanelPage, tab1, 'Example');
+      await assertTabInTree(sidePanelPage, tab2);
+      await assertTabInTree(sidePanelPage, tab3);
+      await assertTabInTree(sidePanelPage, tab4);
+
+      // ページをフォーカス
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // tab4をドラッグ開始
+      await startDrag(sidePanelPage, tab4);
+
+      // tab1とtab2の間にマウスを移動
+      const tab1Box = await getTabNodeBoundingBox(sidePanelPage, tab1);
+      const tab2Box = await getTabNodeBoundingBox(sidePanelPage, tab2);
+      const gap1Y = (tab1Box.y + tab1Box.height + tab2Box.y) / 2;
+      await sidePanelPage.mouse.move(tab1Box.x + tab1Box.width / 2, gap1Y, { steps: 10 });
+
+      // プレースホルダー表示をポーリングで待機
+      await waitForDropIndicatorVisible(sidePanelPage);
+
+      // 最初のプレースホルダー位置を取得
+      const firstIndicatorBox = await getDropIndicatorBoundingBox(sidePanelPage);
+      expect(firstIndicatorBox).not.toBeNull();
+
+      // tab2とtab3の間にマウスを移動
+      const tab3Box = await getTabNodeBoundingBox(sidePanelPage, tab3);
+      const gap2Y = (tab2Box.y + tab2Box.height + tab3Box.y) / 2;
+      await sidePanelPage.mouse.move(tab2Box.x + tab2Box.width / 2, gap2Y, { steps: 10 });
+
+      // プレースホルダーの位置が変わるまで待機
+      await waitForCondition(
+        async () => {
+          const currentBox = await getDropIndicatorBoundingBox(sidePanelPage);
+          if (!currentBox || !firstIndicatorBox) return false;
+          return Math.abs(currentBox.y - firstIndicatorBox.y) >= 1;
+        },
+        { timeout: 3000, interval: 50, timeoutMessage: 'Drop indicator position did not change' }
+      );
+
+      // 2番目のプレースホルダー位置を取得
+      const secondIndicatorBox = await getDropIndicatorBoundingBox(sidePanelPage);
+      expect(secondIndicatorBox).not.toBeNull();
+
+      // プレースホルダーの位置が下に移動していること
+      if (firstIndicatorBox && secondIndicatorBox) {
+        expect(secondIndicatorBox.y).toBeGreaterThan(firstIndicatorBox.y);
+      }
+
+      // ドロップを実行
+      await dropTab(sidePanelPage);
+    });
+  });
+});
