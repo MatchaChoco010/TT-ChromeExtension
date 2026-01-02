@@ -12,7 +12,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
 import { moveTabToParent, getParentTabId, reorderTabs, startDrag, dropTab } from './utils/drag-drop-utils';
-import { waitForParentChildRelation } from './utils/polling-utils';
+import { waitForParentChildRelation, waitForTabDepthInUI } from './utils/polling-utils';
 import type { Page } from '@playwright/test';
 
 /**
@@ -141,6 +141,11 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       const parent2 = await getParentTabId(sidePanelPage, child2);
       expect(parent1).toBe(parentTab);
       expect(parent2).toBe(parentTab);
+
+      // UI上のdepth属性を検証
+      await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, child1, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, child2, 1, { timeout: 3000 });
     });
 
     test('複数の子がある場合、任意の子を親にドロップすると最後の子になること', async ({
@@ -193,6 +198,12 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         expect(finalOrder[0]).toBe(child2);
         expect(finalOrder[1]).toBe(child3);
       }).toPass({ timeout: 5000 });
+
+      // UI上のdepth属性を検証
+      await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, child1, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, child2, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, child3, 1, { timeout: 3000 });
     });
   });
 
@@ -404,6 +415,11 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         expect(parentC).toBe(tabB);
         expect(parentD).toBe(tabB);
       }).toPass({ timeout: 5000 });
+
+      // UI上のdepth属性を検証
+      await waitForTabDepthInUI(sidePanelPage, tabB, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabC, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabD, 1, { timeout: 3000 });
     });
 
     test('ネストしたサブツリーを親の直上にドロップすると、最後の子として配置されること', async ({
@@ -517,6 +533,15 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         const parentF = await getParentTabId(sidePanelPage, tabF);
         expect(parentF).toBe(tabE);
       }).toPass({ timeout: 5000 });
+
+      // UI上のdepth属性を検証
+      await waitForTabDepthInUI(sidePanelPage, tabA, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabB, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabC, 2, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabD, 2, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabE, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabF, 2, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, tabG, 1, { timeout: 3000 });
     });
   });
 });

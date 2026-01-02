@@ -11,6 +11,8 @@ import { createTab, closeTab } from './utils/tab-utils';
 import {
   waitForTabInTreeState,
   waitForParentChildRelation,
+  waitForTabDepthInUI,
+  waitForTabVisibleInUI,
 } from './utils/polling-utils';
 
 test.describe('新規タブ作成時の親子関係維持', () => {
@@ -63,6 +65,11 @@ test.describe('新規タブ作成時の親子関係維持', () => {
     );
 
     expect(parentChildStillValid).toBe(true);
+
+    // UI上の深さを確認
+    await waitForTabDepthInUI(sidePanelPage, parentTabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, newTabId, 0, { timeout: 3000 });
   });
 
   test('複数のタブが親子関係にある状態で新しいタブを開いても、他のタブの親子関係を解消しない', async ({
@@ -130,6 +137,13 @@ test.describe('新規タブ作成時の親子関係維持', () => {
     );
 
     expect(allRelationsValid).toBe(true);
+
+    // UI上の深さを確認
+    await waitForTabDepthInUI(sidePanelPage, parent1TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child1TabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, parent2TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2TabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, newTabId, 0, { timeout: 3000 });
   });
 
   test('孫タブまである親子関係が、新しいタブ作成後も維持される', async ({
@@ -212,5 +226,11 @@ test.describe('新規タブ作成時の親子関係維持', () => {
     );
 
     expect(allRelationsValid).toEqual({ valid: true });
+
+    // UI上の深さを確認
+    await waitForTabDepthInUI(sidePanelPage, parentTabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandchildTabId, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, newTabId, 0, { timeout: 3000 });
   });
 });

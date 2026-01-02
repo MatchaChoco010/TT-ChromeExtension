@@ -157,6 +157,36 @@ test.skip('削除されたUIの操作テスト', async () => { ... });
 
 ### E2Eテスト品質基準
 
+#### 内部状態だけでなくUIの見た目も検証する（必須）
+
+**E2Eテストでは、内部状態（ストレージ、メモリ上の状態）だけでなく、実際のUI上の見た目も検証すること。**
+
+E2Eテストの目的は「ユーザーが実際に見る画面が正しいこと」を保証することです。内部状態が正しくても、UIに反映されていなければユーザーにとってはバグです。
+
+```typescript
+// ❌ BAD: 内部状態のみ検証
+const treeState = await getStorageState();
+expect(treeState.nodes[childId].parentId).toBe(parentId);
+// ストレージは正しいが、UIに反映されているかは不明
+
+// ✅ GOOD: 内部状態 + UIの見た目を両方検証
+await waitForParentChildRelation(extensionContext, childTabId, parentTabId);
+await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
+// ストレージが正しく、かつUIにも正しく表示されていることを確認
+```
+
+**検証すべきUI要素の例**:
+- `data-depth`属性による親子関係の深さ
+- `data-testid`による要素の存在確認
+- CSSクラス（`is-active`, `is-dragging`など）による状態表示
+- 要素の表示/非表示（`toBeVisible()`）
+- テキスト内容やアイコンの表示
+
+**なぜ重要か**:
+- Service WorkerとSide Panel間の状態同期問題を検出できる
+- レンダリングロジックのバグを検出できる
+- ユーザー視点での品質を保証できる
+
 #### フレーキーテストの回避（必須）
 
 **固定時間待機（`waitForTimeout`）は禁止**。ポーリングで状態確定を待つこと:
@@ -176,7 +206,26 @@ await waitForParentChildRelation(context, childTabId, parentTabId);
 - `waitForParentChildRelation` - 親子関係が反映されるまで待機
 - `waitForTabActive` - タブがアクティブになるまで待機
 - `waitForSidePanelReady` - Side Panelの準備完了まで待機
+- `waitForTabDepthInUI` - UIのdata-depth属性が期待値になるまで待機
+- `waitForTabVisibleInUI` - タブがUIに表示されるまで待機
 - その他多数
+
+#### 親子関係テストのUI検証（具体例）
+
+上記の原則を親子関係テストに適用する場合:
+
+```typescript
+// ストレージ + UI両方を検証
+await waitForParentChildRelation(extensionContext, childTabId, parentTabId);
+await waitForTabDepthInUI(sidePanelPage, parentTabId, 0, { timeout: 3000 });
+await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
+```
+
+**親子関係で検証すべきシナリオ**:
+- ドラッグ&ドロップによる親子関係作成後
+- タブ作成時の親子関係設定後
+- 親タブ削除後のサブツリー昇格後
+- タブ移動操作後
 
 #### フレーキーテスト検証（必須）
 

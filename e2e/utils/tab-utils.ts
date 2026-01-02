@@ -159,10 +159,14 @@ export async function createTab(
           await chrome.storage.local.set({ tree_state: treeState });
 
           // IMPORTANT: Reload treeStateManager from storage to sync the in-memory state
+          // and then call syncWithChromeTabs to rebuild treeStructure
           // @ts-expect-error accessing global treeStateManager
           if (globalThis.treeStateManager) {
             // @ts-expect-error accessing global treeStateManager
             await globalThis.treeStateManager.loadState();
+            // Call syncWithChromeTabs to trigger persistState which rebuilds treeStructure
+            // @ts-expect-error accessing global treeStateManager
+            await globalThis.treeStateManager.syncWithChromeTabs();
           }
 
           // Notify Side Panel about the state update

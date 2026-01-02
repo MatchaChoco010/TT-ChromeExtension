@@ -13,7 +13,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
 import { moveTabToParent, getParentTabId, getTabDepth, moveTabToRoot } from './utils/drag-drop-utils';
-import { waitForParentChildRelation, waitForTabNoParent } from './utils/polling-utils';
+import { waitForParentChildRelation, waitForTabNoParent, waitForTabDepthInUI } from './utils/polling-utils';
 
 test.describe('子タブの独立ドラッグ操作', () => {
   // タイムアウトを延長
@@ -42,6 +42,10 @@ test.describe('子タブの独立ドラッグ操作', () => {
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
 
+    // UI depth verification for initial parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 親タブを展開
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
@@ -65,6 +69,10 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     // 検証: 子タブが新しい親の子になっている
     await waitForParentChildRelation(extensionContext, childTab, otherParentTab, { timeout: 5000 });
+
+    // UI depth verification after moving child to new parent
+    await waitForTabDepthInUI(sidePanelPage, otherParentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
 
     // 元の親タブのdepthが変わっていないことを確認（親タブは移動していない）
     const parentNodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -117,8 +125,16 @@ test.describe('子タブの独立ドラッグ操作', () => {
     await moveTabToParent(sidePanelPage, childTab1, parentTab1, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab1, parentTab1, { timeout: 5000 });
 
+    // UI depth verification for first parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab1, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab1, 1, { timeout: 3000 });
+
     await moveTabToParent(sidePanelPage, childTab2, parentTab2, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab2, parentTab2, { timeout: 5000 });
+
+    // UI depth verification for second parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab2, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab2, 1, { timeout: 3000 });
 
     // 両方の親タブを展開
     const expandAllParents = async () => {
@@ -146,6 +162,10 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     // 検証: childTab1がparentTab2の子になっている
     await waitForParentChildRelation(extensionContext, childTab1, parentTab2, { timeout: 5000 });
+
+    // UI depth verification after moving child to new parent
+    await waitForTabDepthInUI(sidePanelPage, parentTab2, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab1, 1, { timeout: 3000 });
 
     // 新しい親タブを展開
     await expandAllParents();
@@ -185,8 +205,15 @@ test.describe('子タブの独立ドラッグ操作', () => {
     await moveTabToParent(sidePanelPage, parentTab, rootTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, parentTab, rootTab, { timeout: 5000 });
 
+    // UI depth verification for first parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, rootTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 1, { timeout: 3000 });
+
     await moveTabToParent(sidePanelPage, grandchildTab, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, grandchildTab, parentTab, { timeout: 5000 });
+
+    // UI depth verification for grandchild relationship
+    await waitForTabDepthInUI(sidePanelPage, grandchildTab, 2, { timeout: 3000 });
 
     // 全ての親タブを展開
     const expandAll = async (tabId: number) => {
@@ -217,6 +244,10 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     // 検証: 孫タブが新しい親の子になっている
     await waitForParentChildRelation(extensionContext, grandchildTab, otherRootTab, { timeout: 5000 });
+
+    // UI depth verification after moving grandchild to new parent
+    await waitForTabDepthInUI(sidePanelPage, otherRootTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandchildTab, 1, { timeout: 3000 });
 
     // 新しい親タブを展開
     await expandAll(otherRootTab);
@@ -255,8 +286,15 @@ test.describe('子タブの独立ドラッグ操作', () => {
     await moveTabToParent(sidePanelPage, childTab1, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab1, parentTab, { timeout: 5000 });
 
+    // UI depth verification for first child
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab1, 1, { timeout: 3000 });
+
     await moveTabToParent(sidePanelPage, childTab2, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab2, parentTab, { timeout: 5000 });
+
+    // UI depth verification for second child
+    await waitForTabDepthInUI(sidePanelPage, childTab2, 1, { timeout: 3000 });
 
     // 親タブを展開
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -277,6 +315,10 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     // 検証: childTab1が新しい親の子になっている
     await waitForParentChildRelation(extensionContext, childTab1, otherParentTab, { timeout: 5000 });
+
+    // UI depth verification after moving child to new parent
+    await waitForTabDepthInUI(sidePanelPage, otherParentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab1, 1, { timeout: 3000 });
 
     // 親タブのdepthが変わっていないこと（親タブは移動していない）
     const parentNodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -327,6 +369,10 @@ test.describe('親子関係解消の永続化', () => {
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
 
+    // UI depth verification for initial parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 親タブを展開
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
@@ -351,6 +397,9 @@ test.describe('親子関係解消の永続化', () => {
 
     // 検証: 子タブの親がnullになっている（ルートレベルに移動された）
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
+
+    // UI depth verification after making child independent
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
 
     // 子タブのdepthが0（ルートレベル）になっていることを確認
     const childDepthAfter = await getTabDepth(sidePanelPage, childTab);
@@ -384,6 +433,10 @@ test.describe('親子関係解消の永続化', () => {
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
 
+    // UI depth verification for initial parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 親タブを展開
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
@@ -405,9 +458,16 @@ test.describe('親子関係解消の永続化', () => {
     // 検証: 子タブの親がnullになっている
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
 
+    // UI depth verification after making child independent
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
+
     // 元子タブを別のタブの子にドラッグ
     await moveTabToParent(sidePanelPage, childTab, targetTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, targetTab, { timeout: 5000 });
+
+    // UI depth verification after moving child to new parent
+    await waitForTabDepthInUI(sidePanelPage, targetTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
 
     // 検証: 元子タブは新しい親（targetTab）の子であり、元親（parentTab）の子ではない
     const newParent = await getParentTabId(sidePanelPage, childTab);
@@ -437,6 +497,10 @@ test.describe('親子関係解消の永続化', () => {
     // D&Dで親子関係を作成
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
+
+    // UI depth verification for initial parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
 
     // 親タブを展開
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -485,6 +549,9 @@ test.describe('親子関係解消の永続化', () => {
 
     // 検証: ストレージで親子関係が解消されていることを確認
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
+
+    // UI depth verification after making child independent
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
 
     const parentIdAfter = await serviceWorker.evaluate(async (childId) => {
       interface TreeNode {
@@ -545,6 +612,10 @@ test.describe('元子タブからの新規タブ作成', () => {
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
 
+    // UI depth verification for initial parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 親タブを展開
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
@@ -568,6 +639,9 @@ test.describe('元子タブからの新規タブ作成', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
 
+    // UI depth verification after making child independent
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
+
     // 元子タブがルートレベルになったことを確認
     const childDepthAfter = await getTabDepth(sidePanelPage, childTab);
     expect(childDepthAfter).toBe(0);
@@ -581,6 +655,10 @@ test.describe('元子タブからの新規タブ作成', () => {
 
     // 検証: 新しいタブが元子タブ（childTab）の子になっていること
     await waitForParentChildRelation(extensionContext, newTab, childTab, { timeout: 5000 });
+
+    // UI depth verification for new child relationship
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, newTab, 1, { timeout: 3000 });
 
     // 元子タブを展開
     const childNodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${childTab}"]`).first();
@@ -632,6 +710,10 @@ test.describe('元子タブからの新規タブ作成', () => {
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
 
+    // UI depth verification for initial parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 親タブを展開
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
@@ -651,6 +733,9 @@ test.describe('元子タブからの新規タブ作成', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
 
+    // UI depth verification after making child independent
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
+
     // 実行2: 元子タブから複数の新しいタブを作成
     const newTab1 = await createTab(extensionContext, 'https://developer.mozilla.org', childTab);
     const newTab2 = await createTab(extensionContext, 'https://www.wikipedia.org', childTab);
@@ -662,6 +747,11 @@ test.describe('元子タブからの新規タブ作成', () => {
     // 検証: 新しいタブはすべて元子タブ（childTab）の子であること
     await waitForParentChildRelation(extensionContext, newTab1, childTab, { timeout: 5000 });
     await waitForParentChildRelation(extensionContext, newTab2, childTab, { timeout: 5000 });
+
+    // UI depth verification for new children relationship
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, newTab1, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, newTab2, 1, { timeout: 3000 });
 
     // 元親タブの子孫を取得して、新しいタブが含まれていないことを確認
     const parentChildren = await serviceWorker.evaluate(async (parentTabId) => {
@@ -754,6 +844,10 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
     await expandParent(parentTab);
 
+    // UI depth verification for first parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 親子関係が正しく設定されたことを確認
     let childParent = await getParentTabId(sidePanelPage, childTab);
     expect(childParent).toBe(parentTab);
@@ -761,6 +855,9 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     // 1回目: 親子関係を解消
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
+
+    // UI depth verification after first independence
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
 
     // 親子関係が解消されたことを確認
     childParent = await getParentTabId(sidePanelPage, childTab);
@@ -773,6 +870,10 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
     await expandParent(parentTab);
 
+    // UI depth verification for second parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 再び親子関係が正しく設定されたことを確認
     childParent = await getParentTabId(sidePanelPage, childTab);
     expect(childParent).toBe(parentTab);
@@ -780,6 +881,9 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     // 2回目: 再度親子関係を解消
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
+
+    // UI depth verification after second independence
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
 
     // 再び親子関係が解消されたことを確認
     childParent = await getParentTabId(sidePanelPage, childTab);
@@ -849,9 +953,16 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
     await expandTab(parentTab);
 
+    // UI depth verification for initial parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     // 親子関係を解消（childTabをルートレベルに移動）
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
+
+    // UI depth verification after making child independent
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
 
     // 元子タブがルートレベルになったことを確認
     const childDepth = await getTabDepth(sidePanelPage, childTab);
@@ -862,6 +973,10 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await assertTabInTree(sidePanelPage, newTab1);
     await waitForParentChildRelation(extensionContext, newTab1, childTab, { timeout: 5000 });
     await expandTab(childTab);
+
+    // UI depth verification for first new child relationship
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, newTab1, 1, { timeout: 3000 });
 
     // 新規タブが元子タブの子になっていることを確認
     const newTab1Parent = await getParentTabId(sidePanelPage, newTab1);
@@ -874,6 +989,10 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await assertTabInTree(sidePanelPage, grandchildTab);
     await waitForParentChildRelation(extensionContext, grandchildTab, newTab1, { timeout: 5000 });
     await expandTab(newTab1);
+
+    // UI depth verification for grandchild relationship
+    await waitForTabDepthInUI(sidePanelPage, newTab1, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandchildTab, 2, { timeout: 3000 });
 
     // 孫タブが新規タブ（newTab1）の子になっていることを確認
     const grandchildParent = await getParentTabId(sidePanelPage, grandchildTab);
@@ -960,12 +1079,19 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await waitForParentChildRelation(extensionContext, childTab, parentTab1, { timeout: 5000 });
     await expandTab(parentTab1);
 
+    // UI depth verification for first parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab1, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+
     let childParent = await getParentTabId(sidePanelPage, childTab);
     expect(childParent).toBe(parentTab1);
 
     // 2. 親子関係を解消（ルートレベルに移動）
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await waitForTabNoParent(extensionContext, childTab, { timeout: 5000 });
+
+    // UI depth verification after making child independent
+    await waitForTabDepthInUI(sidePanelPage, childTab, 0, { timeout: 3000 });
 
     childParent = await getParentTabId(sidePanelPage, childTab);
     expect(childParent).toBeNull();
@@ -974,6 +1100,10 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await moveTabToParent(sidePanelPage, childTab, parentTab2, serviceWorker);
     await waitForParentChildRelation(extensionContext, childTab, parentTab2, { timeout: 5000 });
     await expandTab(parentTab2);
+
+    // UI depth verification for new parent-child relationship
+    await waitForTabDepthInUI(sidePanelPage, parentTab2, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
 
     // 親子関係が正しく設定されたことを確認（UIレベル）
     childParent = await getParentTabId(sidePanelPage, childTab);

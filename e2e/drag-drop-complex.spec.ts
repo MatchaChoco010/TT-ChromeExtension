@@ -13,6 +13,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
 import { moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
+import { waitForTabDepthInUI } from './utils/polling-utils';
 
 test.describe('ドラッグ&ドロップによる複雑なツリー移動', () => {
   test('子タブを持つ親タブを移動した場合、サブツリー全体が一緒に移動することを検証する', async ({
@@ -117,6 +118,14 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     // grandChildも一緒に移動していることを確認（タイムアウト増加）
     const grandChildNode = sidePanelPage.locator(`[data-testid="tree-node-${grandChild}"]`);
     await expect(grandChildNode.first()).toBeVisible({ timeout: 15000 });
+
+    // UI上のdepthを検証（親子関係が正しく反映されていることを確認）
+    // targetParent(depth=0) -> parentTab(depth=1) -> child1/child2(depth=2) -> grandChild(depth=3)
+    await waitForTabDepthInUI(sidePanelPage, targetParent, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, parentTab, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child1, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandChild, 3, { timeout: 3000 });
   });
 
   test('サブツリーをルートレベルにドロップした場合、元の親子関係から切り離され、ルートノードとして配置されることを検証する', async ({
@@ -214,13 +223,11 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expect(grandChild1Node.first()).toBeVisible({ timeout: 15000 });
     await expect(grandChild2Node.first()).toBeVisible({ timeout: 15000 });
 
-    // depthの検証（ルートレベルに移動した場合、depthが0または1になるはず）
-    const childDepth = await childNode.first().getAttribute('data-depth');
-    if (childDepth !== null) {
-      const childDepthNum = parseInt(childDepth, 10);
-      // ルートレベルのタブのdepthは通常0または1
-      expect(childDepthNum).toBeLessThanOrEqual(1);
-    }
+    // UI上のdepthを検証（ルートレベルに移動したことを確認）
+    // childWithSubtree(depth=0) -> grandChild1/grandChild2(depth=1)
+    await waitForTabDepthInUI(sidePanelPage, childWithSubtree, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandChild1, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandChild2, 1, { timeout: 3000 });
   });
 
   test('あるサブツリーを別のサブツリー内に移動した場合、サブツリー全体が移動することを検証する', async ({
@@ -322,6 +329,13 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
       `[data-testid="tree-node-${grandChild1_1_1}"]`
     );
     await expect(grandChild1_1_1Node.first()).toBeVisible({ timeout: 15000 });
+
+    // UI上のdepthを検証（サブツリー移動後の親子関係が正しいことを確認）
+    // parent2(depth=0) -> child2_1(depth=1) -> child1_1(depth=2) -> grandChild1_1_1(depth=3)
+    await waitForTabDepthInUI(sidePanelPage, parent2, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2_1, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child1_1, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandChild1_1_1, 3, { timeout: 3000 });
   });
 
   test('親タブを自分の子孫タブにドロップしようとした場合、循環参照を防ぐため操作が拒否されることを検証する', async ({
@@ -428,13 +442,11 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expect(childNodeAfter).toBeVisible({ timeout: 15000 });
     await expect(grandChildNodeAfter).toBeVisible({ timeout: 15000 });
 
-    // depthが変わっていないことを確認（実装がある場合）
-    const parentDepthBefore = await parentNodeBefore.getAttribute('data-depth');
-    const parentDepthAfter = await parentNodeAfter.getAttribute('data-depth');
-
-    if (parentDepthBefore !== null && parentDepthAfter !== null) {
-      expect(parentDepthAfter).toBe(parentDepthBefore);
-    }
+    // UI上のdepthを検証（循環参照が拒否され、元の構造が維持されていることを確認）
+    // parent(depth=0) -> child(depth=1) -> grandChild(depth=2)
+    await waitForTabDepthInUI(sidePanelPage, parent, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandChild, 2, { timeout: 3000 });
   });
 
   test('サブツリーを移動した場合、サブツリー構造が維持されることを検証する', async ({
@@ -529,5 +541,11 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expandAll(child2);
     const grandChildNode = sidePanelPage.locator(`[data-testid="tree-node-${grandChild}"]`);
     await expect(grandChildNode.first()).toBeVisible({ timeout: 15000 });
+
+    // UI上のdepthを検証（サブツリー構造が維持されていることを確認）
+    // parent2(depth=0) -> child2(depth=1) -> grandChild(depth=2)
+    await waitForTabDepthInUI(sidePanelPage, parent2, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, grandChild, 2, { timeout: 3000 });
   });
 });

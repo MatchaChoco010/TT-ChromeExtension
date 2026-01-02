@@ -11,7 +11,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
 import { reorderTabs, moveTabToParent, getParentTabId, getTabOrder } from './utils/drag-drop-utils';
-import { waitForParentChildRelation } from './utils/polling-utils';
+import { waitForParentChildRelation, waitForTabDepthInUI } from './utils/polling-utils';
 
 test.describe('ドラッグ&ドロップによる異なる深さ間の移動', () => {
   // Playwrightのmouse.moveは各ステップで約1秒かかるため、タイムアウトを延長
@@ -150,6 +150,17 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
       expect(gParentAfter).toBe(tabF);
     }).toPass({ timeout: 5000 });
 
+    // 検証2.5: UIでの深さが正しいことを確認
+    // タブA (depth 0), タブB (depth 1), タブC (depth 2), タブD (depth 2)
+    // タブF (depth 1), タブG (depth 2), タブE (depth 1)
+    await waitForTabDepthInUI(sidePanelPage, tabA, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabB, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabC, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabD, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabF, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabG, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabE, 1, { timeout: 3000 });
+
     // 検証3: タブFがタブEの前に配置されていることを確認
     await expect(async () => {
       const newOrder = await getTabOrder(sidePanelPage);
@@ -269,6 +280,14 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
       const child2AParent = await getParentTabId(sidePanelPage, child2A);
       expect(child2AParent).toBe(root2);
     }).toPass({ timeout: 5000 });
+
+    // 検証2.5: UIでの深さが正しいことを確認
+    // root1 (depth 0), child1A (depth 1), root2 (depth 1), child2A (depth 2), child1B (depth 1)
+    await waitForTabDepthInUI(sidePanelPage, root1, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child1A, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, root2, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2A, 2, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child1B, 1, { timeout: 3000 });
 
     // 検証3: 順序が正しいことを確認（ルート2が子1Aと子1Bの間にある）
     await expect(async () => {

@@ -12,6 +12,8 @@ import {
   waitForTabInTreeState,
   waitForTabRemovedFromTreeState,
   waitForParentChildRelation,
+  waitForTabDepthInUI,
+  waitForTabVisibleInUI,
 } from './utils/polling-utils';
 
 test.describe('親子関係不整合解消', () => {
@@ -82,6 +84,12 @@ test.describe('親子関係不整合解消', () => {
     );
 
     expect(allRelationsValid).toBe(true);
+
+    // UI depth verification
+    await waitForTabDepthInUI(sidePanelPage, parent1TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child1TabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, parent2TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2TabId, 1, { timeout: 3000 });
   });
 
   test('親タブを閉じた後、子タブが昇格しても他の親子関係が維持される', async ({
@@ -138,6 +146,11 @@ test.describe('親子関係不整合解消', () => {
     );
 
     expect(relation2Valid).toBe(true);
+
+    // UI depth verification: child1 becomes root after parent1 is closed
+    await waitForTabDepthInUI(sidePanelPage, child1TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, parent2TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2TabId, 1, { timeout: 3000 });
   });
 
   test('複数のタブ作成と削除を連続で行っても、親子関係が維持される', async ({
@@ -200,6 +213,10 @@ test.describe('親子関係不整合解消', () => {
     );
 
     expect(relationValid).toEqual({ valid: true });
+
+    // UI depth verification
+    await waitForTabDepthInUI(sidePanelPage, parentTabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
   });
 
   test('深い階層（3階層）の親子関係が、他のタブ操作後も維持される', async ({
@@ -283,6 +300,11 @@ test.describe('親子関係不整合解消', () => {
     );
 
     expect(allRelationsValid).toEqual({ valid: true });
+
+    // UI depth verification: 3-level hierarchy
+    await waitForTabDepthInUI(sidePanelPage, rootTabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, middleTabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, leafTabId, 2, { timeout: 3000 });
   });
 
   test('複数の独立した親子関係が、タブ操作の組み合わせ後も維持される', async ({
@@ -378,5 +400,106 @@ test.describe('親子関係不整合解消', () => {
     );
 
     expect(allRelationsValid).toEqual({ valid: true });
+
+    // UI depth verification: all parents depth 0, all children depth 1
+    await waitForTabDepthInUI(sidePanelPage, parent1TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child1bTabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, parent2TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child2TabId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, parent3TabId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, child3TabId, 1, { timeout: 3000 });
+  });
+
+  test('ルート親タブを閉じたとき、子と孫の親子関係が維持される', async ({
+    sidePanelPage,
+    extensionContext,
+    serviceWorker,
+  }) => {
+    // Side Panelが表示されることを確認
+    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
+    await expect(sidePanelRoot).toBeVisible();
+
+    // 3階層の構造を作成:
+    // tabA (root)
+    //   └── tabB
+    //         └── tabC
+    const tabAId = await createTab(extensionContext, 'https://example.com/A');
+    await waitForTabInTreeState(extensionContext, tabAId);
+
+    const tabBId = await createTab(extensionContext, 'https://example.com/B', tabAId);
+    await waitForTabInTreeState(extensionContext, tabBId);
+    await waitForParentChildRelation(extensionContext, tabBId, tabAId);
+
+    const tabCId = await createTab(extensionContext, 'https://example.com/C', tabBId);
+    await waitForTabInTreeState(extensionContext, tabCId);
+    await waitForParentChildRelation(extensionContext, tabCId, tabBId);
+
+    // ルート親タブAを閉じる
+    await closeTab(extensionContext, tabAId);
+    await waitForTabRemovedFromTreeState(extensionContext, tabAId);
+
+    // 期待値:
+    // tabB (新しいroot)
+    //   └── tabC
+    // タブBはルートになり、タブCはタブBの子のまま
+    const relationValid = await serviceWorker.evaluate(
+      async ({ tabBId, tabCId }) => {
+        interface TreeNode {
+          parentId: string | null;
+          depth: number;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, string>;
+          nodes: Record<string, TreeNode>;
+        }
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as LocalTreeState | undefined;
+        if (!treeState?.nodes || !treeState?.tabToNode) {
+          return { valid: false, reason: 'No tree state' };
+        }
+
+        const tabBNodeId = treeState.tabToNode[tabBId];
+        const tabCNodeId = treeState.tabToNode[tabCId];
+
+        if (!tabBNodeId || !tabCNodeId) {
+          return { valid: false, reason: 'Missing node IDs', tabBNodeId, tabCNodeId };
+        }
+
+        const tabBNode = treeState.nodes[tabBNodeId];
+        const tabCNode = treeState.nodes[tabCNodeId];
+
+        // タブBはルートになっているべき
+        if (tabBNode.parentId !== null) {
+          return { valid: false, reason: 'tabB should be root', tabBParentId: tabBNode.parentId };
+        }
+
+        // タブCはタブBの子のままであるべき
+        if (tabCNode.parentId !== tabBNodeId) {
+          return {
+            valid: false,
+            reason: 'tabC should still be child of tabB',
+            tabCParentId: tabCNode.parentId,
+            expectedParentId: tabBNodeId,
+          };
+        }
+
+        // 深さの確認
+        if (tabBNode.depth !== 0) {
+          return { valid: false, reason: 'tabB depth should be 0', tabBDepth: tabBNode.depth };
+        }
+        if (tabCNode.depth !== 1) {
+          return { valid: false, reason: 'tabC depth should be 1', tabCDepth: tabCNode.depth };
+        }
+
+        return { valid: true };
+      },
+      { tabBId, tabCId }
+    );
+
+    expect(relationValid).toEqual({ valid: true });
+
+    // UI depth verification: after tabA is closed, tabB becomes root, tabC is child
+    await waitForTabDepthInUI(sidePanelPage, tabBId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabCId, 1, { timeout: 3000 });
   });
 });

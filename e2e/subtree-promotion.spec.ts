@@ -10,6 +10,8 @@ import { createTab, closeTab } from './utils/tab-utils';
 import {
   waitForTabInTreeState,
   waitForParentChildRelation,
+  waitForTabDepthInUI,
+  waitForTabVisibleInUI,
 } from './utils/polling-utils';
 
 test.describe('親タブ削除時のサブツリー親子関係維持', () => {
@@ -123,6 +125,12 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     );
 
     expect(subtreeRelationsValid).toEqual({ valid: true });
+
+    // UI depth verification
+    await waitForTabVisibleInUI(sidePanelPage, tabBId, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabBId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabCId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabDId, 1, { timeout: 3000 });
   });
 
   test('3階層のツリーで親を閉じても孫の親子関係が維持される', async ({
@@ -231,6 +239,12 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     );
 
     expect(subtreeRelationsValid).toEqual({ valid: true });
+
+    // UI depth verification
+    await waitForTabVisibleInUI(sidePanelPage, tabBId, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabBId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabCId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabDId, 2, { timeout: 3000 });
   });
 
   test('複数の子タブにそれぞれ孫がある場合、親を閉じても全ての親子関係が維持される', async ({
@@ -377,5 +391,14 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     );
 
     expect(subtreeRelationsValid).toEqual({ valid: true });
+
+    // UI depth verification
+    await waitForTabVisibleInUI(sidePanelPage, tabBId, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabBId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabCId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabDId, 1, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabEId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabFId, 0, { timeout: 3000 });
+    await waitForTabDepthInUI(sidePanelPage, tabGId, 1, { timeout: 3000 });
   });
 });

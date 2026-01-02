@@ -13,6 +13,12 @@
  */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, activateTab } from './utils/tab-utils';
+import {
+  waitForTabDepthInUI,
+  waitForTabInTreeState,
+  waitForTabVisibleInUI,
+  waitForParentChildRelation,
+} from './utils/polling-utils';
 
 test.describe('chrome.tabs API統合', () => {
   test.describe('chrome.tabs.create()', () => {
@@ -71,32 +77,33 @@ test.describe('chrome.tabs API統合', () => {
     });
 
     test('chrome.tabs.create()でopenerTabIdを指定した場合、親子関係が確立される', async ({
-      serviceWorker,
+      extensionContext,
       sidePanelPage,
     }) => {
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 親タブを作成
-      const parentTab = await serviceWorker.evaluate(async () => {
-        return await chrome.tabs.create({ url: 'https://example.com/parent' });
-      });
-      expect(parentTab.id).toBeDefined();
+      // 親タブを作成（createTab utilityを使用）
+      const parentTabId = await createTab(extensionContext, 'https://example.com/parent');
+      expect(parentTabId).toBeDefined();
 
-      // 親タブから子タブを作成
-      const childTab = await serviceWorker.evaluate(
-        async (parentId) => {
-          return await chrome.tabs.create({
-            url: 'https://example.com/child',
-            openerTabId: parentId,
-          });
-        },
-        parentTab.id
-      );
+      // タブがツリー状態とUIに反映されるまで待機
+      await waitForTabInTreeState(extensionContext, parentTabId);
+      await waitForTabVisibleInUI(sidePanelPage, parentTabId);
 
-      expect(childTab.id).toBeDefined();
-      expect(childTab.openerTabId).toBe(parentTab.id);
+      // 親タブから子タブを作成（createTab utilityを使用してopenerTabIdを設定）
+      const childTabId = await createTab(extensionContext, 'https://example.com/child', parentTabId);
+      expect(childTabId).toBeDefined();
+
+      // タブがツリー状態とUIに反映されるまで待機
+      await waitForTabInTreeState(extensionContext, childTabId);
+      await waitForTabVisibleInUI(sidePanelPage, childTabId);
+      await waitForParentChildRelation(extensionContext, childTabId, parentTabId);
+
+      // UI depth検証
+      await waitForTabDepthInUI(sidePanelPage, parentTabId, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
     });
   });
 

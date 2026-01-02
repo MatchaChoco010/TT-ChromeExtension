@@ -135,6 +135,11 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
   if (!tab.id) return;
 
   try {
+    // IMPORTANT: Load the latest state from storage before adding a new tab
+    // This ensures we don't overwrite parent-child relationships set by Side Panel's drag & drop
+    // Side Panel updates storage directly, so we need to sync our in-memory state first
+    await treeStateManager.loadState();
+
     // Get user settings to determine new tab position
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
 
@@ -279,6 +284,10 @@ export async function handleTabRemoved(
   const { windowId, isWindowClosing } = removeInfo;
 
   try {
+    // IMPORTANT: Load the latest state from storage before removing a tab
+    // This ensures we don't overwrite parent-child relationships set by Side Panel's drag & drop
+    await treeStateManager.loadState();
+
     // ドラッグセッションのクリーンアップ
     // ドラッグ中のタブが削除された場合はセッションを終了
     dragSessionManager.handleTabRemoved(tabId);

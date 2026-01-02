@@ -14,7 +14,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
 import { moveTabToParent, getParentTabId, getTabDepth } from './utils/drag-drop-utils';
-import { waitForParentChildRelation, waitForCondition, waitForTabInTreeState } from './utils/polling-utils';
+import { waitForParentChildRelation, waitForCondition, waitForTabInTreeState, waitForTabDepthInUI } from './utils/polling-utils';
 
 test.describe('ツリー状態永続化', () => {
   // タイムアウトを延長（D&D操作があるため）
@@ -67,6 +67,10 @@ test.describe('ツリー状態永続化', () => {
 
       expect(parentIdInStorage.found).toBe(true);
       expect(parentIdInStorage.parentNodeId).toBe(parentIdInStorage.expectedParentNodeId);
+
+      // After storage verification, verify UI depth
+      await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
     });
 
     test('サイドパネルリロード後に親子関係が復元されること', async ({
@@ -136,6 +140,10 @@ test.describe('ツリー状態永続化', () => {
       // 子タブのdepthが正しいことを確認
       const childDepthAfter = await getTabDepth(sidePanelPage, childTab);
       expect(childDepthAfter).toBe(1);
+
+      // After storage verification, verify UI depth
+      await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
     });
 
     test('深いネストの親子関係がストレージに正しく保存・復元されること', async ({
@@ -213,6 +221,11 @@ test.describe('ツリー状態永続化', () => {
 
       const grandchildDepth = await getTabDepth(sidePanelPage, grandchildTab);
       expect(grandchildDepth).toBe(2);
+
+      // After storage verification, verify UI depth
+      await waitForTabDepthInUI(sidePanelPage, rootTab, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, grandchildTab, 2, { timeout: 3000 });
     });
   });
 
@@ -584,6 +597,12 @@ test.describe('ツリー状態永続化', () => {
       await setExpandedState(parent2, true);
       const child2Parent = await getParentTabId(sidePanelPage, child2);
       expect(child2Parent).toBe(parent2);
+
+      // After storage verification, verify UI depth
+      await waitForTabDepthInUI(sidePanelPage, parent1, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, child1, 1, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, parent2, 0, { timeout: 3000 });
+      await waitForTabDepthInUI(sidePanelPage, child2, 1, { timeout: 3000 });
     });
 
     test('複数回の折りたたみ操作後もストレージが正しく更新されること', async ({

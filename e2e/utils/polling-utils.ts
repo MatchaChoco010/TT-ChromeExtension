@@ -824,6 +824,110 @@ export async function waitForTabNoParent(
 }
 
 /**
+ * Side Panel UIでタブの親子関係（depth属性）を確認
+ *
+ * 実際のUI上でタブノードのdata-depth属性を確認する。
+ * ストレージの状態ではなく、実際にレンダリングされたDOMを検証する。
+ *
+ * @param page - Side PanelのPage
+ * @param tabId - 確認するタブのID
+ * @param expectedDepth - 期待するdepth値
+ * @param options - ポーリングオプション
+ */
+export async function waitForTabDepthInUI(
+  page: Page,
+  tabId: number,
+  expectedDepth: number,
+  options: PollingOptions = {}
+): Promise<void> {
+  const {
+    timeout = DEFAULT_TIMEOUT,
+    interval = 100,
+    timeoutMessage = `Tab ${tabId} depth in UI did not become ${expectedDepth}`,
+  } = options;
+
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      const actualDepth = await page.locator(`[data-testid="tree-node-${tabId}"]`).getAttribute('data-depth');
+      if (actualDepth === String(expectedDepth)) {
+        return;
+      }
+    } catch {
+      // 要素が見つからない場合は続行
+    }
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
+
+  // 最終状態を取得して詳細なエラーメッセージを生成
+  const finalDepth = await page.locator(`[data-testid="tree-node-${tabId}"]`).getAttribute('data-depth').catch(() => 'not found');
+  throw new Error(`${timeoutMessage}. Actual depth: ${finalDepth}`);
+}
+
+/**
+ * Side Panel UIでタブが表示されているか確認
+ *
+ * @param page - Side PanelのPage
+ * @param tabId - 確認するタブのID
+ * @param options - ポーリングオプション
+ */
+export async function waitForTabVisibleInUI(
+  page: Page,
+  tabId: number,
+  options: PollingOptions = {}
+): Promise<void> {
+  const {
+    timeout = DEFAULT_TIMEOUT,
+    interval = 100,
+    timeoutMessage = `Tab ${tabId} is not visible in UI`,
+  } = options;
+
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      const isVisible = await page.locator(`[data-testid="tree-node-${tabId}"]`).isVisible();
+      if (isVisible) {
+        return;
+      }
+    } catch {
+      // 要素が見つからない場合は続行
+    }
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
+
+  throw new Error(timeoutMessage);
+}
+
+/**
+ * Side Panel UIで全タブのdepth属性を取得
+ *
+ * @param page - Side PanelのPage
+ * @returns タブIDとdepthのマップ
+ */
+export async function getAllTabDepthsFromUI(
+  page: Page
+): Promise<Map<number, number>> {
+  const depths = new Map<number, number>();
+
+  const nodes = await page.locator('[data-testid^="tree-node-"]').all();
+  for (const node of nodes) {
+    const testId = await node.getAttribute('data-testid');
+    const depthStr = await node.getAttribute('data-depth');
+    if (testId && depthStr) {
+      const tabId = parseInt(testId.replace('tree-node-', ''), 10);
+      const depth = parseInt(depthStr, 10);
+      if (!isNaN(tabId) && !isNaN(depth)) {
+        depths.set(tabId, depth);
+      }
+    }
+  }
+
+  return depths;
+}
+
+/**
  * 汎用的な条件待機関数
  *
  * 指定された条件関数がtrueを返すまでポーリングで待機する。
