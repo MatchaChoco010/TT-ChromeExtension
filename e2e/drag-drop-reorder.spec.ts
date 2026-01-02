@@ -250,4 +250,80 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await expect(tab1Node).toBeVisible({ timeout: 3000 });
     await expect(tab2Node).toBeVisible({ timeout: 3000 });
   });
+
+  test('タブを自分より後ろの隙間にドロップした場合、正しい位置に配置されること', async ({
+    extensionContext,
+    sidePanelPage,
+    serviceWorker,
+  }) => {
+    // 準備: 5つのルートレベルのタブを作成
+    // タブA, タブB, タブC, タブD, タブE の順序で作成
+    const tabA = await createTab(extensionContext, 'https://example.com');
+    const tabB = await createTab(extensionContext, 'https://www.iana.org');
+    const tabC = await createTab(extensionContext, 'https://www.w3.org');
+    const tabD = await createTab(extensionContext, 'https://developer.mozilla.org');
+    const tabE = await createTab(extensionContext, 'https://httpbin.org');
+
+    // タブがツリーに表示されるまで待機
+    await assertTabInTree(sidePanelPage, tabA, 'Example');
+    await assertTabInTree(sidePanelPage, tabB);
+    await assertTabInTree(sidePanelPage, tabC);
+    await assertTabInTree(sidePanelPage, tabD);
+    await assertTabInTree(sidePanelPage, tabE);
+
+    // 初期状態の確認: tabA, tabB, tabC, tabD, tabE の順序
+    const initialNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+    const initialCount = await initialNodes.count();
+    expect(initialCount).toBeGreaterThanOrEqual(5);
+
+    // 実行: tabBをtabDの後（tabEの前）にドラッグ&ドロップ
+    // これは「自分より後ろの隙間への移動」のテストケース
+    await reorderTabs(sidePanelPage, tabB, tabE, 'before');
+
+    // 検証: ツリーの更新を待機
+    await serviceWorker.evaluate(async () => {
+      for (let i = 0; i < 20; i++) {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { nodes?: Record<string, unknown>; tabToNode?: Record<number, string> } | undefined;
+        if (treeState?.nodes && Object.keys(treeState.nodes).length >= 5) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    });
+
+    // UIが更新されるまで待機
+    await expect(async () => {
+      const finalNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+      const finalCount = await finalNodes.count();
+      expect(finalCount).toBeGreaterThanOrEqual(5);
+    }).toPass({ timeout: 3000 });
+
+    // 検証: タブの順序が正しいことを確認
+    // 期待される順序: tabA, tabC, tabD, tabB, tabE
+    // tabBがtabDとtabEの間に正しく配置されていることを確認
+    const tabBNode = sidePanelPage.locator(`[data-testid="tree-node-${tabB}"]`).first();
+    const tabDNode = sidePanelPage.locator(`[data-testid="tree-node-${tabD}"]`).first();
+    const tabENode = sidePanelPage.locator(`[data-testid="tree-node-${tabE}"]`).first();
+
+    // 各タブが表示されていることを確認
+    await expect(tabBNode).toBeVisible({ timeout: 3000 });
+    await expect(tabDNode).toBeVisible({ timeout: 3000 });
+    await expect(tabENode).toBeVisible({ timeout: 3000 });
+
+    // tabBのバウンディングボックスを取得
+    const tabBBox = await tabBNode.boundingBox();
+    const tabDBox = await tabDNode.boundingBox();
+    const tabEBox = await tabENode.boundingBox();
+
+    // tabBがtabDの下かつtabEの上に配置されていることを確認（Y座標で検証）
+    expect(tabBBox).not.toBeNull();
+    expect(tabDBox).not.toBeNull();
+    expect(tabEBox).not.toBeNull();
+    if (tabBBox && tabDBox && tabEBox) {
+      // tabDのY座標 < tabBのY座標 < tabEのY座標であることを確認
+      expect(tabDBox.y).toBeLessThan(tabBBox.y);
+      expect(tabBBox.y).toBeLessThan(tabEBox.y);
+    }
+  });
 });

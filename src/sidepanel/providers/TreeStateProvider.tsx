@@ -1021,19 +1021,34 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       try {
         // ドロップ位置からターゲットChromeインデックスを計算
         let targetChromeIndex: number;
+        const activeTabInfo = tabInfoMap[activeNode.tabId];
+        const activeTabIndex = activeTabInfo?.index ?? 0;
+
         if (belowNodeId && updatedNodes[belowNodeId]) {
           // belowNodeの位置に挿入（belowNodeの前に配置）
           const belowNode = updatedNodes[belowNodeId];
           const belowTabInfo = tabInfoMap[belowNode.tabId];
-          targetChromeIndex = belowTabInfo?.index ?? 0;
+          let belowIndex = belowTabInfo?.index ?? 0;
+          // アクティブタブがbelowタブより前にある場合、chrome.tabs.moveで
+          // アクティブタブが除外されてからbelowタブのインデックスが1つ減るため、
+          // 目的インデックスを1減らす
+          if (activeTabIndex < belowIndex) {
+            belowIndex -= 1;
+          }
+          targetChromeIndex = belowIndex;
         } else if (aboveNodeId && updatedNodes[aboveNodeId]) {
           // aboveNodeの後に挿入（リスト末尾）
           const aboveNode = updatedNodes[aboveNodeId];
           const aboveTabInfo = tabInfoMap[aboveNode.tabId];
-          targetChromeIndex = (aboveTabInfo?.index ?? 0) + 1;
+          let aboveIndex = aboveTabInfo?.index ?? 0;
+          // アクティブタブがaboveタブより前にある場合、同様にインデックスを調整
+          if (activeTabIndex < aboveIndex) {
+            aboveIndex -= 1;
+          }
+          targetChromeIndex = aboveIndex + 1;
         } else {
           // 位置情報がない場合は現在位置を維持
-          targetChromeIndex = tabInfoMap[activeNode.tabId]?.index ?? 0;
+          targetChromeIndex = activeTabIndex;
         }
 
         // サブツリー内のタブIDを深さ優先で収集

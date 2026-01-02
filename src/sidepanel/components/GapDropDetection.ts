@@ -44,6 +44,17 @@ export interface AdjacentDepths {
 }
 
 /**
+ * 隣接ノードのID情報
+ * プレースホルダー表示位置の計算に使用
+ */
+export interface AdjacentNodeIds {
+  /** 上のノードのID（存在しない場合はundefined） */
+  aboveNodeId: string | undefined;
+  /** 下のノードのID（存在しない場合はundefined） */
+  belowNodeId: string | undefined;
+}
+
+/**
  * ドロップターゲット情報
  */
 export interface DropTarget {
@@ -55,6 +66,8 @@ export interface DropTarget {
   gapIndex?: number;
   /** 隙間ターゲットの場合の隣接ノードdepth情報 */
   adjacentDepths?: AdjacentDepths;
+  /** 隙間ターゲットの場合の隣接ノードID情報 */
+  adjacentNodeIds?: AdjacentNodeIds;
   /** 水平ドロップの場合の挿入インデックス（ピン留めタブ用） */
   insertIndex?: number;
 }
@@ -158,6 +171,10 @@ export function calculateDropTarget(
         above: undefined,
         below: firstTab.depth,
       },
+      adjacentNodeIds: {
+        aboveNodeId: undefined,
+        belowNodeId: firstTab.nodeId,
+      },
     };
   }
 
@@ -170,6 +187,10 @@ export function calculateDropTarget(
       adjacentDepths: {
         above: lastTab.depth,
         below: undefined,
+      },
+      adjacentNodeIds: {
+        aboveNodeId: lastTab.nodeId,
+        belowNodeId: undefined,
       },
     };
   }
@@ -195,6 +216,10 @@ export function calculateDropTarget(
             above: aboveTab?.depth,
             below: tab.depth,
           },
+          adjacentNodeIds: {
+            aboveNodeId: aboveTab?.nodeId,
+            belowNodeId: tab.nodeId,
+          },
         };
       }
 
@@ -207,6 +232,10 @@ export function calculateDropTarget(
           adjacentDepths: {
             above: tab.depth,
             below: belowTab?.depth,
+          },
+          adjacentNodeIds: {
+            aboveNodeId: tab.nodeId,
+            belowNodeId: belowTab?.nodeId,
           },
         };
       }
@@ -253,6 +282,52 @@ export function calculateIndicatorY(
   const aboveTab = tabPositions[gapIndex - 1];
   const belowTab = tabPositions[gapIndex];
   return (aboveTab.bottom + belowTab.top) / 2;
+}
+
+/**
+ * ノードIDを使ってドロップインジケーターのY座標を計算する
+ * ドラッグ中のノードを含む元のtabPositionsを使用することで、
+ * プレースホルダーが正しい視覚的位置に表示される
+ *
+ * @param aboveNodeId - 上のノードのID（先頭の場合はundefined）
+ * @param belowNodeId - 下のノードのID（末尾の場合はundefined）
+ * @param tabPositions - 元のタブノードの位置情報配列（ドラッグ中ノード含む）
+ * @returns ドロップインジケーターのY座標
+ */
+export function calculateIndicatorYByNodeIds(
+  aboveNodeId: string | undefined,
+  belowNodeId: string | undefined,
+  tabPositions: TabPosition[]
+): number {
+  if (tabPositions.length === 0) {
+    return 0;
+  }
+
+  // 上のノードと下のノードを検索
+  const aboveTab = aboveNodeId
+    ? tabPositions.find(t => t.nodeId === aboveNodeId)
+    : undefined;
+  const belowTab = belowNodeId
+    ? tabPositions.find(t => t.nodeId === belowNodeId)
+    : undefined;
+
+  // 先頭の場合（aboveNodeIdがundefined）
+  if (!aboveTab && belowTab) {
+    return belowTab.top;
+  }
+
+  // 末尾の場合（belowNodeIdがundefined）
+  if (aboveTab && !belowTab) {
+    return aboveTab.bottom;
+  }
+
+  // タブ間の隙間
+  if (aboveTab && belowTab) {
+    return (aboveTab.bottom + belowTab.top) / 2;
+  }
+
+  // フォールバック
+  return 0;
 }
 
 /**

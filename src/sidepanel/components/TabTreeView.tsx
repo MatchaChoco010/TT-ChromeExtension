@@ -9,7 +9,7 @@ import UnreadBadge from './UnreadBadge';
 import CloseButton from './CloseButton';
 import DropIndicator from './DropIndicator';
 import {
-  calculateIndicatorY,
+  calculateIndicatorYByNodeIds,
   type TabPosition,
 } from './GapDropDetection';
 
@@ -1184,24 +1184,18 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     }
     const gapIndex = dropTarget.gapIndex ?? 0;
 
-    // ドラッグ中のノードとそのサブツリーを除外
-    // calculateDropTargetと同じロジックでeffectiveTabPositionsを計算し、
-    // gapIndexとY座標の対応を一致させる
-    let tabPositions = tabPositionsRef.current;
-    if (dragState.draggedItemId) {
-      const subtreeIds = getSubtreeNodeIds(dragState.draggedItemId);
-      const subtreeSet = new Set(subtreeIds);
-      tabPositions = tabPositions.filter(pos => !subtreeSet.has(pos.nodeId));
-    }
+    // adjacentNodeIdsを使って元のtabPositions（ドラッグ中ノード含む）での位置を計算
+    // これにより、プレースホルダーがドラッグ中タブの中央に表示される問題を回避
+    const aboveNodeId = dropTarget.adjacentNodeIds?.aboveNodeId;
+    const belowNodeId = dropTarget.adjacentNodeIds?.belowNodeId;
+    const topY = calculateIndicatorYByNodeIds(aboveNodeId, belowNodeId, tabPositionsRef.current);
 
-    // gapIndexからY位置を計算
-    const topY = calculateIndicatorY(gapIndex, tabPositions);
     return {
       index: gapIndex,
       depth: dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0,
       topY,
     };
-  }, [dropTarget, dragState.draggedItemId, getSubtreeNodeIds]);
+  }, [dropTarget]);
 
   // ドラッグ中の横スクロール防止
   // isDraggingがtrueの間はoverflow-x: hiddenを適用
