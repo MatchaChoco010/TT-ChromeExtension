@@ -79,9 +79,7 @@ test.describe('UIツリービューのdepth属性検証', () => {
     await waitForTabDepthInUI(sidePanelPage, newTabId, 0, { timeout: 3000 });
 
     // 既存の親子関係がUI上で維持されていることを確認
-    // これが失敗する場合、親子関係がフラットになる問題が発生している
     const depthsAfterNewTab = await getAllTabDepthsFromUI(sidePanelPage);
-    console.log('Depths after new tab:', Object.fromEntries(depthsAfterNewTab));
 
     expect(depthsAfterNewTab.get(parentTabId)).toBe(0);
     expect(depthsAfterNewTab.get(childTabId)).toBe(1);
@@ -124,7 +122,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
 
     // 階層構造を確認
     const depthsBefore = await getAllTabDepthsFromUI(sidePanelPage);
-    console.log('Depths before new tab:', Object.fromEntries(depthsBefore));
 
     expect(depthsBefore.get(tabAId)).toBe(0);
     expect(depthsBefore.get(tabBId)).toBe(1);
@@ -135,31 +132,9 @@ test.describe('UIツリービューのdepth属性検証', () => {
     await waitForTabInTreeState(extensionContext, newTabId);
     await waitForTabVisibleInUI(sidePanelPage, newTabId);
 
-    // 少し待機してUIが更新されることを確認
-    await sidePanelPage.waitForTimeout(500);
-
-    // ストレージの状態を確認（デバッグ用）
-    const serviceWorker = extensionContext.serviceWorkers()[0];
-    const storageState = await serviceWorker.evaluate(async () => {
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state;
-      if (!treeState?.nodes) return { error: 'No tree state' };
-
-      // 各ノードのparentIdとdepthを取得
-      const nodeInfo: Record<string, { parentId: string | null; depth: number; tabId: number }> = {};
-      for (const [nodeId, node] of Object.entries(treeState.nodes)) {
-        const n = node as { parentId: string | null; depth: number; tabId: number };
-        nodeInfo[nodeId] = { parentId: n.parentId, depth: n.depth, tabId: n.tabId };
-      }
-      return { tabToNode: treeState.tabToNode, nodes: nodeInfo };
-    });
-    console.log('Storage state after new tab:', JSON.stringify(storageState, null, 2));
-
     // 階層構造がUI上で維持されていることを確認
     const depthsAfter = await getAllTabDepthsFromUI(sidePanelPage);
-    console.log('Depths after new tab:', Object.fromEntries(depthsAfter));
 
-    // これが失敗する場合、親子関係がフラットになる問題が発生している
     expect(depthsAfter.get(tabAId)).toBe(0);
     expect(depthsAfter.get(tabBId)).toBe(1);
     expect(depthsAfter.get(tabCId)).toBe(2);

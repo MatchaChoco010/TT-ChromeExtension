@@ -19,16 +19,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * デバッグログのヘルパー関数
- * CI環境やDEBUG=true環境でのみログを出力
- */
-const debugLog = (message: string) => {
-  if (process.env.CI === 'true' || process.env.DEBUG === 'true') {
-    console.log(`[ExtensionFixture] ${new Date().toISOString()} - ${message}`);
-  }
-};
-
-/**
  * ExtensionFixturesのインターフェース
  */
 export interface ExtensionFixtures {
@@ -124,16 +114,12 @@ const waitForServiceWorker = async (
   timeout: number = 60000
 ): Promise<Worker> => {
   const startTime = Date.now();
-  debugLog(`Starting to wait for Service Worker (timeout: ${timeout}ms)`);
 
   // 1. まず既存のService Workerをチェック
   const existingWorkers = context.serviceWorkers();
   if (existingWorkers.length > 0) {
-    debugLog(`Found existing Service Worker immediately: ${existingWorkers[0].url()}`);
     return existingWorkers[0];
   }
-
-  debugLog('No existing Service Worker found, starting polling');
 
   // 2. シンプルなポーリングで待機
   const pollInterval = 100;
@@ -148,8 +134,6 @@ const waitForServiceWorker = async (
     // Service Workerをチェック
     const workers = context.serviceWorkers();
     if (workers.length > 0) {
-      const elapsed = Date.now() - startTime;
-      debugLog(`Service Worker detected via polling (poll #${pollCount}) in ${elapsed}ms: ${workers[0].url()}`);
       return workers[0];
     }
   }
@@ -157,13 +141,10 @@ const waitForServiceWorker = async (
   // タイムアウト: 最終チェック
   const finalWorkers = context.serviceWorkers();
   if (finalWorkers.length > 0) {
-    const elapsed = Date.now() - startTime;
-    debugLog(`Service Worker found in final check after ${elapsed}ms: ${finalWorkers[0].url()}`);
     return finalWorkers[0];
   }
 
   const elapsed = Date.now() - startTime;
-  debugLog(`Service Worker startup FAILED after ${elapsed}ms (${pollCount} polls)`);
 
   throw new Error(
     `Service Worker did not start within ${elapsed}ms (${pollCount} polls). ` +
@@ -193,7 +174,6 @@ const createUniqueUserDataDir = (): string => {
 
   // ディレクトリを作成
   fs.mkdirSync(userDataDir, { recursive: true });
-  debugLog(`Created unique user data directory: ${userDataDir}`);
 
   return userDataDir;
 };
@@ -204,10 +184,8 @@ const createUniqueUserDataDir = (): string => {
 const removeUserDataDir = (userDataDir: string): void => {
   try {
     fs.rmSync(userDataDir, { recursive: true, force: true });
-    debugLog(`Removed user data directory: ${userDataDir}`);
-  } catch (error) {
+  } catch {
     // 削除失敗は警告のみ（テスト自体は成功）
-    debugLog(`Warning: Failed to remove user data directory: ${error}`);
   }
 };
 
@@ -228,14 +206,11 @@ const createExtensionContext = async (
   extensionPath: string,
   headless: boolean
 ): Promise<{ context: BrowserContext; userDataDir: string }> => {
-  debugLog('Creating browser context');
-
   // 拡張機能のビルド成果物を検証
   const validation = validateExtensionBuild(extensionPath);
   if (!validation.valid) {
     throw new Error(`Extension build validation failed:\n${validation.errors.join('\n')}`);
   }
-  debugLog('Extension build validation passed');
 
   // 一意なユーザーデータディレクトリを作成（並列実行時の競合を防止）
   const userDataDir = createUniqueUserDataDir();
@@ -270,13 +245,10 @@ const createExtensionContext = async (
     ],
   });
 
-  debugLog('Browser context created successfully');
-
   // Service Workerの起動を待機（30秒タイムアウト）
   const timeout = 30000;
   await waitForServiceWorker(context, timeout);
 
-  debugLog('Service Worker is ready');
   return { context, userDataDir };
 };
 
@@ -307,7 +279,6 @@ export const test = base.extend<ExtensionFixtures>({
     await use(context);
 
     // クリーンアップ: コンテキストをクローズ
-    debugLog('Closing browser context');
     await context.close();
 
     // クリーンアップ: ユーザーデータディレクトリを削除

@@ -199,6 +199,7 @@ export type MessageType =
   | { type: 'GET_DRAG_STATE' }
   | { type: 'CLEAR_DRAG_STATE' }
   | { type: 'SYNC_TABS' }
+  | { type: 'REFRESH_TREE_STRUCTURE' }
   | { type: 'STATE_UPDATED' }
   // グループ化機能
   | { type: 'CREATE_GROUP'; payload: { tabIds: number[] } }

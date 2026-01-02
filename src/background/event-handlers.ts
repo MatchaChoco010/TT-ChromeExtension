@@ -517,6 +517,10 @@ function handleMessage(
         handleSyncTabs(sendResponse);
         break;
 
+      case 'REFRESH_TREE_STRUCTURE':
+        handleRefreshTreeStructure(sendResponse);
+        break;
+
       // グループ化機能
       case 'CREATE_GROUP':
         handleCreateGroup(message.payload.tabIds, sendResponse);
@@ -896,6 +900,25 @@ async function handleSyncTabs(
 ): Promise<void> {
   try {
     await treeStateManager.syncWithChromeTabs();
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Handle REFRESH_TREE_STRUCTURE message
+ * Side Panelからのドラッグ&ドロップ操作後に呼び出す
+ * ストレージから最新の状態を読み込み、treeStructureを再構築して保存
+ */
+async function handleRefreshTreeStructure(
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    await treeStateManager.refreshTreeStructure();
     sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({

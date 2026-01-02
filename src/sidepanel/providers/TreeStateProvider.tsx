@@ -907,6 +907,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       // 1. TreeStateProvider directly updates storage
       // 2. Service worker's TreeStateManager will reload from storage when needed
       // 3. Sending UPDATE_TREE would cause duplicate updates and potential race conditions
+      //
+      // しかし、treeStructureを更新する必要があるので、REFRESH_TREE_STRUCTUREを送信
+      // これにより、ブラウザ再起動時に親子関係が正しく復元される
+      chrome.runtime.sendMessage({ type: 'REFRESH_TREE_STRUCTURE' }).catch((_error) => {
+        // Ignore errors when no listeners are available
+      });
     },
     [treeState, updateTreeState, tabInfoMap]
   );
@@ -1124,6 +1130,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       } catch {
         // 同期に失敗してもツリー状態の更新は維持する
       }
+
+      // treeStructureを更新するためにREFRESH_TREE_STRUCTUREを送信
+      // これにより、ブラウザ再起動時に親子関係が正しく復元される
+      chrome.runtime.sendMessage({ type: 'REFRESH_TREE_STRUCTURE' }).catch((_error) => {
+        // Ignore errors when no listeners are available
+      });
     },
     [treeState, updateTreeState, tabInfoMap]
   );

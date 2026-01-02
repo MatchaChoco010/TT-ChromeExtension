@@ -85,10 +85,7 @@ export async function startDrag(page: Page, sourceTabId: number): Promise<void> 
   await page.mouse.move(startX + 10, startY, { steps: 5 });
 
   // ドラッグ状態が確立されるまで待機
-  const isDragging = await waitForDragState(page);
-  if (!isDragging) {
-    console.warn('startDrag: is-dragging class did not appear within timeout');
-  }
+  await waitForDragState(page);
 }
 
 /**

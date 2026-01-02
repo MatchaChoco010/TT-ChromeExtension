@@ -367,6 +367,22 @@ export class TreeStateManager {
   }
 
   /**
+   * treeStructureをリフレッシュする
+   * Side Panelからのドラッグ&ドロップ操作後に呼び出す
+   * ストレージから最新の状態を読み込み、treeStructureを再構築して保存
+   */
+  async refreshTreeStructure(): Promise<void> {
+    try {
+      // ストレージから最新の状態を読み込み
+      await this.loadState();
+      // treeStructureを再構築して保存
+      await this.persistState();
+    } catch (_error) {
+      // Error refreshing tree structure silently
+    }
+  }
+
+  /**
    * treeStructureから親子関係を復元
    * タブのインデックスとURLを使って照合
    *
@@ -428,6 +444,10 @@ export class TreeStateManager {
       }
     }
 
+    // パス1で新規追加されたタブIDを追跡
+    // 既存ノードはloadState()で正しくparentIdが設定されているため、Pass2で上書きしない
+    const newlyAddedTabIds = new Set<number>();
+
     // パス1: すべてのマッチしたタブをルートノードとして追加
     for (let i = 0; i < treeStructure.length; i++) {
       const tabId = structureIndexToTabId.get(i);
@@ -444,6 +464,9 @@ export class TreeStateManager {
       // まずルートノードとして追加
       await this.addTab(tab, null, entry.viewId || defaultViewId);
 
+      // 新規追加されたタブを追跡
+      newlyAddedTabIds.add(tabId);
+
       // 展開状態を設定
       const newNode = this.getNodeByTabId(tab.id);
       if (newNode) {
@@ -456,7 +479,8 @@ export class TreeStateManager {
       }
     }
 
-    // パス2: 親子関係を設定
+    // パス2: 親子関係を設定（新規追加されたノードのみ）
+    // 既存ノードのparentIdはloadState()で正しく設定されているため、上書きしない
     for (let i = 0; i < treeStructure.length; i++) {
       const entry = treeStructure[i];
       if (entry.parentIndex === null) continue;
@@ -464,6 +488,9 @@ export class TreeStateManager {
       const tabId = structureIndexToTabId.get(i);
       const parentTabId = structureIndexToTabId.get(entry.parentIndex);
       if (!tabId || !parentTabId) continue;
+
+      // 新規追加されたノードのみ親子関係を設定
+      if (!newlyAddedTabIds.has(tabId)) continue;
 
       const childNode = this.getNodeByTabId(tabId);
       const parentNode = this.getNodeByTabId(parentTabId);
