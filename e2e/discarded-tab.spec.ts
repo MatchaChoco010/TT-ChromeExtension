@@ -15,6 +15,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, activateTab } from './utils/tab-utils';
 import { waitForCondition } from './utils/polling-utils';
+import { assertTabStructure } from './utils/drag-drop-utils';
 
 test.describe('休止タブの視覚的区別', () => {
   /**
@@ -40,21 +41,19 @@ test.describe('休止タブの視覚的区別', () => {
       active: false,
     });
     expect(tabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
-    // タブの読み込みが完了するまで待機
-    await serviceWorker.evaluate(async (tabId) => {
-      for (let i = 0; i < 100; i++) {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab.status === 'complete') {
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }, tabId);
+    // タブの読み込みが完了するまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const tab = await serviceWorker.evaluate((tabId) => chrome.tabs.get(tabId), tabId);
+        return tab.status === 'complete';
+      },
+      { timeout: 10000, interval: 100, timeoutMessage: 'Tab did not complete loading' }
+    );
 
     // タブがツリーに表示されていることを確認
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(tabNode).toBeVisible({ timeout: 5000 });
 
     // グレーアウトされていない状態を確認（通常状態）
     // discarded-tab-titleのdata-testidはisDiscarded=trueの場合のみ設定される
@@ -70,16 +69,19 @@ test.describe('休止タブの視覚的区別', () => {
         await chrome.tabs.discard(tabId);
       }, tabId);
 
-      // discardが実際に動作したかを確認
-      // 少し待ってからタブの状態を確認
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const tabState = await serviceWorker.evaluate(async (tabId) => {
-        const tab = await chrome.tabs.get(tabId);
-        return { discarded: tab.discarded };
-      }, tabId);
-
-      actuallyDiscarded = tabState.discarded === true;
+      // discardが実際に動作したかをポーリングで確認
+      try {
+        await waitForCondition(
+          async () => {
+            const tab = await serviceWorker.evaluate((tabId) => chrome.tabs.get(tabId), tabId);
+            return tab.discarded === true;
+          },
+          { timeout: 3000, interval: 100, timeoutMessage: 'Tab was not discarded' }
+        );
+        actuallyDiscarded = true;
+      } catch {
+        actuallyDiscarded = false;
+      }
     } catch {
       // Service Workerコンテキストが閉じられた場合（discard操作の副作用）
       // chrome.tabs.discard()の副作用でコンテキストが閉じられることがある
@@ -143,21 +145,19 @@ test.describe('休止タブの視覚的区別', () => {
       active: false,
     });
     expect(tabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
-    // タブの読み込みが完了するまで待機
-    await serviceWorker.evaluate(async (tabId) => {
-      for (let i = 0; i < 100; i++) {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab.status === 'complete') {
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }, tabId);
+    // タブの読み込みが完了するまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const tab = await serviceWorker.evaluate((tabId) => chrome.tabs.get(tabId), tabId);
+        return tab.status === 'complete';
+      },
+      { timeout: 10000, interval: 100, timeoutMessage: 'Tab did not complete loading' }
+    );
 
     // タブがツリーに表示されていることを確認
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(tabNode).toBeVisible({ timeout: 5000 });
 
     // タブを休止状態にする（chrome.tabs.discard）
     let actuallyDiscarded = false;
@@ -166,15 +166,19 @@ test.describe('休止タブの視覚的区別', () => {
         await chrome.tabs.discard(tabId);
       }, tabId);
 
-      // discardが実際に動作したかを確認
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const tabState = await serviceWorker.evaluate(async (tabId) => {
-        const tab = await chrome.tabs.get(tabId);
-        return { discarded: tab.discarded };
-      }, tabId);
-
-      actuallyDiscarded = tabState.discarded === true;
+      // discardが実際に動作したかをポーリングで確認
+      try {
+        await waitForCondition(
+          async () => {
+            const tab = await serviceWorker.evaluate((tabId) => chrome.tabs.get(tabId), tabId);
+            return tab.discarded === true;
+          },
+          { timeout: 3000, interval: 100, timeoutMessage: 'Tab was not discarded' }
+        );
+        actuallyDiscarded = true;
+      } catch {
+        actuallyDiscarded = false;
+      }
     } catch {
       // chrome.tabs.discard()の副作用でコンテキストが閉じられることがある
       actuallyDiscarded = false;

@@ -14,6 +14,7 @@
 
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
+import { assertTabStructure } from './utils/drag-drop-utils';
 
 test.describe('コンテキストメニュー操作', () => {
   test('タブノードを右クリックした場合、コンテキストメニューが表示される', async ({
@@ -22,12 +23,10 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
     // タブノードのlocatorを定義
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-
-    // タブノードが表示されるまで待機（Playwrightの自動リトライ機能を活用）
-    await expect(tabNode).toBeVisible({ timeout: 10000 });
 
     // バックグラウンドスロットリングを回避（ページにフォーカスを当てる）
     await sidePanelPage.bringToFront();
@@ -56,6 +55,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, []);
   });
 
   test('コンテキストメニューから"タブを閉じる"を選択した場合、対象タブが閉じられる', async ({
@@ -64,12 +64,7 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: テスト用タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
-
-    // タブノードが表示されるまで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
     // 現在のタブ数を取得
     const initialTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
@@ -105,6 +100,9 @@ test.describe('コンテキストメニュー操作', () => {
       const currentTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
       expect(currentTabNodes).toBeLessThan(initialTabNodes);
     }).toPass({ timeout: 5000 });
+
+    // タブがUIで閉じられた後の構造を検証（タブが0個になっている）
+    await assertTabStructure(sidePanelPage, []);
   });
 
   test('コンテキストメニューから"サブツリーを閉じる"を選択した場合、対象タブとその全ての子孫タブが閉じられる', async ({
@@ -113,27 +111,23 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: 親タブと子タブを作成してサブツリーを構築
     const parentTabId = await createTab(extensionContext, 'about:blank');
-
-    // 親タブが表示されるまで待機
-    await expect(async () => {
-      const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-      await expect(parentNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [{ tabId: parentTabId, depth: 0 }]);
 
     // 子タブを作成
     const childTabId1 = await createTab(extensionContext, 'about:blank', parentTabId);
-    // 子タブが表示されるまで待機
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId1}"]`)).toBeVisible({ timeout: 10000 });
-    // 親子関係がUIに反映されるまで待機（depth=1）
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId1}"][data-depth="1"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+    ]);
 
     const childTabId2 = await createTab(extensionContext, 'about:blank', parentTabId);
-    // 子タブが表示されるまで待機
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"]`)).toBeVisible({ timeout: 10000 });
-    // 親子関係がUIに反映されるまで待機（depth=1）
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"][data-depth="1"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+      { tabId: childTabId2, depth: 1 },
+    ]);
 
-    // 現在のタブ数を取得（初期タブ + 親タブ + 子タブ2つ）
+    // 現在のタブ数を取得（親タブ + 子タブ2つ）
     const initialTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
     expect(initialTabNodes).toBeGreaterThanOrEqual(3);
 
@@ -173,6 +167,9 @@ test.describe('コンテキストメニュー操作', () => {
     await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId1}"]`)).not.toBeVisible({ timeout: 5000 });
     // 子タブ2が削除されていることを確認
     await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"]`)).not.toBeVisible({ timeout: 5000 });
+
+    // サブツリーが閉じられた後の構造を検証（タブが0個になっている）
+    await assertTabStructure(sidePanelPage, []);
   });
 
   test('コンテキストメニューから"グループに追加"を選択した場合、グループ選択またはグループ作成のインタラクションが開始される', async ({
@@ -181,12 +178,7 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
-
-    // タブノードが表示されるまで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -216,6 +208,7 @@ test.describe('コンテキストメニュー操作', () => {
     await sidePanelPage.keyboard.press('Escape');
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 2000 });
     await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, []);
   });
 
   test('コンテキストメニューから"新しいウィンドウで開く"を選択した場合、タブが新しいウィンドウに移動する', async ({
@@ -225,12 +218,7 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
-
-    // タブノードが表示されるまで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
     // 初期のウィンドウ数を取得
     const initialWindowCount = await serviceWorker.evaluate(async () => {
@@ -280,12 +268,7 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
-
-    // タブノードが表示されるまで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -318,6 +301,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, []);
   });
 
   test('コンテキストメニューの外側をクリックした場合、メニューが閉じられる', async ({
@@ -326,12 +310,7 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
-
-    // タブノードが表示されるまで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -379,6 +358,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, []);
   });
 
   test('Escapeキーを押した場合、コンテキストメニューが閉じられる', async ({
@@ -387,12 +367,7 @@ test.describe('コンテキストメニュー操作', () => {
   }) => {
     // Arrange: タブを作成
     const tabId = await createTab(extensionContext, 'about:blank');
-
-    // タブノードが表示されるまで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -423,5 +398,6 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, []);
   });
 });

@@ -11,7 +11,7 @@
  */
 import { test, expect } from './fixtures/extension';
 import { createTab, assertTabInTree } from './utils/tab-utils';
-import { moveTabToParent, getParentTabId, reorderTabs, startDrag, dropTab } from './utils/drag-drop-utils';
+import { moveTabToParent, getParentTabId, reorderTabs, startDrag, dropTab, assertTabStructure } from './utils/drag-drop-utils';
 import { waitForParentChildRelation, waitForTabDepthInUI } from './utils/polling-utils';
 import type { Page } from '@playwright/test';
 
@@ -116,13 +116,13 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 親タブと2つの子タブを作成
-      const parentTab = await createTab(extensionContext, 'https://example.com');
-      const child1 = await createTab(extensionContext, 'https://www.iana.org');
-      const child2 = await createTab(extensionContext, 'https://www.w3.org');
+      // 準備: 親タブと2つの子タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const parentTab = await createTab(extensionContext, 'about:blank');
+      const child1 = await createTab(extensionContext, 'about:blank');
+      const child2 = await createTab(extensionContext, 'about:blank');
 
       // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab, 'Example');
+      await assertTabInTree(sidePanelPage, parentTab);
       await assertTabInTree(sidePanelPage, child1);
       await assertTabInTree(sidePanelPage, child2);
 
@@ -145,9 +145,9 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       }
 
       // 初期状態の子の順序を確認
+      // moveTabToParentは順序確定を待機するため、[child1, child2]の順になる
       const initialOrder = await getChildOrder(sidePanelPage, parentTab);
-      expect(initialOrder).toContain(child1);
-      expect(initialOrder).toContain(child2);
+      expect(initialOrder).toEqual([child1, child2]);
 
       // 実行: child1を親タブの直上（中央）にドロップ
       await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
@@ -177,14 +177,14 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 親タブと3つの子タブを作成
-      const parentTab = await createTab(extensionContext, 'https://example.com');
-      const child1 = await createTab(extensionContext, 'https://www.iana.org');
-      const child2 = await createTab(extensionContext, 'https://www.w3.org');
-      const child3 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      // 準備: 親タブと3つの子タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const parentTab = await createTab(extensionContext, 'about:blank');
+      const child1 = await createTab(extensionContext, 'about:blank');
+      const child2 = await createTab(extensionContext, 'about:blank');
+      const child3 = await createTab(extensionContext, 'about:blank');
 
       // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab, 'Example');
+      await assertTabInTree(sidePanelPage, parentTab);
       await assertTabInTree(sidePanelPage, child1);
       await assertTabInTree(sidePanelPage, child2);
       await assertTabInTree(sidePanelPage, child3);
@@ -210,17 +210,17 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         await expect(parentNode).toHaveAttribute('data-expanded', 'true', { timeout: 3000 });
       }
 
-      // 実行: child1（最初の子）を親にドロップ
+      // 初期順序を確認: moveTabToParentは順序確定を待機するため、[child1, child2, child3]の順になる
+      const initialOrder = await getChildOrder(sidePanelPage, parentTab);
+      expect(initialOrder).toEqual([child1, child2, child3]);
+
+      // 実行: child1を親にドロップ
       await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
 
-      // 検証: child1が最後の子として配置されていること
+      // 検証: child1が最後の子として配置され、順序は[child2, child3, child1]になること
       await expect(async () => {
         const finalOrder = await getChildOrder(sidePanelPage, parentTab);
-        expect(finalOrder.length).toBe(3);
-        expect(finalOrder[finalOrder.length - 1]).toBe(child1);
-        // 他の子の順序は維持される
-        expect(finalOrder[0]).toBe(child2);
-        expect(finalOrder[1]).toBe(child3);
+        expect(finalOrder).toEqual([child2, child3, child1]);
       }).toPass({ timeout: 5000 });
 
       // UI上のdepth属性を検証
@@ -237,12 +237,12 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 親タブと子タブを作成
-      const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      // 準備: 親タブと子タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const parentTab = await createTab(extensionContext, 'about:blank');
+      const childTab = await createTab(extensionContext, 'about:blank');
 
       // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab, 'Example');
+      await assertTabInTree(sidePanelPage, parentTab);
       await assertTabInTree(sidePanelPage, childTab);
 
       // 親子関係を構築
@@ -288,14 +288,14 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 3つのルートタブと1つの子タブを作成
-      const tabA = await createTab(extensionContext, 'https://example.com');
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
-      const parentTab = await createTab(extensionContext, 'https://www.w3.org');
-      const childTab = await createTab(extensionContext, 'https://developer.mozilla.org');
+      // 準備: 3つのルートタブと1つの子タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const tabA = await createTab(extensionContext, 'about:blank');
+      const tabB = await createTab(extensionContext, 'about:blank');
+      const parentTab = await createTab(extensionContext, 'about:blank');
+      const childTab = await createTab(extensionContext, 'about:blank');
 
       // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tabA, 'Example');
+      await assertTabInTree(sidePanelPage, tabA);
       await assertTabInTree(sidePanelPage, tabB);
       await assertTabInTree(sidePanelPage, parentTab);
       await assertTabInTree(sidePanelPage, childTab);
@@ -339,13 +339,13 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 親タブ、子タブ、末尾用タブを作成
-      const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
-      const lastTab = await createTab(extensionContext, 'https://www.w3.org');
+      // 準備: 親タブ、子タブ、末尾用タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const parentTab = await createTab(extensionContext, 'about:blank');
+      const childTab = await createTab(extensionContext, 'about:blank');
+      const lastTab = await createTab(extensionContext, 'about:blank');
 
       // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab, 'Example');
+      await assertTabInTree(sidePanelPage, parentTab);
       await assertTabInTree(sidePanelPage, childTab);
       await assertTabInTree(sidePanelPage, lastTab);
 
@@ -391,14 +391,14 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       //   Tab C (child of B)
       //   Tab D (child of B)
       // Tab E (root)
-      const tabA = await createTab(extensionContext, 'https://example.com');
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
-      const tabD = await createTab(extensionContext, 'https://developer.mozilla.org');
-      const tabE = await createTab(extensionContext, 'https://httpbin.org');
+      const tabA = await createTab(extensionContext, 'about:blank');
+      const tabB = await createTab(extensionContext, 'about:blank');
+      const tabC = await createTab(extensionContext, 'about:blank');
+      const tabD = await createTab(extensionContext, 'about:blank');
+      const tabE = await createTab(extensionContext, 'about:blank');
 
       // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tabA, 'Example');
+      await assertTabInTree(sidePanelPage, tabA);
       await assertTabInTree(sidePanelPage, tabB);
       await assertTabInTree(sidePanelPage, tabC);
       await assertTabInTree(sidePanelPage, tabD);
@@ -462,16 +462,16 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
       //
       // Tab E を Tab A の直上にドロップすると、Tab E と Tab F のサブツリーが
       // Tab A の最後の子になる（Tab G の下に移動する）
-      const tabA = await createTab(extensionContext, 'https://example.com');
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
-      const tabD = await createTab(extensionContext, 'https://developer.mozilla.org');
-      const tabE = await createTab(extensionContext, 'https://httpbin.org');
-      const tabF = await createTab(extensionContext, 'https://www.google.com');
-      const tabG = await createTab(extensionContext, 'https://www.github.com');
+      const tabA = await createTab(extensionContext, 'about:blank');
+      const tabB = await createTab(extensionContext, 'about:blank');
+      const tabC = await createTab(extensionContext, 'about:blank');
+      const tabD = await createTab(extensionContext, 'about:blank');
+      const tabE = await createTab(extensionContext, 'about:blank');
+      const tabF = await createTab(extensionContext, 'about:blank');
+      const tabG = await createTab(extensionContext, 'about:blank');
 
       // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tabA, 'Example');
+      await assertTabInTree(sidePanelPage, tabA);
       await assertTabInTree(sidePanelPage, tabB);
       await assertTabInTree(sidePanelPage, tabC);
       await assertTabInTree(sidePanelPage, tabD);
@@ -531,7 +531,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         await expect(tabENode).toHaveAttribute('data-expanded', 'true', { timeout: 3000 });
       }
 
-      // 現在の順序を確認: tabB, tabE, tabG の順番
+      // 現在の順序を確認: moveTabToParentは順序確定を待機するため、[tabB, tabE, tabG]の順になる
       await expect(async () => {
         const order = await getVisualTabOrder(sidePanelPage, [tabB, tabE, tabG]);
         expect(order).toEqual([tabB, tabE, tabG]);

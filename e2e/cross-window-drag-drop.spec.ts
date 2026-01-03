@@ -9,6 +9,7 @@
 import { test, expect } from './fixtures/extension';
 import { createWindow, moveTabToWindow, openSidePanelForWindow } from './utils/window-utils';
 import { createTab } from './utils/tab-utils';
+import { assertTabStructure } from './utils/drag-drop-utils';
 import {
   waitForTabInTreeState,
   waitForSidePanelReady,

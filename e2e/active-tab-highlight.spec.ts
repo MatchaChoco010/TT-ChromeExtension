@@ -7,6 +7,7 @@
  */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
+import { assertTabStructure } from './utils/drag-drop-utils';
 
 test.describe('アクティブタブのハイライト', () => {
   test.describe('通常タブのハイライト', () => {
@@ -19,17 +20,15 @@ test.describe('アクティブタブのハイライト', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 2つの通常タブを作成
-      const tabId1 = await createTab(extensionContext, 'https://example.com/1', undefined, { active: false });
-      const tabId2 = await createTab(extensionContext, 'https://example.com/2', undefined, { active: true });
+      // 2つの通常タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const tabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [{ tabId: tabId1, depth: 0 }]);
 
-      // タブがツリーに表示されるまで待機
-      await expect(async () => {
-        const treeNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
-        const treeNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
-        await expect(treeNode1).toBeVisible();
-        await expect(treeNode2).toBeVisible();
-      }).toPass({ timeout: 10000 });
+      const tabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
+      await assertTabStructure(sidePanelPage, [
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ]);
 
       // アクティブなタブ（tabId2）のみがハイライトされていることを確認
       const treeNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
@@ -42,7 +41,10 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, [{ tabId: tabId2, depth: 0 }]);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, []);
     });
 
     test('通常タブをクリックするとそのタブのみがハイライトされる', async ({
@@ -54,17 +56,15 @@ test.describe('アクティブタブのハイライト', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 2つの通常タブを作成
-      const tabId1 = await createTab(extensionContext, 'https://example.com/1', undefined, { active: true });
-      const tabId2 = await createTab(extensionContext, 'https://example.com/2', undefined, { active: false });
+      // 2つの通常タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const tabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
+      await assertTabStructure(sidePanelPage, [{ tabId: tabId1, depth: 0 }]);
 
-      // タブがツリーに表示されるまで待機
-      await expect(async () => {
-        const treeNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
-        const treeNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
-        await expect(treeNode1).toBeVisible();
-        await expect(treeNode2).toBeVisible();
-      }).toPass({ timeout: 10000 });
+      const tabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ]);
 
       // 最初はtabId1がハイライト
       const treeNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
@@ -94,7 +94,10 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, [{ tabId: tabId2, depth: 0 }]);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, []);
     });
   });
 
@@ -108,10 +111,11 @@ test.describe('アクティブタブのハイライト', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // ピン留めタブを作成
-      const pinnedTabId = await createTab(extensionContext, 'https://example.com/pinned', undefined, { active: true });
+      // ピン留めタブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const pinnedTabId = await createTab(extensionContext, 'about:blank', undefined, { active: true });
+      await assertTabStructure(sidePanelPage, [{ tabId: pinnedTabId, depth: 0 }]);
 
-      // タブをピン留め
+      // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.update(tabId, { pinned: true });
       }, pinnedTabId);
@@ -137,8 +141,9 @@ test.describe('アクティブタブのハイライト', () => {
       const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${pinnedTabId}"]`);
       await expect(pinnedTab).toHaveClass(/bg-gray-600/);
 
-      // クリーンアップ
+      // クリーンアップ（ピン留めタブを閉じる。ピン留めタブはツリーに含まれないのでassertTabStructure([])）
       await closeTab(extensionContext, pinnedTabId);
+      await assertTabStructure(sidePanelPage, []);
     });
 
     test('ピン留めタブをクリックするとそのピン留めタブのみがハイライトされる', async ({
@@ -150,11 +155,17 @@ test.describe('アクティブタブのハイライト', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 2つのピン留めタブを作成
-      const pinnedTabId1 = await createTab(extensionContext, 'https://example.com/pinned1', undefined, { active: true });
-      const pinnedTabId2 = await createTab(extensionContext, 'https://example.com/pinned2', undefined, { active: false });
+      // 2つのピン留めタブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const pinnedTabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
+      await assertTabStructure(sidePanelPage, [{ tabId: pinnedTabId1, depth: 0 }]);
 
-      // タブをピン留め
+      const pinnedTabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [
+        { tabId: pinnedTabId1, depth: 0 },
+        { tabId: pinnedTabId2, depth: 0 },
+      ]);
+
+      // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.update(tabId, { pinned: true });
       }, pinnedTabId1);
@@ -196,9 +207,11 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(pinnedTab1).not.toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      // クリーンアップ
+      // クリーンアップ（両方ピン留めタブなのでツリーは空のまま）
       await closeTab(extensionContext, pinnedTabId1);
+      await assertTabStructure(sidePanelPage, []);
       await closeTab(extensionContext, pinnedTabId2);
+      await assertTabStructure(sidePanelPage, []);
     });
   });
 
@@ -212,11 +225,18 @@ test.describe('アクティブタブのハイライト', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 通常タブを作成（アクティブ）
-      const normalTabId = await createTab(extensionContext, 'https://example.com/normal', undefined, { active: true });
+      // 通常タブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const normalTabId = await createTab(extensionContext, 'about:blank', undefined, { active: true });
+      await assertTabStructure(sidePanelPage, [{ tabId: normalTabId, depth: 0 }]);
 
       // ピン留めタブを作成（非アクティブ）
-      const pinnedTabId = await createTab(extensionContext, 'https://example.com/pinned', undefined, { active: false });
+      const pinnedTabId = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [
+        { tabId: normalTabId, depth: 0 },
+        { tabId: pinnedTabId, depth: 0 },
+      ]);
+
+      // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.update(tabId, { pinned: true });
       }, pinnedTabId);
@@ -258,9 +278,11 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(pinnedTab).toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      // クリーンアップ
+      // クリーンアップ（normalTabIdを閉じるとツリーは空、pinnedTabIdはピン留めタブなのでツリーに影響なし）
       await closeTab(extensionContext, normalTabId);
+      await assertTabStructure(sidePanelPage, []);
       await closeTab(extensionContext, pinnedTabId);
+      await assertTabStructure(sidePanelPage, []);
     });
 
     test('ピン留めタブから通常タブに切り替えると、ピン留めタブのハイライトが解除され、通常タブがハイライトされる', async ({
@@ -272,14 +294,18 @@ test.describe('アクティブタブのハイライト', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // ピン留めタブを作成（アクティブ）
-      const pinnedTabId = await createTab(extensionContext, 'https://example.com/pinned', undefined, { active: true });
+      // ピン留めタブを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const pinnedTabId = await createTab(extensionContext, 'about:blank', undefined, { active: true });
+      await assertTabStructure(sidePanelPage, [{ tabId: pinnedTabId, depth: 0 }]);
+
+      // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.update(tabId, { pinned: true });
       }, pinnedTabId);
 
       // 通常タブを作成（非アクティブ）
-      const normalTabId = await createTab(extensionContext, 'https://example.com/normal', undefined, { active: false });
+      const normalTabId = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [{ tabId: normalTabId, depth: 0 }]);
 
       // 両方のタブが表示されるまで待機
       await expect(async () => {
@@ -318,9 +344,11 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(normalTab).toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      // クリーンアップ
+      // クリーンアップ（pinnedTabIdはピン留めタブなのでツリーに影響なし、normalTabIdを閉じるとツリーは空）
       await closeTab(extensionContext, pinnedTabId);
+      await assertTabStructure(sidePanelPage, [{ tabId: normalTabId, depth: 0 }]);
       await closeTab(extensionContext, normalTabId);
+      await assertTabStructure(sidePanelPage, []);
     });
 
     test('常に1つのタブのみがハイライト状態であることを確認（連続切替テスト）', async ({
@@ -332,11 +360,30 @@ test.describe('アクティブタブのハイライト', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 通常タブ2つとピン留めタブ2つを作成
-      const normalTabId1 = await createTab(extensionContext, 'https://example.com/normal1', undefined, { active: true });
-      const normalTabId2 = await createTab(extensionContext, 'https://example.com/normal2', undefined, { active: false });
-      const pinnedTabId1 = await createTab(extensionContext, 'https://example.com/pinned1', undefined, { active: false });
-      const pinnedTabId2 = await createTab(extensionContext, 'https://example.com/pinned2', undefined, { active: false });
+      // 通常タブ2つとピン留めタブ2つを作成（ネットワーク依存を避けるためabout:blankを使用）
+      const normalTabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
+      await assertTabStructure(sidePanelPage, [{ tabId: normalTabId1, depth: 0 }]);
+
+      const normalTabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [
+        { tabId: normalTabId1, depth: 0 },
+        { tabId: normalTabId2, depth: 0 },
+      ]);
+
+      const pinnedTabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [
+        { tabId: normalTabId1, depth: 0 },
+        { tabId: normalTabId2, depth: 0 },
+        { tabId: pinnedTabId1, depth: 0 },
+      ]);
+
+      const pinnedTabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+      await assertTabStructure(sidePanelPage, [
+        { tabId: normalTabId1, depth: 0 },
+        { tabId: normalTabId2, depth: 0 },
+        { tabId: pinnedTabId1, depth: 0 },
+        { tabId: pinnedTabId2, depth: 0 },
+      ]);
 
       // ピン留め
       await serviceWorker.evaluate(async (tabId) => {
@@ -441,11 +488,15 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(normalTab1).toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      // クリーンアップ
+      // クリーンアップ（pinnedTabId1/2はピン留めタブなのでツリーに影響なし）
       await closeTab(extensionContext, normalTabId1);
+      await assertTabStructure(sidePanelPage, [{ tabId: normalTabId2, depth: 0 }]);
       await closeTab(extensionContext, normalTabId2);
+      await assertTabStructure(sidePanelPage, []);
       await closeTab(extensionContext, pinnedTabId1);
+      await assertTabStructure(sidePanelPage, []);
       await closeTab(extensionContext, pinnedTabId2);
+      await assertTabStructure(sidePanelPage, []);
     });
   });
 });

@@ -5,7 +5,8 @@
  * - dnd-kit固有のセレクタを使用しない
  * - マウスイベントベースのドラッグ操作シミュレーション
  */
-import type { Page, Worker } from '@playwright/test';
+import type { Page, Worker, BrowserContext } from '@playwright/test';
+import { openSidePanelForWindow } from './window-utils';
 
 /**
  * 要素のバウンディングボックスを取得
@@ -199,12 +200,12 @@ export async function reorderTabs(
 }
 
 /**
- * 親子関係を作成（タブを別のタブの子にする）
+ * タブを別のタブの子にするD&D操作を実行する（操作のみ、検証は行わない）
  *
  * @param page - Side PanelのPage
  * @param childTabId - 子にするタブのID
  * @param parentTabId - 親タブのID
- * @param _serviceWorker - オプショナル。将来的なストレージ同期用（現在は未使用）
+ * @param _serviceWorker - 後方互換性のため残しているが未使用
  */
 export async function moveTabToParent(
   page: Page,
@@ -243,59 +244,200 @@ export async function moveTabToParent(
   // 4. ドラッグ状態が確立されるまで待機
   await waitForDragState(page);
 
-  // 5. ターゲット位置に移動（steps: 5で確実にホバーを検出）
-  await page.mouse.move(targetX, targetY, { steps: 5 });
+  // 5. ターゲット位置に移動（steps: 10で確実にホバーを検出）
+  await page.mouse.move(targetX, targetY, { steps: 10 });
 
-  // 6. Reactの状態更新を待機
+  // 6. ホバー状態を安定させるための待機（並列実行時のタイミング問題対策）
+  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
+
+  // 7. Reactの状態更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-  // 7. マウスをリリースしてドロップ
+  // 8. マウスをリリースしてドロップ
   await page.mouse.up();
 
-  // D&D後のDOM更新を待機
+  // 9. D&D後のDOM更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-  // ストレージへの親子関係の反映をポーリングで待機（20回×50ms = 最大1秒）
-  await page.evaluate(async (ids) => {
-    interface TreeNode {
-      id: string;
-      tabId: number;
-      parentId: string | null;
-    }
-    interface LocalTreeState {
-      nodes: Record<string, TreeNode>;
-    }
-    const { childId, parentId } = ids;
-    for (let i = 0; i < 20; i++) {
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as LocalTreeState | undefined;
-      if (treeState?.nodes) {
-        const childNode = Object.values(treeState.nodes).find(
-          (n: TreeNode) => n.tabId === childId
+  // 10. ドラッグ状態が完全に解除されるまで待機
+  await waitForDragEnd(page, 2000);
+}
+
+/**
+ * 期待するタブ構造の定義
+ */
+export interface ExpectedTabStructure {
+  tabId: number;
+  depth: number;
+}
+
+/**
+ * assertTabStructure / assertPinnedTabStructure のオプション
+ */
+export interface AssertTabStructureOptions {
+  /** タイムアウト（ミリ秒、デフォルト: 5000） */
+  timeout?: number;
+}
+
+/**
+ * 現在アクティブなビューのインデックスを取得するヘルパー関数
+ */
+async function getActiveViewIndex(page: Page): Promise<number> {
+  const viewSwitcher = page.locator('[data-testid="view-switcher-container"]');
+  const viewButtons = viewSwitcher.locator('button[data-color]');
+  const count = await viewButtons.count();
+
+  // X座標順にソートするための情報を収集
+  const views: { x: number; isActive: boolean }[] = [];
+  for (let i = 0; i < count; i++) {
+    const button = viewButtons.nth(i);
+    const isActive = (await button.getAttribute('data-active')) === 'true';
+    const box = await button.boundingBox();
+    views.push({ x: box?.x || 0, isActive });
+  }
+
+  // X座標でソート
+  views.sort((a, b) => a.x - b.x);
+
+  // アクティブなビューのインデックスを返す
+  return views.findIndex(v => v.isActive);
+}
+
+/**
+ * UI上でタブ構造が期待通りであることを検証する
+ *
+ * タブ操作（moveTabToParent, createTab, closeTab等）の後に必ず呼び出して、
+ * UI上で期待する順序とdepthになっていることを確認する。
+ * 期待通りになるまで待機し、タイムアウトした場合は期待値と実際の値を含むエラーでテストを失敗させる。
+ *
+ * 空の配列を渡した場合は、タブが0個であることを検証する。
+ *
+ * 使用例:
+ * ```typescript
+ * // テスト開始時にサイドパネルを開く
+ * const sidePanelPage = await openSidePanelForWindow(context, windowId);
+ *
+ * await moveTabToParent(sidePanelPage, child, parent);
+ * await assertTabStructure(sidePanelPage, windowId, [
+ *   { tabId: parent, depth: 0 },
+ *   { tabId: child, depth: 1 },
+ * ], 0);
+ *
+ * // タブが0個であることを検証
+ * await closeTab(context, lastTabId);
+ * await assertTabStructure(sidePanelPage, windowId, [], 0);
+ * ```
+ *
+ * @param page - 対象ウィンドウのSide PanelのPage（openSidePanelForWindowで取得）
+ * @param windowId - 検証するウィンドウのID（エラーメッセージの明示性のため）
+ * @param expectedStructure - 期待するタブ構造（順序も検証される）。空配列の場合は0個であることを検証。
+ * @param expectedActiveViewIndex - 期待するアクティブビューのインデックス（0始まり）
+ * @param options - オプション（timeout）
+ */
+export async function assertTabStructure(
+  page: Page,
+  windowId: number,
+  expectedStructure: ExpectedTabStructure[],
+  expectedActiveViewIndex: number,
+  options: AssertTabStructureOptions = {}
+): Promise<void> {
+  const { timeout = 5000 } = options;
+  const startTime = Date.now();
+  let lastError: Error | null = null;
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      // アクティブビューの検証（必須）
+      const actualActiveViewIndex = await getActiveViewIndex(page);
+      if (actualActiveViewIndex !== expectedActiveViewIndex) {
+        throw new Error(
+          `Active view index mismatch (windowId: ${windowId}):\n` +
+          `  Expected: ${expectedActiveViewIndex}\n` +
+          `  Actual:   ${actualActiveViewIndex}`
         );
-        const parentNode = Object.values(treeState.nodes).find(
-          (n: TreeNode) => n.tabId === parentId
+      }
+
+      // UI上に存在する全タブを取得
+      const allTreeNodes = page.locator('[data-testid^="tree-node-"]');
+      const actualTabCount = await allTreeNodes.count();
+
+      // 期待されるタブ数と実際のタブ数を比較
+      if (actualTabCount !== expectedStructure.length) {
+        throw new Error(
+          `Tab count mismatch (windowId: ${windowId}):\n` +
+          `  Expected: ${expectedStructure.length} tabs\n` +
+          `  Actual:   ${actualTabCount} tabs`
         );
-        // 子ノードのparentIdが親ノードのIDになっていることを確認
-        if (childNode && parentNode && childNode.parentId === parentNode.id) {
-          return;
+      }
+
+      // タブが0個の場合は、ここでチェック完了
+      if (expectedStructure.length === 0) {
+        return;
+      }
+
+      // UI上のタブをY座標順に取得
+      const actualStructure: { tabId: number; depth: number; y: number }[] = [];
+
+      for (const expected of expectedStructure) {
+        const element = page.locator(`[data-testid="tree-node-${expected.tabId}"]`).first();
+        const isVisible = await element.isVisible().catch(() => false);
+
+        if (!isVisible) {
+          throw new Error(`Tab ${expected.tabId} is not visible (windowId: ${windowId})`);
+        }
+
+        const box = await element.boundingBox();
+        if (!box) {
+          throw new Error(`Tab ${expected.tabId} has no bounding box (windowId: ${windowId})`);
+        }
+
+        const depth = await element.getAttribute('data-depth');
+        actualStructure.push({
+          tabId: expected.tabId,
+          depth: depth ? parseInt(depth, 10) : 0,
+          y: box.y
+        });
+      }
+
+      // Y座標でソートして順序を確認
+      actualStructure.sort((a, b) => a.y - b.y);
+
+      // 順序の検証
+      const actualOrder = actualStructure.map(s => s.tabId);
+      const expectedOrder = expectedStructure.map(s => s.tabId);
+
+      if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
+        throw new Error(
+          `Tab order mismatch (windowId: ${windowId}):\n` +
+          `  Expected: [${expectedOrder.join(', ')}]\n` +
+          `  Actual:   [${actualOrder.join(', ')}]`
+        );
+      }
+
+      // 深さの検証
+      for (let i = 0; i < expectedStructure.length; i++) {
+        const expected = expectedStructure[i];
+        const actual = actualStructure.find(s => s.tabId === expected.tabId);
+
+        if (actual && actual.depth !== expected.depth) {
+          throw new Error(
+            `Depth mismatch for tab ${expected.tabId} (windowId: ${windowId}):\n` +
+            `  Expected: ${expected.depth}\n` +
+            `  Actual:   ${actual.depth}`
+          );
         }
       }
-      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // すべて一致
+      return;
+    } catch (e) {
+      lastError = e as Error;
     }
-  }, { childId: childTabId, parentId: parentTabId });
 
-  // UIに親子関係が反映されるまで待機（展開ボタンが表示されるまで）
-  const parentNode = page.locator(`[data-testid="tree-node-${parentTabId}"]`).first();
-  const expandButton = parentNode.locator('[data-testid="expand-button"]');
-
-  // 展開ボタンが表示されるまでポーリングで待機（3秒で十分）
-  try {
-    await expandButton.waitFor({ state: 'visible', timeout: 3000 });
-  } catch {
-    // 展開ボタンが表示されなくても、親子関係がストレージに保存されていれば成功とみなす
-    // 展開ボタンはUIの更新タイミングに依存するため、厳密にエラーとしない
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
   }
+
+  throw lastError || new Error(`Timeout waiting for tab structure (windowId: ${windowId})`);
 }
 
 /**
@@ -526,6 +668,286 @@ export async function waitForDragEnd(page: Page, maxWait: number = 2000): Promis
     }
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
   }
+}
+
+/**
+ * 期待するピン留めタブ構造の定義
+ * 順序だけを検証する（depthは常に0）
+ */
+export interface ExpectedPinnedTabStructure {
+  tabId: number;
+}
+
+/**
+ * UI上でピン留めタブ構造が期待通りであることを検証する
+ *
+ * ピン留め操作後に必ず呼び出して、UI上で期待する順序になっていることを確認する。
+ * ピン留めタブが0個の場合は空配列を渡す。
+ *
+ * 使用例:
+ * ```typescript
+ * // テスト開始時にサイドパネルを開く
+ * const sidePanelPage = await openSidePanelForWindow(context, windowId);
+ *
+ * await pinTab(context, tabId);
+ * await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tab1 }, { tabId: tab2 }], 0);
+ *
+ * // ピン留めタブが0個であることを検証
+ * await unpinTab(context, lastPinnedTabId);
+ * await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
+ * ```
+ *
+ * @param page - 対象ウィンドウのSide PanelのPage（openSidePanelForWindowで取得）
+ * @param windowId - 検証するウィンドウのID（エラーメッセージの明示性のため）
+ * @param expectedStructure - 期待するピン留めタブ構造（順序も検証される）。空配列の場合は0個であることを検証。
+ * @param expectedActiveViewIndex - 期待するアクティブビューのインデックス（0始まり）
+ * @param options - オプション（timeout）
+ */
+export async function assertPinnedTabStructure(
+  page: Page,
+  windowId: number,
+  expectedStructure: ExpectedPinnedTabStructure[],
+  expectedActiveViewIndex: number,
+  options: AssertTabStructureOptions = {}
+): Promise<void> {
+  const { timeout = 5000 } = options;
+  const startTime = Date.now();
+  let lastError: Error | null = null;
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      // アクティブビューの検証（必須）
+      const actualActiveViewIndex = await getActiveViewIndex(page);
+      if (actualActiveViewIndex !== expectedActiveViewIndex) {
+        throw new Error(
+          `Active view index mismatch (windowId: ${windowId}):\n` +
+          `  Expected: ${expectedActiveViewIndex}\n` +
+          `  Actual:   ${actualActiveViewIndex}`
+        );
+      }
+
+      // ピン留めタブセクションが存在するか確認
+      const pinnedSection = page.locator('[data-testid="pinned-tabs-section"]');
+      const sectionExists = await pinnedSection.isVisible().catch(() => false);
+
+      // ピン留めタブが0個の場合、セクションが非表示であるべき
+      if (expectedStructure.length === 0) {
+        if (!sectionExists) {
+          return;
+        }
+        // セクションが存在する場合、その中にピン留めタブがないか確認
+        const pinnedTabs = page.locator('[data-testid^="pinned-tab-"]');
+        const actualCount = await pinnedTabs.count();
+        if (actualCount === 0) {
+          return;
+        }
+        throw new Error(
+          `Pinned tab count mismatch (windowId: ${windowId}):\n` +
+          `  Expected: 0 tabs (section should be hidden)\n` +
+          `  Actual:   ${actualCount} tabs`
+        );
+      }
+
+      // ピン留めタブが存在する場合、セクションが表示されているべき
+      if (!sectionExists) {
+        throw new Error(
+          `Pinned tabs section not visible but expected ${expectedStructure.length} pinned tabs (windowId: ${windowId})`
+        );
+      }
+
+      // UI上のピン留めタブを取得
+      const pinnedTabs = page.locator('[data-testid^="pinned-tab-"]');
+      const actualCount = await pinnedTabs.count();
+
+      // ピン留めタブ数を比較
+      if (actualCount !== expectedStructure.length) {
+        throw new Error(
+          `Pinned tab count mismatch (windowId: ${windowId}):\n` +
+          `  Expected: ${expectedStructure.length} tabs\n` +
+          `  Actual:   ${actualCount} tabs`
+        );
+      }
+
+      // UI上のピン留めタブをX座標順に取得
+      const actualStructure: { tabId: number; x: number }[] = [];
+
+      for (const expected of expectedStructure) {
+        const element = page.locator(`[data-testid="pinned-tab-${expected.tabId}"]`).first();
+        const isVisible = await element.isVisible().catch(() => false);
+
+        if (!isVisible) {
+          throw new Error(`Pinned tab ${expected.tabId} is not visible (windowId: ${windowId})`);
+        }
+
+        const box = await element.boundingBox();
+        if (!box) {
+          throw new Error(`Pinned tab ${expected.tabId} has no bounding box (windowId: ${windowId})`);
+        }
+
+        actualStructure.push({
+          tabId: expected.tabId,
+          x: box.x
+        });
+      }
+
+      // X座標でソートして順序を確認（ピン留めタブは水平並び）
+      actualStructure.sort((a, b) => a.x - b.x);
+
+      // 順序の検証
+      const actualOrder = actualStructure.map(s => s.tabId);
+      const expectedOrder = expectedStructure.map(s => s.tabId);
+
+      if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
+        throw new Error(
+          `Pinned tab order mismatch (windowId: ${windowId}):\n` +
+          `  Expected: [${expectedOrder.join(', ')}]\n` +
+          `  Actual:   [${actualOrder.join(', ')}]`
+        );
+      }
+
+      // すべて一致
+      return;
+    } catch (e) {
+      lastError = e as Error;
+    }
+
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  }
+
+  throw lastError || new Error(`Timeout waiting for pinned tab structure (windowId: ${windowId})`);
+}
+
+/**
+ * 期待するビュー構造の定義
+ */
+export interface ExpectedViewStructure {
+  /** ビューの名前またはカラー（識別用） */
+  viewIdentifier: string;
+}
+
+/**
+ * UI上でビュー構造が期待通りであることを検証する
+ *
+ * ビュー操作後に呼び出して、UI上でビューの順序と現在のハイライト状態を確認する。
+ *
+ * 使用例:
+ * ```typescript
+ * // テスト開始時にサイドパネルを開く
+ * const sidePanelPage = await openSidePanelForWindow(context, windowId);
+ *
+ * await createView(sidePanelPage, 'Work');
+ * await assertViewStructure(sidePanelPage, windowId, [
+ *   { viewIdentifier: '#3B82F6' },  // デフォルトのビュー
+ *   { viewIdentifier: '#10B981' },  // 新規作成したビュー
+ * ], 0);  // 0番目のビューがハイライト中
+ * ```
+ *
+ * @param page - 対象ウィンドウのSide PanelのPage（openSidePanelForWindowで取得）
+ * @param windowId - 検証するウィンドウのID（エラーメッセージの明示性のため）
+ * @param expectedStructure - 期待するビュー構造（順序も検証される）。色またはビュー名で識別。
+ * @param activeViewIndex - 現在ハイライト中のビューのインデックス
+ * @param timeout - タイムアウト（ミリ秒、デフォルト: 5000）
+ */
+export async function assertViewStructure(
+  page: Page,
+  windowId: number,
+  expectedStructure: ExpectedViewStructure[],
+  activeViewIndex: number,
+  timeout: number = 5000
+): Promise<void> {
+  const startTime = Date.now();
+  let lastError: Error | null = null;
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      // ビュースイッチャーコンテナを取得
+      const viewSwitcher = page.locator('[data-testid="view-switcher-container"]');
+      const containerExists = await viewSwitcher.isVisible().catch(() => false);
+
+      if (!containerExists) {
+        throw new Error(`View switcher container is not visible (windowId: ${windowId})`);
+      }
+
+      // ビューボタン要素を取得（data-color属性を持つbutton要素）
+      const viewButtons = viewSwitcher.locator('button[data-color]');
+      const actualCount = await viewButtons.count();
+
+      // ビュー数を比較
+      if (actualCount !== expectedStructure.length) {
+        throw new Error(
+          `View count mismatch (windowId: ${windowId}):\n` +
+          `  Expected: ${expectedStructure.length} views\n` +
+          `  Actual:   ${actualCount} views`
+        );
+      }
+
+      // ビューが0個の場合は検証完了
+      if (expectedStructure.length === 0) {
+        return;
+      }
+
+      // 各ビューをX座標順に取得
+      const actualViews: { color: string; x: number; isActive: boolean }[] = [];
+
+      for (let i = 0; i < actualCount; i++) {
+        const button = viewButtons.nth(i);
+        const color = await button.getAttribute('data-color');
+        const isActive = (await button.getAttribute('data-active')) === 'true';
+        const box = await button.boundingBox();
+
+        if (!box) {
+          throw new Error(`View button ${i} has no bounding box (windowId: ${windowId})`);
+        }
+
+        actualViews.push({
+          color: color || '',
+          x: box.x,
+          isActive
+        });
+      }
+
+      // X座標でソートして順序を確認
+      actualViews.sort((a, b) => a.x - b.x);
+
+      // 順序の検証
+      const actualOrder = actualViews.map(v => v.color);
+      const expectedOrder = expectedStructure.map(s => s.viewIdentifier);
+
+      if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
+        throw new Error(
+          `View order mismatch (windowId: ${windowId}):\n` +
+          `  Expected: [${expectedOrder.join(', ')}]\n` +
+          `  Actual:   [${actualOrder.join(', ')}]`
+        );
+      }
+
+      // アクティブビューの検証
+      const activeViews = actualViews.filter(v => v.isActive);
+      if (activeViews.length !== 1) {
+        throw new Error(
+          `Expected exactly 1 active view, but found ${activeViews.length} (windowId: ${windowId})`
+        );
+      }
+
+      const actualActiveIndex = actualViews.findIndex(v => v.isActive);
+      if (actualActiveIndex !== activeViewIndex) {
+        throw new Error(
+          `Active view index mismatch (windowId: ${windowId}):\n` +
+          `  Expected: ${activeViewIndex} (${expectedStructure[activeViewIndex]?.viewIdentifier})\n` +
+          `  Actual:   ${actualActiveIndex} (${actualViews[actualActiveIndex]?.color})`
+        );
+      }
+
+      // すべて一致
+      return;
+    } catch (e) {
+      lastError = e as Error;
+    }
+
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  }
+
+  throw lastError || new Error(`Timeout waiting for view structure (windowId: ${windowId})`);
 }
 
 /**

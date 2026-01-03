@@ -26,7 +26,7 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 準備: ユーザーが報告した問題のツリー構造を作成
+    // 準備: ユーザーが報告した問題のツリー構造を作成（ネットワーク依存を避けるためabout:blankを使用）
     // タブA (ルート)
     //   タブB (タブAの子)
     //     タブC (タブBの子)
@@ -34,13 +34,13 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     //   タブE (タブAの子)
     //   タブF (タブAの子) ← ドラッグするタブ
     //     タブG (タブFの子)
-    const tabA = await createTab(extensionContext, 'https://example.com');
-    const tabB = await createTab(extensionContext, 'https://www.iana.org');
-    const tabC = await createTab(extensionContext, 'https://www.w3.org');
-    const tabD = await createTab(extensionContext, 'https://developer.mozilla.org');
-    const tabE = await createTab(extensionContext, 'https://github.com');
-    const tabF = await createTab(extensionContext, 'https://httpbin.org');
-    const tabG = await createTab(extensionContext, 'https://jsonplaceholder.typicode.com');
+    const tabA = await createTab(extensionContext, 'about:blank');
+    const tabB = await createTab(extensionContext, 'about:blank');
+    const tabC = await createTab(extensionContext, 'about:blank');
+    const tabD = await createTab(extensionContext, 'about:blank');
+    const tabE = await createTab(extensionContext, 'about:blank');
+    const tabF = await createTab(extensionContext, 'about:blank');
+    const tabG = await createTab(extensionContext, 'about:blank');
 
     // すべてのタブがツリーに表示されるまで待機
     await assertTabInTree(sidePanelPage, tabA);
@@ -110,7 +110,7 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
       expect(gParent).toBe(tabF);
     }).toPass({ timeout: 5000 });
 
-    // 初期順序を確認
+    // 初期順序を確認: moveTabToParentは順序確定を待機するため、F が E の後になる
     const initialOrder = await getTabOrder(sidePanelPage);
     const initialFIndex = initialOrder.indexOf(tabF);
     const initialEIndex = initialOrder.indexOf(tabE);
@@ -202,17 +202,17 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 準備: より単純なツリー構造を作成
+    // 準備: より単純なツリー構造を作成（ネットワーク依存を避けるためabout:blankを使用）
     // ルート1 (親なし)
     //   子1A (ルート1の子)
     //   子1B (ルート1の子)
     // ルート2 (親なし) ← ドラッグするタブ
     //   子2A (ルート2の子)
-    const root1 = await createTab(extensionContext, 'https://example.com');
-    const child1A = await createTab(extensionContext, 'https://www.iana.org');
-    const child1B = await createTab(extensionContext, 'https://www.w3.org');
-    const root2 = await createTab(extensionContext, 'https://developer.mozilla.org');
-    const child2A = await createTab(extensionContext, 'https://github.com');
+    const root1 = await createTab(extensionContext, 'about:blank');
+    const child1A = await createTab(extensionContext, 'about:blank');
+    const child1B = await createTab(extensionContext, 'about:blank');
+    const root2 = await createTab(extensionContext, 'about:blank');
+    const child2A = await createTab(extensionContext, 'about:blank');
 
     // すべてのタブがツリーに表示されるまで待機
     await assertTabInTree(sidePanelPage, root1);

@@ -147,10 +147,11 @@ export async function assertWindowTreeSync(
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
 
-        if (treeState?.tabToNode && tabs.length > 0) {
+        const tabToNode = treeState?.tabToNode;
+        if (tabToNode && tabs.length > 0) {
           // すべてのタブがツリー状態に存在することを確認
           const allTabsSynced = tabs.every(
-            (tab: chrome.tabs.Tab) => tab.id && treeState.tabToNode[tab.id]
+            (tab: chrome.tabs.Tab) => tab.id && tabToNode[tab.id]
           );
           if (allTabsSynced) {
             return;
@@ -220,3 +221,21 @@ export async function openSidePanelForWindow(
 
   return page;
 }
+
+/**
+ * 指定されたウィンドウを閉じる
+ *
+ * @param context - ブラウザコンテキスト
+ * @param windowId - 閉じるウィンドウのID
+ */
+export async function closeWindow(
+  context: BrowserContext,
+  windowId: number
+): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+
+  await serviceWorker.evaluate((windowId) => {
+    return chrome.windows.remove(windowId);
+  }, windowId);
+}
+

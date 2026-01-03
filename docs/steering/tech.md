@@ -209,6 +209,95 @@ await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
 - レンダリングロジックのバグを検出できる
 - ユーザー視点での品質を保証できる
 
+#### 事後条件確認関数による網羅的検証（必須）
+
+**E2Eテストでは、場当たり的に条件を確認するのではなく、事後条件確認用の関数を使って事後条件を網羅的に確認すること。**
+
+**原則**: 事後条件確認では、一部の条件だけでなく**全ての状態を網羅的に確認すること**。
+
+事後条件確認関数は`e2e/utils/assertion-utils.ts`に定義されており、以下が利用可能:
+
+| 関数名 | 用途 |
+|--------|------|
+| `assertTabStructure` | 通常タブのツリー構造（順序・depth・アクティブビュー）を網羅的に検証 |
+| `assertPinnedTabStructure` | ピン留めタブの構造（順序・アクティブビュー）を網羅的に検証 |
+| `assertViewStructure` | ビューの構造（順序・アクティブビュー）を網羅的に検証 |
+| `assertWindowClosed` | ウィンドウが閉じられたことを検証 |
+| `assertWindowExists` | ウィンドウが存在することを検証（作成直後の確認用） |
+
+**部分的な確認関数は作成禁止**:
+
+「タブ数だけ確認」「特定のタブが存在するか確認」のような部分的な確認関数を作成してはいけない。例えば以下のような関数は禁止:
+
+```typescript
+// ❌ 禁止: 部分的な確認関数
+assertWindowTabCount(context, windowId, 3);  // タブ数だけ確認
+assertTabsInWindow(context, windowId, [tabId1, tabId2]);  // 特定タブの存在だけ確認
+
+// ✅ 正解: 全ての状態を網羅的に確認
+await assertTabStructure(page, windowId, [
+  { tabId: tab1, depth: 0 },
+  { tabId: tab2, depth: 1 },
+  { tabId: tab3, depth: 0 },
+], 0);
+```
+
+**理由**: 部分的な確認では見落としが発生する。「タブが3つある」ことを確認しても、順序やdepthが正しいかは不明。「特定のタブが存在する」ことを確認しても、余計なタブが存在しないかは不明。全ての状態を明示的に確認することで、意図しない状態変化を確実に検出できる。
+
+**関数シグネチャ**:
+
+```typescript
+// UIアサーション（Page + windowId が必須）
+assertTabStructure(page, windowId, expectedStructure, expectedActiveViewIndex, options?)
+assertPinnedTabStructure(page, windowId, expectedStructure, expectedActiveViewIndex, options?)
+assertViewStructure(page, windowId, expectedStructure, activeViewIndex, timeout?)
+
+// Chrome APIアサーション（BrowserContext + windowId が必須）
+assertWindowClosed(context, windowId, timeout?)
+assertWindowExists(context, windowId, timeout?)
+```
+
+**重要**: `expectedActiveViewIndex`は必須引数であり、オプションではない。常に明示的にアクティブなビューを指定すること。
+
+#### タブ操作後の構造検証（必須）
+
+**すべてのタブ操作（create, move, close, その他全てのタブ操作等）の後には必ず`assertTabStructure`を呼び出すこと。**
+
+`assertTabStructure`は事後条件を確認する関数であり、タブ操作を行った後に呼ばなくてよい例外はない。
+タブが0個になる場合も`await assertTabStructure(page, windowId, [], 0);`を呼び出して、タブが確実に0個になったことを検証すること。
+
+タブ操作は非同期でUIに反映されるため、操作直後にUI上の順序やdepthが期待通りであることを検証する必要がある。
+`assertTabStructure`は期待する構造になるまで待機し、タイムアウト時にはテストを失敗させる。
+
+```typescript
+import { assertTabStructure } from './utils/assertion-utils';
+
+// ✅ GOOD: タブ操作後に必ず構造を検証（windowIdとexpectedActiveViewIndexは必須）
+await moveTabToParent(page, child, parent);
+await assertTabStructure(page, windowId, [
+  { tabId: parent, depth: 0 },
+  { tabId: child, depth: 1 },
+], 0);  // activeViewIndex = 0
+
+// ✅ GOOD: タブを閉じた後も必ず検証（0個になる場合も）
+await closeTab(context, lastTabId);
+await assertTabStructure(page, windowId, [], 0);  // タブが0個であることを検証
+
+// ❌ BAD: 検証なしで次の操作に進む
+await moveTabToParent(page, child, parent);
+// 構造が正しいか確認せずに次へ...
+
+// ❌ BAD: タブが0個になる場合に検証をスキップ
+await closeTab(context, lastTabId);
+// 「タブが0個だから検証不要」は間違い
+```
+
+**このルールを守る理由**:
+- タブ操作のPromiseがresolveしても、UIへの反映は非同期で遅れることがある
+- 検証なしだと、操作が失敗しても気づかずテストが進行し、後続で意味不明なエラーになる
+- 順序やdepthの検証をスキップすると、フレーキーテストの原因になる
+- タブが0個の場合でも、UIに余計なタブが残っていないことを確認する必要がある
+
 #### フレーキーテストの回避（必須）
 
 **固定時間待機（`waitForTimeout`）は禁止**。ポーリングで状態確定を待つこと:
@@ -257,6 +346,30 @@ await waitForTabDepthInUI(sidePanelPage, childTabId, 1, { timeout: 3000 });
 # 10回以上繰り返し実行して100%通過を確認
 npx playwright test --repeat-each=10 path/to/new.spec.ts
 ```
+
+#### E2Eテスト成功の判定方法（必須）
+
+**テスト成功の判定は「0 failed」を明示的に確認すること。**
+
+```bash
+# ❌ BAD: passedの数だけを見る（failedを見落とす可能性）
+npm run test:e2e 2>&1 | grep -E 'passed' | tail -1
+# → "536 passed" と表示されても、別の行に "1 failed" がある可能性
+
+# ✅ GOOD: failedの有無を明示的に確認
+npm run test:e2e 2>&1 | grep -E '^\s+\d+ (failed|passed)'
+# → "1 failed" があれば失敗、"0 failed" または failedが無ければ成功
+```
+
+**よくあるミス**:
+- passedの数だけを確認し、failedの行を見落とす
+- passedの数がばらつく（535, 534, 533）場合、「skippedの差」と誤解して調査しない
+  → 実際はfailedが発生している可能性が高い
+
+**正しい確認手順**:
+1. テスト実行後、出力全体で "failed" を検索
+2. passedの数が一定でない場合は必ず原因を調査
+3. 成功は「failed が 0」であることを確認して初めて判定する
 
 #### Chrome Background Throttling対策
 
