@@ -14,16 +14,19 @@
 
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
-import { assertTabStructure } from './utils/drag-drop-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('コンテキストメニュー操作', () => {
   test('タブノードを右クリックした場合、コンテキストメニューが表示される', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: タブを作成
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     // タブノードのlocatorを定義
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
@@ -55,16 +58,19 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
-    await assertTabStructure(sidePanelPage, []);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
   });
 
   test('コンテキストメニューから"タブを閉じる"を選択した場合、対象タブが閉じられる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: テスト用タブを作成
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     // 現在のタブ数を取得
     const initialTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
@@ -102,30 +108,33 @@ test.describe('コンテキストメニュー操作', () => {
     }).toPass({ timeout: 5000 });
 
     // タブがUIで閉じられた後の構造を検証（タブが0個になっている）
-    await assertTabStructure(sidePanelPage, []);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
   });
 
   test('コンテキストメニューから"サブツリーを閉じる"を選択した場合、対象タブとその全ての子孫タブが閉じられる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: 親タブと子タブを作成してサブツリーを構築
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const parentTabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId: parentTabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: parentTabId, depth: 0 }], 0);
 
     // 子タブを作成
     const childTabId1 = await createTab(extensionContext, 'about:blank', parentTabId);
-    await assertTabStructure(sidePanelPage, [
+    await assertTabStructure(sidePanelPage, windowId, [
       { tabId: parentTabId, depth: 0 },
       { tabId: childTabId1, depth: 1 },
-    ]);
+    ], 0);
 
     const childTabId2 = await createTab(extensionContext, 'about:blank', parentTabId);
-    await assertTabStructure(sidePanelPage, [
+    await assertTabStructure(sidePanelPage, windowId, [
       { tabId: parentTabId, depth: 0 },
       { tabId: childTabId1, depth: 1 },
       { tabId: childTabId2, depth: 1 },
-    ]);
+    ], 0);
 
     // 現在のタブ数を取得（親タブ + 子タブ2つ）
     const initialTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
@@ -169,16 +178,19 @@ test.describe('コンテキストメニュー操作', () => {
     await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId2}"]`)).not.toBeVisible({ timeout: 5000 });
 
     // サブツリーが閉じられた後の構造を検証（タブが0個になっている）
-    await assertTabStructure(sidePanelPage, []);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
   });
 
   test('コンテキストメニューから"グループに追加"を選択した場合、グループ選択またはグループ作成のインタラクションが開始される', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: タブを作成
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -208,7 +220,7 @@ test.describe('コンテキストメニュー操作', () => {
     await sidePanelPage.keyboard.press('Escape');
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 2000 });
     await closeTab(extensionContext, tabId);
-    await assertTabStructure(sidePanelPage, []);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
   });
 
   test('コンテキストメニューから"新しいウィンドウで開く"を選択した場合、タブが新しいウィンドウに移動する', async ({
@@ -217,8 +229,10 @@ test.describe('コンテキストメニュー操作', () => {
     serviceWorker,
   }) => {
     // Arrange: タブを作成
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     // 初期のウィンドウ数を取得
     const initialWindowCount = await serviceWorker.evaluate(async () => {
@@ -265,10 +279,13 @@ test.describe('コンテキストメニュー操作', () => {
   test('コンテキストメニューから"URLをコピー"を選択した場合、クリップボードにURLがコピーされる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: タブを作成
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -301,16 +318,19 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
-    await assertTabStructure(sidePanelPage, []);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
   });
 
   test('コンテキストメニューの外側をクリックした場合、メニューが閉じられる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: タブを作成
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -358,16 +378,19 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
-    await assertTabStructure(sidePanelPage, []);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
   });
 
   test('Escapeキーを押した場合、コンテキストメニューが閉じられる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
     // Arrange: タブを作成
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
     const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
@@ -398,6 +421,6 @@ test.describe('コンテキストメニュー操作', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId);
-    await assertTabStructure(sidePanelPage, []);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
   });
 });

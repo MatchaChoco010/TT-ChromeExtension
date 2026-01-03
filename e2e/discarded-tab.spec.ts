@@ -15,7 +15,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, activateTab } from './utils/tab-utils';
 import { waitForCondition } from './utils/polling-utils';
-import { assertTabStructure } from './utils/drag-drop-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('休止タブの視覚的区別', () => {
   /**
@@ -36,12 +36,16 @@ test.describe('休止タブの視覚的区別', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // 現在のウィンドウIDを取得
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
+
     // タブを作成（アクティブではない状態で作成）
     const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
       active: false,
     });
     expect(tabId).toBeGreaterThan(0);
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     // タブの読み込みが完了するまでポーリングで待機
     await waitForCondition(
@@ -140,12 +144,16 @@ test.describe('休止タブの視覚的区別', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // 現在のウィンドウIDを取得
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+    const windowId = currentWindow.id!;
+
     // タブを作成（アクティブではない状態で作成）
     const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
       active: false,
     });
     expect(tabId).toBeGreaterThan(0);
-    await assertTabStructure(sidePanelPage, [{ tabId, depth: 0 }]);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
 
     // タブの読み込みが完了するまでポーリングで待機
     await waitForCondition(
