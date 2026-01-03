@@ -7,6 +7,7 @@ import {
   registerMessageListener,
   getDragState,
   setDragState,
+  testTreeStateManager,
 } from './event-handlers';
 
 // Sample TabNode for testing
@@ -563,9 +564,23 @@ describe('Service Worker - Messaging', () => {
  * 複数タブのグループ化機能
  */
 describe('複数タブのグループ化機能', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     chromeMock.clearAllListeners();
-    vi.clearAllMocks();
+    // 注意: vi.clearAllMocks()はchrome-mockのstorage実装に影響を与えるため使用しない
+
+    // 初期のtree_stateをストレージにセット
+    await chromeMock.storage.local.set({
+      tree_state: {
+        views: [{ id: 'default', name: 'デフォルト', color: '#3b82f6' }],
+        currentViewId: 'default',
+        nodes: {},
+        tabToNode: {},
+        treeStructure: [],
+      },
+    });
+
+    // TreeStateManagerの内部状態をリセット
+    await testTreeStateManager.loadState();
   });
 
   afterEach(() => {
@@ -600,17 +615,14 @@ describe('複数タブのグループ化機能', () => {
       url: `chrome-extension://test-id/group.html?tabId=${groupTabId}`,
     } as chrome.tabs.Tab);
 
-    // 事前にタブを作成しておく
+    // 事前にタブを作成しておく（競合状態を回避するため直接TreeStateManagerに追加）
     const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
     const tab2 = { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
     const tab3 = { id: 3, index: 2, windowId: 1, url: 'https://example3.com' } as chrome.tabs.Tab;
 
-    chromeMock.tabs.onCreated.trigger(tab1);
-    chromeMock.tabs.onCreated.trigger(tab2);
-    chromeMock.tabs.onCreated.trigger(tab3);
-
-    // 非同期処理を待つ
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await testTreeStateManager.addTab(tab1, null, 'default');
+    await testTreeStateManager.addTab(tab2, null, 'default');
+    await testTreeStateManager.addTab(tab3, null, 'default');
 
     // CREATE_GROUPメッセージを送信
     const message = {
@@ -677,15 +689,12 @@ describe('複数タブのグループ化機能', () => {
       url: `chrome-extension://test-id/group.html?tabId=${groupTabId}`,
     } as chrome.tabs.Tab);
 
-    // 事前にタブを作成しておく
+    // 事前にタブを作成しておく（競合状態を回避するため直接TreeStateManagerに追加）
     const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
     const tab2 = { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
 
-    chromeMock.tabs.onCreated.trigger(tab1);
-    chromeMock.tabs.onCreated.trigger(tab2);
-
-    // 非同期処理を待つ
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await testTreeStateManager.addTab(tab1, null, 'default');
+    await testTreeStateManager.addTab(tab2, null, 'default');
 
     // まずグループを作成
     const createMessage = {

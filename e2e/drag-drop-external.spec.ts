@@ -12,10 +12,10 @@
  *
  * Note: ヘッドレスモードで実行すること（npm run test:e2e）
  */
-import { test, expect } from './fixtures/extension';
-import { createTab, assertTabInTree } from './utils/tab-utils';
-import { waitForCondition } from './utils/polling-utils';
+import { test } from './fixtures/extension';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { dragOutside, startDrag, moveTo, dropTab } from './utils/drag-drop-utils';
+import { assertTabStructure, assertWindowExists, assertWindowCount } from './utils/assertion-utils';
 
 test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
   // マウス操作は各ステップで時間がかかるため、タイムアウトを延長
@@ -26,52 +26,43 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
     sidePanelPage,
     serviceWorker,
   }) => {
+    // 初期セットアップ
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: タブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
-
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, tabId, 'Example');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // 現在のウィンドウ数を取得
-    const windowsBefore = await serviceWorker.evaluate(() => {
-      return chrome.windows.getAll();
-    });
-    const windowCountBefore = windowsBefore.length;
+    const originalWindowId = windowId;
 
     // タブをサイドパネル外にドラッグアウト
     await dragOutside(sidePanelPage, tabId, 'right');
 
-    // 新しいウィンドウが作成されるまで待機（ポーリング）
-    await waitForCondition(
-      async () => {
-        const windowsAfter = await serviceWorker.evaluate(() => {
-          return chrome.windows.getAll();
-        });
-        return windowsAfter.length > windowCountBefore;
-      },
-      {
-        timeout: 10000,
-        interval: 200,
-        timeoutMessage: 'New window was not created after external drop',
-      }
-    );
+    // ドラッグアウト後、元ウィンドウのタブ構造を検証（ドラッグしたタブは移動済み）
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // 検証: 新しいウィンドウが作成されたことを確認
+    // 検証: 新しいウィンドウが作成されたことを確認（ウィンドウ数が2になる）
+    await assertWindowCount(extensionContext, 2);
+
+    // 新しいウィンドウを特定
     const windowsAfter = await serviceWorker.evaluate(() => {
       return chrome.windows.getAll();
     });
-    expect(windowsAfter.length).toBeGreaterThan(windowCountBefore);
-
-    // 新しいウィンドウを特定（元のウィンドウ以外）
     const newWindow = windowsAfter.find((win: chrome.windows.Window) => win.id !== originalWindowId);
-    expect(newWindow).toBeDefined();
+    const newWindowId = newWindow!.id as number;
+
+    // assertWindowExistsで新しいウィンドウの存在を確認
+    await assertWindowExists(extensionContext, newWindowId);
   });
 
   test('ドロップしたタブが新しいウィンドウに正確に移動されること', async ({
@@ -79,103 +70,43 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
     sidePanelPage,
     serviceWorker,
   }) => {
+    // 初期セットアップ
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: タブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
-
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, tabId, 'Example');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // タブが元のウィンドウに存在することを確認
-    const tabBefore = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-    expect(tabBefore.windowId).toBe(originalWindowId);
-
-    // 現在のウィンドウ数を取得
-    const windowsBefore = await serviceWorker.evaluate(() => {
-      return chrome.windows.getAll();
-    });
-    const windowCountBefore = windowsBefore.length;
+    const originalWindowId = windowId;
 
     // タブをサイドパネル外にドラッグアウト
     await dragOutside(sidePanelPage, tabId, 'right');
 
-    // 新しいウィンドウが作成されるまで待機
-    await waitForCondition(
-      async () => {
-        const windowsAfter = await serviceWorker.evaluate(() => {
-          return chrome.windows.getAll();
-        });
-        return windowsAfter.length > windowCountBefore;
-      },
-      {
-        timeout: 10000,
-        interval: 200,
-        timeoutMessage: 'New window was not created after external drop',
-      }
-    );
+    // ドラッグアウト後、元ウィンドウのタブ構造を検証（ドラッグしたタブは移動済み）
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
+    // 検証: 新しいウィンドウが作成されたことを確認（ウィンドウ数が2になる）
+    await assertWindowCount(extensionContext, 2);
 
     // 新しいウィンドウを特定
     const windowsAfter = await serviceWorker.evaluate(() => {
       return chrome.windows.getAll();
     });
     const newWindow = windowsAfter.find((win: chrome.windows.Window) => win.id !== originalWindowId);
-    expect(newWindow).toBeDefined();
     const newWindowId = newWindow!.id as number;
 
-    // タブが新しいウィンドウに移動したことを確認（ポーリング）
-    await waitForCondition(
-      async () => {
-        try {
-          const tabAfter = await serviceWorker.evaluate(
-            ({ tabId }) => {
-              return chrome.tabs.get(tabId);
-            },
-            { tabId }
-          );
-          return tabAfter.windowId === newWindowId;
-        } catch {
-          // タブが見つからない場合はまだ移動中
-          return false;
-        }
-      },
-      {
-        timeout: 10000,
-        interval: 200,
-        timeoutMessage: `Tab ${tabId} was not moved to the new window ${newWindowId}`,
-      }
-    );
-
-    // 検証: タブが新しいウィンドウに存在することを確認
-    const tabAfter = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-    expect(tabAfter.windowId).toBe(newWindowId);
-
-    // 検証: 元のウィンドウにタブが存在しないことを確認
-    const tabsInOriginalWindow = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: originalWindowId }
-    );
-    const tabStillInOriginal = tabsInOriginalWindow.find(
-      (tab: chrome.tabs.Tab) => tab.id === tabId
-    );
-    expect(tabStillInOriginal).toBeUndefined();
+    // assertWindowExistsで新しいウィンドウの存在を確認
+    await assertWindowExists(extensionContext, newWindowId);
   });
 
   /**
@@ -199,30 +130,27 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
     sidePanelPage,
     serviceWorker,
   }) => {
+    // 初期セットアップ
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: タブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
-
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, tabId, 'Example');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // 現在のウィンドウ数を取得
-    const windowsBefore = await serviceWorker.evaluate(() => {
-      return chrome.windows.getAll();
-    });
-    const windowCountBefore = windowsBefore.length;
+    const originalWindowId = windowId;
 
     // サイドパネル全体のコンテナを取得（data-testid="side-panel-root"）
     const sidePanelContainer = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelContainer).toBeVisible();
+    await sidePanelContainer.waitFor({ state: 'visible' });
     const sidePanelBox = await sidePanelContainer.boundingBox();
-    expect(sidePanelBox).not.toBeNull();
 
     // ドラッグ操作を実行（タブをサイドパネル内の空白領域にドラッグ）
     await startDrag(sidePanelPage, tabId);
@@ -236,22 +164,16 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
     // ドロップを実行
     await dropTab(sidePanelPage);
 
-    // 少し待機して、新しいウィンドウが作成されないことを確認
-    await sidePanelPage.evaluate(() => new Promise(resolve => setTimeout(resolve, 500)));
+    // ドロップ後、タブが元のウィンドウに残っていることをassertTabStructureで確認
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
-    // 検証: 新しいウィンドウが作成されていないことを確認
-    const windowsAfter = await serviceWorker.evaluate(() => {
-      return chrome.windows.getAll();
-    });
-    expect(windowsAfter.length).toBe(windowCountBefore);
+    // 検証: 新しいウィンドウが作成されていないことを確認（ウィンドウ数が1のまま）
+    await assertWindowCount(extensionContext, 1);
 
-    // 検証: タブが元のウィンドウに残っていることを確認
-    const tabAfter = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-    expect(tabAfter.windowId).toBe(originalWindowId);
+    // 元のウィンドウが存在することを確認
+    await assertWindowExists(extensionContext, originalWindowId);
   });
 });

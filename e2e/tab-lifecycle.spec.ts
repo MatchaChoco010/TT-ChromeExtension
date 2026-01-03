@@ -13,7 +13,9 @@
  * Side Panelが表示され、基本的なタブ操作が可能であることを確認します。
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, activateTab } from './utils/tab-utils';
+import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
+import { waitForTabInTreeState, waitForTabRemovedFromTreeState, waitForCondition, waitForTabUrlLoaded, waitForTabStatusComplete } from './utils/polling-utils';
 
 test.describe('タブライフサイクルとツリー構造の基本操作', () => {
   test('新しいタブを作成した場合、タブが正常に作成される', async ({
@@ -25,32 +27,30 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // タブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
 
-    // タブのロード完了を待機してから情報を取得
-    // chrome.tabs.query()はタブのロード状態によってはURLが空の場合があるため、
-    // タブのロード完了を待機する
-    const createdTab = await serviceWorker.evaluate(async (tabId) => {
-      // タブのロード完了を待機
-      const maxWait = 10000; // 最大10秒
-      const startTime = Date.now();
-      while (Date.now() - startTime < maxWait) {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab.status === 'complete' || (tab.url && tab.url !== '')) {
-          return tab;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      // タイムアウト時でも現在の状態を返す
-      return chrome.tabs.get(tabId);
-    }, tabId);
+    // タブ作成後の構造を検証（擬似サイドパネルタブ + 新規タブ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId, depth: 0 },
+    ], 0);
 
-    // 作成したタブが存在することを確認
-    expect(createdTab).toBeDefined();
-    expect(createdTab.id).toBe(tabId);
-    // URLが設定されているか、または pending URL が example.com を含むことを確認
+    // URLが正しく設定されていることを確認（ロード完了を待機）
+    const createdTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'example.com');
     expect(createdTab.url || createdTab.pendingUrl || '').toContain('example.com');
   });
 
@@ -63,9 +63,25 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 親タブを作成
     const parentTabId = await createTab(extensionContext, 'https://example.com');
-    expect(parentTabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
     // 親タブから子タブを作成（openerTabIdを指定）
     const childTabId = await createTab(
@@ -73,20 +89,11 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
       'https://example.com/child',
       parentTabId
     );
-    expect(childTabId).toBeGreaterThan(0);
-    expect(childTabId).not.toBe(parentTabId);
-
-    // タブが作成されたことをchrome.tabs APIで確認
-    const tabs = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
-
-    // 両方のタブが存在することを確認
-    expect(tabs.length).toBeGreaterThanOrEqual(2);
-    const parent = tabs.find((tab: chrome.tabs.Tab) => tab.id === parentTabId);
-    const child = tabs.find((tab: chrome.tabs.Tab) => tab.id === childTabId);
-    expect(parent).toBeDefined();
-    expect(child).toBeDefined();
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId, depth: 1 },
+    ], 0);
   });
 
   test('タブを閉じた場合、タブが正常に削除される', async ({
@@ -98,30 +105,34 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // タブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
-
-    // タブ作成前のタブ数を記録
-    const tabsBefore = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
-    const tabCountBefore = tabsBefore.length;
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // タブを閉じる
     await closeTab(extensionContext, tabId);
+    await waitForTabRemovedFromTreeState(extensionContext, tabId);
 
-    // タブが削除されたことをchrome.tabs APIで確認
-    const tabsAfter = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
-
-    // タブ数が減っていることを確認
-    expect(tabsAfter.length).toBeLessThan(tabCountBefore);
-
-    // 削除したタブが存在しないことを確認
-    const deletedTab = tabsAfter.find((tab: chrome.tabs.Tab) => tab.id === tabId);
-    expect(deletedTab).toBeUndefined();
+    // タブ削除後の構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('子タブを持つ親タブを閉じた場合、親タブが正常に削除される', async ({
@@ -133,9 +144,25 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 親タブを作成
     const parentTabId = await createTab(extensionContext, 'https://example.com');
-    expect(parentTabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
     // 子タブを作成
     const childTabId1 = await createTab(
@@ -143,35 +170,34 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
       'https://example.com/child1',
       parentTabId
     );
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+    ], 0);
+
     const childTabId2 = await createTab(
       extensionContext,
       'https://example.com/child2',
       parentTabId
     );
-
-    expect(childTabId1).toBeGreaterThan(0);
-    expect(childTabId2).toBeGreaterThan(0);
-
-    // タブ作成前のタブ数を記録
-    const tabsBefore = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
-    const tabCountBefore = tabsBefore.length;
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+      { tabId: childTabId2, depth: 1 },
+    ], 0);
 
     // 親タブを閉じる
     await closeTab(extensionContext, parentTabId);
+    await waitForTabRemovedFromTreeState(extensionContext, parentTabId);
 
-    // タブが削除されたことをchrome.tabs APIで確認
-    const tabsAfter = await serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    });
-
-    // 親タブが削除されたことを確認
-    const parentTab = tabsAfter.find((tab: chrome.tabs.Tab) => tab.id === parentTabId);
-    expect(parentTab).toBeUndefined();
-
-    // タブ数が変化していることを確認
-    expect(tabsAfter.length).not.toBe(tabCountBefore);
+    // 親タブ削除後の構造を検証（子タブは昇格）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: childTabId1, depth: 0 },
+      { tabId: childTabId2, depth: 0 },
+    ], 0);
   });
 
   test('タブのタイトルまたはURLが変更された場合、変更が反映される', async ({
@@ -183,23 +209,28 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // タブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // 元のタブ情報を確認（ロード完了を待機）
-    const tabBefore = await serviceWorker.evaluate(async (tabId) => {
-      const maxWait = 10000;
-      const startTime = Date.now();
-      while (Date.now() - startTime < maxWait) {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab.status === 'complete' || (tab.url && tab.url !== '')) {
-          return tab;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      return chrome.tabs.get(tabId);
-    }, tabId);
+    const tabBefore = await waitForTabUrlLoaded(serviceWorker, tabId, 'example.com', 10000);
     expect(tabBefore.url || tabBefore.pendingUrl || '').toContain('example.com');
 
     // タブのURLを変更
@@ -211,24 +242,17 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     );
 
     // 更新を待機（URL変更とロード完了を待つ）
-    const tabAfter = await serviceWorker.evaluate(async (tabId) => {
-      const maxWait = 10000;
-      const startTime = Date.now();
-      while (Date.now() - startTime < maxWait) {
-        const tab = await chrome.tabs.get(tabId);
-        // example.orgへのナビゲーションが完了するのを待つ
-        if ((tab.url && tab.url.includes('example.org')) ||
-            (tab.pendingUrl && tab.pendingUrl.includes('example.org'))) {
-          return tab;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      return chrome.tabs.get(tabId);
-    }, tabId);
+    const tabAfter = await waitForTabUrlLoaded(serviceWorker, tabId, 'example.org', 10000);
 
     // URLが変更されたことを確認
     expect(tabAfter).toBeDefined();
     expect(tabAfter.id).toBe(tabId);
+
+    // タブ構造に変化がないことを検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
   });
 
   test('タブがアクティブ化された場合、アクティブ状態が正しく設定される', async ({
@@ -240,16 +264,36 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 複数のタブを作成（非アクティブ）
     const tabId1 = await createTab(extensionContext, 'https://example.com', undefined, {
       active: false,
     });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
     const tabId2 = await createTab(extensionContext, 'https://example.org', undefined, {
       active: false,
     });
-
-    expect(tabId1).toBeGreaterThan(0);
-    expect(tabId2).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     // タブ1をアクティブ化
     await activateTab(extensionContext, tabId1);
@@ -261,6 +305,13 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     const activeTab1 = tabs1.find((tab: chrome.tabs.Tab) => tab.id === tabId1);
     expect(activeTab1?.active).toBe(true);
 
+    // タブ構造に変化がないことを検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
     // タブ2をアクティブ化
     await activateTab(extensionContext, tabId2);
 
@@ -270,5 +321,12 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     });
     const activeTab2 = tabs2.find((tab: chrome.tabs.Tab) => tab.id === tabId2);
     expect(activeTab2?.active).toBe(true);
+
+    // タブ構造に変化がないことを検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
   });
 });

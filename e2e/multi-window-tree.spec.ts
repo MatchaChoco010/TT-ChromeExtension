@@ -8,138 +8,159 @@
  *
  * Note: Run with `npm run test:e2e`
  */
-import { test, expect } from './fixtures/extension';
+import { test } from './fixtures/extension';
 import { createWindow, moveTabToWindow, openSidePanelForWindow } from './utils/window-utils';
-import { createTab } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { assertTabStructure, assertWindowExists } from './utils/assertion-utils';
 import { waitForTabInTreeState, waitForSidePanelReady } from './utils/polling-utils';
 
 test.describe('Multi-Window Tab Tree Display Separation', () => {
   test('each window should only display its own tabs in the tab tree', async ({
     extensionContext,
     serviceWorker,
+    sidePanelPage,
   }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
+    // Initialize test state
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
     // Create tabs in the original window
     const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
     const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
-    expect(tabId1).toBeGreaterThan(0);
-    expect(tabId2).toBeGreaterThan(0);
-
-    // Wait for tabs to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await waitForTabInTreeState(extensionContext, tabId2);
-
-    // Open side panel for the original window with windowId parameter
-    const originalWindowSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-    await waitForSidePanelReady(originalWindowSidePanel, serviceWorker);
-
-    // Verify tabs are displayed in the original window's side panel
-    const treeNode1 = originalWindowSidePanel.locator(`[data-testid="tree-node-${tabId1}"]`);
-    const treeNode2 = originalWindowSidePanel.locator(`[data-testid="tree-node-${tabId2}"]`);
-    await expect(treeNode1).toBeVisible();
-    await expect(treeNode2).toBeVisible();
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     // Create a new window
     const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
-    expect(newWindowId).not.toBe(originalWindowId);
-
-    // Create a tab in the new window
-    const tabId3 = await serviceWorker.evaluate(async ({ windowId }) => {
-      const tab = await chrome.tabs.create({ windowId, url: 'https://example.com/tab3' });
-      return tab.id;
-    }, { windowId: newWindowId });
-    expect(tabId3).toBeGreaterThan(0);
-
-    // Wait for tab3 to be registered in tree state
-    await waitForTabInTreeState(extensionContext, tabId3 as number);
-
-    // Open side panel for the new window
-    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
-
-    // In the new window's side panel, tab3 should be visible
-    const treeNode3InNewWindow = newWindowSidePanel.locator(`[data-testid="tree-node-${tabId3}"]`);
-    await expect(treeNode3InNewWindow).toBeVisible();
-
-    // In the new window's side panel, tabs from original window (tabId1, tabId2) should NOT be visible
-    const treeNode1InNewWindow = newWindowSidePanel.locator(`[data-testid="tree-node-${tabId1}"]`);
-    const treeNode2InNewWindow = newWindowSidePanel.locator(`[data-testid="tree-node-${tabId2}"]`);
-    await expect(treeNode1InNewWindow).not.toBeVisible();
-    await expect(treeNode2InNewWindow).not.toBeVisible();
-
-    // Reload original window's side panel to verify it still shows only its tabs
-    await originalWindowSidePanel.reload();
-    await waitForSidePanelReady(originalWindowSidePanel, serviceWorker);
-
-    // In the original window's side panel, tab3 should NOT be visible
-    const treeNode3InOriginal = originalWindowSidePanel.locator(`[data-testid="tree-node-${tabId3}"]`);
-    await expect(treeNode3InOriginal).not.toBeVisible();
-
-    // In the original window's side panel, its own tabs should still be visible
-    await expect(treeNode1).toBeVisible();
-    await expect(treeNode2).toBeVisible();
-  });
-
-  test('when tab is moved to another window, it should appear in the destination window tree and disappear from source', async ({
-    extensionContext,
-    serviceWorker,
-  }) => {
-    // Get original window ID
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // Create a tab in the original window
-    const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
-
-    // Wait for tab to appear in tree state
-    await waitForTabInTreeState(extensionContext, tabId);
-
-    // Open side panel for the original window with windowId parameter
-    const originalWindowSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-    await waitForSidePanelReady(originalWindowSidePanel, serviceWorker);
-
-    // Verify tab is displayed in original window
-    const treeNode = originalWindowSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(treeNode).toBeVisible();
-
-    // Create a new window
-    const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+    await assertWindowExists(extensionContext, newWindowId);
 
     // Open side panel for new window
     const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
     await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
 
-    // Tab should NOT be visible in new window's tree (before move)
-    const treeNodeInNewWindow = newWindowSidePanel.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(treeNodeInNewWindow).not.toBeVisible();
+    // Get new window's tabs
+    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
 
-    // Move tab to new window
-    await moveTabToWindow(extensionContext, tabId, newWindowId);
+    // Create a tab in the new window
+    const tabId3 = await createTab(extensionContext, 'https://example.com/tab3', { windowId: newWindowId });
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
-    // Wait for tabInfoMap to update and reload the side panel to get new window ID
-    // Tab moves update the windowId in tabInfoMap, but the side panel needs to re-render
+    // Reload side panel to reflect new tab
     await newWindowSidePanel.reload();
     await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
 
-    // Tab should now be visible in new window's tree
-    await expect(treeNodeInNewWindow).toBeVisible({ timeout: 10000 });
+    // Verify new window state (includes the new tab)
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
-    // Reload original window's side panel to reflect the change
-    await originalWindowSidePanel.reload();
-    await waitForSidePanelReady(originalWindowSidePanel, serviceWorker);
+    // Reload original window's side panel to verify it still shows only its tabs
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
-    // Tab should NOT be visible in original window's tree anymore
-    await expect(treeNode).not.toBeVisible();
+    // Verify original window state (unchanged)
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+  });
+
+  test('when tab is moved to another window, it should appear in the destination window tree and disappear from source', async ({
+    extensionContext,
+    serviceWorker,
+    sidePanelPage,
+  }) => {
+    // Initialize test state
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
+    // Create a tab in the original window
+    const tabId = await createTab(extensionContext, 'https://example.com');
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
+
+    // Create a new window
+    const newWindowId = await createWindow(extensionContext);
+    await assertWindowExists(extensionContext, newWindowId);
+
+    // Open side panel for new window
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+
+    // Get new window's tabs
+    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // Move tab to new window
+    await moveTabToWindow(extensionContext, tabId, newWindowId);
+    await waitForTabInTreeState(extensionContext, tabId);
+
+    // Assert tab structure immediately after moveTabToWindow
+    // Verify original window state (tab removed)
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
+    // Verify new window state (tab added)
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
+
+    // Reload side panels and re-verify to ensure persistence
+    await newWindowSidePanel.reload();
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
+
+    // Verify original window state after reload
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
+    // Verify new window state after reload
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
   });
 
   test('new window should have empty tab tree except for default new tab', async ({
@@ -147,55 +168,45 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
     extensionContext,
     serviceWorker,
   }) => {
-    // Verify Side Panel is visible
-    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelRoot).toBeVisible();
+    // Initialize test state
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
     // Create tabs in original window
     const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
-    const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
 
-    // Wait for tabs to appear
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await waitForTabInTreeState(extensionContext, tabId2);
+    const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     // Create a new window (Chrome automatically creates a new tab page)
     const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+    await assertWindowExists(extensionContext, newWindowId);
 
     // Open side panel for new window
     const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
     await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
 
-    // Original window's tabs should NOT appear in new window's tree
-    const treeNode1InNewWindow = newWindowSidePanel.locator(`[data-testid="tree-node-${tabId1}"]`);
-    const treeNode2InNewWindow = newWindowSidePanel.locator(`[data-testid="tree-node-${tabId2}"]`);
-    await expect(treeNode1InNewWindow).not.toBeVisible();
-    await expect(treeNode2InNewWindow).not.toBeVisible();
+    // Get new window's tabs
+    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
 
-    // New window should only show its tabs (not tabs from original window)
-    // Get tabs in new window - Note: There will be at least one tab (new tab page)
-    // and possibly a side panel page as well
-    const tabsInNewWindow = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: newWindowId }
-    );
-
-    // There should be at least 1 tab (the default new tab)
-    expect(tabsInNewWindow.length).toBeGreaterThanOrEqual(1);
-
-    // Any tabs in the new window should be visible in its tree
-    // Filter out the extension pages (sidepanel pages don't have normal URLs)
-    const normalTabs = tabsInNewWindow.filter(
-      (tab: chrome.tabs.Tab) => !tab.url?.startsWith('chrome-extension://')
-    );
-
-    if (normalTabs.length > 0) {
-      const newTabId = normalTabs[0].id as number;
-      const newTabTreeNode = newWindowSidePanel.locator(`[data-testid="tree-node-${newTabId}"]`);
-      await expect(newTabTreeNode).toBeVisible();
-    }
+    // New window should only show its tabs (pseudo side panel + default new tab)
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
   });
 });

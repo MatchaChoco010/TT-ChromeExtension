@@ -12,9 +12,10 @@
  * Note: `--repeat-each=10`で安定性を確認済み
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, assertTabInTree } from './utils/tab-utils';
-import { moveTabToParent, getParentTabId, getTabDepth } from './utils/drag-drop-utils';
-import { waitForParentChildRelation, waitForCondition, waitForTabInTreeState, waitForTabDepthInUI } from './utils/polling-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { moveTabToParent } from './utils/drag-drop-utils';
+import { waitForCondition } from './utils/polling-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ツリー状態永続化', () => {
   // タイムアウトを延長（D&D操作があるため）
@@ -30,17 +31,38 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 親タブと子タブを作成
       const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab);
-      await assertTabInTree(sidePanelPage, childTab);
+      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
 
       // D&Dで親子関係を作成
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
       // ストレージで親子関係が保存されていることを確認
       const parentIdInStorage = await serviceWorker.evaluate(async ({ childId, parentId }) => {
@@ -67,10 +89,6 @@ test.describe('ツリー状態永続化', () => {
 
       expect(parentIdInStorage.found).toBe(true);
       expect(parentIdInStorage.parentNodeId).toBe(parentIdInStorage.expectedParentNodeId);
-
-      // After storage verification, verify UI depth
-      await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
-      await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
     });
 
     test('サイドパネルリロード後に親子関係が復元されること', async ({
@@ -83,19 +101,40 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 親タブと子タブを作成
       const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab);
-      await assertTabInTree(sidePanelPage, childTab);
+      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
 
       // D&Dで親子関係を作成
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
-      // UIで親子関係を確認
+      // 親タブを展開
       const parentNodeBefore = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
       const expandButtonBefore = parentNodeBefore.locator('[data-testid="expand-button"]');
       if ((await expandButtonBefore.count()) > 0) {
@@ -105,14 +144,9 @@ test.describe('ツリー状態永続化', () => {
           await expect(parentNodeBefore).toHaveAttribute('data-expanded', 'true', { timeout: 5000 });
         }
       }
-      const childParentBefore = await getParentTabId(sidePanelPage, childTab);
-      expect(childParentBefore).toBe(parentTab);
 
       // サイドパネルをリロード
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -133,17 +167,12 @@ test.describe('ツリー状態永続化', () => {
         }
       }
 
-      // リロード後も親子関係が維持されていることを確認
-      const childParentAfter = await getParentTabId(sidePanelPage, childTab);
-      expect(childParentAfter).toBe(parentTab);
-
-      // 子タブのdepthが正しいことを確認
-      const childDepthAfter = await getTabDepth(sidePanelPage, childTab);
-      expect(childDepthAfter).toBe(1);
-
-      // After storage verification, verify UI depth
-      await waitForTabDepthInUI(sidePanelPage, parentTab, 0, { timeout: 3000 });
-      await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
+      // リロード後の状態を検証（親子関係とdepthが維持されていることを確認）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
     });
 
     test('深いネストの親子関係がストレージに正しく保存・復元されること', async ({
@@ -156,22 +185,55 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 3階層のタブ構造を作成
       const rootTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
-      const grandchildTab = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: rootTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, rootTab);
-      await assertTabInTree(sidePanelPage, childTab);
-      await assertTabInTree(sidePanelPage, grandchildTab);
+      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: rootTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
+
+      const grandchildTab = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: rootTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+        { tabId: grandchildTab, depth: 0 },
+      ], 0);
 
       // D&Dで階層構造を構築
       await moveTabToParent(sidePanelPage, childTab, rootTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, childTab, rootTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: rootTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+        { tabId: grandchildTab, depth: 0 },
+      ], 0);
 
       await moveTabToParent(sidePanelPage, grandchildTab, childTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, grandchildTab, childTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: rootTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+        { tabId: grandchildTab, depth: 2 },
+      ], 0);
 
       // ヘルパー関数: タブを展開
       const expandTab = async (tabId: number) => {
@@ -191,10 +253,7 @@ test.describe('ツリー状態永続化', () => {
       await expandTab(childTab);
 
       // サイドパネルをリロード
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -208,24 +267,13 @@ test.describe('ツリー状態永続化', () => {
       await expandTab(rootTab);
       await expandTab(childTab);
 
-      // リロード後も親子関係が維持されていることを確認
-      const childParent = await getParentTabId(sidePanelPage, childTab);
-      expect(childParent).toBe(rootTab);
-
-      const grandchildParent = await getParentTabId(sidePanelPage, grandchildTab);
-      expect(grandchildParent).toBe(childTab);
-
-      // depthが正しいことを確認
-      const childDepth = await getTabDepth(sidePanelPage, childTab);
-      expect(childDepth).toBe(1);
-
-      const grandchildDepth = await getTabDepth(sidePanelPage, grandchildTab);
-      expect(grandchildDepth).toBe(2);
-
-      // After storage verification, verify UI depth
-      await waitForTabDepthInUI(sidePanelPage, rootTab, 0, { timeout: 3000 });
-      await waitForTabDepthInUI(sidePanelPage, childTab, 1, { timeout: 3000 });
-      await waitForTabDepthInUI(sidePanelPage, grandchildTab, 2, { timeout: 3000 });
+      // リロード後の状態を検証（親子関係とdepthが維持されていることを確認）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: rootTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+        { tabId: grandchildTab, depth: 2 },
+      ], 0);
     });
   });
 
@@ -239,17 +287,38 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 親タブと子タブを作成
       const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab);
-      await assertTabInTree(sidePanelPage, childTab);
+      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
 
       // D&Dで親子関係を作成
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
       // 親タブを展開
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -328,17 +397,38 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 親タブと子タブを作成
       const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab);
-      await assertTabInTree(sidePanelPage, childTab);
+      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
 
       // D&Dで親子関係を作成
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
       // 親タブを折りたたみ状態にする
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -378,10 +468,7 @@ test.describe('ツリー状態永続化', () => {
       }, { timeout: 5000, timeoutMessage: 'Collapsed state was not saved to storage' });
 
       // サイドパネルをリロード
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -391,10 +478,9 @@ test.describe('ツリー状態永続化', () => {
         return (await pNode.count()) > 0;
       }, { timeout: 10000, timeoutMessage: `Parent tab ${parentTab} not visible after reload` });
 
-      // リロード後も折りたたみ状態が維持されていることを確認
+      // リロード後も折りたたみ状態が維持されていることを確認（展開状態確認はUIインタラクション結果）
       const parentNodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-      const isExpandedAfter = await parentNodeAfter.getAttribute('data-expanded');
-      expect(isExpandedAfter).toBe('false');
+      await expect(parentNodeAfter).toHaveAttribute('data-expanded', 'false', { timeout: 5000 });
     });
 
     test('サイドパネルリロード後に折りたたみ状態が復元されること（展開状態）', async ({
@@ -407,17 +493,38 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 親タブと子タブを作成
       const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab);
-      await assertTabInTree(sidePanelPage, childTab);
+      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
 
       // D&Dで親子関係を作成
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
       // 親タブを展開状態にする
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -457,10 +564,7 @@ test.describe('ツリー状態永続化', () => {
       }, { timeout: 5000, timeoutMessage: 'Expanded state was not saved to storage' });
 
       // サイドパネルをリロード
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -470,14 +574,16 @@ test.describe('ツリー状態永続化', () => {
         return (await pNode.count()) > 0;
       }, { timeout: 10000, timeoutMessage: `Parent tab ${parentTab} not visible after reload` });
 
-      // リロード後も展開状態が維持されていることを確認
+      // リロード後も展開状態が維持されていることを確認（展開状態確認はUIインタラクション結果）
       const parentNodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-      const isExpandedAfter = await parentNodeAfter.getAttribute('data-expanded');
-      expect(isExpandedAfter).toBe('true');
+      await expect(parentNodeAfter).toHaveAttribute('data-expanded', 'true', { timeout: 5000 });
 
-      // 子タブが表示されていることを確認
-      const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTab}"]`).first();
-      await expect(childNode).toBeVisible({ timeout: 5000 });
+      // リロード後の状態を検証（子タブの表示確認も含む）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
     });
   });
 
@@ -492,26 +598,68 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 複数のタブで異なる親子関係と折りたたみ状態を作成
       // Parent1 (展開) -> Child1
       // Parent2 (折りたたみ) -> Child2
       const parent1 = await createTab(extensionContext, 'https://example.com');
-      const child1 = await createTab(extensionContext, 'https://www.iana.org');
-      const parent2 = await createTab(extensionContext, 'https://www.w3.org');
-      const child2 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parent1, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parent1);
-      await assertTabInTree(sidePanelPage, child1);
-      await assertTabInTree(sidePanelPage, parent2);
-      await assertTabInTree(sidePanelPage, child2);
+      const child1 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parent1, depth: 0 },
+        { tabId: child1, depth: 0 },
+      ], 0);
+
+      const parent2 = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parent1, depth: 0 },
+        { tabId: child1, depth: 0 },
+        { tabId: parent2, depth: 0 },
+      ], 0);
+
+      const child2 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parent1, depth: 0 },
+        { tabId: child1, depth: 0 },
+        { tabId: parent2, depth: 0 },
+        { tabId: child2, depth: 0 },
+      ], 0);
 
       // D&Dで親子関係を作成
       await moveTabToParent(sidePanelPage, child1, parent1, serviceWorker);
-      await waitForParentChildRelation(extensionContext, child1, parent1, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parent1, depth: 0 },
+        { tabId: child1, depth: 1 },
+        { tabId: parent2, depth: 0 },
+        { tabId: child2, depth: 0 },
+      ], 0);
 
       await moveTabToParent(sidePanelPage, child2, parent2, serviceWorker);
-      await waitForParentChildRelation(extensionContext, child2, parent2, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parent1, depth: 0 },
+        { tabId: child1, depth: 1 },
+        { tabId: parent2, depth: 0 },
+        { tabId: child2, depth: 1 },
+      ], 0);
 
       // ヘルパー関数: タブの折りたたみ状態を設定
       const setExpandedState = async (tabId: number, expanded: boolean) => {
@@ -564,10 +712,7 @@ test.describe('ツリー状態永続化', () => {
       }, { timeout: 5000, timeoutMessage: 'Expand states were not saved to storage' });
 
       // サイドパネルをリロード
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -578,31 +723,26 @@ test.describe('ツリー状態永続化', () => {
         return (await p1Node.count()) > 0 && (await p2Node.count()) > 0;
       }, { timeout: 10000, timeoutMessage: 'Parent tabs not visible after reload' });
 
-      // リロード後の状態を検証
+      // リロード後の展開状態を検証（展開状態確認はUIインタラクション結果）
       // parent1: 展開状態
       const parent1NodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parent1}"]`).first();
-      const parent1ExpandedAfter = await parent1NodeAfter.getAttribute('data-expanded');
-      expect(parent1ExpandedAfter).toBe('true');
+      await expect(parent1NodeAfter).toHaveAttribute('data-expanded', 'true', { timeout: 5000 });
 
       // parent2: 折りたたみ状態
       const parent2NodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parent2}"]`).first();
-      const parent2ExpandedAfter = await parent2NodeAfter.getAttribute('data-expanded');
-      expect(parent2ExpandedAfter).toBe('false');
+      await expect(parent2NodeAfter).toHaveAttribute('data-expanded', 'false', { timeout: 5000 });
 
-      // 親子関係も維持されていることを確認
-      const child1Parent = await getParentTabId(sidePanelPage, child1);
-      expect(child1Parent).toBe(parent1);
-
-      // parent2を展開して子タブを確認
+      // parent2を展開して子タブを表示
       await setExpandedState(parent2, true);
-      const child2Parent = await getParentTabId(sidePanelPage, child2);
-      expect(child2Parent).toBe(parent2);
 
-      // After storage verification, verify UI depth
-      await waitForTabDepthInUI(sidePanelPage, parent1, 0, { timeout: 3000 });
-      await waitForTabDepthInUI(sidePanelPage, child1, 1, { timeout: 3000 });
-      await waitForTabDepthInUI(sidePanelPage, parent2, 0, { timeout: 3000 });
-      await waitForTabDepthInUI(sidePanelPage, child2, 1, { timeout: 3000 });
+      // リロード後の状態を検証（親子関係とdepthが維持されていることを確認）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parent1, depth: 0 },
+        { tabId: child1, depth: 1 },
+        { tabId: parent2, depth: 0 },
+        { tabId: child2, depth: 1 },
+      ], 0);
     });
 
     test('複数回の折りたたみ操作後もストレージが正しく更新されること', async ({
@@ -614,17 +754,38 @@ test.describe('ツリー状態永続化', () => {
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // windowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 親タブと子タブを作成
       const parentTab = await createTab(extensionContext, 'https://example.com');
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab);
-      await assertTabInTree(sidePanelPage, childTab);
+      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
 
       // D&Dで親子関係を作成
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
-      await waitForParentChildRelation(extensionContext, childTab, parentTab, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
       // 親タブの展開ボタンを取得
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
@@ -657,25 +818,31 @@ test.describe('ツリー状態永続化', () => {
 
       // 展開 -> 折りたたみ -> 展開 を繰り返す
       // 1. 展開状態にする
-      let isExpanded = await parentNode.getAttribute('data-expanded');
+      const isExpanded = await parentNode.getAttribute('data-expanded');
       if (isExpanded !== 'true') {
         await expandButton.first().click();
         await expect(parentNode).toHaveAttribute('data-expanded', 'true', { timeout: 5000 });
       }
-      await waitForCondition(async () => (await getExpandedFromStorage()) === true, { timeout: 3000 });
-      expect(await getExpandedFromStorage()).toBe(true);
+      await waitForCondition(async () => (await getExpandedFromStorage()) === true, {
+        timeout: 3000,
+        timeoutMessage: 'Expanded state (true) was not saved to storage',
+      });
 
       // 2. 折りたたみ状態にする
       await expandButton.first().click();
       await expect(parentNode).toHaveAttribute('data-expanded', 'false', { timeout: 5000 });
-      await waitForCondition(async () => (await getExpandedFromStorage()) === false, { timeout: 3000 });
-      expect(await getExpandedFromStorage()).toBe(false);
+      await waitForCondition(async () => (await getExpandedFromStorage()) === false, {
+        timeout: 3000,
+        timeoutMessage: 'Collapsed state (false) was not saved to storage',
+      });
 
       // 3. 再び展開状態にする
       await expandButton.first().click();
       await expect(parentNode).toHaveAttribute('data-expanded', 'true', { timeout: 5000 });
-      await waitForCondition(async () => (await getExpandedFromStorage()) === true, { timeout: 3000 });
-      expect(await getExpandedFromStorage()).toBe(true);
+      await waitForCondition(async () => (await getExpandedFromStorage()) === true, {
+        timeout: 3000,
+        timeoutMessage: 'Expanded state (true) was not saved to storage after toggle',
+      });
     });
   });
 });

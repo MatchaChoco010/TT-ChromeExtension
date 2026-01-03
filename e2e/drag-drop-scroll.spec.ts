@@ -10,14 +10,15 @@
  * スクロール制限のE2Eテスト（自前D&D実装対応）
  */
 import { test, expect } from './fixtures/extension';
-import type { Page, Locator } from '@playwright/test';
-import { createTab, assertTabInTree } from './utils/tab-utils';
+import type { Locator } from '@playwright/test';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { startDrag, dropTab } from './utils/drag-drop-utils';
+import { assertTabStructure } from './utils/assertion-utils';
+import { waitForCondition } from './utils/polling-utils';
 
 /**
- * スクロール位置が変化するまで待機（ポーリング）
+ * スクロール位置が変化するまで待機（polling-utilsを使用）
  *
- * @param page - Page
  * @param container - スクロールコンテナのLocator
  * @param initialScrollTop - 初期スクロール位置
  * @param direction - 期待するスクロール方向（'down'または'up'）
@@ -25,59 +26,62 @@ import { startDrag, dropTab } from './utils/drag-drop-utils';
  * @returns 最終スクロール位置
  */
 async function waitForScrollChange(
-  page: Page,
   container: Locator,
   initialScrollTop: number,
   direction: 'down' | 'up',
   maxWait: number = 1000
 ): Promise<number> {
-  const startTime = Date.now();
   let currentScrollTop = initialScrollTop;
 
-  while (Date.now() - startTime < maxWait) {
-    currentScrollTop = await container.evaluate((el) => el.scrollTop);
-    if (direction === 'down' && currentScrollTop > initialScrollTop) {
-      return currentScrollTop;
-    }
-    if (direction === 'up' && currentScrollTop < initialScrollTop) {
-      return currentScrollTop;
-    }
-    // requestAnimationFrameで待機
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
-  }
+  await waitForCondition(
+    async () => {
+      currentScrollTop = await container.evaluate((el) => el.scrollTop);
+      if (direction === 'down') {
+        return currentScrollTop > initialScrollTop;
+      }
+      return currentScrollTop < initialScrollTop;
+    },
+    { timeout: maxWait, interval: 16 }
+  ).catch(() => {
+    // タイムアウトしても最終値を返す
+  });
+
   return currentScrollTop;
 }
 
 /**
- * スクロール位置が安定するまで待機（ポーリング）
+ * スクロール位置が安定するまで待機（polling-utilsを使用）
  *
- * @param page - Page
  * @param container - スクロールコンテナのLocator
  * @param maxWait - 最大待機時間（ミリ秒）
  * @returns 最終スクロール位置
  */
 async function waitForScrollStabilize(
-  page: Page,
   container: Locator,
   maxWait: number = 500
 ): Promise<number> {
-  const startTime = Date.now();
   let lastScrollTop = await container.evaluate((el) => el.scrollTop);
   let stableCount = 0;
 
-  while (Date.now() - startTime < maxWait) {
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
-    const currentScrollTop = await container.evaluate((el) => el.scrollTop);
-    if (currentScrollTop === lastScrollTop) {
-      stableCount++;
-      if (stableCount >= 3) {
-        return currentScrollTop;
+  await waitForCondition(
+    async () => {
+      const currentScrollTop = await container.evaluate((el) => el.scrollTop);
+      if (currentScrollTop === lastScrollTop) {
+        stableCount++;
+        if (stableCount >= 3) {
+          return true;
+        }
+      } else {
+        stableCount = 0;
+        lastScrollTop = currentScrollTop;
       }
-    } else {
-      stableCount = 0;
-      lastScrollTop = currentScrollTop;
-    }
-  }
+      return false;
+    },
+    { timeout: maxWait, interval: 16 }
+  ).catch(() => {
+    // タイムアウトしても最終値を返す
+  });
+
   return lastScrollTop;
 }
 
@@ -89,16 +93,40 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
   test('ドラッグ中に横スクロールが発生しないことを検証する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 準備: 複数タブを作成してドラッグ対象を確保
     const tab1 = await createTab(extensionContext, 'https://example.com');
-    const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-    const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+    ], 0);
 
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, tab1, 'Example');
-    await assertTabInTree(sidePanelPage, tab2);
-    await assertTabInTree(sidePanelPage, tab3);
+    const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+      { tabId: tab2, depth: 0 },
+    ], 0);
+
+    const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+      { tabId: tab2, depth: 0 },
+      { tabId: tab3, depth: 0 },
+    ], 0);
 
     // ツリーコンテナの初期スクロール位置を記録
     const container = sidePanelPage.locator('[data-testid="tab-tree-view"]');
@@ -115,7 +143,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       // コンテナの右端を超えてマウスを移動
       await sidePanelPage.mouse.move(box.x + box.width + 100, box.y + box.height / 2, { steps: 5 });
       // スクロール位置が安定するまで待機（ポーリング）
-      await waitForScrollStabilize(sidePanelPage, container);
+      await waitForScrollStabilize(container);
     }
 
     // 横スクロールが発生していないことを検証
@@ -131,16 +159,40 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
   test('ドラッグ中にツリービューが必要以上に縦スクロールしないことを検証する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 準備: 少数のタブを作成（ビューポートを超えない程度）
     const tab1 = await createTab(extensionContext, 'https://example.com');
-    const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-    const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+    ], 0);
 
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, tab1, 'Example');
-    await assertTabInTree(sidePanelPage, tab2);
-    await assertTabInTree(sidePanelPage, tab3);
+    const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+      { tabId: tab2, depth: 0 },
+    ], 0);
+
+    const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+      { tabId: tab2, depth: 0 },
+      { tabId: tab3, depth: 0 },
+    ], 0);
 
     // ツリーコンテナの情報を取得
     const container = sidePanelPage.locator('[data-testid="tab-tree-view"]');
@@ -158,7 +210,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       // コンテナの下端を超えてマウスを移動
       await sidePanelPage.mouse.move(box.x + box.width / 2, box.y + box.height + 200, { steps: 5 });
       // スクロール位置が安定するまで待機（ポーリング）
-      await waitForScrollStabilize(sidePanelPage, container);
+      await waitForScrollStabilize(container);
     }
 
     // スクロール量を取得
@@ -189,7 +241,19 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
   test('コンテンツがビューポートを超えている場合のみスクロールが許可されることを検証する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 準備: ビューポートを超える数のタブを作成
     const tabs: number[] = [];
     const urls = [
@@ -210,11 +274,11 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     for (const url of urls) {
       const tab = await createTab(extensionContext, url);
       tabs.push(tab);
-    }
-
-    // すべてのタブがツリーに表示されるまで待機
-    for (const tab of tabs) {
-      await assertTabInTree(sidePanelPage, tab);
+      // 各タブ作成直後にassertTabStructureを呼び出す
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        ...tabs.map(t => ({ tabId: t, depth: 0 })),
+      ], 0);
     }
 
     // ツリーコンテナの情報を取得
@@ -242,7 +306,7 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       if (box) {
         await sidePanelPage.mouse.move(box.x + box.width / 2, box.y + box.height + 100, { steps: 5 });
         // スクロール位置が変化するか安定するまで待機（ポーリング）
-        await waitForScrollChange(sidePanelPage, container, initialScrollTop, 'down');
+        await waitForScrollChange(container, initialScrollTop, 'down');
       }
 
       // スクロール位置を取得
@@ -271,7 +335,19 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
   test('ドラッグ中のスクロール加速度が制限されていることを検証する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 準備: ビューポートを超える数のタブを作成
     const tabs: number[] = [];
     const urls = [
@@ -288,11 +364,11 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     for (const url of urls) {
       const tab = await createTab(extensionContext, url);
       tabs.push(tab);
-    }
-
-    // すべてのタブがツリーに表示されるまで待機
-    for (const tab of tabs) {
-      await assertTabInTree(sidePanelPage, tab);
+      // 各タブ作成直後にassertTabStructureを呼び出す
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        ...tabs.map(t => ({ tabId: t, depth: 0 })),
+      ], 0);
     }
 
     // ツリーコンテナの情報を取得

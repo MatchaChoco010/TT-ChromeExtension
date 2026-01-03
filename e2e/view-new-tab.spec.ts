@@ -11,6 +11,14 @@
 
 import { test, expect } from './fixtures/extension';
 import { waitForViewSwitcher, waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
+import { assertTabStructure, assertViewStructure } from './utils/assertion-utils';
+import {
+  createTab,
+  closeTab,
+  getCurrentWindowId,
+  getPseudoSidePanelTabId,
+  getInitialBrowserTabId
+} from './utils/tab-utils';
 
 test.describe('ビューへの新規タブ追加', () => {
   test.describe('ビューを開いている状態で新しいタブをそのビューに追加', () => {
@@ -19,11 +27,26 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（デフォルトビュー: index 0）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
+      // ビュー追加ボタンの可視性確認（UI操作前確認）
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
+
+      // 新しいビューを追加
       await addButton.click();
 
       // 新しいビューボタンが表示されるまで待機
@@ -35,30 +58,25 @@ test.describe('ビューへの新規タブ追加', () => {
       // 新しいビューに切り替え
       await newViewButton.click();
 
-      // 新しいビューがアクティブになるまで待機
-      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+      // 新しいビューがアクティブになったことをassertViewStructureで検証
+      // デフォルトビュー(#3B82F6)と新規ビュー(#10B981)が存在し、新規ビュー(index 1)がアクティブ
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 1);
 
-      // 新しいビューには「No tabs in this view」が表示されるはず
+      // 新しいビューには「No tabs in this view」が表示されるはず（UI状態確認）
       const emptyMessage = sidePanelPage.locator('text=No tabs in this view');
       await expect(emptyMessage).toBeVisible({ timeout: 5000 });
 
-      // Chrome APIを使って新しいタブを開く
-      const newTabId = await sidePanelPage.evaluate(async () => {
-        const tab = await chrome.tabs.create({ url: 'about:blank' });
-        return tab.id;
-      });
+      // createTab関数を使って新しいタブを作成
+      const newTabId = await createTab(extensionContext, 'about:blank');
 
-      expect(newTabId).toBeDefined();
-
-      // 新しいタブがツリーに追加されるまで待機
-      await waitForTabInTreeState(extensionContext, newTabId!);
-
-      // 新しいタブがこのビューに表示されることを確認（空のメッセージが非表示になる）
-      await expect(async () => {
-        const treeItems = sidePanelPage.locator('[data-testid^="tree-node-"]');
-        const count = await treeItems.count();
-        expect(count).toBeGreaterThan(0);
-      }).toPass({ timeout: 10000 });
+      // タブ作成直後にassertTabStructureで検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId, depth: 0 },
+      ], 1);
 
       // 新しいタブがカスタムビューに属していることをストレージで確認
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
@@ -72,7 +90,7 @@ test.describe('ビューへの新規タブ追加', () => {
           return treeState.nodes[nodeId].viewId;
         }
         return null;
-      }, newTabId!);
+      }, newTabId);
 
       // ビューIDが'default'ではないことを確認（カスタムビューに追加されている）
       expect(tabViewId).not.toBe('default');
@@ -84,12 +102,28 @@ test.describe('ビューへの新規タブ追加', () => {
     test('新しいタブを開いた後もビュースイッチャーは同じビューを表示し続ける', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（デフォルトビュー: index 0）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
+      // ビュー追加ボタンの可視性確認（UI操作前確認）
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
+
+      // 新しいビューを追加
       await addButton.click();
 
       // 新しいビューボタンが表示されるまで待機
@@ -101,50 +135,53 @@ test.describe('ビューへの新規タブ追加', () => {
       // 新しいビューに切り替え
       await newViewButton.click();
 
-      // 新しいビューがアクティブになるまで待機
-      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+      // 新しいビューがアクティブになったことをassertViewStructureで検証
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 1);
 
-      // 現在のビューを記録
-      const currentViewIsActive = await newViewButton.getAttribute('data-active');
-      expect(currentViewIsActive).toBe('true');
+      // createTab関数を使って新しいタブを作成
+      const newTabId = await createTab(extensionContext, 'about:blank');
 
-      // Chrome APIを使って新しいタブを開く
-      const newTabId = await sidePanelPage.evaluate(async () => {
-        const tab = await chrome.tabs.create({ url: 'about:blank' });
-        return tab.id;
-      });
+      // タブ作成直後にassertTabStructureで検証（ビューindex 1が維持されていることも確認）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId, depth: 0 },
+      ], 1);
 
-      expect(newTabId).toBeDefined();
-
-      // 新しいタブがツリーに追加されるまで待機
-      await waitForTabInTreeState(extensionContext, newTabId!);
-
-      // タブがツリーに表示されるまで待機（UIの反映を確認）
-      await expect(async () => {
-        const treeItems = sidePanelPage.locator('[data-testid^="tree-node-"]');
-        const count = await treeItems.count();
-        expect(count).toBeGreaterThan(0);
-      }).toPass({ timeout: 10000 });
-
-      // ビュースイッチャーが同じビューをアクティブに保っていることを確認
-      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
-
-      // デフォルトビューがアクティブでないことを確認
-      const defaultViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to Default view"]'
-      );
-      await expect(defaultViewButton).toHaveAttribute('data-active', 'false', { timeout: 5000 });
+      // タブ追加後もビュー構造が維持されていることを検証
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 1);
     });
 
     test('複数のタブを追加してもビュースイッチャーは同じビューを維持する', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（デフォルトビュー: index 0）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
+      // ビュー追加ボタンの可視性確認（UI操作前確認）
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
+
+      // 新しいビューを追加
       await addButton.click();
 
       // 新しいビューボタンが表示されるまで待機
@@ -155,22 +192,40 @@ test.describe('ビューへの新規タブ追加', () => {
 
       // 新しいビューに切り替え
       await newViewButton.click();
-      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
-      // 3つのタブを順番に追加
-      for (let i = 0; i < 3; i++) {
-        const tabId = await sidePanelPage.evaluate(async () => {
-          const tab = await chrome.tabs.create({ url: 'about:blank' });
-          return tab.id;
-        });
+      // 新しいビューがアクティブになったことをassertViewStructureで検証
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 1);
 
-        if (tabId) {
-          await waitForTabInTreeState(extensionContext, tabId);
-        }
-      }
+      // 3つのタブを順番に追加（各タブ作成直後にassertTabStructure）
+      const tab1 = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 1);
 
-      // ビュースイッチャーが同じビューをアクティブに保っていることを確認
-      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+      const tab2 = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 1);
+
+      const tab3 = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 1);
+
+      // 複数タブ追加後もビュー構造が維持されていることを検証
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 1);
     });
   });
 
@@ -180,9 +235,22 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（デフォルトビュー: index 0）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       await waitForViewSwitcher(sidePanelPage);
 
-      // デフォルトビューがアクティブであることを確認
+      // デフォルトビューボタンの可視性確認（UI操作前確認）
       const defaultViewButton = sidePanelPage.locator(
         '[aria-label="Switch to Default view"]'
       );
@@ -190,18 +258,20 @@ test.describe('ビューへの新規タブ追加', () => {
 
       // デフォルトビューをクリックしてアクティブにする
       await defaultViewButton.click();
-      await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
-      // Chrome APIを使って新しいタブを開く
-      const newTabId = await sidePanelPage.evaluate(async () => {
-        const tab = await chrome.tabs.create({ url: 'about:blank' });
-        return tab.id;
-      });
+      // デフォルトビューがアクティブであることをassertViewStructureで検証
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+      ], 0);
 
-      expect(newTabId).toBeDefined();
+      // createTab関数を使って新しいタブを作成
+      const newTabId = await createTab(extensionContext, 'about:blank');
 
-      // 新しいタブがツリーに追加されるまで待機
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      // タブ作成直後にassertTabStructureで検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId, depth: 0 },
+      ], 0);
 
       // 新しいタブがデフォルトビューに属していることをストレージで確認
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
@@ -215,7 +285,7 @@ test.describe('ビューへの新規タブ追加', () => {
           return treeState.nodes[nodeId].viewId;
         }
         return null;
-      }, newTabId!);
+      }, newTabId);
 
       expect(tabViewId).toBe('default');
     });
@@ -225,30 +295,55 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（デフォルトビュー: index 0）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       await waitForViewSwitcher(sidePanelPage);
 
-      // ビューAを追加
+      // ビュー追加ボタンの可視性確認（UI操作前確認）
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
+
+      // ビューAを追加
       await addButton.click();
 
-      // ビューAボタンが表示されるまで待機（最初のNew Viewボタン）
-      const viewButtons = sidePanelPage.locator('[aria-label^="Switch to New View"]');
-      await expect(viewButtons.first()).toBeVisible({ timeout: 5000 });
+      // ビューA追加後のビュー構造を検証（デフォルト + ビューA、デフォルトがアクティブのまま）
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 0);
 
       // ビューBを追加
       await addButton.click();
 
-      // 2つ目のビューボタンが表示されるまで待機
-      await expect(async () => {
-        const count = await viewButtons.count();
-        expect(count).toBe(2);
-      }).toPass({ timeout: 5000 });
+      // ビューB追加後のビュー構造を検証（デフォルト + ビューA + ビューB）
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+        { viewIdentifier: '#F59E0B' },
+      ], 0);
 
-      // ビューAに切り替え（最初のNew Viewボタン）
+      // ビューAに切り替え
+      const viewButtons = sidePanelPage.locator('[aria-label^="Switch to New View"]');
       const viewAButton = viewButtons.first();
       await viewAButton.click();
-      await expect(viewAButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      // ビューAがアクティブになったことを検証（index 1）
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+        { viewIdentifier: '#F59E0B' },
+      ], 1);
 
       // ビューAのIDを取得
       const viewAId = await serviceWorker.evaluate(async () => {
@@ -257,10 +352,16 @@ test.describe('ビューへの新規タブ追加', () => {
         return treeState.currentViewId;
       });
 
-      // 2つ目のビューボタン（ビューB）を見つけて切り替え
+      // ビューBに切り替え
       const viewBButton = viewButtons.nth(1);
       await viewBButton.click();
-      await expect(viewBButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      // ビューBがアクティブになったことを検証（index 2）
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+        { viewIdentifier: '#F59E0B' },
+      ], 2);
 
       // ビューBのIDを取得
       const viewBId = await serviceWorker.evaluate(async () => {
@@ -269,19 +370,17 @@ test.describe('ビューへの新規タブ追加', () => {
         return treeState.currentViewId;
       });
 
-      // ビューAとビューBが異なることを確認
+      // ビューAとビューBが異なることを確認（ビジネスロジックの検証）
       expect(viewAId).not.toBe(viewBId);
 
-      // Chrome APIを使って新しいタブを開く
-      const newTabId = await sidePanelPage.evaluate(async () => {
-        const tab = await chrome.tabs.create({ url: 'about:blank' });
-        return tab.id;
-      });
+      // createTab関数を使って新しいタブを作成
+      const newTabId = await createTab(extensionContext, 'about:blank');
 
-      expect(newTabId).toBeDefined();
-
-      // 新しいタブがツリーに追加されるまで待機
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      // タブ作成直後にassertTabStructureで検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId, depth: 0 },
+      ], 2);
 
       // 新しいタブがビューBに属していることをストレージで確認
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
@@ -295,9 +394,9 @@ test.describe('ビューへの新規タブ追加', () => {
           return treeState.nodes[nodeId].viewId;
         }
         return null;
-      }, newTabId!);
+      }, newTabId);
 
-      // 新しいタブがビューBに追加されていることを確認
+      // 新しいタブがビューBに追加されていることを確認（ビジネスロジックの検証）
       expect(tabViewId).toBe(viewBId);
       expect(tabViewId).not.toBe(viewAId);
     });
@@ -309,11 +408,26 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（デフォルトビュー: index 0）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
+      // ビュー追加ボタンの可視性確認（UI操作前確認）
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
+
+      // 新しいビューを追加
       await addButton.click();
 
       // 新しいビューボタンが表示されるまで待機
@@ -324,7 +438,12 @@ test.describe('ビューへの新規タブ追加', () => {
 
       // 新しいビューに切り替え
       await newViewButton.click();
-      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      // 新しいビューがアクティブになったことをassertViewStructureで検証
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 1);
 
       // 現在のビューIDを取得
       const currentViewId = await serviceWorker.evaluate(async () => {
@@ -333,7 +452,7 @@ test.describe('ビューへの新規タブ追加', () => {
         return treeState.currentViewId;
       });
 
-      // 新規タブ追加ボタンが表示されるまで待機
+      // 新規タブ追加ボタンの可視性確認（UI操作前確認）
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
 
@@ -364,12 +483,21 @@ test.describe('ビューへの新規タブ追加', () => {
         return tabs[0]?.id;
       });
 
-      expect(newTabId).toBeDefined();
+      // newTabIdがundefinedの場合はテスト失敗
+      if (!newTabId) {
+        throw new Error('New tab ID is undefined');
+      }
 
       // 新しいタブがツリーに追加されるまで待機
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      await waitForTabInTreeState(extensionContext, newTabId);
 
-      // 新しいタブが現在のビューに属していることを確認
+      // タブ作成直後にassertTabStructureで検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId, depth: 0 },
+      ], 1);
+
+      // 新しいタブが現在のビューに属していることを確認（ビジネスロジックの検証）
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
@@ -381,7 +509,7 @@ test.describe('ビューへの新規タブ追加', () => {
           return treeState.nodes[nodeId].viewId;
         }
         return null;
-      }, newTabId!);
+      }, newTabId);
 
       expect(tabViewId).toBe(currentViewId);
     });

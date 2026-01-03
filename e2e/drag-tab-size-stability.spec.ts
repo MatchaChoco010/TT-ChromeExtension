@@ -7,7 +7,8 @@
  * - ホバーターゲット変化時もサイズを固定
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, assertTabInTree } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 import { startDrag, hoverOverTab, dropTab } from './utils/drag-drop-utils';
 import type { Page } from '@playwright/test';
 
@@ -53,16 +54,40 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
     test('ドラッグ開始前後でタブのサイズが変化しないこと', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 3つのタブを作成
       const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
-      const tab3 = await createTab(extensionContext, 'data:text/html,<h1>Tab3</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
+      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'data:text/html,<h1>Tab3</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
 
       // ページをフォーカスしてバックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -84,7 +109,15 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
       // ドロップを実行
       await dropTab(sidePanelPage);
 
-      // ドロップ後のサイズも確認
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
+
+      // ドロップ後のサイズも確認（UIサイズの安定性検証）
       const sizeAfter = await getTabNodeSize(sidePanelPage, tab3);
       expect(Math.abs(sizeAfter.width - sizeBefore.width)).toBeLessThanOrEqual(2);
       expect(Math.abs(sizeAfter.height - sizeBefore.height)).toBeLessThanOrEqual(2);
@@ -93,14 +126,32 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
     test('親子関係形成時にドラッグ中のタブサイズが変化しないこと', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 2つのタブを作成（親候補と子候補）
       const parentTab = await createTab(extensionContext, 'data:text/html,<h1>Parent</h1>');
-      const childTab = await createTab(extensionContext, 'data:text/html,<h1>Child</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, parentTab);
-      await assertTabInTree(sidePanelPage, childTab);
+      const childTab = await createTab(extensionContext, 'data:text/html,<h1>Child</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
 
       // ページをフォーカスしてバックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -127,23 +178,61 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: childTab, depth: 0 },
+      ], 0);
     });
 
     test('ホバーターゲットが変化してもドラッグ中のタブサイズが一定であること', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 4つのタブを作成
       const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
-      const tab3 = await createTab(extensionContext, 'data:text/html,<h1>Tab3</h1>');
-      const tabToDrag = await createTab(extensionContext, 'data:text/html,<h1>Drag Me</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
-      await assertTabInTree(sidePanelPage, tabToDrag);
+      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'data:text/html,<h1>Tab3</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
+
+      const tabToDrag = await createTab(extensionContext, 'data:text/html,<h1>Drag Me</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tabToDrag, depth: 0 },
+      ], 0);
 
       // ページをフォーカスしてバックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -172,6 +261,15 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tabToDrag, depth: 0 },
+      ], 0);
     });
   });
 
@@ -179,14 +277,32 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
     test('ターゲットタブがハイライトされてもサイズが変化しないこと', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 2つのタブを作成
       const targetTab = await createTab(extensionContext, 'data:text/html,<h1>Target</h1>');
-      const dragTab = await createTab(extensionContext, 'data:text/html,<h1>Drag</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: targetTab, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, targetTab);
-      await assertTabInTree(sidePanelPage, dragTab);
+      const dragTab = await createTab(extensionContext, 'data:text/html,<h1>Drag</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: targetTab, depth: 0 },
+        { tabId: dragTab, depth: 0 },
+      ], 0);
 
       // ページをフォーカスしてバックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -211,21 +327,52 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: targetTab, depth: 0 },
+        { tabId: dragTab, depth: 0 },
+      ], 0);
     });
 
     test('ハイライトが解除された後もサイズが元に戻ること', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 3つのタブを作成
       const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
-      const dragTab = await createTab(extensionContext, 'data:text/html,<h1>Drag</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, dragTab);
+      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const dragTab = await createTab(extensionContext, 'data:text/html,<h1>Drag</h1>');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: dragTab, depth: 0 },
+      ], 0);
 
       // ページをフォーカスしてバックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -248,13 +395,21 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
       // tab2の上に移動（tab1のハイライトが解除される）
       await hoverOverTab(sidePanelPage, tab2);
 
-      // ハイライト解除後のtab1のサイズを確認
+      // ハイライト解除後のtab1のサイズを確認（UIサイズの安定性検証）
       const tab1SizeAfterUnhighlight = await getTabNodeSize(sidePanelPage, tab1);
       expect(Math.abs(tab1SizeAfterUnhighlight.width - tab1SizeBefore.width)).toBeLessThanOrEqual(2);
       expect(Math.abs(tab1SizeAfterUnhighlight.height - tab1SizeBefore.height)).toBeLessThanOrEqual(2);
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: dragTab, depth: 0 },
+      ], 0);
     });
   });
 });

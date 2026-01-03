@@ -220,62 +220,6 @@ export async function waitForTabRemovedFromTreeState(
 }
 
 /**
- * 親子関係がストレージに反映されるまで待機
- *
- * @param context - ブラウザコンテキスト
- * @param childTabId - 子タブのID
- * @param parentTabId - 親タブのID
- * @param options - ポーリングオプション
- */
-export async function waitForParentChildRelation(
-  context: BrowserContext,
-  childTabId: number,
-  parentTabId: number,
-  options: PollingOptions = {}
-): Promise<void> {
-  const {
-    timeout = DEFAULT_TIMEOUT,
-    interval = 50,
-  } = options;
-
-  const serviceWorker = await getServiceWorker(context);
-  const iterations = Math.ceil(timeout / interval);
-
-  const found = await serviceWorker.evaluate(
-    async ({ parentTabId, childTabId, iterations, interval }) => {
-      interface TreeNode {
-        parentId: string | null;
-      }
-      interface LocalTreeState {
-        tabToNode: Record<number, string>;
-        nodes: Record<string, TreeNode>;
-      }
-      for (let i = 0; i < iterations; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as LocalTreeState | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
-          const parentNodeId = treeState.tabToNode[parentTabId];
-          const childNodeId = treeState.tabToNode[childTabId];
-          if (parentNodeId && childNodeId) {
-            const childNode = treeState.nodes[childNodeId];
-            if (childNode && childNode.parentId === parentNodeId) {
-              return true;
-            }
-          }
-        }
-        await new Promise(resolve => setTimeout(resolve, interval));
-      }
-      return false;
-    },
-    { parentTabId, childTabId, iterations, interval }
-  );
-
-  if (!found) {
-    throw new Error(`Parent-child relation not established: parent=${parentTabId}, child=${childTabId}`);
-  }
-}
-
-/**
  * タブがアクティブになるまで待機
  *
  * @param context - ブラウザコンテキスト
@@ -770,161 +714,80 @@ export async function waitForViewSwitcher(
 }
 
 /**
- * タブが親を持たない（ルートレベル）になるまで待機
+ * タブのURLがロードされるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * タブ作成後、URLが設定されるまで待機する。
+ * タブのロードは非同期で行われるため、URLの検証前に呼び出す。
+ *
+ * @param serviceWorker - Service Worker
+ * @param tabId - タブID
+ * @param expectedUrlPart - URLに含まれるべき文字列
+ * @param timeout - タイムアウト（ミリ秒、デフォルト: 10000）
+ * @returns ロード完了後のタブ情報
+ */
+export async function waitForTabUrlLoaded(
+  serviceWorker: Worker,
+  tabId: number,
+  expectedUrlPart: string,
+  timeout: number = 10000
+): Promise<chrome.tabs.Tab> {
+  return await serviceWorker.evaluate(async ({ id, urlPart, maxWait }) => {
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWait) {
+      const tab = await chrome.tabs.get(id);
+      if (tab.url && tab.url.includes(urlPart)) {
+        return tab;
+      }
+      if (tab.pendingUrl && tab.pendingUrl.includes(urlPart)) {
+        return tab;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return chrome.tabs.get(id);
+  }, { id: tabId, urlPart: expectedUrlPart, maxWait: timeout });
+}
+
+/**
+ * タブの読み込みが完了するまで待機
+ *
+ * @param serviceWorker - Service Worker
  * @param tabId - 待機するタブのID
  * @param options - ポーリングオプション
  */
-export async function waitForTabNoParent(
-  context: BrowserContext,
+export async function waitForTabStatusComplete(
+  serviceWorker: Worker,
   tabId: number,
   options: PollingOptions = {}
 ): Promise<void> {
   const {
-    timeout = DEFAULT_TIMEOUT,
-    interval = 50,
-    timeoutMessage = `Tab ${tabId} still has a parent within timeout`,
+    timeout = 10000,
+    interval = 100,
+    timeoutMessage = `Tab ${tabId} did not complete loading`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  const found = await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
-      interface TreeNode {
-        parentId: string | null;
-      }
-      interface LocalTreeState {
-        tabToNode: Record<number, string>;
-        nodes: Record<string, TreeNode>;
-      }
       for (let i = 0; i < iterations; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as LocalTreeState | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
-          const nodeId = treeState.tabToNode[tabId];
-          if (nodeId) {
-            const node = treeState.nodes[nodeId];
-            if (node && node.parentId === null) {
-              return true;
-            }
+        try {
+          const tab = await chrome.tabs.get(tabId);
+          if (tab.status === 'complete') {
+            return { success: true };
           }
+        } catch {
+          // タブが見つからない場合はエラーを無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
-      return false;
+      return { success: false };
     },
     { tabId, iterations, interval }
   );
 
-  if (!found) {
+  if (!result.success) {
     throw new Error(timeoutMessage);
   }
-}
-
-/**
- * Side Panel UIでタブの親子関係（depth属性）を確認
- *
- * 実際のUI上でタブノードのdata-depth属性を確認する。
- * ストレージの状態ではなく、実際にレンダリングされたDOMを検証する。
- *
- * @param page - Side PanelのPage
- * @param tabId - 確認するタブのID
- * @param expectedDepth - 期待するdepth値
- * @param options - ポーリングオプション
- */
-export async function waitForTabDepthInUI(
-  page: Page,
-  tabId: number,
-  expectedDepth: number,
-  options: PollingOptions = {}
-): Promise<void> {
-  const {
-    timeout = DEFAULT_TIMEOUT,
-    interval = 100,
-    timeoutMessage = `Tab ${tabId} depth in UI did not become ${expectedDepth}`,
-  } = options;
-
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < timeout) {
-    try {
-      const actualDepth = await page.locator(`[data-testid="tree-node-${tabId}"]`).getAttribute('data-depth');
-      if (actualDepth === String(expectedDepth)) {
-        return;
-      }
-    } catch {
-      // 要素が見つからない場合は続行
-    }
-    await new Promise(resolve => setTimeout(resolve, interval));
-  }
-
-  // 最終状態を取得して詳細なエラーメッセージを生成
-  const finalDepth = await page.locator(`[data-testid="tree-node-${tabId}"]`).getAttribute('data-depth').catch(() => 'not found');
-  throw new Error(`${timeoutMessage}. Actual depth: ${finalDepth}`);
-}
-
-/**
- * Side Panel UIでタブが表示されているか確認
- *
- * @param page - Side PanelのPage
- * @param tabId - 確認するタブのID
- * @param options - ポーリングオプション
- */
-export async function waitForTabVisibleInUI(
-  page: Page,
-  tabId: number,
-  options: PollingOptions = {}
-): Promise<void> {
-  const {
-    timeout = DEFAULT_TIMEOUT,
-    interval = 100,
-    timeoutMessage = `Tab ${tabId} is not visible in UI`,
-  } = options;
-
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < timeout) {
-    try {
-      const isVisible = await page.locator(`[data-testid="tree-node-${tabId}"]`).isVisible();
-      if (isVisible) {
-        return;
-      }
-    } catch {
-      // 要素が見つからない場合は続行
-    }
-    await new Promise(resolve => setTimeout(resolve, interval));
-  }
-
-  throw new Error(timeoutMessage);
-}
-
-/**
- * Side Panel UIで全タブのdepth属性を取得
- *
- * @param page - Side PanelのPage
- * @returns タブIDとdepthのマップ
- */
-export async function getAllTabDepthsFromUI(
-  page: Page
-): Promise<Map<number, number>> {
-  const depths = new Map<number, number>();
-
-  const nodes = await page.locator('[data-testid^="tree-node-"]').all();
-  for (const node of nodes) {
-    const testId = await node.getAttribute('data-testid');
-    const depthStr = await node.getAttribute('data-depth');
-    if (testId && depthStr) {
-      const tabId = parseInt(testId.replace('tree-node-', ''), 10);
-      const depth = parseInt(depthStr, 10);
-      if (!isNaN(tabId) && !isNaN(depth)) {
-        depths.set(tabId, depth);
-      }
-    }
-  }
-
-  return depths;
 }
 
 /**

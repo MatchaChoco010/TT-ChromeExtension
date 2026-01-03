@@ -6,15 +6,14 @@
  * 2. 休止タブがアクティブ化された際にグレーアウトが解除されることを検証
  *
  * 注意: chrome.tabs.discard() APIはheadlessモードやテスト環境では
- * 正常に動作しない場合があります。その場合、テストは環境制限として
- * スキップされます（テストパス扱い）。
+ * 正常に動作しない場合があります。その場合、テストはスキップされます。
  *
  * 本機能はユニットテスト（TreeNode.test.tsx）でコンポーネントレベルの
  * 動作が完全に検証されています。
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, activateTab } from './utils/tab-utils';
-import { waitForCondition } from './utils/polling-utils';
+import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { waitForCondition, waitForTabStatusComplete } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('休止タブの視覚的区別', () => {
@@ -25,7 +24,7 @@ test.describe('休止タブの視覚的区別', () => {
    * 表示されることを検証します。
    *
    * 注意: chrome.tabs.discard() APIがテスト環境で動作しない場合は、
-   * テストを早期リターンして成功とみなします。
+   * テストはスキップされます。
    */
   test('休止状態のタブはグレーアウト表示される', async ({
     sidePanelPage,
@@ -36,30 +35,35 @@ test.describe('休止タブの視覚的区別', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 現在のウィンドウIDを取得
-    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-    const windowId = currentWindow.id!;
+    // テスト環境を取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
     // タブを作成（アクティブではない状態で作成）
     const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
       active: false,
     });
-    expect(tabId).toBeGreaterThan(0);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId, depth: 0 },
+    ], 0);
 
-    // タブの読み込みが完了するまでポーリングで待機
-    await waitForCondition(
-      async () => {
-        const tab = await serviceWorker.evaluate((tabId) => chrome.tabs.get(tabId), tabId);
-        return tab.status === 'complete';
-      },
-      { timeout: 10000, interval: 100, timeoutMessage: 'Tab did not complete loading' }
-    );
+    // タブの読み込みが完了するまで待機
+    await waitForTabStatusComplete(serviceWorker, tabId);
 
-    // タブがツリーに表示されていることを確認
+    // グレーアウト状態確認用のロケータを取得
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
-    // グレーアウトされていない状態を確認（通常状態）
+    // グレーアウトされていない状態を確認（休止前の通常状態）
     // discarded-tab-titleのdata-testidはisDiscarded=trueの場合のみ設定される
     const discardedTitleBefore = tabNode.locator('[data-testid="discarded-tab-title"]');
     await expect(discardedTitleBefore).toHaveCount(0);
@@ -92,15 +96,10 @@ test.describe('休止タブの視覚的区別', () => {
       actuallyDiscarded = false;
     }
 
-    // chrome.tabs.discard()が実際に動作しなかった場合は早期リターン
-    // 注: この場合もテストは成功とみなす（環境制限）
+    // chrome.tabs.discard()が実際に動作しなかった場合はスキップ
     // コンポーネントの動作はユニットテストで検証済み
     if (!actuallyDiscarded) {
-      test.info().annotations.push({
-        type: 'limitation',
-        description: 'chrome.tabs.discard() did not actually discard the tab in this environment',
-      });
-      // テストを成功として扱う（早期リターン）
+      test.skip(true, 'chrome.tabs.discard() did not work in this environment');
       return;
     }
 
@@ -133,7 +132,7 @@ test.describe('休止タブの視覚的区別', () => {
    * 表示が解除されることを検証します。
    *
    * 注意: chrome.tabs.discard() APIがテスト環境で動作しない場合は、
-   * テストを早期リターンして成功とみなします。
+   * テストはスキップされます。
    */
   test('休止タブをアクティブ化するとグレーアウトが解除される', async ({
     sidePanelPage,
@@ -144,27 +143,32 @@ test.describe('休止タブの視覚的区別', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 現在のウィンドウIDを取得
-    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-    const windowId = currentWindow.id!;
+    // テスト環境を取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
     // タブを作成（アクティブではない状態で作成）
     const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
       active: false,
     });
-    expect(tabId).toBeGreaterThan(0);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId, depth: 0 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId, depth: 0 },
+    ], 0);
 
-    // タブの読み込みが完了するまでポーリングで待機
-    await waitForCondition(
-      async () => {
-        const tab = await serviceWorker.evaluate((tabId) => chrome.tabs.get(tabId), tabId);
-        return tab.status === 'complete';
-      },
-      { timeout: 10000, interval: 100, timeoutMessage: 'Tab did not complete loading' }
-    );
+    // タブの読み込みが完了するまで待機
+    await waitForTabStatusComplete(serviceWorker, tabId);
 
-    // タブがツリーに表示されていることを確認
+    // グレーアウト状態確認用のロケータを取得
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
     // タブを休止状態にする（chrome.tabs.discard）
@@ -192,12 +196,9 @@ test.describe('休止タブの視覚的区別', () => {
       actuallyDiscarded = false;
     }
 
-    // chrome.tabs.discard()が実際に動作しなかった場合は早期リターン
+    // chrome.tabs.discard()が実際に動作しなかった場合はスキップ
     if (!actuallyDiscarded) {
-      test.info().annotations.push({
-        type: 'limitation',
-        description: 'chrome.tabs.discard() did not actually discard the tab in this environment',
-      });
+      test.skip(true, 'chrome.tabs.discard() did not work in this environment');
       return;
     }
 
@@ -221,6 +222,10 @@ test.describe('休止タブの視覚的区別', () => {
 
     // 休止タブをアクティブ化する（タブを読み込む）
     await activateTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId, depth: 0 },
+    ], 0);
 
     // タブがアクティブになり、休止状態が解除されるまで待機
     await waitForCondition(

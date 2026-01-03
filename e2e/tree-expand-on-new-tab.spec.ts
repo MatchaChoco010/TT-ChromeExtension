@@ -9,12 +9,9 @@
  * 2. 新しい子タブが作成された場合、その子タブが見える状態になる
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab } from './utils/tab-utils';
-import {
-  waitForTabInTreeState,
-  waitForParentChildRelation,
-  waitForCondition,
-} from './utils/polling-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { waitForCondition } from './utils/polling-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('新規タブ作成時のツリー展開', () => {
   test('折りたたまれた親タブから子タブを開くと、親タブが自動展開される', async ({
@@ -26,10 +23,23 @@ test.describe('新規タブ作成時のツリー展開', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 親タブを作成
     const parentTabId = await createTab(extensionContext, 'https://example.com');
-    expect(parentTabId).toBeGreaterThan(0);
-    await waitForTabInTreeState(extensionContext, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
     // 子タブを作成（親タブのopenerTabIdを指定）
     const childTabId1 = await createTab(
@@ -37,9 +47,11 @@ test.describe('新規タブ作成時のツリー展開', () => {
       'https://example.com/child1',
       parentTabId
     );
-    expect(childTabId1).toBeGreaterThan(0);
-    await waitForTabInTreeState(extensionContext, childTabId1);
-    await waitForParentChildRelation(extensionContext, childTabId1, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+    ], 0);
 
     // 親タブを折りたたむ（TreeStateManagerを経由して状態を更新）
     // treeStateManager.toggleExpand()を使用して折りたたむ
@@ -83,9 +95,12 @@ test.describe('新規タブ作成時のツリー展開', () => {
       'https://example.com/child2',
       parentTabId
     );
-    expect(childTabId2).toBeGreaterThan(0);
-    await waitForTabInTreeState(extensionContext, childTabId2);
-    await waitForParentChildRelation(extensionContext, childTabId2, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+      { tabId: childTabId2, depth: 1 },
+    ], 0);
 
     // 親タブが自動展開されていることを確認
     await waitForCondition(
@@ -110,8 +125,22 @@ test.describe('新規タブ作成時のツリー展開', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, childTabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+    ], 0);
+
     await closeTab(extensionContext, childTabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('既に展開されている親タブから子タブを開いても展開状態が維持される', async ({
@@ -123,10 +152,23 @@ test.describe('新規タブ作成時のツリー展開', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 親タブを作成
     const parentTabId = await createTab(extensionContext, 'https://example.com');
-    expect(parentTabId).toBeGreaterThan(0);
-    await waitForTabInTreeState(extensionContext, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
     // 親タブが展開状態であることを確認
     const isExpandedBefore = await serviceWorker.evaluate(async (parentTabId) => {
@@ -146,9 +188,11 @@ test.describe('新規タブ作成時のツリー展開', () => {
       'https://example.com/child',
       parentTabId
     );
-    expect(childTabId).toBeGreaterThan(0);
-    await waitForTabInTreeState(extensionContext, childTabId);
-    await waitForParentChildRelation(extensionContext, childTabId, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId, depth: 1 },
+    ], 0);
 
     // 親タブが展開状態のままであることを確認
     const isExpandedAfter = await serviceWorker.evaluate(async (parentTabId) => {
@@ -164,6 +208,14 @@ test.describe('新規タブ作成時のツリー展開', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, childTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 });

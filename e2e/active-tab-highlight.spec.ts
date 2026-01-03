@@ -6,7 +6,7 @@
  * - 通常タブとピン留めタブ間でアクティブタブを切り替えた際に、常に1つのタブのみがハイライト状態であることを検証
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab } from './utils/tab-utils';
+import { createTab, closeTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
 import { waitForTabActive } from './utils/polling-utils';
 
@@ -17,27 +17,30 @@ test.describe('アクティブタブのハイライト', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDを取得
-      const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-      const windowId = currentWindow.id!;
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 初期タブを取得（テスト環境では初期タブが存在する）
-      const initialTabs = await serviceWorker.evaluate(async (wId) => {
-        const tabs = await chrome.tabs.query({ windowId: wId });
-        return tabs.filter(t => !t.pinned).map(t => ({ tabId: t.id!, depth: 0 }));
-      }, windowId);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 2つの通常タブを作成（ネットワーク依存を避けるためabout:blankを使用）
       const tabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: tabId1, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId1, depth: 0 }], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -53,10 +56,10 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: tabId2, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId2, depth: 0 }], 0);
 
       await closeTab(extensionContext, tabId2);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
     });
 
     test('通常タブをクリックするとそのタブのみがハイライトされる', async ({
@@ -64,27 +67,30 @@ test.describe('アクティブタブのハイライト', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDを取得
-      const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-      const windowId = currentWindow.id!;
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 初期タブを取得（テスト環境では初期タブが存在する）
-      const initialTabs = await serviceWorker.evaluate(async (wId) => {
-        const tabs = await chrome.tabs.query({ windowId: wId });
-        return tabs.filter(t => !t.pinned).map(t => ({ tabId: t.id!, depth: 0 }));
-      }, windowId);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 2つの通常タブを作成（ネットワーク依存を避けるためabout:blankを使用）
       const tabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: tabId1, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId1, depth: 0 }], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -109,10 +115,10 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: tabId2, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId2, depth: 0 }], 0);
 
       await closeTab(extensionContext, tabId2);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
     });
   });
 
@@ -122,31 +128,30 @@ test.describe('アクティブタブのハイライト', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDを取得
-      const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-      const windowId = currentWindow.id!;
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 初期タブを取得（テスト環境では初期タブが存在する）
-      const initialTabs = await serviceWorker.evaluate(async (wId) => {
-        const tabs = await chrome.tabs.query({ windowId: wId });
-        return tabs.filter(t => !t.pinned).map(t => ({ tabId: t.id!, depth: 0 }));
-      }, windowId);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // ピン留めタブを作成（ネットワーク依存を避けるためabout:blankを使用）
       const pinnedTabId = await createTab(extensionContext, 'about:blank', undefined, { active: true });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: pinnedTabId, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId, depth: 0 }], 0);
 
       // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { pinned: true });
-      }, pinnedTabId);
-
-      // ピン留め後の構造を検証（初期タブのみがツリーに残り、ピン留めタブセクションに1つ）
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await pinTab(extensionContext, pinnedTabId);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
       // ピン留めタブがハイライトされていることを確認（bg-gray-600）
@@ -155,7 +160,7 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ（ピン留めタブを閉じる）
       await closeTab(extensionContext, pinnedTabId);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
 
@@ -164,42 +169,41 @@ test.describe('アクティブタブのハイライト', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDを取得
-      const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-      const windowId = currentWindow.id!;
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 初期タブを取得（テスト環境では初期タブが存在する）
-      const initialTabs = await serviceWorker.evaluate(async (wId) => {
-        const tabs = await chrome.tabs.query({ windowId: wId });
-        return tabs.filter(t => !t.pinned).map(t => ({ tabId: t.id!, depth: 0 }));
-      }, windowId);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 2つのピン留めタブを作成（ネットワーク依存を避けるためabout:blankを使用）
       const pinnedTabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: pinnedTabId1, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId1, depth: 0 }], 0);
 
       const pinnedTabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: pinnedTabId1, depth: 0 },
         { tabId: pinnedTabId2, depth: 0 },
       ], 0);
 
       // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { pinned: true });
-      }, pinnedTabId1);
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: pinnedTabId2, depth: 0 }], 0);
+      await pinTab(extensionContext, pinnedTabId1);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId2, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }], 0);
 
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { pinned: true });
-      }, pinnedTabId2);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await pinTab(extensionContext, pinnedTabId2);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }, { tabId: pinnedTabId2 }], 0);
 
       // 最初はpinnedTabId1がハイライト
@@ -219,11 +223,11 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, pinnedTabId1);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId2 }], 0);
 
       await closeTab(extensionContext, pinnedTabId2);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
   });
@@ -234,37 +238,38 @@ test.describe('アクティブタブのハイライト', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDを取得
-      const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-      const windowId = currentWindow.id!;
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 初期タブを取得（テスト環境では初期タブが存在する）
-      const initialTabs = await serviceWorker.evaluate(async (wId) => {
-        const tabs = await chrome.tabs.query({ windowId: wId });
-        return tabs.filter(t => !t.pinned).map(t => ({ tabId: t.id!, depth: 0 }));
-      }, windowId);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 通常タブを作成（ネットワーク依存を避けるためabout:blankを使用）
       const normalTabId = await createTab(extensionContext, 'about:blank', undefined, { active: true });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: normalTabId, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
 
       // ピン留めタブを作成（非アクティブ）
       const pinnedTabId = await createTab(extensionContext, 'about:blank', undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
         { tabId: pinnedTabId, depth: 0 },
       ], 0);
 
       // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { pinned: true });
-      }, pinnedTabId);
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: normalTabId, depth: 0 }], 0);
+      await pinTab(extensionContext, pinnedTabId);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
       const normalTab = sidePanelPage.locator(`[data-testid="tree-node-${normalTabId}"]`);
@@ -285,11 +290,11 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, normalTabId);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
       await closeTab(extensionContext, pinnedTabId);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
 
@@ -298,34 +303,35 @@ test.describe('アクティブタブのハイライト', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDを取得
-      const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-      const windowId = currentWindow.id!;
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 初期タブを取得（テスト環境では初期タブが存在する）
-      const initialTabs = await serviceWorker.evaluate(async (wId) => {
-        const tabs = await chrome.tabs.query({ windowId: wId });
-        return tabs.filter(t => !t.pinned).map(t => ({ tabId: t.id!, depth: 0 }));
-      }, windowId);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // ピン留めタブを作成（ネットワーク依存を避けるためabout:blankを使用）
       const pinnedTabId = await createTab(extensionContext, 'about:blank', undefined, { active: true });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: pinnedTabId, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId, depth: 0 }], 0);
 
       // タブをピン留め（ピン留め後はツリーから消えてpinned-tabセクションに移動）
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { pinned: true });
-      }, pinnedTabId);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await pinTab(extensionContext, pinnedTabId);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
       // 通常タブを作成（非アクティブ）
       const normalTabId = await createTab(extensionContext, 'about:blank', undefined, { active: false });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: normalTabId, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
       const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${pinnedTabId}"]`);
@@ -346,11 +352,11 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, pinnedTabId);
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: normalTabId, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
       await closeTab(extensionContext, normalTabId);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
 
@@ -359,34 +365,37 @@ test.describe('アクティブタブのハイライト', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDを取得
-      const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-      const windowId = currentWindow.id!;
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 初期タブを取得（テスト環境では初期タブが存在する）
-      const initialTabs = await serviceWorker.evaluate(async (wId) => {
-        const tabs = await chrome.tabs.query({ windowId: wId });
-        return tabs.filter(t => !t.pinned).map(t => ({ tabId: t.id!, depth: 0 }));
-      }, windowId);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 通常タブ2つとピン留めタブ2つを作成（ネットワーク依存を避けるためabout:blankを使用）
       const normalTabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: true });
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: normalTabId1, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId1, depth: 0 }], 0);
 
       const normalTabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
         { tabId: normalTabId2, depth: 0 },
       ], 0);
 
       const pinnedTabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
         { tabId: normalTabId2, depth: 0 },
         { tabId: pinnedTabId1, depth: 0 },
@@ -394,7 +403,7 @@ test.describe('アクティブタブのハイライト', () => {
 
       const pinnedTabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
         { tabId: normalTabId2, depth: 0 },
         { tabId: pinnedTabId1, depth: 0 },
@@ -402,22 +411,18 @@ test.describe('アクティブタブのハイライト', () => {
       ], 0);
 
       // ピン留め
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { pinned: true });
-      }, pinnedTabId1);
+      await pinTab(extensionContext, pinnedTabId1);
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
         { tabId: normalTabId2, depth: 0 },
         { tabId: pinnedTabId2, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }], 0);
 
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { pinned: true });
-      }, pinnedTabId2);
+      await pinTab(extensionContext, pinnedTabId2);
       await assertTabStructure(sidePanelPage, windowId, [
-        ...initialTabs,
+        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
         { tabId: normalTabId2, depth: 0 },
       ], 0);
@@ -477,19 +482,19 @@ test.describe('アクティブタブのハイライト', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, normalTabId1);
-      await assertTabStructure(sidePanelPage, windowId, [...initialTabs, { tabId: normalTabId2, depth: 0 }], 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId2, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }, { tabId: pinnedTabId2 }], 0);
 
       await closeTab(extensionContext, normalTabId2);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }, { tabId: pinnedTabId2 }], 0);
 
       await closeTab(extensionContext, pinnedTabId1);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId2 }], 0);
 
       await closeTab(extensionContext, pinnedTabId2);
-      await assertTabStructure(sidePanelPage, windowId, initialTabs, 0);
+      await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
   });

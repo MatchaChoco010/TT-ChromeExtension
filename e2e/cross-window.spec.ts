@@ -1,385 +1,414 @@
 /**
- * クロスウィンドウドラッグ&ドロップテスト
+ * Cross-Window Drag & Drop Tests
  *
- * このテストスイートでは、以下を検証します:
- * 1. タブをパネル外にドラッグアウトした場合、新しいウィンドウが作成されることを検証する
- * 2. タブを別ウィンドウに移動した場合、元のウィンドウのツリーから削除され、移動先ウィンドウのツリーに追加されることを検証する
- * 3. 子タブを持つ親タブを別ウィンドウに移動した場合、サブツリー全体が一緒に移動することを検証する
- * 4. 複数ウィンドウ間でタブを移動した後、各ウィンドウのツリー状態が正しく同期されることを検証する
+ * This test suite verifies:
+ * 1. Moving tabs between windows updates tree state correctly
+ * 2. Parent tabs move independently (Chrome API behavior)
+ * 3. Tab movement between multiple windows maintains correct sync
+ * 4. Tabs can be moved back to original window
+ * 5. Closing windows maintains correct tree state
  *
- * 注: 本テストは `npm run test:e2e` (ヘッドレスモード) で実行すること
+ * Note: Run with `npm run test:e2e` (headless mode)
  */
-import { test, expect } from './fixtures/extension';
-import { createWindow, moveTabToWindow, assertWindowTreeSync } from './utils/window-utils';
-import { createTab } from './utils/tab-utils';
-import { waitForWindowClosed } from './utils/polling-utils';
+import { test } from './fixtures/extension';
+import { createWindow, moveTabToWindow, openSidePanelForWindow } from './utils/window-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { assertTabStructure, assertWindowClosed, assertWindowExists } from './utils/assertion-utils';
+import { waitForSidePanelReady, waitForTabInTreeState } from './utils/polling-utils';
 
-test.describe('クロスウィンドウドラッグ&ドロップ', () => {
-  test('タブを別ウィンドウに移動した場合、元のウィンドウのツリーから削除され、移動先ウィンドウのツリーに追加される', async ({
+test.describe('Cross-Window Drag & Drop', () => {
+  test('Moving tab to another window removes it from source and adds to destination tree', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
-    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelRoot).toBeVisible();
+    // Get original window ID and initialize
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // タブを作成
+    // Create a tab
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
-    // createTab内でストレージ同期を待機済みなので追加待機は不要
-
-    // タブが元のウィンドウに存在することを確認
-    const tabBefore = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-    expect(tabBefore.windowId).toBe(originalWindowId);
-
-    // 新しいウィンドウを作成
+    // Create a new window
     const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
-    expect(newWindowId).not.toBe(originalWindowId);
+    await assertWindowExists(extensionContext, newWindowId);
 
-    // createWindow内でウィンドウ登録を待機済みなので追加待機は不要
+    // Open side panel for new window
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
 
-    // タブを新しいウィンドウに移動
+    // Get new window's pseudo side panel tab and initial browser tab
+    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+
+    // Verify new window initial state
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // Move tab to the new window
     await moveTabToWindow(extensionContext, tabId, newWindowId);
+    await waitForTabInTreeState(extensionContext, tabId);
 
-    // moveTabToWindow内でタブ移動完了を待機済みなので追加待機は不要
+    // Reload side panels to reflect changes
+    await newWindowSidePanel.reload();
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
-    // タブが新しいウィンドウに移動したことを確認
-    const tabAfter = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-    expect(tabAfter.windowId).toBe(newWindowId);
+    // Verify original window state (tab removed)
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // 元のウィンドウにタブが存在しないことを確認
-    const tabsInOriginalWindow = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: originalWindowId }
-    );
-    const tabInOriginal = tabsInOriginalWindow.find(
-      (tab: chrome.tabs.Tab) => tab.id === tabId
-    );
-    expect(tabInOriginal).toBeUndefined();
-
-    // 新しいウィンドウにタブが存在することを確認
-    const tabsInNewWindow = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: newWindowId }
-    );
-    const tabInNew = tabsInNewWindow.find((tab: chrome.tabs.Tab) => tab.id === tabId);
-    expect(tabInNew).toBeDefined();
+    // Verify new window state (tab added)
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
   });
 
-  test('子タブを持つ親タブを別ウィンドウに移動した場合、親タブのみが移動する', async ({
+  test('Moving parent tab to another window moves only the parent (Chrome API behavior)', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
-    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelRoot).toBeVisible();
+    // Get original window ID and initialize
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // 親タブを作成
+    // Create parent tab
     const parentTabId = await createTab(extensionContext, 'https://example.com');
-    expect(parentTabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
-    // 子タブを作成（親タブから開いたタブ）
-    const childTabId1 = await createTab(
-      extensionContext,
-      'https://example.com/child1',
-      parentTabId
-    );
-    const childTabId2 = await createTab(
-      extensionContext,
-      'https://example.com/child2',
-      parentTabId
-    );
-    expect(childTabId1).toBeGreaterThan(0);
-    expect(childTabId2).toBeGreaterThan(0);
+    // Create child tabs (opened from parent tab)
+    const childTabId1 = await createTab(extensionContext, 'https://example.com/child1', parentTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+    ], 0);
 
-    // 全てのタブが元のウィンドウに存在することを確認
-    const parentBefore = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId: parentTabId }
-    );
-    const child1Before = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId: childTabId1 }
-    );
-    const child2Before = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId: childTabId2 }
-    );
+    const childTabId2 = await createTab(extensionContext, 'https://example.com/child2', parentTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+      { tabId: childTabId2, depth: 1 },
+    ], 0);
 
-    expect(parentBefore.windowId).toBe(originalWindowId);
-    expect(child1Before.windowId).toBe(originalWindowId);
-    expect(child2Before.windowId).toBe(originalWindowId);
-
-    // 新しいウィンドウを作成
+    // Create a new window
     const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+    await assertWindowExists(extensionContext, newWindowId);
 
-    // 親タブを新しいウィンドウに移動
+    // Open side panel for new window
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+
+    // Get new window's tabs
+    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // Move parent tab to the new window
     await moveTabToWindow(extensionContext, parentTabId, newWindowId);
+    await waitForTabInTreeState(extensionContext, parentTabId);
 
-    // 親タブが新しいウィンドウに移動したことを確認
-    const parentAfter = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId: parentTabId }
-    );
-    expect(parentAfter.windowId).toBe(newWindowId);
+    // Reload side panels
+    await newWindowSidePanel.reload();
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
-    // 注: Chrome APIのchrome.tabs.move()は子タブを一緒に移動しない
-    // 子タブは元のウィンドウに残る（これはChrome APIの仕様）
-    // サブツリー一括移動は拡張機能のUI上の機能であり、
-    // テストでは個別のAPIレベルでの動作を検証している
-    const child1After = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId: childTabId1 }
-    );
-    const child2After = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId: childTabId2 }
-    );
+    // Verify original window state (parent moved, children remain but now at depth 0)
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: childTabId1, depth: 0 },
+      { tabId: childTabId2, depth: 0 },
+    ], 0);
 
-    // 子タブは元のウィンドウに残っていることを確認
-    expect(child1After.windowId).toBe(originalWindowId);
-    expect(child2After.windowId).toBe(originalWindowId);
+    // Verify new window state (parent added)
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
   });
 
-  test('複数ウィンドウ間でタブを移動した後、各ウィンドウのツリー状態が正しく同期される', async ({
+  test('Tab movement between multiple windows maintains correct sync', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
-    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelRoot).toBeVisible();
+    // Get original window ID and initialize
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // 複数のタブを作成
+    // Create multiple tabs
     const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
     const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
     const tabId3 = await createTab(extensionContext, 'https://example.com/tab3');
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
-    expect(tabId1).toBeGreaterThan(0);
-    expect(tabId2).toBeGreaterThan(0);
-    expect(tabId3).toBeGreaterThan(0);
-
-    // 2つの新しいウィンドウを作成
+    // Create two new windows
     const newWindowId1 = await createWindow(extensionContext);
+    await assertWindowExists(extensionContext, newWindowId1);
+
     const newWindowId2 = await createWindow(extensionContext);
+    await assertWindowExists(extensionContext, newWindowId2);
 
-    expect(newWindowId1).toBeGreaterThan(0);
-    expect(newWindowId2).toBeGreaterThan(0);
+    // Open side panels for new windows
+    const newWindowSidePanel1 = await openSidePanelForWindow(extensionContext, newWindowId1);
+    await waitForSidePanelReady(newWindowSidePanel1, serviceWorker);
+    const newPseudo1 = await getPseudoSidePanelTabId(serviceWorker, newWindowId1);
+    const newInitial1 = await getInitialBrowserTabId(serviceWorker, newWindowId1);
+    await assertTabStructure(newWindowSidePanel1, newWindowId1, [
+      { tabId: newPseudo1, depth: 0 },
+      { tabId: newInitial1, depth: 0 },
+    ], 0);
 
-    // タブ1を新しいウィンドウ1に移動
+    const newWindowSidePanel2 = await openSidePanelForWindow(extensionContext, newWindowId2);
+    await waitForSidePanelReady(newWindowSidePanel2, serviceWorker);
+    const newPseudo2 = await getPseudoSidePanelTabId(serviceWorker, newWindowId2);
+    const newInitial2 = await getInitialBrowserTabId(serviceWorker, newWindowId2);
+    await assertTabStructure(newWindowSidePanel2, newWindowId2, [
+      { tabId: newPseudo2, depth: 0 },
+      { tabId: newInitial2, depth: 0 },
+    ], 0);
+
+    // Move tab1 to window1
     await moveTabToWindow(extensionContext, tabId1, newWindowId1);
+    await waitForTabInTreeState(extensionContext, tabId1);
 
-    // タブ2を新しいウィンドウ2に移動
+    // Reload and verify
+    await newWindowSidePanel1.reload();
+    await waitForSidePanelReady(newWindowSidePanel1, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
+
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
+    await assertTabStructure(newWindowSidePanel1, newWindowId1, [
+      { tabId: newPseudo1, depth: 0 },
+      { tabId: newInitial1, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    // Move tab2 to window2
     await moveTabToWindow(extensionContext, tabId2, newWindowId2);
+    await waitForTabInTreeState(extensionContext, tabId2);
 
-    // タブ3は元のウィンドウに残る
+    // Reload and verify
+    await newWindowSidePanel2.reload();
+    await waitForSidePanelReady(newWindowSidePanel2, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
-    // 各ウィンドウのツリー状態が同期されていることを検証
-    await assertWindowTreeSync(extensionContext, originalWindowId);
-    await assertWindowTreeSync(extensionContext, newWindowId1);
-    await assertWindowTreeSync(extensionContext, newWindowId2);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
-    // 各ウィンドウのタブを検証
-    const tabsInOriginal = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: originalWindowId }
-    );
-    const tabsInNew1 = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: newWindowId1 }
-    );
-    const tabsInNew2 = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: newWindowId2 }
-    );
-
-    // 元のウィンドウにタブ3が存在することを確認
-    const tab3InOriginal = tabsInOriginal.find(
-      (tab: chrome.tabs.Tab) => tab.id === tabId3
-    );
-    expect(tab3InOriginal).toBeDefined();
-
-    // 新しいウィンドウ1にタブ1が存在することを確認
-    const tab1InNew1 = tabsInNew1.find((tab: chrome.tabs.Tab) => tab.id === tabId1);
-    expect(tab1InNew1).toBeDefined();
-
-    // 新しいウィンドウ2にタブ2が存在することを確認
-    const tab2InNew2 = tabsInNew2.find((tab: chrome.tabs.Tab) => tab.id === tabId2);
-    expect(tab2InNew2).toBeDefined();
+    await assertTabStructure(newWindowSidePanel2, newWindowId2, [
+      { tabId: newPseudo2, depth: 0 },
+      { tabId: newInitial2, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
   });
 
-  test('タブを別ウィンドウから元のウィンドウに戻すことができる', async ({
+  test('Tab can be moved back to original window', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
-    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelRoot).toBeVisible();
+    // Get original window ID and initialize
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // タブを作成
+    // Create a tab
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
-    // 新しいウィンドウを作成
+    // Create a new window
     const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+    await assertWindowExists(extensionContext, newWindowId);
 
-    // タブを新しいウィンドウに移動
+    // Open side panel for new window
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // Move tab to the new window
     await moveTabToWindow(extensionContext, tabId, newWindowId);
+    await waitForTabInTreeState(extensionContext, tabId);
 
-    // タブが新しいウィンドウに移動したことを確認
-    const tabInNew = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-    expect(tabInNew.windowId).toBe(newWindowId);
+    // Reload and verify
+    await newWindowSidePanel.reload();
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
-    // タブを元のウィンドウに戻す
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
+
+    // Move tab back to original window
     await moveTabToWindow(extensionContext, tabId, originalWindowId);
+    await waitForTabInTreeState(extensionContext, tabId);
 
-    // タブが元のウィンドウに戻ったことを確認
-    const tabBack = await serviceWorker.evaluate(
-      ({ tabId }) => {
-        return chrome.tabs.get(tabId);
-      },
-      { tabId }
-    );
-    expect(tabBack.windowId).toBe(originalWindowId);
+    // Reload and verify
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
+    await newWindowSidePanel.reload();
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
 
-    // ツリー状態が同期されていることを検証
-    await assertWindowTreeSync(extensionContext, originalWindowId);
-    await assertWindowTreeSync(extensionContext, newWindowId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
+
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
   });
 
-  test('ウィンドウを閉じた後、残りのウィンドウのツリー状態が正しい', async ({
+  test('Closing window maintains correct tree state in remaining window', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
-    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelRoot).toBeVisible();
+    // Get original window ID and initialize
+    const originalWindowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // 元のウィンドウのIDを取得
-    const originalWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const originalWindowId = originalWindow.id as number;
-
-    // タブを作成
+    // Create a tab
     const tabId = await createTab(extensionContext, 'https://example.com');
-    expect(tabId).toBeGreaterThan(0);
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
-    // 新しいウィンドウを作成
+    // Create a new window
     const newWindowId = await createWindow(extensionContext);
-    expect(newWindowId).toBeGreaterThan(0);
+    await assertWindowExists(extensionContext, newWindowId);
 
-    // タブを新しいウィンドウに移動
+    // Open side panel for new window
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // Move tab to the new window
     await moveTabToWindow(extensionContext, tabId, newWindowId);
+    await waitForTabInTreeState(extensionContext, tabId);
 
-    // 新しいウィンドウのタブを確認
-    const tabsInNewBefore = await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.tabs.query({ windowId });
-      },
-      { windowId: newWindowId }
-    );
-    const tabIdInNew = tabsInNewBefore.find(
-      (tab: chrome.tabs.Tab) => tab.id === tabId
-    );
-    expect(tabIdInNew).toBeDefined();
+    // Reload and verify
+    await newWindowSidePanel.reload();
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
-    // 新しいウィンドウを閉じる
-    await serviceWorker.evaluate(
-      ({ windowId }) => {
-        return chrome.windows.remove(windowId);
-      },
-      { windowId: newWindowId }
-    );
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
 
-    // ウィンドウが閉じられるまで待機
-    await waitForWindowClosed(extensionContext, newWindowId);
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
+      { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
-    // 元のウィンドウのツリー状態が正しいことを検証
-    await assertWindowTreeSync(extensionContext, originalWindowId);
+    // Close the new window
+    await serviceWorker.evaluate(({ windowId }) => {
+      return chrome.windows.remove(windowId);
+    }, { windowId: newWindowId });
 
-    // 元のウィンドウが存在することを確認
-    const windows = await serviceWorker.evaluate(() => {
-      return chrome.windows.getAll();
-    });
-    const originalWindowExists = windows.find(
-      (win: chrome.windows.Window) => win.id === originalWindowId
-    );
-    expect(originalWindowExists).toBeDefined();
+    // Verify window is closed
+    await assertWindowClosed(extensionContext, newWindowId);
 
-    // 閉じたウィンドウが存在しないことを確認
-    const closedWindowExists = windows.find(
-      (win: chrome.windows.Window) => win.id === newWindowId
-    );
-    expect(closedWindowExists).toBeUndefined();
+    // Verify original window still exists and has correct state
+    await assertWindowExists(extensionContext, originalWindowId);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
+
+    await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 });

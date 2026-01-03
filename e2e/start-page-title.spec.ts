@@ -13,6 +13,14 @@
 
 import { test, expect } from './fixtures/extension';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
+import { assertTabStructure } from './utils/assertion-utils';
+import {
+  getCurrentWindowId,
+  getPseudoSidePanelTabId,
+  getInitialBrowserTabId,
+  closeTab,
+  createTab,
+} from './utils/tab-utils';
 
 /**
  * タブタイトル要素を取得するヘルパー関数
@@ -42,64 +50,65 @@ test.describe('スタートページタイトル', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // Side Panelが表示されることを確認
-      const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-      await expect(sidePanelRoot).toBeVisible();
+      // 初期化: ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // 新規タブ追加ボタンが表示されるまで待機
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
 
-      // 現在のタブ数を取得
-      const initialTabCount = await serviceWorker.evaluate(async () => {
-        const tabs = await chrome.tabs.query({});
-        return tabs.length;
-      });
-
       // 新規タブ追加ボタンをクリック
       await newTabButton.click();
 
-      // 新しいタブが作成されるまでポーリングで待機
+      // 新しいタブのIDを取得するためにポーリングで待機
+      let newTabId: number | undefined;
       await waitForCondition(
         async () => {
-          const currentTabCount = await serviceWorker.evaluate(async () => {
-            const tabs = await chrome.tabs.query({});
-            return tabs.length;
+          const tabs = await serviceWorker.evaluate(async (wId) => {
+            return chrome.tabs.query({ windowId: wId });
+          }, windowId);
+          // 擬似サイドパネルタブ以外のタブを探す
+          const extensionId = await serviceWorker.evaluate(() => chrome.runtime.id);
+          const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
+          const nonSidePanelTabs = tabs.filter((t: chrome.tabs.Tab) => {
+            const url = t.url || t.pendingUrl || '';
+            return !url.startsWith(sidePanelUrlPrefix);
           });
-          return currentTabCount > initialTabCount;
+          if (nonSidePanelTabs.length > 0) {
+            newTabId = nonSidePanelTabs[nonSidePanelTabs.length - 1]?.id;
+            return true;
+          }
+          return false;
         },
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      // 新しいタブのIDを取得
-      const newTabId = await serviceWorker.evaluate(async () => {
-        const tabs = await chrome.tabs.query({ active: true });
-        return tabs[0]?.id;
-      });
-
-      expect(newTabId).toBeDefined();
-
       // 新しいタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, newTabId!);
 
-      // 新しいタブがツリーに表示されるまで待機
-      await expect(async () => {
-        const newTabNode = sidePanelPage.locator(`[data-testid="tree-node-${newTabId}"]`);
-        await expect(newTabNode).toBeVisible();
-      }).toPass({ timeout: 10000 });
+      // タブ作成直後に構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId!, depth: 0 },
+      ], 0);
 
-      // ツリー状態からタブのURLを取得して検証
-      // URLがVivaldiスタートページであることを確認
+      // ツリー状態からタブのURLを取得して検証（URL検証は本テストの目的なので許容）
       const treeTabUrl = await sidePanelPage.evaluate(async (tabId: number) => {
-        // サイドパネル内のTreeStateContextからタブ情報を取得
         const tabNode = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
         if (!tabNode) return null;
-        // data-tab-url属性があれば取得
         return tabNode.getAttribute('data-tab-url');
       }, newTabId!);
 
-      // ツリー状態にURLが保存されている場合は検証
-      // 注: data-tab-url属性がない場合は、タイトル表示で検証
       if (treeTabUrl) {
         expect(treeTabUrl).toBe('chrome://vivaldi-webui/startpage');
       }
@@ -107,9 +116,7 @@ test.describe('スタートページタイトル', () => {
       // タブノード内のタイトル要素を取得
       const tabTitleElement = await getTabTitleElement(sidePanelPage, newTabId!);
 
-      // タイトルが「スタートページ」になることを確認
-      // chrome://vivaldi-webui/startpage のURLを持つタブは、
-      // TreeNodeのgetDisplayTitle関数で「スタートページ」に変換される
+      // タイトルが「スタートページ」になることを確認（タイトル検証は本テストの目的なので許容）
       await waitForCondition(
         async () => {
           const titleText = await tabTitleElement.textContent();
@@ -134,30 +141,32 @@ test.describe('スタートページタイトル', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // Side Panelが表示されることを確認
-      const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-      await expect(sidePanelRoot).toBeVisible();
+      // 初期化: ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // 新規タブを作成
-      const tab = await serviceWorker.evaluate(async () => {
-        return chrome.tabs.create({});
-      });
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
 
-      expect(tab.id).toBeDefined();
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
-      // タブがツリーに追加されるまで待機
-      await waitForTabInTreeState(extensionContext, tab.id!);
+      // 新規タブを作成（createTabユーティリティはツリーへの追加を待機する）
+      const tabId = await createTab(extensionContext, '');
 
-      // タブがツリーに表示されるまで待機
-      await expect(async () => {
-        const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tab.id}"]`);
-        await expect(tabNode).toBeVisible();
-      }).toPass({ timeout: 10000 });
+      // タブ作成直後に構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // タブノード内のタイトル要素を取得
-      const tabTitleElement = await getTabTitleElement(sidePanelPage, tab.id!);
+      const tabTitleElement = await getTabTitleElement(sidePanelPage, tabId);
 
-      // タイトルが適切に設定されるまで待機
+      // タイトルが適切に設定されるまで待機（タイトル検証は本テストの目的なので許容）
       await waitForCondition(
         async () => {
           const titleText = await tabTitleElement.textContent();
@@ -176,7 +185,12 @@ test.describe('スタートページタイトル', () => {
       expect(['スタートページ', '新しいタブ', 'Loading...']).toContain(titleText);
 
       // クリーンアップ
-      await serviceWorker.evaluate((tabId) => chrome.tabs.remove(tabId), tab.id!);
+      await closeTab(extensionContext, tabId);
+
+      // クリーンアップ後の構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -186,59 +200,64 @@ test.describe('スタートページタイトル', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // Side Panelが表示されることを確認
-      const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-      await expect(sidePanelRoot).toBeVisible();
+      // 初期化: ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // 新規タブ追加ボタンをクリックして新しいタブを作成
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
 
-      // 現在のタブ数を取得
-      const initialTabCount = await serviceWorker.evaluate(async () => {
-        const tabs = await chrome.tabs.query({});
-        return tabs.length;
-      });
-
       await newTabButton.click();
 
-      // 新しいタブが作成されるまでポーリングで待機
+      // 新しいタブのIDを取得するためにポーリングで待機
+      let newTabId: number | undefined;
       await waitForCondition(
         async () => {
-          const currentTabCount = await serviceWorker.evaluate(async () => {
-            const tabs = await chrome.tabs.query({});
-            return tabs.length;
+          const tabs = await serviceWorker.evaluate(async (wId) => {
+            return chrome.tabs.query({ windowId: wId });
+          }, windowId);
+          // 擬似サイドパネルタブ以外のタブを探す
+          const extensionId = await serviceWorker.evaluate(() => chrome.runtime.id);
+          const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
+          const nonSidePanelTabs = tabs.filter((t: chrome.tabs.Tab) => {
+            const url = t.url || t.pendingUrl || '';
+            return !url.startsWith(sidePanelUrlPrefix);
           });
-          return currentTabCount > initialTabCount;
+          if (nonSidePanelTabs.length > 0) {
+            newTabId = nonSidePanelTabs[nonSidePanelTabs.length - 1]?.id;
+            return true;
+          }
+          return false;
         },
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      // 新しいタブのIDを取得
-      const newTabId = await serviceWorker.evaluate(async () => {
-        const tabs = await chrome.tabs.query({ active: true });
-        return tabs[0]?.id;
-      });
-
-      expect(newTabId).toBeDefined();
-
       // タブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, newTabId!);
 
-      // タブがツリーに表示されるまで待機
-      await expect(async () => {
-        const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${newTabId}"]`);
-        await expect(tabNode).toBeVisible();
-      }).toPass({ timeout: 10000 });
+      // タブ作成直後に構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId!, depth: 0 },
+      ], 0);
 
       // タブノード内のタイトル要素を取得
       const tabTitleElement = await getTabTitleElement(sidePanelPage, newTabId!);
 
-      // タイトルが「スタートページ」（chrome://vivaldi-webui/startpageを開くため）または「Loading...」であることを確認
+      // タイトルが「スタートページ」または「Loading...」であることを確認（タイトル検証は本テストの目的なので許容）
       await waitForCondition(
         async () => {
           const titleText = await tabTitleElement.textContent();
-          // 新規タブボタンはchrome://vivaldi-webui/startpageを開くため、タイトルは「スタートページ」
           return titleText === 'スタートページ' || titleText === 'Loading...';
         },
         {
@@ -268,7 +287,7 @@ test.describe('スタートページタイトル', () => {
         { timeout: 10000, interval: 200, timeoutMessage: 'Page navigation did not complete' }
       );
 
-      // タイトルが更新されるまで待機
+      // タイトルが更新されるまで待機（タイトル検証は本テストの目的なので許容）
       await waitForCondition(
         async () => {
           const titleText = await tabTitleElement.textContent();
@@ -282,14 +301,19 @@ test.describe('スタートページタイトル', () => {
         }
       );
 
-      // 最終的なタイトルがスタートページ関連の表示ではないことを確認
+      // 最終的なタイトルがスタートページ関連の表示ではないことを確認（タイトル検証は本テストの目的なので許容）
       const finalTitle = await tabTitleElement.textContent();
       expect(finalTitle).not.toBe('スタートページ');
       expect(finalTitle).not.toBe('Loading...');
       expect(finalTitle).toBeTruthy();
 
       // クリーンアップ
-      await serviceWorker.evaluate((tabId) => chrome.tabs.remove(tabId), newTabId!);
+      await closeTab(extensionContext, newTabId!);
+
+      // クリーンアップ後の構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     // Note: about:blankへの遷移テストは、URL変更時のtabInfoMap更新のタイミング問題により

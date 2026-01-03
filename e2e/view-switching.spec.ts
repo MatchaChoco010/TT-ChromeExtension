@@ -6,7 +6,9 @@
  * 2. カスタムビューの作成、削除、名前・色変更
  */
 import { test, expect } from './fixtures/extension';
-import { waitForViewSwitcher } from './utils/polling-utils';
+import { waitForViewSwitcher, waitForCondition } from './utils/polling-utils';
+import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab } from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ビュー切り替え機能', () => {
   test.describe('ビュー一覧とビュー切り替え', () => {
@@ -117,7 +119,7 @@ test.describe('ビュー切り替え機能', () => {
       await expect(viewSwitcher).toBeVisible({ timeout: 5000 });
 
       // 初期状態ではデフォルトビューのみ
-      let viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
+      const viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
       const initialCount = await viewButtons.count();
 
       // 新しいビュー追加ボタンをクリック
@@ -125,11 +127,14 @@ test.describe('ビュー切り替え機能', () => {
       await addButton.click();
 
       // ビューの数が増えたことを確認（ポーリング）
-      await expect(async () => {
-        viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
-        const newCount = await viewButtons.count();
-        expect(newCount).toBe(initialCount + 1);
-      }).toPass({ timeout: 5000 });
+      await waitForCondition(
+        async () => {
+          const currentViewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
+          const newCount = await currentViewButtons.count();
+          return newCount === initialCount + 1;
+        },
+        { timeout: 5000, timeoutMessage: 'View count did not increase after adding a new view' }
+      );
     });
 
     test('カスタムビューを作成した場合、新しいビューがビューリストに追加される', async ({
@@ -253,8 +258,18 @@ test.describe('ビュー切り替え機能', () => {
   test.describe('ビュー切り替え動作の修正', () => {
     test('ビューを切り替えた後に新しいタブを開いた場合、現在アクティブなビューにタブを追加する', async ({
       sidePanelPage,
-      context,
+      extensionContext,
+      serviceWorker,
     }) => {
+      // Initialize test state
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       await waitForViewSwitcher(sidePanelPage);
 
       // 新しいビューを追加
@@ -278,19 +293,12 @@ test.describe('ビュー切り替え機能', () => {
       const emptyMessage = sidePanelPage.locator('text=No tabs in this view');
       await expect(emptyMessage).toBeVisible({ timeout: 5000 });
 
-      // Chrome APIを使って新しいタブを開く（Service Workerを経由）
-      await sidePanelPage.evaluate(async () => {
-        await chrome.tabs.create({ url: 'about:blank' });
-      });
-
-      // 新しいタブがこのビューに表示されることを確認
-      // 空のメッセージが非表示になるか、tree-nodeが表示されるはず
-      await expect(async () => {
-        // data-testid="tree-node-<tabId>" 形式のセレクタを使用
-        const treeItems = sidePanelPage.locator('[data-testid^="tree-node-"]');
-        const count = await treeItems.count();
-        expect(count).toBeGreaterThan(0);
-      }).toPass({ timeout: 15000 });
+      // 新しいタブを開く（createTabユーティリティを使用）
+      const newTabId = await createTab(extensionContext, 'about:blank');
+      // activeViewIndex=1: 新しいビュー（New View）がアクティブ
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: newTabId, depth: 0 },
+      ], 1);
     });
 
     test('ビューを追加した場合、ページをリロードしてもビューが永続化されている', async ({
@@ -335,10 +343,13 @@ test.describe('ビュー切り替え機能', () => {
 
       // 2つ目のビューボタンが表示されるまで待機（2つ目のビューは "New View" ではなく "New View" となる）
       const viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
-      await expect(async () => {
-        const count = await viewButtons.count();
-        expect(count).toBeGreaterThanOrEqual(3); // Default + 2 new views
-      }).toPass({ timeout: 5000 });
+      await waitForCondition(
+        async () => {
+          const count = await viewButtons.count();
+          return count >= 3; // Default + 2 new views
+        },
+        { timeout: 5000, timeoutMessage: 'Two new views were not created' }
+      );
 
       // ビュー間を何度か切り替え
       const defaultViewButton = sidePanelPage.locator(
@@ -348,10 +359,13 @@ test.describe('ビュー切り替え機能', () => {
       await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
       // すべてのビューがまだ存在していることを確認
-      await expect(async () => {
-        const count = await viewButtons.count();
-        expect(count).toBeGreaterThanOrEqual(3);
-      }).toPass({ timeout: 5000 });
+      await waitForCondition(
+        async () => {
+          const count = await viewButtons.count();
+          return count >= 3;
+        },
+        { timeout: 5000, timeoutMessage: 'Views disappeared after switching' }
+      );
     });
   });
 

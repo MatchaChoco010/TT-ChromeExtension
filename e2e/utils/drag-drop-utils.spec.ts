@@ -3,9 +3,10 @@
  *
  * ドラッグ&ドロップ操作のシミュレーションとドロップ位置検証のテスト
  */
-import { test, expect } from '../fixtures/extension';
+import { test } from '../fixtures/extension';
 import * as dragDropUtils from './drag-drop-utils';
-import * as tabUtils from './tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './tab-utils';
+import { assertTabStructure } from './assertion-utils';
 
 test.describe('DragDropUtils', () => {
 
@@ -13,10 +14,27 @@ test.describe('DragDropUtils', () => {
     test('タブノードをドラッグ開始できる', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // テスト用にタブを作成
-      const tabId = await tabUtils.createTab(extensionContext, 'https://example.com');
-      await tabUtils.assertTabInTree(sidePanelPage, tabId, 'Example Domain');
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
 
       // タブノードのドラッグを開始（非同期関数は直接awaitする）
       await dragDropUtils.startDrag(sidePanelPage, tabId);
@@ -30,13 +48,34 @@ test.describe('DragDropUtils', () => {
     test('別のタブノード上にホバーできる', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
-      // 2つのタブを作成
-      const tab1Id = await tabUtils.createTab(extensionContext, 'https://example.com');
-      const tab2Id = await tabUtils.createTab(extensionContext, 'https://www.example.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      await tabUtils.assertTabInTree(sidePanelPage, tab1Id, 'Example Domain');
-      await tabUtils.assertTabInTree(sidePanelPage, tab2Id, 'Example');
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 2つのタブを作成
+      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+      ], 0);
+
+      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+        { tabId: tab2Id, depth: 0 },
+      ], 0);
 
       // tab1をドラッグ開始
       await dragDropUtils.startDrag(sidePanelPage, tab1Id);
@@ -50,10 +89,26 @@ test.describe('DragDropUtils', () => {
   });
 
   test.describe('dropTab', () => {
-    test('ドロップを実行できる', async ({ extensionContext, sidePanelPage }) => {
+    test('ドロップを実行できる', async ({ extensionContext, sidePanelPage, serviceWorker }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // タブを作成
-      const tabId = await tabUtils.createTab(extensionContext, 'https://example.com');
-      await tabUtils.assertTabInTree(sidePanelPage, tabId, 'Example Domain');
+      const tabId = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
 
       // ドラッグ開始
       await dragDropUtils.startDrag(sidePanelPage, tabId);
@@ -61,11 +116,11 @@ test.describe('DragDropUtils', () => {
       // ドロップを実行（非同期関数は直接awaitする）
       await dragDropUtils.dropTab(sidePanelPage);
 
-      // タブが正常に残っていることを確認 - ドラッグ操作後のDOM安定化をポーリングで待機
-      await expect(async () => {
-        const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-        await expect(tabNode).toBeVisible();
-      }).toPass({ timeout: 5000 });
+      // タブが正常に残っていることを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -73,47 +128,87 @@ test.describe('DragDropUtils', () => {
     test('同階層のタブを並び替えできる（before）', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
-      // 2つのタブを作成
-      const tab1Id = await tabUtils.createTab(extensionContext, 'https://example.com');
-      const tab2Id = await tabUtils.createTab(extensionContext, 'https://www.example.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      await tabUtils.assertTabInTree(sidePanelPage, tab1Id, 'Example Domain');
-      await tabUtils.assertTabInTree(sidePanelPage, tab2Id, 'Example');
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 2つのタブを作成
+      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+      ], 0);
+
+      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+        { tabId: tab2Id, depth: 0 },
+      ], 0);
 
       // tab2をtab1の前に移動
       await dragDropUtils.reorderTabs(sidePanelPage, tab2Id, tab1Id, 'before');
 
-      // 並び順が変更されたことを確認 - ドラッグ操作後のDOM安定化をポーリングで待機
-      await expect(async () => {
-        const tab1Node = sidePanelPage.locator(`[data-testid="tree-node-${tab1Id}"]`);
-        const tab2Node = sidePanelPage.locator(`[data-testid="tree-node-${tab2Id}"]`);
-        await expect(tab1Node).toBeVisible();
-        await expect(tab2Node).toBeVisible();
-      }).toPass({ timeout: 5000 });
+      // 並び順が変更されたことを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab2Id, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+      ], 0);
     });
 
     test('同階層のタブを並び替えできる（after）', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
-      // 2つのタブを作成
-      const tab1Id = await tabUtils.createTab(extensionContext, 'https://example.com');
-      const tab2Id = await tabUtils.createTab(extensionContext, 'https://www.example.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      await tabUtils.assertTabInTree(sidePanelPage, tab1Id, 'Example Domain');
-      await tabUtils.assertTabInTree(sidePanelPage, tab2Id, 'Example');
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 2つのタブを作成
+      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+      ], 0);
+
+      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+        { tabId: tab2Id, depth: 0 },
+      ], 0);
 
       // tab1をtab2の後に移動
       await dragDropUtils.reorderTabs(sidePanelPage, tab1Id, tab2Id, 'after');
 
-      // 並び順が変更されたことを確認 - ドラッグ操作後のDOM安定化をポーリングで待機
-      await expect(async () => {
-        const tab1Node = sidePanelPage.locator(`[data-testid="tree-node-${tab1Id}"]`);
-        const tab2Node = sidePanelPage.locator(`[data-testid="tree-node-${tab2Id}"]`);
-        await expect(tab1Node).toBeVisible();
-        await expect(tab2Node).toBeVisible();
-      }).toPass({ timeout: 10000, intervals: [100, 200, 500, 1000, 2000] });
+      // 並び順が変更されたことを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab2Id, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+      ], 0);
     });
   });
 
@@ -121,24 +216,44 @@ test.describe('DragDropUtils', () => {
     test('タブを別のタブの子にできる', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
-      // 2つのタブを作成
-      const parentTabId = await tabUtils.createTab(extensionContext, 'https://example.com');
-      const childTabId = await tabUtils.createTab(extensionContext, 'https://www.example.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      await tabUtils.assertTabInTree(sidePanelPage, parentTabId, 'Example Domain');
-      await tabUtils.assertTabInTree(sidePanelPage, childTabId, 'Example');
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 2つのタブを作成
+      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
+      const childTabId = await createTab(extensionContext, 'https://www.example.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: childTabId, depth: 0 },
+      ], 0);
 
       // childTabをparentTabの子にする
-      await dragDropUtils.moveTabToParent(sidePanelPage, childTabId, parentTabId);
+      await dragDropUtils.moveTabToParent(sidePanelPage, childTabId, parentTabId, serviceWorker);
 
-      // 親子関係が作成されたことを確認 - ドラッグ操作後のDOM安定化をポーリングで待機
-      await expect(async () => {
-        const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-        const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTabId}"]`);
-        await expect(parentNode).toBeVisible();
-        await expect(childNode).toBeVisible();
-      }).toPass({ timeout: 5000 });
+      // 親子関係が作成されたことを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
     });
   });
 
@@ -146,24 +261,45 @@ test.describe('DragDropUtils', () => {
     test('ドロップインジケータの表示を検証できる', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
-      // 2つのタブを作成
-      const tab1Id = await tabUtils.createTab(extensionContext, 'https://example.com');
-      const tab2Id = await tabUtils.createTab(extensionContext, 'https://www.example.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      await tabUtils.assertTabInTree(sidePanelPage, tab1Id, 'Example Domain');
-      await tabUtils.assertTabInTree(sidePanelPage, tab2Id, 'Example');
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 2つのタブを作成
+      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+      ], 0);
+
+      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+        { tabId: tab2Id, depth: 0 },
+      ], 0);
 
       // ドラッグ開始
       await dragDropUtils.startDrag(sidePanelPage, tab1Id);
       await dragDropUtils.hoverOverTab(sidePanelPage, tab2Id);
 
-      // ドラッグ状態が確立されたことを確認 - ホバー後のDOM安定化をポーリングで待機
-      // ドロップインジケータの表示はUI実装に依存するため、基本的なノード存在確認を行う
-      await expect(async () => {
-        const tab2Node = sidePanelPage.locator(`[data-testid="tree-node-${tab2Id}"]`);
-        await expect(tab2Node).toBeVisible();
-      }).toPass({ timeout: 5000 });
+      // ドラッグ状態が確立されたことを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1Id, depth: 0 },
+        { tabId: tab2Id, depth: 0 },
+      ], 0);
 
       // ドラッグを終了
       await dragDropUtils.dropTab(sidePanelPage);
@@ -174,15 +310,43 @@ test.describe('DragDropUtils', () => {
     test('ホバー自動展開を検証できる', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
-      // 親タブと子タブを作成
-      const parentTabId = await tabUtils.createTab(extensionContext, 'https://example.com');
-      await tabUtils.createTab(extensionContext, 'https://www.example.org', parentTabId);
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      await tabUtils.assertTabInTree(sidePanelPage, parentTabId, 'Example Domain');
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証（擬似サイドパネルタブのみ）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 親タブと子タブを作成
+      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
+      const childTabId = await createTab(extensionContext, 'https://www.example.org', parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       // 別のタブを作成（ドラッグ用）
-      await tabUtils.createTab(extensionContext, 'https://www.iana.org');
+      const dragTabId = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: childTabId, depth: 1 },
+        { tabId: dragTabId, depth: 0 },
+      ], 0);
 
       // 親タブを折りたたむ（実際の実装では、UIから折りたたみ操作が必要）
       // ここでは、ホバー自動展開機能のテストフレームワークを確認

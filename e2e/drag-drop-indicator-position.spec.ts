@@ -13,10 +13,11 @@
  * Note: ヘッドレスモードで実行すること（npm run test:e2e）
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, assertTabInTree } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { startDrag, dropTab, moveTabToParent } from './utils/drag-drop-utils';
 import { waitForCondition } from './utils/polling-utils';
-import type { Page, Worker } from '@playwright/test';
+import { assertTabStructure } from './utils/assertion-utils';
+import type { Page } from '@playwright/test';
 
 /**
  * タブノードのバウンディングボックスを取得
@@ -65,28 +66,6 @@ async function waitForDropIndicatorVisible(
   );
 }
 
-/**
- * ストレージにすべてのタブが存在するまで待機
- */
-async function waitForAllTabsInStorage(
-  serviceWorker: Worker,
-  tabIds: number[]
-): Promise<void> {
-  await serviceWorker.evaluate(async (ids: number[]) => {
-    for (let i = 0; i < 30; i++) {
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-      if (treeState?.tabToNode) {
-        const allTabsExist = ids.every(id => treeState.tabToNode?.[id]);
-        if (allTabsExist) {
-          return;
-        }
-      }
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-  }, tabIds);
-}
-
 test.describe('ドラッグ&ドロップ - プレースホルダー位置精度', () => {
   // タイムアウトを120秒に設定
   test.setTimeout(120000);
@@ -104,22 +83,66 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       //     タブC -> タブBの子
       // タブY -> 親タブ（サブツリーなし）
 
-      const tabX = await createTab(extensionContext, 'https://example.com');
-      const tabA = await createTab(extensionContext, 'https://www.iana.org');
-      const tabB = await createTab(extensionContext, 'https://www.w3.org');
-      const tabC = await createTab(extensionContext, 'https://developer.mozilla.org');
-      const tabY = await createTab(extensionContext, 'https://httpbin.org');
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tabX, 'Example');
-      await assertTabInTree(sidePanelPage, tabA);
-      await assertTabInTree(sidePanelPage, tabB);
-      await assertTabInTree(sidePanelPage, tabC);
-      await assertTabInTree(sidePanelPage, tabY);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      const tabX = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+      ], 0);
+
+      const tabA = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
+
+      const tabB = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
+
+      const tabC = await createTab(extensionContext, 'https://developer.mozilla.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
+
+      const tabY = await createTab(extensionContext, 'https://httpbin.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+        { tabId: tabY, depth: 0 },
+      ], 0);
 
       // 親子関係を構築: B -> Aの子、C -> Bの子
       await moveTabToParent(sidePanelPage, tabB, tabA, serviceWorker);
-      await waitForAllTabsInStorage(serviceWorker, [tabX, tabA, tabB, tabC, tabY]);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 1 },
+        { tabId: tabC, depth: 0 },
+        { tabId: tabY, depth: 0 },
+      ], 0);
 
       // 親タブを展開
       const tabANode = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`).first();
@@ -132,7 +155,14 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       }
 
       await moveTabToParent(sidePanelPage, tabC, tabB, serviceWorker);
-      await waitForAllTabsInStorage(serviceWorker, [tabX, tabA, tabB, tabC, tabY]);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 1 },
+        { tabId: tabC, depth: 2 },
+        { tabId: tabY, depth: 0 },
+      ], 0);
 
       // タブBを展開
       const tabBNode = sidePanelPage.locator(`[data-testid="tree-node-${tabB}"]`).first();
@@ -181,6 +211,16 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証（元の位置に戻る or 変更がなかったことを確認）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabX, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 1 },
+        { tabId: tabC, depth: 2 },
+        { tabId: tabY, depth: 0 },
+      ], 0);
     });
   });
 
@@ -188,19 +228,42 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
     test('タブBをドラッグ中にタブAとタブBの間にホバーするとプレースホルダーがタブAとタブBの間に表示されること', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
       // 準備: 3つのタブを作成
       // タブA
       // タブB <- ドラッグするタブ
       // タブC
-      const tabA = await createTab(extensionContext, 'https://example.com');
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tabA, 'Example');
-      await assertTabInTree(sidePanelPage, tabB);
-      await assertTabInTree(sidePanelPage, tabC);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      const tabA = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
+
+      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
+
+      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
 
       // ページをフォーカス
       await sidePanelPage.bringToFront();
@@ -243,24 +306,55 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
     });
 
     test('タブBをドラッグ中にタブBとタブCの間にホバーするとプレースホルダーがタブBとタブCの間に表示されること', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
       // 準備: 3つのタブを作成
       // タブA
       // タブB <- ドラッグするタブ
       // タブC
-      const tabA = await createTab(extensionContext, 'https://example.com');
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tabA, 'Example');
-      await assertTabInTree(sidePanelPage, tabB);
-      await assertTabInTree(sidePanelPage, tabC);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      const tabA = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
+
+      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
+
+      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
 
       // ページをフォーカス
       await sidePanelPage.bringToFront();
@@ -302,6 +396,14 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
     });
   });
 
@@ -309,18 +411,48 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
     test('ドラッグ中に複数の隙間をホバーするとプレースホルダーが正しく追従すること', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
       // 準備: 4つのタブを作成
-      const tab1 = await createTab(extensionContext, 'https://example.com');
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1, 'Example');
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
-      await assertTabInTree(sidePanelPage, tab4);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
+      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
+
+      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tab4, depth: 0 },
+      ], 0);
 
       // ページをフォーカス
       await sidePanelPage.bringToFront();
@@ -368,6 +500,15 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       // ドロップを実行
       await dropTab(sidePanelPage);
+
+      // ドロップ後のタブ構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab4, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
     });
   });
 });

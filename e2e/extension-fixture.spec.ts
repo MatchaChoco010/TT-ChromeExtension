@@ -5,6 +5,7 @@
  * Service Workerの起動を待機し、Extension IDを抽出できることを検証します。
  */
 import { test, expect } from './fixtures/extension';
+import { waitForCondition } from './utils/polling-utils';
 
 // リソース競合を避けるため直列実行
 test.describe.serial('ExtensionFixture', () => {
@@ -26,15 +27,15 @@ test.describe.serial('ExtensionFixture', () => {
 
     // Service Workerが評価可能な状態であることをポーリングで検証
     // chrome APIが完全に初期化されるまで待機
-    let result = false;
-    for (let i = 0; i < 50; i++) {
-      result = await serviceWorker.evaluate(() => {
-        return typeof chrome !== 'undefined' && chrome.runtime !== undefined;
-      });
-      if (result) break;
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    expect(result).toBe(true);
+    await waitForCondition(
+      async () => {
+        const result = await serviceWorker.evaluate(() => {
+          return typeof chrome !== 'undefined' && chrome.runtime !== undefined;
+        });
+        return result;
+      },
+      { timeout: 5000, interval: 100, timeoutMessage: 'chrome API was not initialized' }
+    );
   });
 
   test('Side Panelページが正しく開けること', async ({
@@ -58,13 +59,13 @@ test.describe.serial('ExtensionFixture', () => {
     expect(Number(windowId)).toBeGreaterThan(0);
 
     // ページがロード完了するまでポーリングで待機
-    let readyState = '';
-    for (let i = 0; i < 50; i++) {
-      readyState = await sidePanelPage.evaluate(() => document.readyState);
-      if (readyState === 'complete') break;
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    expect(readyState).toBe('complete');
+    await waitForCondition(
+      async () => {
+        const readyState = await sidePanelPage.evaluate(() => document.readyState);
+        return readyState === 'complete';
+      },
+      { timeout: 5000, interval: 100, timeoutMessage: 'Page did not reach complete state' }
+    );
 
     // Reactのルート要素が存在することを検証
     const rootElement = sidePanelPage.locator('#root');
@@ -78,12 +79,13 @@ test.describe.serial('ExtensionFixture', () => {
     expect(extensionContext).toBeDefined();
 
     // Service Workerが存在することをポーリングで検証
-    let serviceWorkers = extensionContext.serviceWorkers();
-    for (let i = 0; i < 50 && serviceWorkers.length === 0; i++) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      serviceWorkers = extensionContext.serviceWorkers();
-    }
-    expect(serviceWorkers.length).toBeGreaterThan(0);
+    await waitForCondition(
+      async () => {
+        const serviceWorkers = extensionContext.serviceWorkers();
+        return serviceWorkers.length > 0;
+      },
+      { timeout: 5000, interval: 100, timeoutMessage: 'Service worker was not found' }
+    );
 
     // 少なくとも1つのページが存在することを検証（Side Panel）
     const pages = extensionContext.pages();
@@ -118,20 +120,19 @@ test.describe.serial('ExtensionFixture', () => {
     // Service Workerからmanifest情報を取得
     // chrome.runtime APIが利用可能になるまでポーリング
     let manifestName = '';
-    for (let i = 0; i < 50; i++) {
-      try {
-        manifestName = await serviceWorker.evaluate(() => {
-          return chrome.runtime.getManifest().name;
-        });
-        if (manifestName) break;
-      } catch {
-        // chrome.runtime APIがまだ利用できない場合は待機
-      }
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    // manifest.jsonのnameが取得できることを検証
-    expect(manifestName).toBeDefined();
-    expect(manifestName.length).toBeGreaterThan(0);
+    await waitForCondition(
+      async () => {
+        try {
+          manifestName = await serviceWorker.evaluate(() => {
+            return chrome.runtime.getManifest().name;
+          });
+          return manifestName.length > 0;
+        } catch {
+          // chrome.runtime APIがまだ利用できない場合は待機
+          return false;
+        }
+      },
+      { timeout: 5000, interval: 100, timeoutMessage: 'Manifest name was not retrieved' }
+    );
   });
 });

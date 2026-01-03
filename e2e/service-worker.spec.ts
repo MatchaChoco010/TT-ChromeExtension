@@ -18,7 +18,17 @@ import {
   waitForMessageReceived,
   waitForCounterIncreased,
   waitForTabInTreeState,
+  waitForTabActive,
+  waitForCondition,
 } from './utils/polling-utils';
+import {
+  createTab,
+  closeTab,
+  getCurrentWindowId,
+  getPseudoSidePanelTabId,
+  getInitialBrowserTabId,
+} from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 // Window型拡張を適用するためのインポート
 import './types';
 
@@ -58,16 +68,28 @@ test.describe('Service Workerとの通信', () => {
     test('ACTIVATE_TABメッセージでタブをアクティブ化できること', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 新しいタブを作成（非アクティブ）
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // ACTIVATE_TABメッセージを送信
       const response = await sendMessageToServiceWorker(sidePanelPage, {
         type: 'ACTIVATE_TAB',
-        payload: { tabId: tab.id },
+        payload: { tabId: tabId },
       });
 
       // 成功レスポンスを検証
@@ -79,36 +101,49 @@ test.describe('Service Workerとの通信', () => {
       const isActive = await serviceWorker.evaluate(async (tabId) => {
         const tabs = await chrome.tabs.query({ active: true });
         return tabs.some((t) => t.id === tabId);
-      }, tab.id!);
+      }, tabId);
 
       expect(isActive).toBe(true);
 
       // クリーンアップ
-      await serviceWorker.evaluate((tabId) => {
-        return chrome.tabs.remove(tabId);
-      }, tab.id!);
+      await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('CLOSE_TABメッセージでタブを閉じることができること', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 新しいタブを作成
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // タブが存在することを確認
       const existsBefore = await serviceWorker.evaluate(async (tabId) => {
         const tabs = await chrome.tabs.query({});
         return tabs.some((t) => t.id === tabId);
-      }, tab.id!);
+      }, tabId);
       expect(existsBefore).toBe(true);
 
       // CLOSE_TABメッセージを送信
       const response = await sendMessageToServiceWorker(sidePanelPage, {
         type: 'CLOSE_TAB',
-        payload: { tabId: tab.id },
+        payload: { tabId: tabId },
       });
 
       // 成功レスポンスを検証
@@ -120,9 +155,14 @@ test.describe('Service Workerとの通信', () => {
       const existsAfter = await serviceWorker.evaluate(async (tabId) => {
         const tabs = await chrome.tabs.query({});
         return tabs.some((t) => t.id === tabId);
-      }, tab.id!);
+      }, tabId);
 
       expect(existsAfter).toBe(false);
+
+      // UI上でもタブが削除されていることを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('SYNC_TABSメッセージでChrome タブと同期できること', async ({
@@ -193,14 +233,12 @@ test.describe('Service Workerとの通信', () => {
       });
 
       // メッセージが受信されるまでポーリングで待機
-      await sidePanelPage.evaluate(async () => {
-        for (let i = 0; i < 50; i++) {
-          if (window.stateUpdatedReceived) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      });
+      await waitForCondition(
+        async () => {
+          return await sidePanelPage.evaluate(() => window.stateUpdatedReceived === true);
+        },
+        { timeout: 5000, interval: 100 }
+      );
 
       // STATE_UPDATEDメッセージが受信されたことを確認
       const stateUpdatedReceived = await sidePanelPage.evaluate(() => {
@@ -215,7 +253,17 @@ test.describe('Service Workerとの通信', () => {
     test('タブ作成時にService WorkerがSTATE_UPDATEDメッセージを送信すること', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
         window.stateUpdateCount = 0;
@@ -232,20 +280,14 @@ test.describe('Service Workerとの通信', () => {
       });
 
       // タブを作成
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // STATE_UPDATEDメッセージが送信されるまでポーリングで待機
-      await sidePanelPage.evaluate(async (initial: number) => {
-        for (let i = 0; i < 50; i++) {
-          const count = window.stateUpdateCount;
-          if (count !== undefined && count > initial) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, initialCount ?? 0);
+      await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount ?? 0);
 
       // カウントが増加したことを確認
       const finalCount = await sidePanelPage.evaluate(() => {
@@ -255,9 +297,10 @@ test.describe('Service Workerとの通信', () => {
       expect(finalCount).toBeGreaterThan(initialCount ?? 0);
 
       // クリーンアップ
-      await serviceWorker.evaluate((tabId) => {
-        return chrome.tabs.remove(tabId);
-      }, tab.id!);
+      await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('タブ削除時にService WorkerがSTATE_UPDATEDメッセージを送信すること', async ({
@@ -265,13 +308,24 @@ test.describe('Service Workerとの通信', () => {
       serviceWorker,
       extensionContext,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // タブを作成
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // タブがツリーに同期されるまで待機
-      await waitForTabInTreeState(extensionContext, tab.id!);
+      await waitForTabInTreeState(extensionContext, tabId);
 
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
@@ -289,9 +343,10 @@ test.describe('Service Workerとの通信', () => {
       });
 
       // タブを削除
-      await serviceWorker.evaluate((tabId) => {
-        return chrome.tabs.remove(tabId);
-      }, tab.id!);
+      await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // STATE_UPDATEDメッセージが送信されるまで待機
       await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount);
@@ -309,13 +364,24 @@ test.describe('Service Workerとの通信', () => {
       serviceWorker,
       extensionContext,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // タブを作成
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // タブがツリーに同期されるまで待機
-      await waitForTabInTreeState(extensionContext, tab.id!);
+      await waitForTabInTreeState(extensionContext, tabId);
 
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
@@ -335,7 +401,7 @@ test.describe('Service Workerとの通信', () => {
       // タブを更新（URLを変更）
       await serviceWorker.evaluate((tabId) => {
         return chrome.tabs.update(tabId, { url: 'chrome://newtab' });
-      }, tab.id!);
+      }, tabId);
 
       // STATE_UPDATEDメッセージが送信されるまで待機
       await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount);
@@ -348,34 +414,43 @@ test.describe('Service Workerとの通信', () => {
       expect(finalCount).toBeGreaterThan(initialCount ?? 0);
 
       // クリーンアップ
-      await serviceWorker.evaluate((tabId) => {
-        return chrome.tabs.remove(tabId);
-      }, tab.id!);
+      await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('タブアクティブ化時にツリー状態が同期されること', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // タブを2つ作成
-      const tab1 = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: true });
-      });
-      const tab2 = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tab1 = await createTab(extensionContext, 'about:blank', { active: true });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
+      const tab2 = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
 
       // タブがツリーに同期されるまでポーリングで待機
-      await serviceWorker.evaluate(async (tabIds: number[]) => {
-        for (let i = 0; i < 50; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-          if (treeState?.tabToNode?.[tabIds[0]] && treeState?.tabToNode?.[tabIds[1]]) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, [tab1.id!, tab2.id!]);
+      await waitForTabInTreeState(extensionContext, tab1);
+      await waitForTabInTreeState(extensionContext, tab2);
 
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
@@ -390,18 +465,10 @@ test.describe('Service Workerとの通信', () => {
       // tab2をアクティブ化
       await serviceWorker.evaluate((tabId) => {
         return chrome.tabs.update(tabId, { active: true });
-      }, tab2.id!);
+      }, tab2);
 
       // アクティブなタブがtab2になるまでポーリングで待機
-      await serviceWorker.evaluate(async (expectedTabId: number) => {
-        for (let i = 0; i < 50; i++) {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tabs[0]?.id === expectedTabId) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, tab2.id!);
+      await waitForTabActive(extensionContext, tab2);
 
       // アクティブなタブがtab2であることを確認
       const activeTabId = await serviceWorker.evaluate(async () => {
@@ -409,12 +476,19 @@ test.describe('Service Workerとの通信', () => {
         return tabs[0]?.id;
       });
 
-      expect(activeTabId).toBe(tab2.id);
+      expect(activeTabId).toBe(tab2);
 
       // クリーンアップ
-      await serviceWorker.evaluate(async (tabIds) => {
-        await chrome.tabs.remove(tabIds);
-      }, [tab1.id!, tab2.id!]);
+      await closeTab(extensionContext, tab1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      await closeTab(extensionContext, tab2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -554,7 +628,17 @@ test.describe('Service Workerとの通信', () => {
     test('タブ作成からツリー更新までの完全なフロー', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Side Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
         window.messageLog = [];
@@ -567,20 +651,20 @@ test.describe('Service Workerとの通信', () => {
       });
 
       // タブを作成
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // STATE_UPDATEDメッセージが送信されるまでポーリングで待機
-      await sidePanelPage.evaluate(async () => {
-        for (let i = 0; i < 50; i++) {
-          const log = window.messageLog;
-          if (log && log.some((msg) => msg.type === 'STATE_UPDATED')) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      });
+      await waitForCondition(
+        async () => {
+          const log = await sidePanelPage.evaluate(() => window.messageLog);
+          return log !== undefined && log.some((msg) => msg.type === 'STATE_UPDATED');
+        },
+        { timeout: 5000, interval: 100 }
+      );
 
       // メッセージログを確認
       const messageLog = await sidePanelPage.evaluate(() => {
@@ -596,50 +680,45 @@ test.describe('Service Workerとの通信', () => {
       // タブをアクティブ化
       await sendMessageToServiceWorker(sidePanelPage, {
         type: 'ACTIVATE_TAB',
-        payload: { tabId: tab.id },
+        payload: { tabId: tabId },
       });
 
       // アクティブなタブが変更されるまでポーリングで待機
-      await serviceWorker.evaluate(async (expectedTabId: number) => {
-        for (let i = 0; i < 50; i++) {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tabs[0]?.id === expectedTabId) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, tab.id!);
+      await waitForTabActive(extensionContext, tabId);
 
       // アクティブなタブが変更されたことを確認
       const activeTabId = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         return tabs[0]?.id;
       });
-      expect(activeTabId).toBe(tab.id);
+      expect(activeTabId).toBe(tabId);
 
       // タブを閉じる
       await sendMessageToServiceWorker(sidePanelPage, {
         type: 'CLOSE_TAB',
-        payload: { tabId: tab.id },
+        payload: { tabId: tabId },
       });
 
       // タブが削除されるまでポーリングで待機
-      await serviceWorker.evaluate(async (tabId: number) => {
-        for (let i = 0; i < 50; i++) {
-          const tabs = await chrome.tabs.query({});
-          if (!tabs.some((t) => t.id === tabId)) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }, tab.id!);
+      await waitForCondition(
+        async () => {
+          const tabs = await serviceWorker.evaluate(() => chrome.tabs.query({}));
+          return !tabs.some((t: chrome.tabs.Tab) => t.id === tabId);
+        },
+        { timeout: 5000, interval: 100 }
+      );
 
       // タブが削除されたことを確認
       const tabExists = await serviceWorker.evaluate(async (tabId) => {
         const tabs = await chrome.tabs.query({});
         return tabs.some((t) => t.id === tabId);
-      }, tab.id!);
+      }, tabId);
       expect(tabExists).toBe(false);
+
+      // UI上でもタブが削除されていることを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('複数タブ間でのService Worker通信', async ({
@@ -648,10 +727,40 @@ test.describe('Service Workerとの通信', () => {
       extensionId,
       serviceWorker,
     }) => {
+      // テスト初期化パターン
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 2つ目のSide Panelページを開く
       const sidePanelPage2 = await extensionContext.newPage();
       await sidePanelPage2.goto(`chrome-extension://${extensionId}/sidepanel.html`);
       await sidePanelPage2.waitForSelector('#root', { timeout: 5000 });
+
+      // 2つ目のサイドパネルタブのIDを取得して構造を更新
+      const sidePanelTab2Id = await serviceWorker.evaluate(async (wId) => {
+        const extensionIdInner = chrome.runtime.id;
+        const sidePanelUrlPrefix = `chrome-extension://${extensionIdInner}/sidepanel.html`;
+        const tabs = await chrome.tabs.query({ windowId: wId });
+        const sidePanelTabs = tabs.filter(t => {
+          const url = t.url || t.pendingUrl || '';
+          return url.startsWith(sidePanelUrlPrefix);
+        });
+        // 2つ目のサイドパネルタブを取得
+        if (sidePanelTabs.length >= 2) {
+          return sidePanelTabs[1].id!;
+        }
+        return sidePanelTabs[0]?.id ?? 0;
+      }, windowId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: sidePanelTab2Id, depth: 0 },
+      ], 0);
 
       // 両方のSide Panelでメッセージリスナーを設定
       await sidePanelPage.evaluate(() => {
@@ -673,28 +782,16 @@ test.describe('Service Workerとの通信', () => {
       });
 
       // タブを作成（STATE_UPDATEDメッセージがブロードキャストされる）
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: sidePanelTab2Id, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // 両方のSide Panelでメッセージが受信されるまでポーリングで待機
-      await sidePanelPage.evaluate(async () => {
-        for (let i = 0; i < 50; i++) {
-          if (window.receivedCount !== undefined && window.receivedCount > 0) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      });
-
-      await sidePanelPage2.evaluate(async () => {
-        for (let i = 0; i < 50; i++) {
-          if (window.receivedCount !== undefined && window.receivedCount > 0) {
-            return;
-          }
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      });
+      await waitForCounterIncreased(sidePanelPage, 'receivedCount', 0);
+      await waitForCounterIncreased(sidePanelPage2, 'receivedCount', 0);
 
       // 両方のSide Panelでメッセージを受信したことを確認
       const receivedCount1 = await sidePanelPage.evaluate(() => {
@@ -709,9 +806,16 @@ test.describe('Service Workerとの通信', () => {
 
       // クリーンアップ
       await sidePanelPage2.close();
-      await serviceWorker.evaluate((tabId) => {
-        return chrome.tabs.remove(tabId);
-      }, tab.id!);
+      // ページを閉じるとタブも削除されるので、構造を更新
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
+
+      await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 

@@ -11,7 +11,8 @@ import {
   assertRealTimeUpdate,
   assertSmoothScrolling,
 } from './side-panel-utils';
-import { createTab, closeTab } from './tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './tab-utils';
+import { assertTabStructure } from './assertion-utils';
 
 test.describe('SidePanelUtils', () => {
   test('openSidePanelはSide Panelを開く', async ({ extensionContext, extensionId }) => {
@@ -36,39 +37,63 @@ test.describe('SidePanelUtils', () => {
   test('assertRealTimeUpdateは別タブでのタブ作成をSide Panelで検証する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
-    // 初期のツリーノード数を取得
-    const initialNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
-    const initialCount = await initialNodes.count();
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // 新しいタブを作成するアクション
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
+    // 新しいタブを作成するアクション用の変数
+    let createdTabId: number | null = null;
     const action = async () => {
-      await createTab(extensionContext, 'https://example.com');
+      createdTabId = await createTab(extensionContext, 'https://example.com');
     };
 
     // リアルタイム更新を検証（例外が発生しない）
     await assertRealTimeUpdate(sidePanelPage, action);
 
-    // 作成したタブがUIに反映されるまでポーリングで待機
-    await expect(async () => {
-      const currentNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
-      const currentCount = await currentNodes.count();
-      expect(currentCount).toBeGreaterThan(initialCount);
-    }).toPass({ timeout: 10000 });
+    // 作成したタブの構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: createdTabId!, depth: 0 },
+    ], 0);
   });
 
   test('assertRealTimeUpdateはタブ削除もSide Panelで検証する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 事前にタブを作成
     const tabId = await createTab(extensionContext, 'https://example.com');
 
-    // タブがUIに反映されるまでポーリングで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).toBeVisible();
-    }).toPass({ timeout: 10000 });
+    // タブ作成後の構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId, depth: 0 },
+    ], 0);
 
     // タブを削除するアクション
     const action = async () => {
@@ -78,30 +103,43 @@ test.describe('SidePanelUtils', () => {
     // リアルタイム更新を検証（例外が発生しない）
     await assertRealTimeUpdate(sidePanelPage, action);
 
-    // タブがUIから削除されるまでポーリングで待機
-    await expect(async () => {
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      await expect(tabNode).not.toBeVisible();
-    }).toPass({ timeout: 10000 });
+    // タブ削除後の構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('assertSmoothScrollingは大量タブ時のスクロール動作を検証する', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // 複数のタブを作成（10個）
     const tabCount = 10;
+    const createdTabs: number[] = [];
     for (let i = 0; i < tabCount; i++) {
-      await createTab(extensionContext, `https://example.com/page${i}`);
-    }
+      const tabId = await createTab(extensionContext, `https://example.com/page${i}`);
+      createdTabs.push(tabId);
 
-    // すべてのタブがUIに反映されるまでポーリングで待機
-    await expect(async () => {
-      const treeNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
-      const count = await treeNodes.count();
-      // 作成したタブ + 初期タブ（sidePanelPageのタブ）が存在することを確認
-      expect(count).toBeGreaterThanOrEqual(tabCount);
-    }).toPass({ timeout: 10000 });
+      // 各タブ作成直後に構造を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        ...createdTabs.map(id => ({ tabId: id, depth: 0 })),
+      ], 0);
+    }
 
     // スムーズなスクロールを検証（例外が発生しない）
     await assertSmoothScrolling(sidePanelPage, tabCount);

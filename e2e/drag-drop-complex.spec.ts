@@ -11,9 +11,10 @@
  * Note: ヘッドレスモードで実行すること（npm run test:e2e）
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, assertTabInTree } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
-import { waitForTabDepthInUI } from './utils/polling-utils';
+import { assertTabStructure } from './utils/assertion-utils';
+import { waitForCondition } from './utils/polling-utils';
 
 test.describe('ドラッグ&ドロップによる複雑なツリー移動', () => {
   test('子タブを持つ親タブを移動した場合、サブツリー全体が一緒に移動することを検証する', async ({
@@ -25,29 +26,64 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: サブツリーを持つタブ構造を作成
     // parentTab (ルートレベル)
     //   ├─ child1
     //   └─ child2
     //       └─ grandChild
     const parentTab = await createTab(extensionContext, 'https://example.com');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+    ], 0);
+
     const child1 = await createTab(extensionContext, 'https://www.iana.org', parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+      { tabId: child1, depth: 1 },
+    ], 0);
+
     const child2 = await createTab(extensionContext, 'https://www.w3.org', parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1 },
+    ], 0);
+
     const grandChild = await createTab(
       extensionContext,
       'https://developer.mozilla.org',
       child2
     );
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1 },
+      { tabId: grandChild, depth: 2 },
+    ], 0);
 
     // 別のルートレベルのタブを作成（移動先）
     const targetParent = await createTab(extensionContext, 'https://www.github.com');
-
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, parentTab);
-    await assertTabInTree(sidePanelPage, child1);
-    await assertTabInTree(sidePanelPage, child2);
-    await assertTabInTree(sidePanelPage, grandChild);
-    await assertTabInTree(sidePanelPage, targetParent);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1 },
+      { tabId: grandChild, depth: 2 },
+      { tabId: targetParent, depth: 0 },
+    ], 0);
 
     // ツリーを展開してすべてのタブを表示
     const expandAll = async (tabId: number) => {
@@ -79,16 +115,12 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expect(targetNodeForDrop).toBeVisible({ timeout: 5000 });
 
     // 要素のバウンディングボックスが取得可能になるまで待機
-    await sidePanelPage.waitForFunction(
-      ([parentId, targetId]) => {
-        const parent = document.querySelector(`[data-testid="tree-node-${parentId}"]`);
-        const target = document.querySelector(`[data-testid="tree-node-${targetId}"]`);
-        if (!parent || !target) return false;
-        const parentRect = parent.getBoundingClientRect();
-        const targetRect = target.getBoundingClientRect();
-        return parentRect.width > 0 && parentRect.height > 0 && targetRect.width > 0 && targetRect.height > 0;
+    await waitForCondition(
+      async () => {
+        const parentBox = await parentNodeForDrag.boundingBox();
+        const targetBox = await targetNodeForDrop.boundingBox();
+        return !!(parentBox && targetBox && parentBox.width > 0 && parentBox.height > 0 && targetBox.width > 0 && targetBox.height > 0);
       },
-      [parentTab, targetParent] as [number, number],
       { timeout: 5000 }
     );
 
@@ -96,36 +128,19 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await moveTabToParent(sidePanelPage, parentTab, targetParent);
 
     // 検証: parentTabとその全ての子孫が新しい親の配下に移動したことを確認
-    // targetParentを展開
-    await expandAll(targetParent);
-
-    // parentTabが存在することを確認
-    const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
-    await expect(parentNode.first()).toBeVisible({ timeout: 15000 });
-
-    // parentTabを展開
-    await expandAll(parentTab);
-
-    // 子タブが存在することを確認（タイムアウト増加）
-    const child1Node = sidePanelPage.locator(`[data-testid="tree-node-${child1}"]`);
-    const child2Node = sidePanelPage.locator(`[data-testid="tree-node-${child2}"]`);
-    await expect(child1Node.first()).toBeVisible({ timeout: 15000 });
-    await expect(child2Node.first()).toBeVisible({ timeout: 15000 });
-
-    // child2を展開
-    await expandAll(child2);
-
-    // grandChildも一緒に移動していることを確認（タイムアウト増加）
-    const grandChildNode = sidePanelPage.locator(`[data-testid="tree-node-${grandChild}"]`);
-    await expect(grandChildNode.first()).toBeVisible({ timeout: 15000 });
-
-    // UI上のdepthを検証（親子関係が正しく反映されていることを確認）
     // targetParent(depth=0) -> parentTab(depth=1) -> child1/child2(depth=2) -> grandChild(depth=3)
-    await waitForTabDepthInUI(sidePanelPage, targetParent, 0, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, parentTab, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child1, 2, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child2, 2, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, grandChild, 3, { timeout: 3000 });
+    // ツリーを展開してから構造を検証
+    await expandAll(targetParent);
+    await expandAll(parentTab);
+    await expandAll(child2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: targetParent, depth: 0 },
+      { tabId: parentTab, depth: 1 },
+      { tabId: child1, depth: 2 },
+      { tabId: child2, depth: 2 },
+      { tabId: grandChild, depth: 3 },
+    ], 0);
   });
 
   test('サブツリーをルートレベルにドロップした場合、元の親子関係から切り離され、ルートノードとして配置されることを検証する', async ({
@@ -137,32 +152,68 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: 深い階層のタブ構造を作成
     // rootParent
     //   └─ childWithSubtree
     //       ├─ grandChild1
     //       └─ grandChild2
     const rootParent = await createTab(extensionContext, 'https://example.com');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: rootParent, depth: 0 },
+    ], 0);
+
     const childWithSubtree = await createTab(extensionContext, 'https://www.iana.org', rootParent);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: rootParent, depth: 0 },
+      { tabId: childWithSubtree, depth: 1 },
+    ], 0);
+
     const grandChild1 = await createTab(
       extensionContext,
       'https://www.w3.org',
       childWithSubtree
     );
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: rootParent, depth: 0 },
+      { tabId: childWithSubtree, depth: 1 },
+      { tabId: grandChild1, depth: 2 },
+    ], 0);
+
     const grandChild2 = await createTab(
       extensionContext,
       'https://developer.mozilla.org',
       childWithSubtree
     );
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: rootParent, depth: 0 },
+      { tabId: childWithSubtree, depth: 1 },
+      { tabId: grandChild1, depth: 2 },
+      { tabId: grandChild2, depth: 2 },
+    ], 0);
+
     // 別のルートレベルのタブを作成（並び替えのターゲット）
     const rootTab = await createTab(extensionContext, 'https://www.github.com');
-
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, rootParent);
-    await assertTabInTree(sidePanelPage, childWithSubtree);
-    await assertTabInTree(sidePanelPage, grandChild1);
-    await assertTabInTree(sidePanelPage, grandChild2);
-    await assertTabInTree(sidePanelPage, rootTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: rootParent, depth: 0 },
+      { tabId: childWithSubtree, depth: 1 },
+      { tabId: grandChild1, depth: 2 },
+      { tabId: grandChild2, depth: 2 },
+      { tabId: rootTab, depth: 0 },
+    ], 0);
 
     // ツリーを展開してすべてのタブを表示
     const expandAll = async (tabId: number) => {
@@ -194,40 +245,30 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expect(rootTabForDrop).toBeVisible({ timeout: 5000 });
 
     // 要素のバウンディングボックスが取得可能になるまで待機
-    await sidePanelPage.waitForFunction(
-      ([childId, rootId]) => {
-        const child = document.querySelector(`[data-testid="tree-node-${childId}"]`);
-        const root = document.querySelector(`[data-testid="tree-node-${rootId}"]`);
-        if (!child || !root) return false;
-        const childRect = child.getBoundingClientRect();
-        const rootRect = root.getBoundingClientRect();
-        return childRect.width > 0 && childRect.height > 0 && rootRect.width > 0 && rootRect.height > 0;
+    await waitForCondition(
+      async () => {
+        const childBox = await childForDrag.boundingBox();
+        const rootBox = await rootTabForDrop.boundingBox();
+        return !!(childBox && rootBox && childBox.width > 0 && childBox.height > 0 && rootBox.width > 0 && rootBox.height > 0);
       },
-      [childWithSubtree, rootTab] as [number, number],
       { timeout: 5000 }
     );
 
     // 実行: childWithSubtreeをルートレベルに移動（rootTabの後にドロップ）
     await reorderTabs(sidePanelPage, childWithSubtree, rootTab, 'after');
 
-    // 検証: childWithSubtreeがルートレベルに存在することを確認
-    const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childWithSubtree}"]`);
-    await expect(childNode.first()).toBeVisible({ timeout: 15000 });
-
-    // childWithSubtreeを展開
-    await expandAll(childWithSubtree);
-
-    // その子孫（grandChild1, grandChild2）も一緒に移動していることを確認
-    const grandChild1Node = sidePanelPage.locator(`[data-testid="tree-node-${grandChild1}"]`);
-    const grandChild2Node = sidePanelPage.locator(`[data-testid="tree-node-${grandChild2}"]`);
-    await expect(grandChild1Node.first()).toBeVisible({ timeout: 15000 });
-    await expect(grandChild2Node.first()).toBeVisible({ timeout: 15000 });
-
-    // UI上のdepthを検証（ルートレベルに移動したことを確認）
+    // 検証: childWithSubtreeがルートレベルに移動し、子孫も一緒に移動していることを確認
     // childWithSubtree(depth=0) -> grandChild1/grandChild2(depth=1)
-    await waitForTabDepthInUI(sidePanelPage, childWithSubtree, 0, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, grandChild1, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, grandChild2, 1, { timeout: 3000 });
+    // ツリーを展開してから構造を検証
+    await expandAll(childWithSubtree);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: rootParent, depth: 0 },
+      { tabId: rootTab, depth: 0 },
+      { tabId: childWithSubtree, depth: 0 },
+      { tabId: grandChild1, depth: 1 },
+      { tabId: grandChild2, depth: 1 },
+    ], 0);
   });
 
   test('あるサブツリーを別のサブツリー内に移動した場合、サブツリー全体が移動することを検証する', async ({
@@ -239,6 +280,15 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: 2つの独立したサブツリーを作成
     // Tree 1:
     // parent1
@@ -249,21 +299,48 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     // parent2
     //   └─ child2_1
     const parent1 = await createTab(extensionContext, 'https://example.com');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+    ], 0);
+
     const child1_1 = await createTab(extensionContext, 'https://www.iana.org', parent1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1_1, depth: 1 },
+    ], 0);
+
     const grandChild1_1_1 = await createTab(
       extensionContext,
       'https://www.w3.org',
       child1_1
     );
-    const parent2 = await createTab(extensionContext, 'https://www.github.com');
-    const child2_1 = await createTab(extensionContext, 'https://developer.mozilla.org', parent2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1_1, depth: 1 },
+      { tabId: grandChild1_1_1, depth: 2 },
+    ], 0);
 
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, parent1);
-    await assertTabInTree(sidePanelPage, child1_1);
-    await assertTabInTree(sidePanelPage, grandChild1_1_1);
-    await assertTabInTree(sidePanelPage, parent2);
-    await assertTabInTree(sidePanelPage, child2_1);
+    const parent2 = await createTab(extensionContext, 'https://www.github.com');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1_1, depth: 1 },
+      { tabId: grandChild1_1_1, depth: 2 },
+      { tabId: parent2, depth: 0 },
+    ], 0);
+
+    const child2_1 = await createTab(extensionContext, 'https://developer.mozilla.org', parent2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1_1, depth: 1 },
+      { tabId: grandChild1_1_1, depth: 2 },
+      { tabId: parent2, depth: 0 },
+      { tabId: child2_1, depth: 1 },
+    ], 0);
 
     // ツリーを展開してすべてのタブを表示
     const expandAll = async (tabId: number) => {
@@ -296,46 +373,31 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expect(child2_1ForDrop).toBeVisible({ timeout: 5000 });
 
     // 要素のバウンディングボックスが取得可能になるまで待機
-    await sidePanelPage.waitForFunction(
-      ([child1Id, child2Id]) => {
-        const child1 = document.querySelector(`[data-testid="tree-node-${child1Id}"]`);
-        const child2 = document.querySelector(`[data-testid="tree-node-${child2Id}"]`);
-        if (!child1 || !child2) return false;
-        const child1Rect = child1.getBoundingClientRect();
-        const child2Rect = child2.getBoundingClientRect();
-        return child1Rect.width > 0 && child1Rect.height > 0 && child2Rect.width > 0 && child2Rect.height > 0;
+    await waitForCondition(
+      async () => {
+        const child1Box = await child1_1ForDrag.boundingBox();
+        const child2Box = await child2_1ForDrop.boundingBox();
+        return !!(child1Box && child2Box && child1Box.width > 0 && child1Box.height > 0 && child2Box.width > 0 && child2Box.height > 0);
       },
-      [child1_1, child2_1] as [number, number],
       { timeout: 5000 }
     );
 
     // 実行: child1_1（とそのサブツリー）をchild2_1にドロップ
     await moveTabToParent(sidePanelPage, child1_1, child2_1, serviceWorker);
 
-    // 検証: child1_1とgrandChild1_1_1が移動後も存在することを確認
-    // child2_1を展開
-    await expandAll(child2_1);
-
-    // child1_1が存在することを確認
-    const child1_1Node = sidePanelPage.locator(`[data-testid="tree-node-${child1_1}"]`);
-    await expect(child1_1Node.first()).toBeVisible({ timeout: 15000 });
-
-    // child1_1を展開
-    await expandAll(child1_1);
-
-    // grandChild1_1_1も一緒に移動していることを確認
-    // これがサブツリー移動の本質的なテスト
-    const grandChild1_1_1Node = sidePanelPage.locator(
-      `[data-testid="tree-node-${grandChild1_1_1}"]`
-    );
-    await expect(grandChild1_1_1Node.first()).toBeVisible({ timeout: 15000 });
-
-    // UI上のdepthを検証（サブツリー移動後の親子関係が正しいことを確認）
+    // 検証: child1_1とgrandChild1_1_1がサブツリーごと移動したことを確認
     // parent2(depth=0) -> child2_1(depth=1) -> child1_1(depth=2) -> grandChild1_1_1(depth=3)
-    await waitForTabDepthInUI(sidePanelPage, parent2, 0, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child2_1, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child1_1, 2, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, grandChild1_1_1, 3, { timeout: 3000 });
+    // ツリーを展開してから構造を検証
+    await expandAll(child2_1);
+    await expandAll(child1_1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: parent2, depth: 0 },
+      { tabId: child2_1, depth: 1 },
+      { tabId: child1_1, depth: 2 },
+      { tabId: grandChild1_1_1, depth: 3 },
+    ], 0);
   });
 
   test('親タブを自分の子孫タブにドロップしようとした場合、循環参照を防ぐため操作が拒否されることを検証する', async ({
@@ -347,18 +409,39 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: 階層的なタブ構造を作成
     // parent
     //   └─ child
     //       └─ grandChild
     const parent = await createTab(extensionContext, 'https://example.com');
-    const child = await createTab(extensionContext, 'https://www.iana.org', parent);
-    const grandChild = await createTab(extensionContext, 'https://www.w3.org', child);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent, depth: 0 },
+    ], 0);
 
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, parent);
-    await assertTabInTree(sidePanelPage, child);
-    await assertTabInTree(sidePanelPage, grandChild);
+    const child = await createTab(extensionContext, 'https://www.iana.org', parent);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent, depth: 0 },
+      { tabId: child, depth: 1 },
+    ], 0);
+
+    const grandChild = await createTab(extensionContext, 'https://www.w3.org', child);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent, depth: 0 },
+      { tabId: child, depth: 1 },
+      { tabId: grandChild, depth: 2 },
+    ], 0);
 
     // ツリーを展開してすべてのタブを表示
     const expandAll = async (tabId: number) => {
@@ -383,30 +466,19 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expandAll(parent);
     await expandAll(child);
 
-    // 移動前の親子関係を記録
-    const parentNodeBefore = sidePanelPage.locator(`[data-testid="tree-node-${parent}"]`).first();
-    const childNodeBefore = sidePanelPage.locator(`[data-testid="tree-node-${child}"]`).first();
-    const grandChildNodeBefore = sidePanelPage.locator(
-      `[data-testid="tree-node-${grandChild}"]`
-    ).first();
-
-    // 移動前の状態を確認
-    await expect(parentNodeBefore).toBeVisible({ timeout: 5000 });
-    await expect(childNodeBefore).toBeVisible({ timeout: 5000 });
-    await expect(grandChildNodeBefore).toBeVisible({ timeout: 5000 });
-
     // ドラッグ対象とドロップ先の要素が完全に準備できるまで待機
+    const parentNodeForDrag = sidePanelPage.locator(`[data-testid="tree-node-${parent}"]`).first();
+    const grandChildNodeForDrop = sidePanelPage.locator(`[data-testid="tree-node-${grandChild}"]`).first();
+    await expect(parentNodeForDrag).toBeVisible({ timeout: 5000 });
+    await expect(grandChildNodeForDrop).toBeVisible({ timeout: 5000 });
+
     // 要素のバウンディングボックスが取得可能になるまで待機
-    await sidePanelPage.waitForFunction(
-      ([parentId, grandChildId]) => {
-        const parentEl = document.querySelector(`[data-testid="tree-node-${parentId}"]`);
-        const grandChildEl = document.querySelector(`[data-testid="tree-node-${grandChildId}"]`);
-        if (!parentEl || !grandChildEl) return false;
-        const parentRect = parentEl.getBoundingClientRect();
-        const grandChildRect = grandChildEl.getBoundingClientRect();
-        return parentRect.width > 0 && parentRect.height > 0 && grandChildRect.width > 0 && grandChildRect.height > 0;
+    await waitForCondition(
+      async () => {
+        const parentBox = await parentNodeForDrag.boundingBox();
+        const grandChildBox = await grandChildNodeForDrop.boundingBox();
+        return !!(parentBox && grandChildBox && parentBox.width > 0 && parentBox.height > 0 && grandChildBox.width > 0 && grandChildBox.height > 0);
       },
-      [parent, grandChild] as [number, number],
       { timeout: 5000 }
     );
 
@@ -415,38 +487,16 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await moveTabToParent(sidePanelPage, parent, grandChild);
 
     // 検証: 操作が拒否され、元の構造が維持されることを確認
-    // ドロップ後に状態が更新されないことを確認（少し待機してから検証）
-    await serviceWorker.evaluate(async () => {
-      for (let i = 0; i < 10; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        if (result.tree_state) {
-          return;
-        }
-        // eslint-disable-next-line no-undef
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    });
-
-    // ツリーを再度展開
+    // parent(depth=0) -> child(depth=1) -> grandChild(depth=2)
+    // ツリーを再度展開してから構造を検証
     await expandAll(parent);
     await expandAll(child);
-
-    // 親子関係が変わっていないことを確認
-    const parentNodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parent}"]`).first();
-    const childNodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${child}"]`).first();
-    const grandChildNodeAfter = sidePanelPage.locator(
-      `[data-testid="tree-node-${grandChild}"]`
-    ).first();
-
-    await expect(parentNodeAfter).toBeVisible({ timeout: 15000 });
-    await expect(childNodeAfter).toBeVisible({ timeout: 15000 });
-    await expect(grandChildNodeAfter).toBeVisible({ timeout: 15000 });
-
-    // UI上のdepthを検証（循環参照が拒否され、元の構造が維持されていることを確認）
-    // parent(depth=0) -> child(depth=1) -> grandChild(depth=2)
-    await waitForTabDepthInUI(sidePanelPage, parent, 0, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, grandChild, 2, { timeout: 3000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent, depth: 0 },
+      { tabId: child, depth: 1 },
+      { tabId: grandChild, depth: 2 },
+    ], 0);
   });
 
   test('サブツリーを移動した場合、サブツリー構造が維持されることを検証する', async ({
@@ -458,28 +508,64 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: サブツリーを持つタブ構造を作成
     // parent1
     //   ├─ child1
     //   └─ child2
     //       └─ grandChild
     const parent1 = await createTab(extensionContext, 'https://example.com');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+    ], 0);
+
     const child1 = await createTab(extensionContext, 'https://www.iana.org', parent1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1, depth: 1 },
+    ], 0);
+
     const child2 = await createTab(extensionContext, 'https://www.w3.org', parent1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1 },
+    ], 0);
+
     const grandChild = await createTab(
       extensionContext,
       'https://developer.mozilla.org',
       child2
     );
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1 },
+      { tabId: grandChild, depth: 2 },
+    ], 0);
+
     // 別のルートレベルのタブを作成（移動先）
     const parent2 = await createTab(extensionContext, 'https://www.github.com');
-
-    // タブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, parent1);
-    await assertTabInTree(sidePanelPage, child1);
-    await assertTabInTree(sidePanelPage, child2);
-    await assertTabInTree(sidePanelPage, grandChild);
-    await assertTabInTree(sidePanelPage, parent2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1 },
+      { tabId: grandChild, depth: 2 },
+      { tabId: parent2, depth: 0 },
+    ], 0);
 
     // ツリーを展開してすべてのタブを表示
     const expandAll = async (tabId: number) => {
@@ -512,40 +598,30 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     await expect(parent2ForDrop).toBeVisible({ timeout: 5000 });
 
     // 要素のバウンディングボックスが取得可能になるまで待機
-    await sidePanelPage.waitForFunction(
-      ([child2Id, parent2Id]) => {
-        const child2El = document.querySelector(`[data-testid="tree-node-${child2Id}"]`);
-        const parent2El = document.querySelector(`[data-testid="tree-node-${parent2Id}"]`);
-        if (!child2El || !parent2El) return false;
-        const child2Rect = child2El.getBoundingClientRect();
-        const parent2Rect = parent2El.getBoundingClientRect();
-        return child2Rect.width > 0 && child2Rect.height > 0 && parent2Rect.width > 0 && parent2Rect.height > 0;
+    await waitForCondition(
+      async () => {
+        const child2Box = await child2ForDrag.boundingBox();
+        const parent2Box = await parent2ForDrop.boundingBox();
+        return !!(child2Box && parent2Box && child2Box.width > 0 && child2Box.height > 0 && parent2Box.width > 0 && parent2Box.height > 0);
       },
-      [child2, parent2] as [number, number],
       { timeout: 5000 }
     );
 
     // 実行: child2（サブツリー）をparent2にドロップ
     await moveTabToParent(sidePanelPage, child2, parent2, serviceWorker);
 
-    // 検証: child2が移動したことを確認
-    // parent2を展開
-    await expandAll(parent2);
-
-    // child2が存在することを確認
-    const child2Node = sidePanelPage.locator(`[data-testid="tree-node-${child2}"]`);
-    await expect(child2Node.first()).toBeVisible({ timeout: 15000 });
-
-    // child2を展開して、grandChildも一緒に移動していることを確認
-    // （これがサブツリー移動の本質的なテスト）
-    await expandAll(child2);
-    const grandChildNode = sidePanelPage.locator(`[data-testid="tree-node-${grandChild}"]`);
-    await expect(grandChildNode.first()).toBeVisible({ timeout: 15000 });
-
-    // UI上のdepthを検証（サブツリー構造が維持されていることを確認）
+    // 検証: child2とgrandChildがサブツリー構造を維持して移動したことを確認
     // parent2(depth=0) -> child2(depth=1) -> grandChild(depth=2)
-    await waitForTabDepthInUI(sidePanelPage, parent2, 0, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child2, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, grandChild, 2, { timeout: 3000 });
+    // ツリーを展開してから構造を検証
+    await expandAll(parent2);
+    await expandAll(child2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parent1, depth: 0 },
+      { tabId: child1, depth: 1 },
+      { tabId: parent2, depth: 0 },
+      { tabId: child2, depth: 1 },
+      { tabId: grandChild, depth: 2 },
+    ], 0);
   });
 });

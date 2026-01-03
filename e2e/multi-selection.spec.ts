@@ -9,26 +9,49 @@
  */
 
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab } from './utils/tab-utils';
-import { waitForTabInTreeState } from './utils/polling-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('複数選択機能', () => {
   test('Shift+クリックで範囲選択ができる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // Arrange: 複数のタブを作成
     const tabId1 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
 
     const tabId2 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId2);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     const tabId3 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId3);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
     // バックグラウンドスロットリングを回避
     await sidePanelPage.bringToFront();
@@ -53,26 +76,63 @@ test.describe('複数選択機能', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('Ctrl+クリックで追加選択/選択解除ができる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // Arrange: 複数のタブを作成
     const tabId1 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
 
     const tabId2 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId2);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     const tabId3 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId3);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
     // バックグラウンドスロットリングを回避
     await sidePanelPage.bringToFront();
@@ -106,22 +166,55 @@ test.describe('複数選択機能', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('複数選択時にコンテキストメニューで選択タブ数が表示される', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // Arrange: 複数のタブを作成
     const tabId1 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
 
     const tabId2 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId2);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     // バックグラウンドスロットリングを回避
     await sidePanelPage.bringToFront();
@@ -167,32 +260,60 @@ test.describe('複数選択機能', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('複数選択時のコンテキストメニューから選択タブを一括で閉じることができる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // Arrange: 複数のタブを作成
     const tabId1 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
 
     const tabId2 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId2);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     const tabId3 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId3);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
     // バックグラウンドスロットリングを回避
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
-
-    // 現在のタブ数を取得
-    const initialTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
 
     const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
     const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
@@ -231,31 +352,50 @@ test.describe('複数選択機能', () => {
     // コンテキストメニューが閉じるまで待機
     await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-    // Assert: 選択されたタブ（2つ）が閉じられている
-    await expect(async () => {
-      const currentTabNodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
-      expect(currentTabNodes).toBe(initialTabNodes - 2);
-    }).toPass({ timeout: 5000 });
-
-    // 3番目のタブは残っていることを確認
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`)).toBeVisible();
+    // Assert: 選択されたタブ（2つ）が閉じられている（コンテキストメニュー操作後の状態確認）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
     // クリーンアップ
     await closeTab(extensionContext, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('複数選択時のコンテキストメニューでグループ化オプションが表示される', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // Arrange: 複数のタブを作成
     const tabId1 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
 
     const tabId2 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId2);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     // バックグラウンドスロットリングを回避
     await sidePanelPage.bringToFront();
@@ -301,25 +441,56 @@ test.describe('複数選択機能', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('通常クリックで既存の選択がクリアされる', async ({
     extensionContext,
     sidePanelPage,
+    serviceWorker,
   }) => {
+    // ウィンドウIDと擬似サイドパネルタブIDを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
     // Arrange: 複数のタブを作成
     const tabId1 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId1);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
 
     const tabId2 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId2);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
 
     const tabId3 = await createTab(extensionContext, 'about:blank');
-    await waitForTabInTreeState(extensionContext, tabId3);
-    await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`)).toBeVisible({ timeout: 10000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
 
     // バックグラウンドスロットリングを回避
     await sidePanelPage.bringToFront();
@@ -345,7 +516,21 @@ test.describe('複数選択機能', () => {
 
     // クリーンアップ
     await closeTab(extensionContext, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(extensionContext, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 });

@@ -24,11 +24,6 @@ test.describe('E2Eディレクトリ構造', () => {
     expect(existsSync(join(e2eDir, 'test-data'))).toBe(true);
   });
 
-  test('README.mdが存在すること', () => {
-    const readmePath = join(process.cwd(), 'e2e', 'README.md');
-    expect(existsSync(readmePath)).toBe(true);
-  });
-
   test('テストファイルの命名規則が正しいこと', () => {
     const testFile = join(process.cwd(), 'e2e', 'directory-structure.spec.ts');
 

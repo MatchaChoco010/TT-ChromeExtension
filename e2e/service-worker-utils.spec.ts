@@ -11,6 +11,8 @@ import {
   assertEventListenersRegistered,
   assertServiceWorkerLifecycle,
 } from './utils/service-worker-utils';
+import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, createTab } from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 // Window型拡張を適用するためのインポート
 import './types';
 
@@ -31,15 +33,27 @@ test.describe('ServiceWorkerUtils', () => {
     test('Service Workerから正しいレスポンスを受信できること', async ({
       sidePanelPage,
       serviceWorker,
+      extensionContext,
     }) => {
+      // テスト初期化
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 既存のACTIVATE_TABメッセージを使用して検証
       // まず新しいタブを作成
-      const tab = await serviceWorker.evaluate(() => {
-        return chrome.tabs.create({ url: 'about:blank', active: false });
-      });
+      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // メッセージを送信してタブをアクティブ化
-      const message = { type: 'ACTIVATE_TAB', payload: { tabId: tab.id } };
+      const message = { type: 'ACTIVATE_TAB', payload: { tabId: tabId } };
       const response = await sendMessageToServiceWorker(sidePanelPage, message);
 
       // レスポンスの内容を検証
@@ -48,9 +62,10 @@ test.describe('ServiceWorkerUtils', () => {
       });
 
       // タブをクリーンアップ
-      await serviceWorker.evaluate((tabId) => {
-        return chrome.tabs.remove(tabId);
-      }, tab.id!);
+      await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('タイムアウト時にエラーをスローすること', async ({ sidePanelPage }) => {

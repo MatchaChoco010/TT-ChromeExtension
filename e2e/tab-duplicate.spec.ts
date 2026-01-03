@@ -11,8 +11,9 @@
  */
 
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab } from './utils/tab-utils';
-import { waitForTabInTreeState, waitForCondition, waitForParentChildRelation } from './utils/polling-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { waitForTabInTreeState } from './utils/polling-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('タブ複製時の配置', () => {
   test.describe('複製されたタブが元のタブの兄弟として配置される', () => {
@@ -21,10 +22,23 @@ test.describe('タブ複製時の配置', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -42,23 +56,6 @@ test.describe('タブ複製時の配置', () => {
         { timeout: 5000 }
       );
 
-      // 元のタブのノードIDを取得
-      const originalNodeId = await serviceWorker.evaluate(async (tid) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode: Record<number, string> };
-        return treeState.tabToNode[tid];
-      }, tabId);
-
-      // 元のタブの親ノードIDを取得
-      const originalParentId = await serviceWorker.evaluate(async (nodeId) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes: Record<string, { parentId: string | null }> };
-        return treeState.nodes[nodeId]?.parentId;
-      }, originalNodeId);
-
-      // 現在のタブ数を取得
-      const initialTabCount = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
-
       // Act: コンテキストメニューからタブを複製
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await tabNode.click({ button: 'right' });
@@ -74,9 +71,6 @@ test.describe('タブ複製時の配置', () => {
       // コンテキストメニューが閉じるまで待機
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 新しいタブが作成されるまで待機
-      await expect(sidePanelPage.locator('[data-testid^="tree-node-"]')).toHaveCount(initialTabCount + 1, { timeout: 10000 });
-
       // Assert: 新しいタブ（複製されたタブ）を見つける
       const newTabId = await serviceWorker.evaluate(async (originalTabId) => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -85,28 +79,27 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, tabId);
 
-      expect(newTabId).toBeDefined();
-
       // 複製されたタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, newTabId!);
 
-      // 複製されたタブの親ノードIDを取得
-      const duplicateParentId = await serviceWorker.evaluate(async (tid) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode: Record<number, string>;
-          nodes: Record<string, { parentId: string | null }>;
-        };
-        const nodeId = treeState.tabToNode[tid];
-        return treeState.nodes[nodeId]?.parentId;
-      }, newTabId!);
-
-      // 複製されたタブが元のタブと同じ親を持つこと（兄弟関係）を確認
-      expect(duplicateParentId).toBe(originalParentId);
+      // 複製後の構造を検証（複製されたタブは元のタブの直後に配置）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+        { tabId: newTabId!, depth: 0 },
+      ], 0);
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId!, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, newTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -116,18 +109,38 @@ test.describe('タブ複製時の配置', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成して、間にタブがある状態を作る
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, tabId1);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, tabId2);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       const tabId3 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, tabId3);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`)).toBeVisible({ timeout: 10000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -164,35 +177,43 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [tabId1, tabId2, tabId3]);
 
-      expect(duplicatedTabId).toBeDefined();
-
       await waitForTabInTreeState(extensionContext, duplicatedTabId!);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${duplicatedTabId}"]`)).toBeVisible({ timeout: 10000 });
 
-      // Assert: DOMの順序を確認（tabId1の直後にduplicatedTabIdがあること）
-      // ツリーノードのDOMの順序を取得
-      const nodeOrder = await sidePanelPage.evaluate(() => {
-        const nodes = Array.from(document.querySelectorAll('[data-testid^="tree-node-"]'));
-        return nodes.map(node => {
-          const testId = node.getAttribute('data-testid');
-          // "tree-node-123" から "123" を抽出
-          return testId ? parseInt(testId.replace('tree-node-', ''), 10) : 0;
-        });
-      });
-
-      // tabId1のインデックスを取得
-      const tabId1Index = nodeOrder.indexOf(tabId1);
-      // 複製タブのインデックスを取得
-      const duplicatedIndex = nodeOrder.indexOf(duplicatedTabId!);
-
-      // 複製タブはtabId1の直後（インデックス+1）にあること
-      expect(duplicatedIndex).toBe(tabId1Index + 1);
+      // Assert: 複製後の構造を検証（tabId1の直後にduplicatedTabIdがある）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: duplicatedTabId!, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
 
       // Cleanup
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: duplicatedTabId!, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: duplicatedTabId!, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: duplicatedTabId!, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, duplicatedTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('複製されたタブは元のタブの直後に配置される', async ({
@@ -200,11 +221,23 @@ test.describe('タブ複製時の配置', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, tabId1);
-
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -222,12 +255,6 @@ test.describe('タブ複製時の配置', () => {
         { timeout: 5000 }
       );
 
-      // 現在のタブ数を取得
-      const initialTabCount = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
-
-      // 元のタブの位置（Y座標）を取得
-      const originalY = await sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`).boundingBox().then(b => b?.y ?? 0);
-
       // Act: タブ1を複製
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click({ button: 'right' });
@@ -240,9 +267,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 新しいタブが作成されるまで待機
-      await expect(sidePanelPage.locator('[data-testid^="tree-node-"]')).toHaveCount(initialTabCount + 1, { timeout: 10000 });
-
       // 複製されたタブのIDを取得
       const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -250,38 +274,26 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [tabId1]);
 
-      expect(duplicatedTabId).toBeDefined();
-
       await waitForTabInTreeState(extensionContext, duplicatedTabId!);
 
-      // 複製されたタブがUIに表示されるまで待機
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${duplicatedTabId}"]`)).toBeVisible({ timeout: 10000 });
-
-      // Assert: 複製されたタブが元のタブと同じ親（兄弟関係）を持つことを確認
-      const { originalParentId, duplicateParentId } = await serviceWorker.evaluate(async ({ origId, dupId }) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode: Record<number, string>;
-          nodes: Record<string, { parentId: string | null }>;
-        };
-        const origNodeId = treeState.tabToNode[origId];
-        const dupNodeId = treeState.tabToNode[dupId];
-        return {
-          originalParentId: treeState.nodes[origNodeId]?.parentId,
-          duplicateParentId: treeState.nodes[dupNodeId]?.parentId,
-        };
-      }, { origId: tabId1, dupId: duplicatedTabId! });
-
-      // 複製されたタブは元のタブと同じ親を持つ（兄弟関係）
-      expect(duplicateParentId).toBe(originalParentId);
-
-      // 複製されたタブのY座標が元のタブより下にあることを確認（直後に配置されている）
-      const duplicateY = await sidePanelPage.locator(`[data-testid="tree-node-${duplicatedTabId}"]`).boundingBox().then(b => b?.y ?? 0);
-      expect(duplicateY).toBeGreaterThan(originalY);
+      // Assert: 複製後の構造を検証（複製されたタブは元のタブの直後に配置）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: duplicatedTabId!, depth: 0 },
+      ], 0);
 
       // Cleanup
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: duplicatedTabId!, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, duplicatedTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -291,18 +303,31 @@ test.describe('タブ複製時の配置', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 親子関係のあるタブを作成
       const parentTabId = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, parentTabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`)).toBeVisible({ timeout: 10000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
 
       // 子タブを作成（親タブのopenerTabIdを指定）
       const childTabId = await createTab(extensionContext, 'about:blank', parentTabId);
-      await waitForTabInTreeState(extensionContext, childTabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${childTabId}"]`)).toBeVisible({ timeout: 10000 });
-
-      // 親子関係が反映されるまで待機
-      await waitForParentChildRelation(extensionContext, childTabId, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -320,16 +345,6 @@ test.describe('タブ複製時の配置', () => {
         { timeout: 5000 }
       );
 
-      // 元の子タブのノードIDを取得
-      const childNodeId = await serviceWorker.evaluate(async (tid) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode: Record<number, string> };
-        return treeState.tabToNode[tid];
-      }, childTabId);
-
-      // 現在のタブ数を取得
-      const initialTabCount = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
-
       // Act: 子タブを複製
       const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTabId}"]`);
       await childNode.click({ button: 'right' });
@@ -342,9 +357,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 新しいタブが作成されるまで待機
-      await expect(sidePanelPage.locator('[data-testid^="tree-node-"]')).toHaveCount(initialTabCount + 1, { timeout: 10000 });
-
       // 複製されたタブのIDを取得
       const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -352,32 +364,37 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [parentTabId, childTabId]);
 
-      expect(duplicatedTabId).toBeDefined();
-
+      // 複製されたタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, duplicatedTabId!);
 
-      // 複製されたタブがUIに表示されるまで待機
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${duplicatedTabId}"]`)).toBeVisible({ timeout: 10000 });
-
-      // Assert: 複製されたタブの親ノードIDを確認
-      const duplicateParentNodeId = await serviceWorker.evaluate(async (tid) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode: Record<number, string>;
-          nodes: Record<string, { parentId: string | null }>;
-        };
-        const nodeId = treeState.tabToNode[tid];
-        return treeState.nodes[nodeId]?.parentId;
-      }, duplicatedTabId!);
-
-      // 複製されたタブの親が、複製元タブ自身でないことを確認
-      // これにより、複製されたタブが複製元の子タブとして配置されていないことを検証
-      expect(duplicateParentNodeId).not.toBe(childNodeId);
+      // Assert: 複製後の構造を検証
+      // 複製されたタブは元のタブ（childTabId）の兄弟として配置される（depth: 1）
+      // 複製されたタブが複製元の子タブにならないことは、depth: 1 であることで検証される
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: childTabId, depth: 1 },
+        { tabId: duplicatedTabId!, depth: 1 },
+      ], 0);
 
       // Cleanup
-      await closeTab(extensionContext, parentTabId);
-      await closeTab(extensionContext, childTabId);
       await closeTab(extensionContext, duplicatedTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
+
+      await closeTab(extensionContext, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
+      await closeTab(extensionContext, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 });

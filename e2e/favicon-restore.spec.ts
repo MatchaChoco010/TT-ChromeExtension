@@ -8,8 +8,9 @@
  */
 
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ファビコンの永続化復元', () => {
   test.describe('ブラウザ再起動後にファビコンが永続化データから復元される', () => {
@@ -18,10 +19,25 @@ test.describe('ファビコンの永続化復元', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // ファビコンをストレージに直接設定
       const testFaviconUrl = 'https://example.com/test-favicon.ico';
@@ -46,6 +62,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('ファビコンが永続化ストレージに正しく保存されること', async ({
@@ -53,8 +72,24 @@ test.describe('ファビコンの永続化復元', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
 
       // ファビコンを設定
@@ -80,6 +115,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -89,10 +127,25 @@ test.describe('ファビコンの永続化復元', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // ファビコンをストレージに設定
       const testFaviconUrl = 'https://example.com/discarded-tab-favicon.ico';
@@ -121,6 +174,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -130,15 +186,34 @@ test.describe('ファビコンの永続化復元', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId1);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 10000 });
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 10000 });
+      await waitForTabInTreeState(extensionContext, tabId2);
 
       // 各タブにファビコンを設定
       const favicon1 = 'https://example.com/favicon1.ico';
@@ -170,7 +245,15 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('タブを閉じた際にファビコンデータが削除されること', async ({
@@ -178,10 +261,25 @@ test.describe('ファビコンの永続化復元', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // ファビコンを設定
       const testFaviconUrl = 'https://example.com/to-be-deleted.ico';
@@ -205,6 +303,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Act: タブを閉じる
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // ファビコンを手動でクリーンアップ（実際の実装ではonRemovedイベントで自動的に行われる）
       await serviceWorker.evaluate(async (tid) => {
@@ -229,10 +330,25 @@ test.describe('ファビコンの永続化復元', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // 初期ファビコンを設定
       const initialFavicon = 'https://example.com/initial.ico';
@@ -278,6 +394,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -288,10 +407,25 @@ test.describe('ファビコンの永続化復元', () => {
       serviceWorker,
       extensionId,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // ファビコンをストレージに設定（タブのロード状態に依存しないファビコン復元をシミュレート）
       const testFaviconUrl = 'https://www.google.com/favicon.ico';
@@ -306,10 +440,7 @@ test.describe('ファビコンの永続化復元', () => {
       );
 
       // Act: サイドパネルをリロードしてファビコン復元をシミュレート
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -337,6 +468,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('タブ情報にfavIconUrlがない場合でも永続化ファビコンが表示されること', async ({
@@ -345,12 +479,27 @@ test.describe('ファビコンの永続化復元', () => {
       serviceWorker,
       extensionId,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成（about:blankはファビコンを持たない）
       const tabId = await createTab(extensionContext, 'about:blank');
-      await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
 
-      // 最初はデフォルトアイコンが表示されていることを確認
+      await waitForTabInTreeState(extensionContext, tabId);
+
+      // 最初はデフォルトアイコンが表示されていることを確認（UIインタラクション前確認）
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       const defaultIcon = treeNode.locator('[data-testid="default-icon"]');
       await expect(defaultIcon).toBeVisible({ timeout: 5000 });
@@ -368,10 +517,7 @@ test.describe('ファビコンの永続化復元', () => {
       );
 
       // Act: サイドパネルをリロードして永続化ファビコンを読み込む
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -397,6 +543,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('タブがロードされた後に新しいファビコンで表示が更新されること', async ({
@@ -405,10 +554,25 @@ test.describe('ファビコンの永続化復元', () => {
       serviceWorker,
       extensionId,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // 初期ファビコンをストレージに設定
       const initialFaviconUrl = 'https://example.com/initial-favicon.ico';
@@ -423,10 +587,7 @@ test.describe('ファビコンの永続化復元', () => {
       );
 
       // サイドパネルをリロードして初期ファビコンを表示
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -474,6 +635,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -484,10 +648,25 @@ test.describe('ファビコンの永続化復元', () => {
       serviceWorker,
       extensionId,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // ファビコンをストレージに設定
       const testFaviconUrl = 'https://www.google.com/favicon.ico';
@@ -501,7 +680,7 @@ test.describe('ファビコンの永続化復元', () => {
         { tabId, faviconUrl: testFaviconUrl }
       );
 
-      // ストレージにファビコンが保存されていることを確認
+      // ストレージにファビコンが保存されていることを確認（ストレージ永続化テストのため必要）
       const storedFavicon = await serviceWorker.evaluate(async (tid) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = result.tab_favicons as Record<number, string> | undefined;
@@ -510,10 +689,7 @@ test.describe('ファビコンの永続化復元', () => {
       expect(storedFavicon).toBe(testFaviconUrl);
 
       // Act: サイドパネルをリロードしてファビコン復元をシミュレート
-      const currentWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
 
@@ -533,6 +709,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('ファビコン永続化の読み書きが正しく動作すること', async ({
@@ -540,10 +719,25 @@ test.describe('ファビコンの永続化復元', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // ファビコンをストレージに手動で設定（実際のネットワーク依存を避ける）
       const testFaviconUrl = 'https://example.com/auto-persist-test.ico';
@@ -576,6 +770,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Cleanup
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('タブを閉じた際に永続化ファビコンデータが自動的にクリーンアップされること', async ({
@@ -583,10 +780,25 @@ test.describe('ファビコンの永続化復元', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを作成してファビコンを設定
       const tabId = await createTab(extensionContext, 'about:blank');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId, depth: 0 },
+      ], 0);
+
       await waitForTabInTreeState(extensionContext, tabId);
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`)).toBeVisible({ timeout: 10000 });
 
       // ファビコンを手動で設定
       const testFaviconUrl = 'https://example.com/cleanup-test.ico';
@@ -610,6 +822,9 @@ test.describe('ファビコンの永続化復元', () => {
 
       // Act: タブを閉じる
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // ファビコンデータがクリーンアップされるまでポーリングで待機
       // event-handlers.ts の handleTabRemoved でファビコンが削除される

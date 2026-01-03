@@ -9,9 +9,9 @@
  * Note: ヘッドレスモードで実行すること（npm run test:e2e）
  */
 import { test, expect } from './fixtures/extension';
-import { createTab, assertTabInTree } from './utils/tab-utils';
-import { reorderTabs, moveTabToParent, getParentTabId, getTabOrder } from './utils/drag-drop-utils';
-import { waitForParentChildRelation, waitForTabDepthInUI } from './utils/polling-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { reorderTabs, moveTabToParent } from './utils/drag-drop-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ドラッグ&ドロップによる異なる深さ間の移動', () => {
   // Playwrightのmouse.moveは各ステップで約1秒かかるため、タイムアウトを延長
@@ -26,6 +26,15 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: ユーザーが報告した問題のツリー構造を作成（ネットワーク依存を避けるためabout:blankを使用）
     // タブA (ルート)
     //   タブB (タブAの子)
@@ -35,46 +44,146 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     //   タブF (タブAの子) ← ドラッグするタブ
     //     タブG (タブFの子)
     const tabA = await createTab(extensionContext, 'about:blank');
-    const tabB = await createTab(extensionContext, 'about:blank');
-    const tabC = await createTab(extensionContext, 'about:blank');
-    const tabD = await createTab(extensionContext, 'about:blank');
-    const tabE = await createTab(extensionContext, 'about:blank');
-    const tabF = await createTab(extensionContext, 'about:blank');
-    const tabG = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+    ], 0);
 
-    // すべてのタブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, tabA);
-    await assertTabInTree(sidePanelPage, tabB);
-    await assertTabInTree(sidePanelPage, tabC);
-    await assertTabInTree(sidePanelPage, tabD);
-    await assertTabInTree(sidePanelPage, tabE);
-    await assertTabInTree(sidePanelPage, tabF);
-    await assertTabInTree(sidePanelPage, tabG);
+    const tabB = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+    ], 0);
+
+    const tabC = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+      { tabId: tabC, depth: 0 },
+    ], 0);
+
+    const tabD = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+      { tabId: tabC, depth: 0 },
+      { tabId: tabD, depth: 0 },
+    ], 0);
+
+    const tabE = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+      { tabId: tabC, depth: 0 },
+      { tabId: tabD, depth: 0 },
+      { tabId: tabE, depth: 0 },
+    ], 0);
+
+    const tabF = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+      { tabId: tabC, depth: 0 },
+      { tabId: tabD, depth: 0 },
+      { tabId: tabE, depth: 0 },
+      { tabId: tabF, depth: 0 },
+    ], 0);
+
+    const tabG = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+      { tabId: tabC, depth: 0 },
+      { tabId: tabD, depth: 0 },
+      { tabId: tabE, depth: 0 },
+      { tabId: tabF, depth: 0 },
+      { tabId: tabG, depth: 0 },
+    ], 0);
 
     // D&Dで親子関係を構築
     // タブB を タブA の子にする
     await moveTabToParent(sidePanelPage, tabB, tabA, serviceWorker);
-    await waitForParentChildRelation(extensionContext, tabB, tabA, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabC, depth: 0 },
+      { tabId: tabD, depth: 0 },
+      { tabId: tabE, depth: 0 },
+      { tabId: tabF, depth: 0 },
+      { tabId: tabG, depth: 0 },
+    ], 0);
 
     // タブC を タブB の子にする
     await moveTabToParent(sidePanelPage, tabC, tabB, serviceWorker);
-    await waitForParentChildRelation(extensionContext, tabC, tabB, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabC, depth: 2 },
+      { tabId: tabD, depth: 0 },
+      { tabId: tabE, depth: 0 },
+      { tabId: tabF, depth: 0 },
+      { tabId: tabG, depth: 0 },
+    ], 0);
 
     // タブD を タブB の子にする
     await moveTabToParent(sidePanelPage, tabD, tabB, serviceWorker);
-    await waitForParentChildRelation(extensionContext, tabD, tabB, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabC, depth: 2 },
+      { tabId: tabD, depth: 2 },
+      { tabId: tabE, depth: 0 },
+      { tabId: tabF, depth: 0 },
+      { tabId: tabG, depth: 0 },
+    ], 0);
 
     // タブE を タブA の子にする
     await moveTabToParent(sidePanelPage, tabE, tabA, serviceWorker);
-    await waitForParentChildRelation(extensionContext, tabE, tabA, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabC, depth: 2 },
+      { tabId: tabD, depth: 2 },
+      { tabId: tabE, depth: 1 },
+      { tabId: tabF, depth: 0 },
+      { tabId: tabG, depth: 0 },
+    ], 0);
 
     // タブF を タブA の子にする
     await moveTabToParent(sidePanelPage, tabF, tabA, serviceWorker);
-    await waitForParentChildRelation(extensionContext, tabF, tabA, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabC, depth: 2 },
+      { tabId: tabD, depth: 2 },
+      { tabId: tabE, depth: 1 },
+      { tabId: tabF, depth: 1 },
+      { tabId: tabG, depth: 0 },
+    ], 0);
 
     // タブG を タブF の子にする
     await moveTabToParent(sidePanelPage, tabG, tabF, serviceWorker);
-    await waitForParentChildRelation(extensionContext, tabG, tabF, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabC, depth: 2 },
+      { tabId: tabD, depth: 2 },
+      { tabId: tabE, depth: 1 },
+      { tabId: tabF, depth: 1 },
+      { tabId: tabG, depth: 2 },
+    ], 0);
 
     // すべてのタブを展開
     const expandAll = async (tabId: number) => {
@@ -93,104 +202,26 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     await expandAll(tabB);
     await expandAll(tabF);
 
-    // 親子関係が正しく構築されていることを確認
-    await expect(async () => {
-      const bParent = await getParentTabId(sidePanelPage, tabB);
-      const cParent = await getParentTabId(sidePanelPage, tabC);
-      const dParent = await getParentTabId(sidePanelPage, tabD);
-      const eParent = await getParentTabId(sidePanelPage, tabE);
-      const fParent = await getParentTabId(sidePanelPage, tabF);
-      const gParent = await getParentTabId(sidePanelPage, tabG);
-
-      expect(bParent).toBe(tabA);
-      expect(cParent).toBe(tabB);
-      expect(dParent).toBe(tabB);
-      expect(eParent).toBe(tabA);
-      expect(fParent).toBe(tabA);
-      expect(gParent).toBe(tabF);
-    }).toPass({ timeout: 5000 });
-
-    // 初期順序を確認: moveTabToParentは順序確定を待機するため、F が E の後になる
-    const initialOrder = await getTabOrder(sidePanelPage);
-    const initialFIndex = initialOrder.indexOf(tabF);
-    const initialEIndex = initialOrder.indexOf(tabE);
-    expect(initialFIndex).toBeGreaterThan(initialEIndex); // 初期状態では F が E の後
-
     // 実行: タブFをタブEの前（タブDとタブEの間のギャップ）にドロップ
     // 異なる深さ（タブD: depth=2、タブE: depth=1）のノード間のギャップへのドロップ
     await reorderTabs(sidePanelPage, tabF, tabE, 'before');
 
-    // ストレージへの反映を待機
-    await serviceWorker.evaluate(async (tabIds: number[]) => {
-      for (let i = 0; i < 30; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, unknown>; tabToNode?: Record<number, string> } | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
-          const allTabsExist = tabIds.every(id => treeState.tabToNode[id]);
-          if (allTabsExist) {
-            return;
-          }
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    }, [tabA, tabB, tabC, tabD, tabE, tabF, tabG]);
-
     // 移動後、タブFを再展開（ドラッグ操作で折りたたまれる可能性があるため）
     await expandAll(tabF);
 
-    // 検証1: タブFの親がタブA（タブEと同じ親）であることを確認
-    await expect(async () => {
-      const fParentAfter = await getParentTabId(sidePanelPage, tabF);
-      expect(fParentAfter).toBe(tabA);
-    }).toPass({ timeout: 5000 });
-
-    // 検証2: タブGの親がタブFのまま（サブツリー構造が維持されていること）
-    await expect(async () => {
-      const gParentAfter = await getParentTabId(sidePanelPage, tabG);
-      expect(gParentAfter).toBe(tabF);
-    }).toPass({ timeout: 5000 });
-
-    // 検証2.5: UIでの深さが正しいことを確認
+    // 検証: UIでの順序と深さが正しいことを確認
     // タブA (depth 0), タブB (depth 1), タブC (depth 2), タブD (depth 2)
     // タブF (depth 1), タブG (depth 2), タブE (depth 1)
-    await waitForTabDepthInUI(sidePanelPage, tabA, 0, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, tabB, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, tabC, 2, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, tabD, 2, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, tabF, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, tabG, 2, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, tabE, 1, { timeout: 3000 });
-
-    // 検証3: タブFがタブEの前に配置されていることを確認
-    await expect(async () => {
-      const newOrder = await getTabOrder(sidePanelPage);
-      const newFIndex = newOrder.indexOf(tabF);
-      const newEIndex = newOrder.indexOf(tabE);
-      expect(newFIndex).toBeLessThan(newEIndex); // 移動後は F が E の前
-    }).toPass({ timeout: 5000 });
-
-    // 検証4: Chromeタブのインデックスがツリー順序と整合していることを確認
-    // ツリーを深さ優先で走査したときの順序がChromeタブのインデックス順と一致すべき
-    await expect(async () => {
-      const orderedTabIds = await getTabOrder(sidePanelPage);
-
-      // Chromeタブのインデックスを取得（sidePanelPage経由でChrome APIにアクセス）
-      const tabs = await sidePanelPage.evaluate(async () => {
-        const allTabs = await chrome.tabs.query({ currentWindow: true });
-        return allTabs
-          .filter(t => !t.pinned)
-          .sort((a, b) => a.index - b.index)
-          .map(t => t.id);
-      });
-
-      // タブAとその子孫のタブIDをフィルタリング
-      const relevantTabIds = [tabA, tabB, tabC, tabD, tabE, tabF, tabG];
-      const filteredTreeOrder = orderedTabIds.filter(id => relevantTabIds.includes(id));
-      const filteredChromeOrder = (tabs as (number | undefined)[]).filter((id) => id !== undefined && relevantTabIds.includes(id));
-
-      // 順序が一致することを確認
-      expect(filteredTreeOrder).toEqual(filteredChromeOrder);
-    }).toPass({ timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabC, depth: 2 },
+      { tabId: tabD, depth: 2 },
+      { tabId: tabF, depth: 1 },
+      { tabId: tabG, depth: 2 },
+      { tabId: tabE, depth: 1 },
+    ], 0);
   });
 
   test('サブツリーを別の親の子ノード間のギャップにドロップした場合、その親の子として配置されサブツリー構造が維持されること', async ({
@@ -202,6 +233,15 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
+    // windowIdとpseudoSidePanelTabIdを取得
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+
     // 準備: より単純なツリー構造を作成（ネットワーク依存を避けるためabout:blankを使用）
     // ルート1 (親なし)
     //   子1A (ルート1の子)
@@ -209,27 +249,75 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     // ルート2 (親なし) ← ドラッグするタブ
     //   子2A (ルート2の子)
     const root1 = await createTab(extensionContext, 'about:blank');
-    const child1A = await createTab(extensionContext, 'about:blank');
-    const child1B = await createTab(extensionContext, 'about:blank');
-    const root2 = await createTab(extensionContext, 'about:blank');
-    const child2A = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+    ], 0);
 
-    // すべてのタブがツリーに表示されるまで待機
-    await assertTabInTree(sidePanelPage, root1);
-    await assertTabInTree(sidePanelPage, child1A);
-    await assertTabInTree(sidePanelPage, child1B);
-    await assertTabInTree(sidePanelPage, root2);
-    await assertTabInTree(sidePanelPage, child2A);
+    const child1A = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 0 },
+    ], 0);
+
+    const child1B = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 0 },
+      { tabId: child1B, depth: 0 },
+    ], 0);
+
+    const root2 = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 0 },
+      { tabId: child1B, depth: 0 },
+      { tabId: root2, depth: 0 },
+    ], 0);
+
+    const child2A = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 0 },
+      { tabId: child1B, depth: 0 },
+      { tabId: root2, depth: 0 },
+      { tabId: child2A, depth: 0 },
+    ], 0);
 
     // D&Dで親子関係を構築
     await moveTabToParent(sidePanelPage, child1A, root1, serviceWorker);
-    await waitForParentChildRelation(extensionContext, child1A, root1, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 1 },
+      { tabId: child1B, depth: 0 },
+      { tabId: root2, depth: 0 },
+      { tabId: child2A, depth: 0 },
+    ], 0);
 
     await moveTabToParent(sidePanelPage, child1B, root1, serviceWorker);
-    await waitForParentChildRelation(extensionContext, child1B, root1, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 1 },
+      { tabId: child1B, depth: 1 },
+      { tabId: root2, depth: 0 },
+      { tabId: child2A, depth: 0 },
+    ], 0);
 
     await moveTabToParent(sidePanelPage, child2A, root2, serviceWorker);
-    await waitForParentChildRelation(extensionContext, child2A, root2, { timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 1 },
+      { tabId: child1B, depth: 1 },
+      { tabId: root2, depth: 0 },
+      { tabId: child2A, depth: 1 },
+    ], 0);
 
     // すべてのタブを展開
     const expandAll = async (tabId: number) => {
@@ -250,54 +338,18 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     // 実行: ルート2（とその子）を子1Aと子1Bの間のギャップにドロップ
     await reorderTabs(sidePanelPage, root2, child1B, 'before');
 
-    // ストレージへの反映を待機
-    await serviceWorker.evaluate(async (tabIds: number[]) => {
-      for (let i = 0; i < 30; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, unknown>; tabToNode?: Record<number, string> } | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
-          const allTabsExist = tabIds.every(id => treeState.tabToNode[id]);
-          if (allTabsExist) {
-            return;
-          }
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    }, [root1, child1A, child1B, root2, child2A]);
-
     // ルート2を再展開
     await expandAll(root2);
 
-    // 検証1: ルート2の親がルート1になっていること
-    // （child1Bの親がルート1なので、ルート2もルート1の子として配置される）
-    await expect(async () => {
-      const root2Parent = await getParentTabId(sidePanelPage, root2);
-      expect(root2Parent).toBe(root1);
-    }).toPass({ timeout: 5000 });
-
-    // 検証2: 子2Aの親がルート2のまま（サブツリー構造が維持されていること）
-    await expect(async () => {
-      const child2AParent = await getParentTabId(sidePanelPage, child2A);
-      expect(child2AParent).toBe(root2);
-    }).toPass({ timeout: 5000 });
-
-    // 検証2.5: UIでの深さが正しいことを確認
+    // 検証: UIでの順序と深さが正しいことを確認
     // root1 (depth 0), child1A (depth 1), root2 (depth 1), child2A (depth 2), child1B (depth 1)
-    await waitForTabDepthInUI(sidePanelPage, root1, 0, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child1A, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, root2, 1, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child2A, 2, { timeout: 3000 });
-    await waitForTabDepthInUI(sidePanelPage, child1B, 1, { timeout: 3000 });
-
-    // 検証3: 順序が正しいことを確認（ルート2が子1Aと子1Bの間にある）
-    await expect(async () => {
-      const order = await getTabOrder(sidePanelPage);
-      const child1AIndex = order.indexOf(child1A);
-      const root2Index = order.indexOf(root2);
-      const child1BIndex = order.indexOf(child1B);
-
-      expect(root2Index).toBeGreaterThan(child1AIndex);
-      expect(root2Index).toBeLessThan(child1BIndex);
-    }).toPass({ timeout: 5000 });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: root1, depth: 0 },
+      { tabId: child1A, depth: 1 },
+      { tabId: root2, depth: 1 },
+      { tabId: child2A, depth: 2 },
+      { tabId: child1B, depth: 1 },
+    ], 0);
   });
 });

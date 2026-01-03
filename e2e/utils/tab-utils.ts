@@ -4,8 +4,7 @@
  * タブ操作（作成、削除、アクティブ化、検証）の共通ヘルパー関数
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
-import { expect } from '@playwright/test';
-import type { TreeState, TestGlobals } from '../types';
+import type { TestGlobals } from '../types';
 
 // globalThis 拡張の型定義
 declare const globalThis: typeof globalThis & TestGlobals;
@@ -277,6 +276,91 @@ export async function activateTab(
 }
 
 /**
+ * タブをピン留めする
+ *
+ * @param context - ブラウザコンテキスト
+ * @param tabId - ピン留めするタブのID
+ */
+export async function pinTab(context: BrowserContext, tabId: number): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+
+  await serviceWorker.evaluate(async (id) => {
+    await chrome.tabs.update(id, { pinned: true });
+  }, tabId);
+
+  // ピン留め状態が反映されるまでポーリングで待機
+  await serviceWorker.evaluate(
+    async (id) => {
+      for (let i = 0; i < 50; i++) {
+        const tab = await chrome.tabs.get(id);
+        if (tab.pinned) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    },
+    tabId
+  );
+}
+
+/**
+ * タブのピン留めを解除する
+ *
+ * @param context - ブラウザコンテキスト
+ * @param tabId - ピン留め解除するタブのID
+ */
+export async function unpinTab(context: BrowserContext, tabId: number): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+
+  await serviceWorker.evaluate(async (id) => {
+    await chrome.tabs.update(id, { pinned: false });
+  }, tabId);
+
+  // ピン留め解除が反映されるまでポーリングで待機
+  await serviceWorker.evaluate(
+    async (id) => {
+      for (let i = 0; i < 50; i++) {
+        const tab = await chrome.tabs.get(id);
+        if (!tab.pinned) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    },
+    tabId
+  );
+}
+
+/**
+ * タブのURLを更新する
+ *
+ * @param context - ブラウザコンテキスト
+ * @param tabId - 更新するタブのID
+ * @param url - 新しいURL
+ */
+export async function updateTabUrl(context: BrowserContext, tabId: number, url: string): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+
+  await serviceWorker.evaluate(async ({ id, newUrl }) => {
+    await chrome.tabs.update(id, { url: newUrl });
+  }, { id: tabId, newUrl: url });
+
+  // URL更新が反映されるまでポーリングで待機
+  await serviceWorker.evaluate(
+    async ({ id, expectedUrl }) => {
+      for (let i = 0; i < 100; i++) {
+        const tab = await chrome.tabs.get(id);
+        if (tab.url?.includes(expectedUrl) || tab.pendingUrl?.includes(expectedUrl)) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    },
+    { id: tabId, expectedUrl: url }
+  );
+}
+
+/**
  * Side PanelのUIを再読み込みして最新のストレージ状態を反映
  *
  * @param context - ブラウザコンテキスト
@@ -301,176 +385,93 @@ export async function refreshSidePanel(
   await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
 }
 
-/**
- * ツリー内のタブノードを検証
- *
- * @param page - Side PanelのPage
- * @param tabId - 検証するタブのID
- * @param _expectedTitle - 期待されるタブのタイトル（現在は未使用、将来的な拡張のため保持）
- */
-export async function assertTabInTree(
-  page: Page,
-  tabId: number,
-  _expectedTitle?: string
-): Promise<void> {
-  // タブIDで直接検索する（data-testid属性を使用）
-  // TabTreeViewでは "Tab {tabId}" と表示されるため、タブIDでの検索が確実
-  const tabNode = page.locator(`[data-testid="tree-node-${tabId}"]`);
 
-  // タブノードが表示されるまで待機（5秒で十分）
-  await expect(tabNode.first()).toBeVisible({ timeout: 5000 });
+/**
+ * 現在のウィンドウIDを取得
+ *
+ * @param serviceWorker - Service Worker
+ * @returns 現在のウィンドウID
+ */
+export async function getCurrentWindowId(serviceWorker: Worker): Promise<number> {
+  const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
+  return currentWindow.id!;
 }
 
 /**
- * ツリーからタブノードが削除されたことを検証
+ * 擬似サイドパネルタブのIDを取得
  *
- * @param page - Side PanelのPage
- * @param tabId - 検証するタブのID（現在は未使用）
+ * Playwrightでは本物のChrome拡張機能サイドパネル（chrome.sidePanel API）を
+ * 直接テストできないため、sidepanel.htmlを通常のタブとして開いてテストしている。
+ * この「擬似サイドパネルタブ」はテスト環境でのみ存在し、ツリービューの検証に使用される。
+ *
+ * 本物のサイドパネルはchrome.tabs.queryに含まれないが、
+ * 擬似サイドパネルタブは通常のタブとして存在するため、
+ * テストではこのタブを考慮する必要がある。
+ *
+ * @param serviceWorker - Service Worker
+ * @param windowId - ウィンドウID
+ * @returns 擬似サイドパネルタブのID
+ * @throws 擬似サイドパネルタブが見つからない場合
  */
-export async function assertTabNotInTree(page: Page, tabId: number): Promise<void> {
-  // タブノードがDOMから削除されるまでポーリングで待機
-  const tabNode = page.locator(`[data-testid="tree-node-${tabId}"]`);
+export async function getPseudoSidePanelTabId(serviceWorker: Worker, windowId: number): Promise<number> {
+  return await serviceWorker.evaluate(async (wId) => {
+    const extensionId = chrome.runtime.id;
+    const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
 
-  // 要素が表示されなくなるまで待機（最大5秒）
-  await expect(tabNode).not.toBeVisible({ timeout: 5000 });
-}
+    const tabs = await chrome.tabs.query({ windowId: wId });
+    const sidePanelTab = tabs.find(t => {
+      const url = t.url || t.pendingUrl || '';
+      return url.startsWith(sidePanelUrlPrefix);
+    });
 
-/**
- * 未読バッジが表示されることを検証
- *
- * @param page - Side PanelのPage
- * @param tabId - 検証するタブのID（現在はグローバルなバッジ確認）
- * @param expectedCount - 期待される未読数（オプション、現在の実装ではドット表示のみ）
- *
- * 注意: 現在のUnreadBadgeコンポーネントの実装では、countプロパティが渡されない限り
- * ドット表示のみとなり、テキスト内容は空になります。expectedCountが指定された場合、
- * data-testid="unread-count"要素を使用してカウントを検証します。
- */
-export async function assertUnreadBadge(
-  page: Page,
-  tabId: number,
-  expectedCount?: number
-): Promise<void> {
-  // 任意の未読バッジを検索
-  const unreadBadge = page.locator(`[data-testid="unread-badge"]`);
-
-  // 未読バッジが表示されることを確認
-  await expect(unreadBadge.first()).toBeVisible({ timeout: 5000 });
-
-  // 未読数が指定されている場合、未読カウント要素を検証
-  if (expectedCount !== undefined) {
-    // UnreadBadgeコンポーネントでは、countが渡されると data-testid="unread-count" 要素が表示される
-    const unreadCountElement = page.locator(`[data-testid="unread-count"]`);
-    const countElementCount = await unreadCountElement.count();
-
-    if (countElementCount > 0) {
-      // カウント表示がある場合、テキストを検証
-      const displayedCount =
-        expectedCount > 99 ? '99+' : expectedCount.toString();
-      await expect(unreadCountElement.first()).toContainText(displayedCount);
+    if (!sidePanelTab || !sidePanelTab.id) {
+      throw new Error('Pseudo side panel tab not found');
     }
-    // カウント表示がない場合（ドット表示のみ）、バッジが存在することで未読状態を確認済み
-  }
+
+    return sidePanelTab.id;
+  }, windowId);
 }
 
 /**
- * タブがツリーに表示されるまで待機
+ * ブラウザ起動時のデフォルトタブIDを取得（擬似サイドパネルタブとピン留めタブを除く）
  *
- * @param page - Side PanelのPage
- * @param titleOrUrl - タブのタイトルまたはURLの一部（部分一致）
- * @param timeout - タイムアウト時間（ミリ秒）
+ * ブラウザ起動時に自動的に作成される1つのタブ（新しいタブページやabout:blankなど）を取得する。
+ * このタブはテストに不要なため、テスト開始時に閉じることができる。
+ *
+ * @param serviceWorker - Service Worker
+ * @param windowId - ウィンドウID
+ * @returns ブラウザデフォルトタブのID
+ * @throws ブラウザデフォルトタブが見つからない、または複数見つかった場合
  */
-export async function waitForTabInTree(
-  page: Page,
-  titleOrUrl: string,
-  timeout: number = 10000
-): Promise<void> {
-  // タブノードが表示されるまで待機
-  const tabNode = page.locator('[data-testid^="tree-node-"]', {
-    hasText: titleOrUrl,
-  });
+export async function getInitialBrowserTabId(serviceWorker: Worker, windowId: number): Promise<number> {
+  return await serviceWorker.evaluate(async (wId) => {
+    const extensionId = chrome.runtime.id;
+    const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
 
-  await expect(tabNode.first()).toBeVisible({ timeout });
+    const tabs = await chrome.tabs.query({ windowId: wId });
+    const browserTabs = tabs
+      .filter(t => !t.pinned)
+      .filter(t => {
+        const url = t.url || t.pendingUrl || '';
+        // 擬似サイドパネルタブは除外
+        return !url.startsWith(sidePanelUrlPrefix);
+      });
+
+    if (browserTabs.length === 0) {
+      throw new Error('Initial browser tab not found');
+    }
+
+    if (browserTabs.length > 1) {
+      throw new Error(`Expected 1 initial browser tab, but found ${browserTabs.length}`);
+    }
+
+    const browserTab = browserTabs[0];
+    if (!browserTab.id) {
+      throw new Error('Initial browser tab has no ID');
+    }
+
+    return browserTab.id;
+  }, windowId);
 }
 
-/**
- * ストレージ内のツリー状態が期待する条件を満たすまで待機
- *
- * @param context - ブラウザコンテキスト
- * @param condition - 状態をチェックする関数（trueを返すと待機終了）
- * @param timeout - タイムアウト時間（ミリ秒）
- */
-export async function waitForTreeState(
-  context: BrowserContext,
-  condition: (treeState: TreeState | undefined) => boolean,
-  timeout: number = 10000
-): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-  const startTime = Date.now();
 
-  await serviceWorker.evaluate(
-    async ({ timeout }) => {
-      const startTime = Date.now();
-      while (Date.now() - startTime < timeout) {
-        const result = await chrome.storage.local.get('tree_state');
-        // Note: We can't pass the function directly, so we'll check in a simple way
-        if (result.tree_state) {
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    },
-    { timeout }
-  );
-
-  // Also verify on the caller side
-  const elapsed = Date.now() - startTime;
-  const remainingTimeout = Math.max(timeout - elapsed, 1000);
-
-  await serviceWorker.evaluate(
-    async (remainingTimeout) => {
-      const startTime = Date.now();
-      while (Date.now() - startTime < remainingTimeout) {
-        const result = await chrome.storage.local.get('tree_state');
-        if (result.tree_state) {
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    },
-    remainingTimeout
-  );
-}
-
-/**
- * 指定したタブ数がストレージに保存されるまで待機
- *
- * @param context - ブラウザコンテキスト
- * @param expectedCount - 期待するタブ数
- * @param timeout - タイムアウト時間（ミリ秒）
- */
-export async function waitForTabCount(
-  context: BrowserContext,
-  expectedCount: number,
-  timeout: number = 10000
-): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
-  await serviceWorker.evaluate(
-    async ({ expectedCount, timeout }) => {
-      const startTime = Date.now();
-      while (Date.now() - startTime < timeout) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
-        if (treeState?.tabToNode) {
-          const tabCount = Object.keys(treeState.tabToNode).length;
-          if (tabCount >= expectedCount) {
-            return;
-          }
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    },
-    { expectedCount, timeout }
-  );
-}

@@ -164,6 +164,45 @@ export class ChromeMock {
     // Reset mock implementations
     this.runtime.sendMessage.mockImplementation(() => Promise.resolve());
     this.runtime.lastError = undefined;
+
+    // Re-apply storage mock implementations (may be cleared by vi.clearAllMocks())
+    this.storage.local.get.mockImplementation((keys?: string | string[] | null) => {
+      if (!keys) {
+        return Promise.resolve({ ...this.storageData });
+      }
+      if (typeof keys === 'string') {
+        return Promise.resolve(
+          keys in this.storageData
+            ? { [keys]: this.storageData[keys] }
+            : {},
+        );
+      }
+      const result: Record<string, unknown> = {};
+      keys.forEach((key) => {
+        if (key in this.storageData) {
+          result[key] = this.storageData[key];
+        }
+      });
+      return Promise.resolve(result);
+    });
+
+    this.storage.local.set.mockImplementation((items: Record<string, unknown>) => {
+      Object.assign(this.storageData, items);
+      return Promise.resolve();
+    });
+
+    this.storage.local.remove.mockImplementation((keys: string | string[]) => {
+      const keysArray = typeof keys === 'string' ? [keys] : keys;
+      keysArray.forEach((key) => {
+        delete this.storageData[key];
+      });
+      return Promise.resolve();
+    });
+
+    this.storage.local.clear.mockImplementation(() => {
+      this.storageData = {};
+      return Promise.resolve();
+    });
   }
 }
 

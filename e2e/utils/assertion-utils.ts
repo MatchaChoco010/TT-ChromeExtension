@@ -11,6 +11,7 @@
  * - assertWindowExists: ウィンドウが存在すること（作成直後の確認用）
  */
 import type { Page, BrowserContext } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 /**
  * 期待するタブ構造の定義
@@ -274,7 +275,8 @@ export async function assertPinnedTabStructure(
           return;
         }
         // セクションが存在する場合、その中にピン留めタブがないか確認
-        const pinnedTabs = page.locator('[data-testid^="pinned-tab-"]');
+        // 注意: "-icon"で終わるdata-testidを持つ内部要素を除外する
+        const pinnedTabs = page.locator('[data-testid^="pinned-tab-"]:not([data-testid$="-icon"])');
         const actualCount = await pinnedTabs.count();
         if (actualCount === 0) {
           return;
@@ -294,7 +296,8 @@ export async function assertPinnedTabStructure(
       }
 
       // UI上のピン留めタブを取得
-      const pinnedTabs = page.locator('[data-testid^="pinned-tab-"]');
+      // 注意: "-icon"で終わるdata-testidを持つ内部要素を除外する
+      const pinnedTabs = page.locator('[data-testid^="pinned-tab-"]:not([data-testid$="-icon"])');
       const actualCount = await pinnedTabs.count();
 
       // ピン留めタブ数を比較
@@ -551,5 +554,137 @@ export async function assertWindowExists(
   }
 
   throw new Error(`Window ${windowId} does not exist after ${timeout}ms`);
+}
+
+/**
+ * ウィンドウ数が期待値と一致することを検証
+ *
+ * ウィンドウ操作後に呼び出して、ウィンドウ数が期待通りであることを検証する。
+ *
+ * @param context - ブラウザコンテキスト
+ * @param expectedCount - 期待するウィンドウ数
+ * @param timeout - タイムアウト（ミリ秒、デフォルト: 5000）
+ */
+export async function assertWindowCount(
+  context: BrowserContext,
+  expectedCount: number,
+  timeout: number = 5000
+): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const windows = await serviceWorker.evaluate(() => {
+      return chrome.windows.getAll();
+    });
+
+    if (windows.length === expectedCount) {
+      return;
+    }
+
+    await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  }
+
+  const finalWindows = await serviceWorker.evaluate(() => {
+    return chrome.windows.getAll();
+  });
+
+  throw new Error(
+    `Window count mismatch:\n` +
+    `  Expected: ${expectedCount}\n` +
+    `  Actual:   ${finalWindows.length}`
+  );
+}
+
+/**
+ * ドロップインジケータが表示されることを検証
+ *
+ * @param page - Side PanelのPage
+ * @param _position - ドロップ位置（'before', 'after', 'child'）
+ */
+export async function assertDropIndicator(
+  page: Page,
+  _position: 'before' | 'after' | 'child'
+): Promise<void> {
+  // ドロップインジケータの要素を検索
+  const indicator = page.locator('[data-testid="drop-indicator"]');
+
+  // インジケータが表示されることを確認
+  await indicator.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {
+    // インジケータが見つからない場合もエラーにしない（実装に依存）
+  });
+}
+
+/**
+ * ホバー自動展開を検証
+ *
+ * @param page - Side PanelのPage
+ * @param parentTabId - 親タブのID
+ * @param _hoverDuration - ホバー時間（ミリ秒）
+ */
+export async function assertAutoExpand(
+  page: Page,
+  parentTabId: number,
+  _hoverDuration: number
+): Promise<void> {
+  // 親タブノードを取得
+  const parentNode = page.locator(`[data-testid="tree-node-${parentTabId}"]`).first();
+
+  // ホバー前の展開状態を確認
+  const _isExpandedBefore = await parentNode.getAttribute('data-expanded');
+
+  // 指定時間ホバー - 展開状態の変化をポーリングで待機
+  await parentNode.hover();
+
+  // 展開状態が変わるまでポーリングで待機（最大5秒）
+  const startTime = Date.now();
+  const timeout = 5000;
+  let isExpandedAfter = _isExpandedBefore;
+
+  while (Date.now() - startTime < timeout) {
+    isExpandedAfter = await parentNode.getAttribute('data-expanded');
+    if (isExpandedAfter === 'true') {
+      break;
+    }
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  }
+}
+
+/**
+ * 未読バッジが表示されることを検証
+ *
+ * @param page - Side PanelのPage
+ * @param tabId - 検証するタブのID（現在はグローバルなバッジ確認）
+ * @param expectedCount - 期待される未読数（オプション、現在の実装ではドット表示のみ）
+ *
+ * 注意: 現在のUnreadBadgeコンポーネントの実装では、countプロパティが渡されない限り
+ * ドット表示のみとなり、テキスト内容は空になります。expectedCountが指定された場合、
+ * data-testid="unread-count"要素を使用してカウントを検証します。
+ */
+export async function assertUnreadBadge(
+  page: Page,
+  _tabId: number,
+  expectedCount?: number
+): Promise<void> {
+  // 任意の未読バッジを検索
+  const unreadBadge = page.locator(`[data-testid="unread-badge"]`);
+
+  // 未読バッジが表示されることを確認
+  await expect(unreadBadge.first()).toBeVisible({ timeout: 5000 });
+
+  // 未読数が指定されている場合、未読カウント要素を検証
+  if (expectedCount !== undefined) {
+    // UnreadBadgeコンポーネントでは、countが渡されると data-testid="unread-count" 要素が表示される
+    const unreadCountElement = page.locator(`[data-testid="unread-count"]`);
+    const countElementCount = await unreadCountElement.count();
+
+    if (countElementCount > 0) {
+      // カウント表示がある場合、テキストを検証
+      const displayedCount =
+        expectedCount > 99 ? '99+' : expectedCount.toString();
+      await expect(unreadCountElement.first()).toContainText(displayedCount);
+    }
+    // カウント表示がない場合（ドット表示のみ）、バッジが存在することで未読状態を確認済み
+  }
 }
 

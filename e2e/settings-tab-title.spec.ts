@@ -13,6 +13,14 @@ import {
   waitForTabInTreeState,
   waitForCondition,
 } from './utils/polling-utils';
+import {
+  createTab,
+  getCurrentWindowId,
+  getPseudoSidePanelTabId,
+  getInitialBrowserTabId,
+  closeTab,
+} from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('設定タブのタイトル表示', () => {
   test('設定タブがツリーで「Settings」というタイトルで表示される', async ({
@@ -27,26 +35,32 @@ test.describe('設定タブのタイトル表示', () => {
     });
 
     // 現在のウィンドウIDを取得（Side Panelが表示されているウィンドウ）
-    const windowId = await serviceWorker.evaluate(async () => {
-      const currentWindow = await chrome.windows.getCurrent();
-      return currentWindow.id;
-    });
+    const windowId = await getCurrentWindowId(serviceWorker);
+
+    // 初期状態をセットアップ
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     // Act: 設定ページを同じウィンドウで新規タブとして開く
-    const settingsTabId = await serviceWorker.evaluate(async ({ extensionId, windowId }) => {
-      const tab = await chrome.tabs.create({
-        url: `chrome-extension://${extensionId}/settings.html`,
-        active: true,
-        windowId: windowId,
-      });
-      return tab.id as number;
-    }, { extensionId, windowId });
+    const settingsTabId = await createTab(
+      extensionContext,
+      `chrome-extension://${extensionId}/settings.html`,
+      { active: true, windowId }
+    );
 
-    // Assert: タブがツリー状態に追加されるまで待機
+    // タブがツリー状態に追加されるまで待機
     await waitForTabInTreeState(extensionContext, settingsTabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `Settings tab ${settingsTabId} was not added to tree`,
     });
+
+    // タブ作成後の構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: settingsTabId, depth: 0 },
+    ], 0);
 
     // タブが完全にロードされてタイトルが「Settings」になるまで待機
     await waitForCondition(
@@ -63,9 +77,6 @@ test.describe('設定タブのタイトル表示', () => {
         timeoutMessage: 'Settings tab did not load with correct title',
       }
     );
-
-    // chrome.tabs.onUpdatedイベントが処理されるまで少し待機
-    await sidePanelPage.waitForTimeout(200);
 
     // Assert: ツリーにSettingsタイトルが表示されることを確認
     // Side Panelはchrome.tabs.onUpdatedイベントでtabInfoMapを更新するので、
@@ -86,16 +97,9 @@ test.describe('設定タブのタイトル表示', () => {
       }
     );
 
-    // Assert: タイトルが「新しいタブ」ではないことを確認
-    const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${settingsTabId}"]`);
-    const displayedTitle = await treeNode.locator('[data-testid="tab-title"], [data-testid="discarded-tab-title"]').textContent();
-    expect(displayedTitle).not.toBe('新しいタブ');
-    expect(displayedTitle).not.toBe('New Tab');
-
     // Cleanup: タブを閉じる
-    await serviceWorker.evaluate(async (tabId) => {
-      await chrome.tabs.remove(tabId);
-    }, settingsTabId);
+    await closeTab(extensionContext, settingsTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 
   test('設定タブのHTMLタイトルが「Settings」である', async ({
@@ -108,10 +112,8 @@ test.describe('設定タブのタイトル表示', () => {
     await settingsPage.waitForLoadState('domcontentloaded');
 
     // Assert: ページのタイトルがSettingsであることを確認
-    const title = await settingsPage.title();
-    expect(title).toBe('Settings');
-    expect(title).not.toBe('新しいタブ');
-    expect(title).not.toBe('New Tab');
+    // このテストはページタイトル自体を確認する目的なので、expect使用が必須
+    await expect(settingsPage).toHaveTitle('Settings');
 
     // Cleanup
     await settingsPage.close();
@@ -130,26 +132,32 @@ test.describe('内部ページのタイトル表示', () => {
     });
 
     // 現在のウィンドウIDを取得
-    const windowId = await serviceWorker.evaluate(async () => {
-      const currentWindow = await chrome.windows.getCurrent();
-      return currentWindow.id;
-    });
+    const windowId = await getCurrentWindowId(serviceWorker);
+
+    // 初期状態をセットアップ
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     // Act: chrome://versionページを新規タブで開く
-    const tabId = await serviceWorker.evaluate(async (windowId) => {
-      const tab = await chrome.tabs.create({
-        url: 'chrome://version',
-        active: true,
-        windowId: windowId,
-      });
-      return tab.id as number;
-    }, windowId);
+    const tabId = await createTab(
+      extensionContext,
+      'chrome://version',
+      { active: true, windowId }
+    );
 
-    // Assert: タブがツリー状態に追加されるまで待機
+    // タブがツリー状態に追加されるまで待機
     await waitForTabInTreeState(extensionContext, tabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `chrome://version tab ${tabId} was not added to tree`,
     });
+
+    // タブ作成後の構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // Assert: タブのタイトルを取得してツリーに表示されることを確認
     // chrome://versionのタイトルはブラウザによって異なるが、chrome.tabs.Tab.titleと一致するはず
@@ -185,9 +193,8 @@ test.describe('内部ページのタイトル表示', () => {
     );
 
     // Cleanup: タブを閉じる
-    await serviceWorker.evaluate(async (id) => {
-      await chrome.tabs.remove(id);
-    }, tabId);
+    await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 
   test('chrome://settingsページがツリーでブラウザのタイトルと同じタイトルで表示される', async ({
@@ -201,26 +208,32 @@ test.describe('内部ページのタイトル表示', () => {
     });
 
     // 現在のウィンドウIDを取得
-    const windowId = await serviceWorker.evaluate(async () => {
-      const currentWindow = await chrome.windows.getCurrent();
-      return currentWindow.id;
-    });
+    const windowId = await getCurrentWindowId(serviceWorker);
+
+    // 初期状態をセットアップ
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     // Act: chrome://settingsページを新規タブで開く
-    const tabId = await serviceWorker.evaluate(async (windowId) => {
-      const tab = await chrome.tabs.create({
-        url: 'chrome://settings',
-        active: true,
-        windowId: windowId,
-      });
-      return tab.id as number;
-    }, windowId);
+    const tabId = await createTab(
+      extensionContext,
+      'chrome://settings',
+      { active: true, windowId }
+    );
 
-    // Assert: タブがツリー状態に追加されるまで待機
+    // タブがツリー状態に追加されるまで待機
     await waitForTabInTreeState(extensionContext, tabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `chrome://settings tab ${tabId} was not added to tree`,
     });
+
+    // タブ作成後の構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // Assert: タブのタイトルを取得してツリーに表示されることを確認
     await waitForCondition(
@@ -263,9 +276,8 @@ test.describe('内部ページのタイトル表示', () => {
     );
 
     // Cleanup: タブを閉じる
-    await serviceWorker.evaluate(async (id) => {
-      await chrome.tabs.remove(id);
-    }, tabId);
+    await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 
   test('about:blankページがツリーで適切なタイトルで表示される', async ({
@@ -279,26 +291,32 @@ test.describe('内部ページのタイトル表示', () => {
     });
 
     // 現在のウィンドウIDを取得
-    const windowId = await serviceWorker.evaluate(async () => {
-      const currentWindow = await chrome.windows.getCurrent();
-      return currentWindow.id;
-    });
+    const windowId = await getCurrentWindowId(serviceWorker);
+
+    // 初期状態をセットアップ
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     // Act: about:blankページを新規タブで開く
-    const tabId = await serviceWorker.evaluate(async (windowId) => {
-      const tab = await chrome.tabs.create({
-        url: 'about:blank',
-        active: true,
-        windowId: windowId,
-      });
-      return tab.id as number;
-    }, windowId);
+    const tabId = await createTab(
+      extensionContext,
+      'about:blank',
+      { active: true, windowId }
+    );
 
-    // Assert: タブがツリー状態に追加されるまで待機
+    // タブがツリー状態に追加されるまで待機
     await waitForTabInTreeState(extensionContext, tabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `about:blank tab ${tabId} was not added to tree`,
     });
+
+    // タブ作成後の構造を検証
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // Assert: about:blankは「新しいタブ」として表示されるはず（TreeNode.tsxのgetDisplayTitle）
     await waitForCondition(
@@ -319,9 +337,8 @@ test.describe('内部ページのタイトル表示', () => {
     );
 
     // Cleanup: タブを閉じる
-    await serviceWorker.evaluate(async (id) => {
-      await chrome.tabs.remove(id);
-    }, tabId);
+    await closeTab(extensionContext, tabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 });
 
@@ -338,29 +355,36 @@ test.describe('タイトル表示の安定性テスト', () => {
     });
 
     // 現在のウィンドウIDを取得
-    const windowId = await serviceWorker.evaluate(async () => {
-      const currentWindow = await chrome.windows.getCurrent();
-      return currentWindow.id;
-    });
+    const windowId = await getCurrentWindowId(serviceWorker);
+
+    // 初期状態をセットアップ
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     const tabIds: number[] = [];
 
-    // Act: 3つの設定タブを連続で開く
+    // Act: 3つの設定タブを連続で開く（各タブ作成後にassertTabStructureを呼ぶ）
     for (let i = 0; i < 3; i++) {
-      const tabId = await serviceWorker.evaluate(async ({ extensionId, windowId }) => {
-        const tab = await chrome.tabs.create({
-          url: `chrome-extension://${extensionId}/settings.html`,
-          active: true,
-          windowId: windowId,
-        });
-        return tab.id as number;
-      }, { extensionId, windowId });
+      const tabId = await createTab(
+        extensionContext,
+        `chrome-extension://${extensionId}/settings.html`,
+        { active: true, windowId }
+      );
       tabIds.push(tabId);
 
       // タブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, tabId, {
         timeout: COMMON_TIMEOUTS.medium,
       });
+
+      // 各タブ作成後に構造を検証
+      const expectedStructure = [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        ...tabIds.map(id => ({ tabId: id, depth: 0 })),
+      ];
+      await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);
 
       // タブが完全にロードされてタイトルが「Settings」になるまで待機
       await waitForCondition(
@@ -377,9 +401,6 @@ test.describe('タイトル表示の安定性テスト', () => {
         }
       );
     }
-
-    // chrome.tabs.onUpdatedイベントが処理されるまで少し待機
-    await sidePanelPage.waitForTimeout(300);
 
     // Assert: すべてのタブが「Settings」タイトルで表示されることを確認
     for (const tabId of tabIds) {
@@ -400,11 +421,15 @@ test.describe('タイトル表示の安定性テスト', () => {
       );
     }
 
-    // Cleanup: すべてのタブを閉じる
-    await serviceWorker.evaluate(async (ids) => {
-      for (const id of ids) {
-        await chrome.tabs.remove(id);
-      }
-    }, tabIds);
+    // Cleanup: すべてのタブを閉じる（各タブ削除後にassertTabStructureを呼ぶ）
+    for (let i = tabIds.length - 1; i >= 0; i--) {
+      await closeTab(extensionContext, tabIds[i]);
+      const remainingTabs = tabIds.slice(0, i);
+      const expectedStructure = [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        ...remainingTabs.map(id => ({ tabId: id, depth: 0 })),
+      ];
+      await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);
+    }
   });
 });

@@ -1,9 +1,6 @@
 /**
  * E2E Tests: Cross-Window Drag Indicator Display
  *
- * cross-window-drag-indicator.spec.ts の書き直し
- * クロスウィンドウドラッグE2Eテストの検証
- *
  * Tests verify:
  * - Drag session state synchronization via DragSessionManager
  * - Cross-window drag state detection from different windows
@@ -13,7 +10,8 @@
  */
 import { test, expect } from './fixtures/extension';
 import { createWindow, openSidePanelForWindow } from './utils/window-utils';
-import { createTab } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { assertTabStructure, assertWindowExists } from './utils/assertion-utils';
 import { waitForTabInTreeState, waitForSidePanelReady } from './utils/polling-utils';
 import type { DragSession } from '../src/background/drag-session-manager';
 import type { MessageResponse, TabNode } from '../src/types';
@@ -25,19 +23,21 @@ test.describe('Cross-Window Drag Indicator', () => {
       serviceWorker,
       extensionContext,
     }) => {
-      // Ensure side panel is visible
-      const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-      await expect(sidePanelRoot).toBeVisible();
-
-      // Get original window ID
-      const originalWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      const originalWindowId = originalWindow.id as number;
+      // Initialize test state
+      const originalWindowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // Create a tab in the original window
       const tabId = await createTab(extensionContext, 'https://example.com');
-      expect(tabId).toBeGreaterThan(0);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // Wait for tab to appear in tree state
       await waitForTabInTreeState(extensionContext, tabId);
@@ -118,34 +118,45 @@ test.describe('Cross-Window Drag Indicator', () => {
     test('side panel should be able to detect cross-window drag state', async ({
       extensionContext,
       serviceWorker,
+      sidePanelPage,
     }) => {
-      // Get original window ID
-      const originalWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      const originalWindowId = originalWindow.id as number;
+      // Initialize test state
+      const originalWindowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // Create a tab in the original window
       const tabId = await createTab(extensionContext, 'https://example.com');
-      expect(tabId).toBeGreaterThan(0);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // Wait for tab to appear in tree state
       await waitForTabInTreeState(extensionContext, tabId);
 
       // Create a new window
       const newWindowId = await createWindow(extensionContext);
-      expect(newWindowId).toBeGreaterThan(0);
-      expect(newWindowId).not.toBe(originalWindowId);
+      await assertWindowExists(extensionContext, newWindowId);
 
-      // Open side panel for both windows
-      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-      await waitForSidePanelReady(originalSidePanel, serviceWorker);
-
+      // Open side panel for new window
       const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
       await waitForSidePanelReady(newSidePanel, serviceWorker);
 
+      // Get new window's tabs
+      const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+      const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+      await assertTabStructure(newSidePanel, newWindowId, [
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
+        { tabId: newInitialBrowserTabId, depth: 0 },
+      ], 0);
+
       // Start drag session from original window's side panel (simulating drag start)
-      await originalSidePanel.evaluate(
+      await sidePanelPage.evaluate(
         async ({ tabId, windowId }) => {
           await new Promise<void>((resolve) => {
             chrome.runtime.sendMessage(
@@ -195,7 +206,7 @@ test.describe('Cross-Window Drag Indicator', () => {
       expect(dragSessionInNewWindow.data?.currentWindowId).not.toBe(newWindowId);
 
       // Clean up drag session
-      await originalSidePanel.evaluate(() => {
+      await sidePanelPage.evaluate(() => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage(
             { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
@@ -208,47 +219,64 @@ test.describe('Cross-Window Drag Indicator', () => {
     test('cross-window drag session should include source window information', async ({
       extensionContext,
       serviceWorker,
+      sidePanelPage,
     }) => {
-      // Get original window ID
-      const originalWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      const originalWindowId = originalWindow.id as number;
+      // Initialize test state
+      const originalWindowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // Create a tab in the original window
       const tabId = await createTab(extensionContext, 'https://example.com/indicator-test');
-      expect(tabId).toBeGreaterThan(0);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // Wait for tab to appear in tree state
       await waitForTabInTreeState(extensionContext, tabId);
 
       // Create a new window with a tab
       const newWindowId = await createWindow(extensionContext);
-      expect(newWindowId).toBeGreaterThan(0);
+      await assertWindowExists(extensionContext, newWindowId);
 
-      // Create a tab in the new window for the tree to show
-      const tabInNewWindow = await serviceWorker.evaluate(async ({ windowId }) => {
-        const tab = await chrome.tabs.create({ windowId, url: 'https://example.org' });
-        return tab.id;
-      }, { windowId: newWindowId });
-      expect(tabInNewWindow).toBeGreaterThan(0);
-
-      // Wait for tab to appear in tree state
-      await waitForTabInTreeState(extensionContext, tabInNewWindow as number);
-
-      // Open side panels for both windows
-      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-      await waitForSidePanelReady(originalSidePanel, serviceWorker);
-
+      // Open side panel for new window
       const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
       await waitForSidePanelReady(newSidePanel, serviceWorker);
 
-      // Verify the new window's tab is visible
-      const treeNodeInNewWindow = newSidePanel.locator(`[data-testid="tree-node-${tabInNewWindow}"]`);
-      await expect(treeNodeInNewWindow).toBeVisible();
+      // Get new window's pseudo side panel tab
+      const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+      const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+      await assertTabStructure(newSidePanel, newWindowId, [
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
+        { tabId: newInitialBrowserTabId, depth: 0 },
+      ], 0);
+
+      // Create a tab in the new window for the tree to show
+      const tabInNewWindow = await createTab(extensionContext, 'https://example.org', { windowId: newWindowId });
+      await assertTabStructure(newSidePanel, newWindowId, [
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
+        { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: tabInNewWindow, depth: 0 },
+      ], 0);
+
+      // Reload side panel to reflect new tab
+      await newSidePanel.reload();
+      await waitForSidePanelReady(newSidePanel, serviceWorker);
+
+      // Verify new window state with new tab
+      await assertTabStructure(newSidePanel, newWindowId, [
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
+        { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: tabInNewWindow, depth: 0 },
+      ], 0);
 
       // Start drag session from original window's side panel (simulating drag start from window A)
-      await originalSidePanel.evaluate(
+      await sidePanelPage.evaluate(
         async ({ tabId, windowId }) => {
           await new Promise<void>((resolve) => {
             chrome.runtime.sendMessage(
@@ -306,7 +334,7 @@ test.describe('Cross-Window Drag Indicator', () => {
       expect(typeof dragSession?.sessionId).toBe('string');
 
       // Clean up
-      await originalSidePanel.evaluate(() => {
+      await sidePanelPage.evaluate(() => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage(
             { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
@@ -321,33 +349,45 @@ test.describe('Cross-Window Drag Indicator', () => {
     test('destination window should recognize cross-window drag origin', async ({
       extensionContext,
       serviceWorker,
+      sidePanelPage,
     }) => {
-      // Get original window ID
-      const originalWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      const originalWindowId = originalWindow.id as number;
+      // Initialize test state
+      const originalWindowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // Create a tab in the original window
       const tabId = await createTab(extensionContext, 'https://example.com');
-      expect(tabId).toBeGreaterThan(0);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // Wait for tab to appear in tree state
       await waitForTabInTreeState(extensionContext, tabId);
 
       // Create a new window
       const newWindowId = await createWindow(extensionContext);
-      expect(newWindowId).toBeGreaterThan(0);
+      await assertWindowExists(extensionContext, newWindowId);
 
       // Open side panels
-      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-      await waitForSidePanelReady(originalSidePanel, serviceWorker);
-
       const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
       await waitForSidePanelReady(newSidePanel, serviceWorker);
 
+      // Verify new window initial state
+      const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+      const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+      await assertTabStructure(newSidePanel, newWindowId, [
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
+        { tabId: newInitialBrowserTabId, depth: 0 },
+      ], 0);
+
       // Start drag session from original window
-      await originalSidePanel.evaluate(
+      await sidePanelPage.evaluate(
         async ({ tabId, windowId }) => {
           await new Promise<void>((resolve) => {
             chrome.runtime.sendMessage(
@@ -400,7 +440,7 @@ test.describe('Cross-Window Drag Indicator', () => {
       expect(sessionFromDestination?.currentWindowId).toBe(originalWindowId);
 
       // Clean up
-      await originalSidePanel.evaluate(() => {
+      await sidePanelPage.evaluate(() => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage(
             { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },
@@ -426,33 +466,45 @@ test.describe('Cross-Window Drag Indicator', () => {
     test('drag session should maintain state across window queries', async ({
       extensionContext,
       serviceWorker,
+      sidePanelPage,
     }) => {
-      // Get original window ID
-      const originalWindow = await serviceWorker.evaluate(() => {
-        return chrome.windows.getCurrent();
-      });
-      const originalWindowId = originalWindow.id as number;
+      // Initialize test state
+      const originalWindowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       // Create a tab in the original window
       const tabId = await createTab(extensionContext, 'https://example.com');
-      expect(tabId).toBeGreaterThan(0);
+      await assertTabStructure(sidePanelPage, originalWindowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // Wait for tab to appear in tree state
       await waitForTabInTreeState(extensionContext, tabId);
 
       // Create a new window
       const newWindowId = await createWindow(extensionContext);
-      expect(newWindowId).toBeGreaterThan(0);
+      await assertWindowExists(extensionContext, newWindowId);
 
       // Open side panels
-      const originalSidePanel = await openSidePanelForWindow(extensionContext, originalWindowId);
-      await waitForSidePanelReady(originalSidePanel, serviceWorker);
-
       const newSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
       await waitForSidePanelReady(newSidePanel, serviceWorker);
 
+      // Verify new window state
+      const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
+      const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
+      await assertTabStructure(newSidePanel, newWindowId, [
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
+        { tabId: newInitialBrowserTabId, depth: 0 },
+      ], 0);
+
       // Start drag session
-      await originalSidePanel.evaluate(
+      await sidePanelPage.evaluate(
         async ({ tabId, windowId }) => {
           await new Promise<void>((resolve) => {
             chrome.runtime.sendMessage(
@@ -472,7 +524,7 @@ test.describe('Cross-Window Drag Indicator', () => {
       );
 
       // Query from original window
-      const sessionFromOriginal = await originalSidePanel.evaluate(async () => {
+      const sessionFromOriginal = await sidePanelPage.evaluate(async () => {
         const response = await new Promise<MessageResponse<DragSession | null>>((resolve) => {
           chrome.runtime.sendMessage(
             { type: 'GET_DRAG_SESSION' },
@@ -502,7 +554,7 @@ test.describe('Cross-Window Drag Indicator', () => {
       expect(sessionFromOriginal?.state).toBe(sessionFromNew?.state);
 
       // Clean up
-      await originalSidePanel.evaluate(() => {
+      await sidePanelPage.evaluate(() => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage(
             { type: 'END_DRAG_SESSION', payload: { reason: 'TEST_CLEANUP' } },

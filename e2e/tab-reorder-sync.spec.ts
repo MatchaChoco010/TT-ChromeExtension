@@ -12,10 +12,10 @@
  * Note: フレーキーテスト対策として固定時間待機は使用せず、
  * ポーリングベースの状態確定待機を使用しています。
  */
-import { test, expect } from './fixtures/extension';
-import { createTab, assertTabInTree } from './utils/tab-utils';
-import { waitForCondition, waitForTabInTreeState } from './utils/polling-utils';
-import { reorderTabs, getTabOrder } from './utils/drag-drop-utils';
+import { test } from './fixtures/extension';
+import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab } from './utils/tab-utils';
+import { reorderTabs } from './utils/drag-drop-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('タブ並び替え同期テスト', () => {
   // Playwrightのmouse.moveは各ステップで約1秒かかるため、タイムアウトを延長
@@ -27,45 +27,53 @@ test.describe('タブ並び替え同期テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 3つのタブを作成
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 準備: 3つのタブを作成（各createTabの直後にassertTabStructure）
       const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
       const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
       const tab3 = await createTab(extensionContext, 'https://www.w3.org');
-
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1, 'Example');
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
-
-      // ツリービューでのタブ順序を取得（初期状態）
-      const initialOrder = await getTabOrder(sidePanelPage);
-      expect(initialOrder).toContain(tab1);
-      expect(initialOrder).toContain(tab2);
-      expect(initialOrder).toContain(tab3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
 
       // chrome.tabs.move APIでtab3を先頭に移動
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 0 });
       }, tab3);
 
-      // ツリービューが更新されるまでポーリングで待機
-      // onMovedイベントでツリー状態が再読み込みされる
-      await waitForCondition(
-        async () => {
-          const order = await getTabOrder(sidePanelPage);
-          // tab3が先頭にあることを確認
-          const tab3Index = order.indexOf(tab3);
-          const tab1Index = order.indexOf(tab1);
-          return tab3Index !== -1 && tab1Index !== -1 && tab3Index < tab1Index;
-        },
-        { timeout: 10000, interval: 100, timeoutMessage: 'Tab order was not updated after chrome.tabs.move' }
-      );
-
-      // 最終確認: ツリービューでtab3が先頭にあること
-      const finalOrder = await getTabOrder(sidePanelPage);
-      const tab3FinalIndex = finalOrder.indexOf(tab3);
-      const tab1FinalIndex = finalOrder.indexOf(tab1);
-      expect(tab3FinalIndex).toBeLessThan(tab1FinalIndex);
+      // ツリービューが更新されることを検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tab3, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
     });
 
     test('chrome.tabs.moveでタブを末尾に移動した場合、ツリービューが正しく更新されること', async ({
@@ -73,15 +81,40 @@ test.describe('タブ並び替え同期テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 3つのタブを作成
-      const tab1 = await createTab(extensionContext, 'https://example.com');
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 準備: 3つのタブを作成（各createTabの直後にassertTabStructure）
+      const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
+      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
 
       // chrome.tabs.move APIでtab1を末尾に移動
       await serviceWorker.evaluate(async (tabId) => {
@@ -89,23 +122,13 @@ test.describe('タブ並び替え同期テスト', () => {
         await chrome.tabs.move(tabId, { index: -1 });
       }, tab1);
 
-      // ツリービューが更新されるまでポーリングで待機
-      await waitForCondition(
-        async () => {
-          const order = await getTabOrder(sidePanelPage);
-          const tab1Index = order.indexOf(tab1);
-          const tab3Index = order.indexOf(tab3);
-          // tab1が末尾（tab3より後）にあることを確認
-          return tab1Index !== -1 && tab3Index !== -1 && tab1Index > tab3Index;
-        },
-        { timeout: 10000, interval: 100, timeoutMessage: 'Tab order was not updated when moving to end' }
-      );
-
-      // 最終確認
-      const finalOrder = await getTabOrder(sidePanelPage);
-      const tab1FinalIndex = finalOrder.indexOf(tab1);
-      const tab3FinalIndex = finalOrder.indexOf(tab3);
-      expect(tab1FinalIndex).toBeGreaterThan(tab3FinalIndex);
+      // ツリービューが更新されることを検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
     });
 
     test('chrome.tabs.moveで複数回タブを移動した場合、ツリービューが毎回正しく更新されること', async ({
@@ -113,54 +136,77 @@ test.describe('タブ並び替え同期テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 4つのタブを作成
-      const tab1 = await createTab(extensionContext, 'https://example.com');
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
-      const tab4 = await createTab(extensionContext, 'https://httpbin.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
-      await assertTabInTree(sidePanelPage, tab4);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 準備: 4つのタブを作成（各createTabの直後にassertTabStructure）
+      const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
+      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
+
+      const tab4 = await createTab(extensionContext, 'https://httpbin.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tab4, depth: 0 },
+      ], 0);
 
       // 第1回移動: tab4を先頭に移動
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 0 });
       }, tab4);
 
-      // 更新を待機
-      await waitForCondition(
-        async () => {
-          const order = await getTabOrder(sidePanelPage);
-          const tab4Index = order.indexOf(tab4);
-          const tab1Index = order.indexOf(tab1);
-          return tab4Index !== -1 && tab1Index !== -1 && tab4Index < tab1Index;
-        },
-        { timeout: 10000, interval: 100 }
-      );
+      // 第1回移動後の状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tab4, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
 
       // 第2回移動: tab1を先頭に移動（tab4の前に）
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 0 });
       }, tab1);
 
-      // 更新を待機
-      await waitForCondition(
-        async () => {
-          const order = await getTabOrder(sidePanelPage);
-          const tab1Index = order.indexOf(tab1);
-          const tab4Index = order.indexOf(tab4);
-          return tab1Index !== -1 && tab4Index !== -1 && tab1Index < tab4Index;
-        },
-        { timeout: 10000, interval: 100, timeoutMessage: 'Tab order was not updated after second move' }
-      );
-
-      // 最終確認: tab1が先頭にあること
-      const finalOrder = await getTabOrder(sidePanelPage);
-      const tab1FinalIndex = finalOrder.indexOf(tab1);
-      expect(tab1FinalIndex).toBeLessThan(finalOrder.indexOf(tab4));
+      // 第2回移動後の状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tab1, depth: 0 },
+        { tabId: tab4, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
     });
   });
 
@@ -170,36 +216,51 @@ test.describe('タブ並び替え同期テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 3つのタブを作成
-      const tab1 = await createTab(extensionContext, 'https://example.com');
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 準備: 3つのタブを作成（各createTabの直後にassertTabStructure）
+      const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
+      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
 
       // D&Dでtab3をtab1の前に移動
       await reorderTabs(sidePanelPage, tab3, tab1, 'before');
 
-      // ブラウザタブの順序を取得
-      const browserTabOrder = await serviceWorker.evaluate(async () => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        return tabs.filter(t => t.id).map(t => t.id as number);
-      });
-
-      // ツリービューの順序を取得
-      const treeOrder = await getTabOrder(sidePanelPage);
-
-      // ブラウザタブとツリービューでtab3がtab1より前にあることを確認
-      const browserTab3Index = browserTabOrder.indexOf(tab3);
-      const browserTab1Index = browserTabOrder.indexOf(tab1);
-      expect(browserTab3Index).toBeLessThan(browserTab1Index);
-
-      const treeTab3Index = treeOrder.indexOf(tab3);
-      const treeTab1Index = treeOrder.indexOf(tab1);
-      expect(treeTab3Index).toBeLessThan(treeTab1Index);
+      // D&D後の状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
     });
 
     test('D&Dでタブを並び替えた後、ブラウザタブの順序がストレージに反映されていること', async ({
@@ -207,41 +268,51 @@ test.describe('タブ並び替え同期テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 3つのタブを作成
-      const tab1 = await createTab(extensionContext, 'https://example.com');
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-      await assertTabInTree(sidePanelPage, tab2);
-      await assertTabInTree(sidePanelPage, tab3);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 準備: 3つのタブを作成（各createTabの直後にassertTabStructure）
+      const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
+      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
 
       // D&Dでtab3をtab1の前に移動
       await reorderTabs(sidePanelPage, tab3, tab1, 'before');
 
-      // ブラウザのタブ順序が更新されたことを確認
-      await waitForCondition(
-        async () => {
-          const browserTabOrder = await serviceWorker.evaluate(async () => {
-            const tabs = await chrome.tabs.query({ currentWindow: true });
-            return tabs.filter(t => t.id).map(t => t.id as number);
-          }) as number[];
-
-          const tab3Index = browserTabOrder.indexOf(tab3);
-          const tab1Index = browserTabOrder.indexOf(tab1);
-
-          // tab3がtab1より前にあることを確認
-          return tab3Index !== -1 && tab1Index !== -1 && tab3Index < tab1Index;
-        },
-        { timeout: 10000, interval: 100, timeoutMessage: 'Browser tab order was not updated after D&D' }
-      );
-
-      // ツリービューの順序もブラウザタブと同期していることを確認
-      const treeOrder = await getTabOrder(sidePanelPage);
-      const treeTab3Index = treeOrder.indexOf(tab3);
-      const treeTab1Index = treeOrder.indexOf(tab1);
-      expect(treeTab3Index).toBeLessThan(treeTab1Index);
+      // D&D後の状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
     });
   });
 
@@ -251,21 +322,37 @@ test.describe('タブ並び替え同期テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // 準備: 1つのタブを作成
       const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
 
-      // タブがツリーに表示されるまで待機
-      await assertTabInTree(sidePanelPage, tab1);
-
-      // chrome.tabs.moveを呼び出し（エラーが発生しないことを確認）
-      await expect(
-        serviceWorker.evaluate(async (tabId) => {
-          await chrome.tabs.move(tabId, { index: 0 });
-        }, tab1)
-      ).resolves.not.toThrow();
+      // chrome.tabs.moveを呼び出し
+      await serviceWorker.evaluate(async (tabId) => {
+        await chrome.tabs.move(tabId, { index: 0 });
+      }, tab1);
 
       // タブがまだツリーに存在することを確認
-      await assertTabInTree(sidePanelPage, tab1);
+      // chrome.tabs.moveでindex:0に移動したので、tab1が先頭になる
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tab1, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('高速に連続してタブを移動した場合、最終的な順序が正しく反映されること', async ({
@@ -273,19 +360,59 @@ test.describe('タブ並び替え同期テスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 準備: 5つのタブを作成
-      const tab1 = await createTab(extensionContext, 'https://example.com');
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
-      const tab4 = await createTab(extensionContext, 'https://httpbin.org');
-      const tab5 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      // ウィンドウIDと擬似サイドパネルタブIDを取得
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // タブがツリーに表示されるまで待機
-      await waitForTabInTreeState(extensionContext, tab1);
-      await waitForTabInTreeState(extensionContext, tab2);
-      await waitForTabInTreeState(extensionContext, tab3);
-      await waitForTabInTreeState(extensionContext, tab4);
-      await waitForTabInTreeState(extensionContext, tab5);
+      // ブラウザ起動時のデフォルトタブを閉じる
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      // 準備: 5つのタブを作成（各createTabの直後にassertTabStructure）
+      const tab1 = await createTab(extensionContext, 'https://example.com');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+      ], 0);
+
+      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
+
+      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+      ], 0);
+
+      const tab4 = await createTab(extensionContext, 'https://httpbin.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tab4, depth: 0 },
+      ], 0);
+
+      const tab5 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+        { tabId: tab3, depth: 0 },
+        { tabId: tab4, depth: 0 },
+        { tabId: tab5, depth: 0 },
+      ], 0);
 
       // 高速に連続してタブを移動
       await serviceWorker.evaluate(async (tabIds: number[]) => {
@@ -297,24 +424,15 @@ test.describe('タブ並び替え同期テスト', () => {
         await chrome.tabs.move(tabIds[2], { index: 0 });
       }, [tab1, tab2, tab3, tab4, tab5]);
 
-      // ツリービューが最終的な順序に更新されるまで待機
-      await waitForCondition(
-        async () => {
-          const order = await getTabOrder(sidePanelPage);
-          const tab3Index = order.indexOf(tab3);
-          const tab4Index = order.indexOf(tab4);
-          const tab5Index = order.indexOf(tab5);
-          // tab3, tab4, tab5の順序を確認（全て先頭近くにあるはず）
-          return tab3Index !== -1 && tab4Index !== -1 && tab5Index !== -1 &&
-                 tab3Index < tab4Index && tab4Index < tab5Index;
-        },
-        { timeout: 15000, interval: 100, timeoutMessage: 'Final tab order was not correctly applied after rapid moves' }
-      );
-
-      // 最終確認
-      const finalOrder = await getTabOrder(sidePanelPage);
-      expect(finalOrder.indexOf(tab3)).toBeLessThan(finalOrder.indexOf(tab4));
-      expect(finalOrder.indexOf(tab4)).toBeLessThan(finalOrder.indexOf(tab5));
+      // 高速移動後の最終状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tab3, depth: 0 },
+        { tabId: tab4, depth: 0 },
+        { tabId: tab5, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tab1, depth: 0 },
+        { tabId: tab2, depth: 0 },
+      ], 0);
     });
   });
 });

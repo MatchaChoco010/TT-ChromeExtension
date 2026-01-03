@@ -13,34 +13,9 @@
  */
 
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, refreshSidePanel } from './utils/tab-utils';
-import { waitForCondition, waitForTabDepthInUI } from './utils/polling-utils';
-
-/**
- * タブが作成された後、UIに表示されるまで待機するヘルパー関数
- */
-async function waitForTabInUI(
-  sidePanelPage: import('@playwright/test').Page,
-  extensionContext: import('@playwright/test').BrowserContext,
-  tabId: number,
-  timeout: number = 15000
-): Promise<void> {
-  // まず STATE_UPDATED を送信してUIの更新をトリガー
-  const serviceWorkers = extensionContext.serviceWorkers();
-  if (serviceWorkers.length > 0) {
-    await serviceWorkers[0].evaluate(async () => {
-      try {
-        await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
-      } catch { /* ignore */ }
-    });
-  }
-
-  // UIに表示されるまで待機
-  await expect(async () => {
-    const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-    await expect(tabNode).toBeVisible();
-  }).toPass({ timeout });
-}
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { waitForCondition } from './utils/polling-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('タブグループ化機能', () => {
   test.describe('複数タブのグループ化', () => {
@@ -52,12 +27,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -123,13 +116,38 @@ test.describe('タブグループ化機能', () => {
       const groupNode = sidePanelPage.locator('[data-testid^="group-header-"]');
       await expect(groupNode.first()).toBeVisible({ timeout: 5000 });
 
+      // グループタブのIDを取得
+      const groupTabId = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+        if (!treeState?.nodes) return null;
+        const groupNode = Object.values(treeState.nodes).find(
+          (node) => node.id.startsWith('group-') && node.tabId > 0
+        );
+        return groupNode?.tabId ?? null;
+      });
+
       // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
-      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
-      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -140,12 +158,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -204,9 +240,30 @@ test.describe('タブグループ化機能', () => {
       const groupIcon = groupNode.locator('text=📁');
       await expect(groupIcon).toBeVisible({ timeout: 3000 });
 
+      // グループタブのIDを取得
+      const groupTabId = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+        if (!treeState?.nodes) return null;
+        const groupNode = Object.values(treeState.nodes).find(
+          (node) => node.id.startsWith('group-') && node.tabId > 0
+        );
+        return groupNode?.tabId ?? null;
+      });
+
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+      ], 0);
     });
   });
 
@@ -222,11 +279,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -268,6 +344,7 @@ test.describe('タブグループ化機能', () => {
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       // Assert: グループ親タブが作成されていることを確認（実タブを使用するためtabId > 0）
+      let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
@@ -276,9 +353,14 @@ test.describe('タブグループ化機能', () => {
           });
           if (!treeState?.nodes) return false;
           // group-で始まるIDを持つノードが存在するか確認（実タブを使用するためtabId > 0）
-          return Object.values(treeState.nodes).some(
+          const groupNode = Object.values(treeState.nodes).find(
             (node) => node.id.startsWith('group-') && node.tabId > 0
           );
+          if (groupNode) {
+            groupTabId = groupNode.tabId;
+            return true;
+          }
+          return false;
         },
         { timeout: 10000, timeoutMessage: 'Group parent node was not created from multiple tabs' }
       );
@@ -288,8 +370,12 @@ test.describe('タブグループ化機能', () => {
       await expect(groupNode.first()).toBeVisible({ timeout: 5000 });
 
       // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
-      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
-      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
 
       // 元のタブがグループの子として配置されていることを確認
       await waitForCondition(
@@ -318,7 +404,17 @@ test.describe('タブグループ化機能', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -330,11 +426,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -384,7 +499,15 @@ test.describe('タブグループ化機能', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -394,16 +517,39 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: まずグループを作成するために2つのタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // 追加でグループに追加する3番目のタブを作成
       const tabId3 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -543,19 +689,62 @@ test.describe('タブグループ化機能', () => {
         { timeout: 10000, timeoutMessage: 'Tab was not added to group' }
       );
 
+      // グループタブのIDを取得
+      const groupTabId = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+        if (!treeState?.nodes) return null;
+        const groupNode = Object.values(treeState.nodes).find(
+          (node) => node.id.startsWith('group-') && node.tabId > 0
+        );
+        return groupNode?.tabId ?? null;
+      });
+
       // クリーンアップ
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId2, depth: 1 },
+        { tabId: tabId3, depth: 1 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId3, depth: 1 },
+      ], 0);
+
       await closeTab(extensionContext, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+      ], 0);
     });
 
     test('利用可能なグループがない場合はメニュー項目が無効化される', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: タブを1つだけ作成（グループがない状態）
       const tabId = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -600,6 +789,9 @@ test.describe('タブグループ化機能', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -621,11 +813,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成（要件3.8により単一タブのグループ化は無効化）
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -693,16 +904,34 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group tab was not created with chrome-extension:// URL' }
       );
 
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -714,11 +943,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成（要件3.8により単一タブのグループ化は無効化）
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -783,16 +1031,34 @@ test.describe('タブグループ化機能', () => {
 
       expect(tabExists).toBe(true);
 
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -804,11 +1070,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成（要件3.8により単一タブのグループ化は無効化）
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -882,19 +1167,33 @@ test.describe('タブグループ化機能', () => {
       );
 
       // UIで子タブの深さが正しく表示されていることを確認（depth=1）
-      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
-      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
 
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -906,11 +1205,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成（要件3.8により単一タブのグループ化は無効化）
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -974,16 +1292,34 @@ test.describe('タブグループ化機能', () => {
 
       expect(groupTabUrl).toMatch(/^chrome-extension:\/\/.*\/group\.html/);
 
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -995,11 +1331,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成（要件3.8により単一タブのグループ化は無効化）
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -1063,16 +1418,34 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group node was not saved correctly to storage' }
       );
 
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -1089,10 +1462,25 @@ test.describe('タブグループ化機能', () => {
     test('単一タブ選択時にグループ化オプションがグレーアウトされる', async ({
       extensionContext,
       sidePanelPage,
+      serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 単一のタブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -1130,6 +1518,9 @@ test.describe('タブグループ化機能', () => {
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -1140,12 +1531,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -1207,24 +1616,34 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group node is not expanded after creation' }
       );
 
-      // UIでも子タブが表示されていることを確認（展開状態の証拠）
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`)).toBeVisible({ timeout: 5000 });
-      await expect(sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`)).toBeVisible({ timeout: 5000 });
-
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
-      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
-      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+      // 子タブの深さがUIで正しく表示されていることを確認（depth=1、展開状態であることも検証）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
 
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -1235,15 +1654,38 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを順番に作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       const tabId3 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -1328,21 +1770,42 @@ test.describe('タブグループ化機能', () => {
       );
 
       // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
-      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
-      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
-      await waitForTabDepthInUI(sidePanelPage, tabId3, 1, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+        { tabId: tabId3, depth: 1 },
+      ], 0);
 
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+          { tabId: tabId3, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     /**
@@ -1355,12 +1818,30 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
+      // テスト環境セットアップ
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+      await closeTab(extensionContext, initialBrowserTabId);
+
+      // 初期状態を検証
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
       // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
       const tabId2 = await createTab(extensionContext, 'about:blank');
-      await waitForTabInUI(sidePanelPage, extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
 
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
@@ -1439,19 +1920,33 @@ test.describe('タブグループ化機能', () => {
       );
 
       // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
-      await waitForTabDepthInUI(sidePanelPage, tabId1, 1, { timeout: 5000 });
-      await waitForTabDepthInUI(sidePanelPage, tabId2, 1, { timeout: 5000 });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
 
       // クリーンアップ
       if (groupTabId) {
-        await serviceWorker.evaluate(async (tabId) => {
-          try {
-            await chrome.tabs.remove(tabId);
-          } catch { /* ignore */ }
-        }, groupTabId);
+        await closeTab(extensionContext, groupTabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: tabId1, depth: 0 },
+          { tabId: tabId2, depth: 0 },
+        ], 0);
       }
+
       await closeTab(extensionContext, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
       await closeTab(extensionContext, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 });

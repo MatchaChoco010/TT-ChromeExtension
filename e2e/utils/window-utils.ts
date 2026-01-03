@@ -104,30 +104,6 @@ export async function moveTabToWindow(
 }
 
 /**
- * クロスウィンドウドラッグ&ドロップをシミュレート
- *
- * 注: 実際のドラッグ&ドロップUIをシミュレートする代わりに、
- * 内部的にmoveTabToWindowを使用してタブを移動します。
- * これは、クロスウィンドウのドラッグ&ドロップUIが複雑であるため、
- * E2Eテストでは実際のAPI呼び出しでの検証に焦点を当てています。
- *
- * @param page - Side PanelのPage
- * @param tabId - 移動するタブのID
- * @param targetWindowId - 移動先のウィンドウID
- */
-export async function dragTabToWindow(
-  page: Page,
-  tabId: number,
-  targetWindowId: number
-): Promise<void> {
-  // 現在のコンテキストを取得
-  const context = page.context();
-
-  // 内部的にmoveTabToWindowを使用（ポーリング待機込み）
-  await moveTabToWindow(context, tabId, targetWindowId);
-}
-
-/**
  * 各ウィンドウのツリー状態が正しく同期されることを検証
  *
  * @param context - ブラウザコンテキスト
