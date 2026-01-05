@@ -874,6 +874,11 @@ export class TreeStateManager {
       // 深さを1レベル上げる
       child.depth = parentNode.depth;
 
+      // グループIDをクリア（グループから解放された場合）
+      if (child.groupId === parentNode.id || child.groupId === parentNode.groupId) {
+        child.groupId = parentNode.parentId ? this.nodes.get(parentNode.parentId)?.groupId : undefined;
+      }
+
       // 子ノードの子孫の深さも再帰的に更新
       this.updateChildrenDepth(child);
 
@@ -891,9 +896,20 @@ export class TreeStateManager {
             grandparentNode.children.push(child);
           }
         }
+      } else {
+        // 親がルートノードの場合、子をビューノードリストに追加
+        // 親ノードの直後の位置に挿入
+        const viewNodes = this.views.get(parentNode.viewId) || [];
+        const parentIndex = viewNodes.indexOf(parentNode.id);
+        if (parentIndex !== -1) {
+          // 親の後の位置に順番に挿入（最初の子は親の直後、2番目は最初の子の後、...）
+          const insertIndex = parentIndex + 1 + children.indexOf(child);
+          viewNodes.splice(insertIndex, 0, child.id);
+        } else {
+          viewNodes.push(child.id);
+        }
+        this.views.set(parentNode.viewId, viewNodes);
       }
-      // 親がルートノードの場合は何もしない
-      // (child.parentId = nullで既にルートノードとして扱われる)
     }
 
     // 親ノードの子配列をクリア
@@ -1002,17 +1018,42 @@ export class TreeStateManager {
     this.tabToNode.set(groupTabId, groupNodeId);
     this.expandedNodes.add(groupNodeId);
 
-    // 親ノードがある場合は親の子リストに追加
+    // ビューノードリストを取得
+    const viewNodes = this.views.get(viewId) || [];
+
+    // グループ化対象の最初のノードのインデックスを取得
+    const firstNodeIndex = viewNodes.findIndex((nodeId) => {
+      const node = this.nodes.get(nodeId);
+      return node && tabIds.includes(node.tabId);
+    });
+
+    // 親ノードがある場合は親の子リストに追加（グループ化対象の最初のノードの位置に挿入）
     if (commonParentId !== null) {
       const parentNode = this.nodes.get(commonParentId);
       if (parentNode) {
-        parentNode.children.push(groupNode);
+        // グループ化対象ノードの親の子リストでの位置を見つける
+        const firstChildIndex = parentNode.children.findIndex(
+          (child) => tabIds.includes(child.tabId)
+        );
+        if (firstChildIndex >= 0) {
+          // グループ化対象ノードを親の子リストから削除
+          parentNode.children = parentNode.children.filter(
+            (child) => !tabIds.includes(child.tabId)
+          );
+          // グループノードを最初の子の位置に挿入
+          parentNode.children.splice(firstChildIndex, 0, groupNode);
+        } else {
+          parentNode.children.push(groupNode);
+        }
       }
     }
 
-    // ビューに追加
-    const viewNodes = this.views.get(viewId) || [];
-    viewNodes.push(groupNodeId);
+    // ビューに追加（グループ化対象の最初のノードの位置に挿入）
+    if (firstNodeIndex >= 0) {
+      viewNodes.splice(firstNodeIndex, 0, groupNodeId);
+    } else {
+      viewNodes.push(groupNodeId);
+    }
     this.views.set(viewId, viewNodes);
 
     // 選択されたタブをグループの子として移動
@@ -1026,6 +1067,12 @@ export class TreeStateManager {
         if (oldParent) {
           oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
         }
+      }
+
+      // ビューノードリストから削除（子になるのでルートレベルから削除）
+      const nodeIndexInView = viewNodes.indexOf(node.id);
+      if (nodeIndexInView >= 0) {
+        viewNodes.splice(nodeIndexInView, 1);
       }
 
       // グループの子として追加
@@ -1053,100 +1100,7 @@ export class TreeStateManager {
       };
       await chrome.storage.local.set({ groups: existingGroups });
     } catch (_err) {
-      // グループストレージの保存に失敗してもグループ作成自体は成功とする
-    }
-
-    return groupNodeId;
-  }
-
-  /**
-   * 複数タブからグループを作成（仮想タブID版 - 後方互換性のため残す）
-   *
-   * 新しいグループ親ノードを作成し、選択されたタブをその子要素として移動します。
-   * 注意: この関数は仮想タブIDを使用するため、新しいコードではcreateGroupWithRealTabを使用してください。
-   *
-   * @param tabIds - グループ化するタブIDの配列
-   * @returns 作成されたグループノードのID
-   * @deprecated createGroupWithRealTabを使用してください
-   */
-  async createGroupFromTabs(tabIds: number[]): Promise<string> {
-    if (tabIds.length === 0) {
-      throw new Error('No tabs specified for grouping');
-    }
-
-    // 最初のタブからviewIdを取得
-    const firstNode = this.getNodeByTabId(tabIds[0]);
-    if (!firstNode) {
-      throw new Error('First tab not found');
-    }
-    const viewId = firstNode.viewId;
-
-    // グループ用の仮想タブID（負の値を使用して実際のタブと区別）
-    const groupTabId = -(Date.now());
-    const groupNodeId = `group-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-    // グループノードを作成
-    const groupNode: TabNode = {
-      id: groupNodeId,
-      tabId: groupTabId,
-      parentId: null,
-      children: [],
-      isExpanded: true,
-      depth: 0,
-      viewId,
-      groupId: groupNodeId, // グループノード自体にgroupIdを設定
-    };
-
-    // マッピングに追加
-    this.nodes.set(groupNodeId, groupNode);
-    this.tabToNode.set(groupTabId, groupNodeId);
-    this.expandedNodes.add(groupNodeId);
-
-    // ビューに追加
-    const viewNodes = this.views.get(viewId) || [];
-    viewNodes.push(groupNodeId);
-    this.views.set(viewId, viewNodes);
-
-    // 選択されたタブをグループの子として移動
-    for (const tabId of tabIds) {
-      const node = this.getNodeByTabId(tabId);
-      if (!node) continue;
-
-      // 既存の親から削除
-      if (node.parentId) {
-        const oldParent = this.nodes.get(node.parentId);
-        if (oldParent) {
-          oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
-        }
-      }
-
-      // グループの子として追加
-      node.parentId = groupNodeId;
-      node.depth = 1;
-      node.groupId = groupNodeId;
-      groupNode.children.push(node);
-
-      // 子ノードの深さを再帰的に更新
-      this.updateChildrenDepth(node);
-    }
-
-    // ストレージに永続化
-    await this.persistState();
-
-    // グループ情報をgroupsストレージにも保存
-    // これにより、TreeStateProviderのgroupsステートと同期される
-    try {
-      const result = await chrome.storage.local.get('groups');
-      const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
-      existingGroups[groupNodeId] = {
-        id: groupNodeId,
-        name: '新しいグループ',  // デフォルト名
-        color: '#f59e0b',  // オレンジ色のデフォルト
-        isExpanded: true,
-      };
-      await chrome.storage.local.set({ groups: existingGroups });
-    } catch (_err) {
-      // グループストレージの保存に失敗してもグループ作成自体は成功とする
+      // グループストレージの保存に失敗
     }
 
     return groupNodeId;

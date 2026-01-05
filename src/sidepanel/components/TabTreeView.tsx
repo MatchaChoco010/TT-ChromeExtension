@@ -639,125 +639,6 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 // DragMonitorコンポーネントとcollectAllNodeIds関数は削除（自前useDragDropに統合）
 
 /**
- * グループノードかどうかを判定するヘルパー関数
- * TreeStateManager.createGroupWithRealTabで作成されたノードは:
- * - idが'group-'で始まる
- * - tabIdは正の値（実タブ）
- *
- * 注意: グループ化は実タブを使用するように変更されたため、
- * tabIdの符号ではなくIDプレフィックスのみで判定する
- */
-const isGroupNode = (node: TabNode): boolean => {
-  return node.id.startsWith('group-');
-};
-
-/**
- * グループノードヘッダーコンポーネント
- * グループをツリー内に統合表示するためのヘッダー
- */
-interface GroupNodeHeaderProps {
-  group: Group;
-  onToggle: (groupId: string) => void;
-}
-
-const GroupNodeHeader: React.FC<GroupNodeHeaderProps> = ({ group, onToggle }) => {
-  const handleToggleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onToggle(group.id);
-  };
-
-  return (
-    <div
-      data-testid={`group-tree-node-${group.id}`}
-      className="flex items-center p-2 bg-gray-800 hover:bg-gray-700 cursor-pointer"
-      style={{ paddingLeft: '8px' }}
-    >
-      {/* 展開/折りたたみボタン */}
-      <button
-        data-testid={`toggle-expand-${group.id}`}
-        onClick={handleToggleClick}
-        className="mr-2 w-4 h-4 flex items-center justify-center text-gray-300"
-        aria-label={group.isExpanded ? 'Collapse' : 'Expand'}
-      >
-        {group.isExpanded ? '▼' : '▶'}
-      </button>
-
-      {/* グループカラーインジケータ */}
-      <div
-        data-testid={`group-color-indicator-${group.id}`}
-        className="mr-2 w-3 h-3 rounded-full flex-shrink-0"
-        style={{ backgroundColor: group.color }}
-      />
-
-      {/* グループ名 */}
-      <span className="text-sm font-medium truncate text-gray-100">{group.name}</span>
-    </div>
-  );
-};
-
-/**
- * TreeStateManagerのグループノードヘッダーコンポーネント
- * TreeStateManager.createGroupFromTabsで作成されたグループノードを表示
- * 通常のタブとは異なる専用の表示スタイル
- */
-interface TreeGroupNodeHeaderProps {
-  node: TabNode;
-  onToggle: (nodeId: string) => void;
-  renderChildren: () => React.ReactNode;
-}
-
-const TreeGroupNodeHeader: React.FC<TreeGroupNodeHeaderProps> = ({ node, onToggle, renderChildren }) => {
-  const hasChildren = node.children && node.children.length > 0;
-
-  const handleToggleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onToggle(node.id);
-  };
-
-  return (
-    <div>
-      <div
-        data-testid={`group-header-${node.id}`}
-        className="flex items-center p-2 bg-gray-800 hover:bg-gray-700 cursor-pointer select-none"
-        style={{ paddingLeft: `${node.depth * 20 + 8}px` }}
-      >
-        {/* 展開/折りたたみボタン */}
-        {hasChildren && (
-          <button
-            data-testid={`toggle-expand-${node.id}`}
-            onClick={handleToggleClick}
-            className="mr-2 w-4 h-4 flex items-center justify-center text-gray-300"
-            aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
-          >
-            {node.isExpanded ? '▼' : '▶'}
-          </button>
-        )}
-
-        {/* グループアイコン（フォルダアイコンとして表示） */}
-        <div className="mr-2 w-4 h-4 flex items-center justify-center text-gray-400 flex-shrink-0">
-          📁
-        </div>
-
-        {/* グループ名（グループIDから抽出またはデフォルト名） */}
-        <span className="text-sm font-medium truncate text-gray-100">
-          グループ
-        </span>
-
-        {/* 子タブ数の表示 */}
-        {hasChildren && (
-          <span className="ml-2 text-xs text-gray-400">
-            ({node.children.length})
-          </span>
-        )}
-      </div>
-
-      {/* 子ノードの表示（展開時のみ） */}
-      {node.isExpanded && renderChildren()}
-    </div>
-  );
-};
-
-/**
  * タブツリービューコンポーネント
  * タブのツリー構造を表示し、現在のビューに基づいてフィルタリングする
  * onDragEndが提供されている場合、ドラッグ&ドロップ機能を有効化
@@ -789,7 +670,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onSnapshot,
   // グループ機能をツリー内に統合表示
   groups,
-  onGroupToggle,
   // グループ追加サブメニュー用
   onAddToGroup,
   // ビュー移動サブメニュー用
@@ -822,29 +702,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     () => nodes.filter((node) => node.viewId === currentViewId),
     [nodes, currentViewId]
   );
-
-  // グループ別にタブをグループ化
-  const { groupedNodes, ungroupedNodes } = useMemo(() => {
-    if (!groups) {
-      return { groupedNodes: {}, ungroupedNodes: filteredNodes };
-    }
-
-    const grouped: Record<string, TabNode[]> = {};
-    const ungrouped: TabNode[] = [];
-
-    filteredNodes.forEach((node) => {
-      if (node.groupId && groups[node.groupId]) {
-        if (!grouped[node.groupId]) {
-          grouped[node.groupId] = [];
-        }
-        grouped[node.groupId].push(node);
-      } else {
-        ungrouped.push(node);
-      }
-    });
-
-    return { groupedNodes: grouped, ungroupedNodes: ungrouped };
-  }, [filteredNodes, groups]);
 
   const isDraggable = !!onDragEnd;
 
@@ -1214,24 +1071,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   }, [globalIsDragging]);
 
   // タブノードをレンダリングするヘルパー関数
-  // グループノード（TreeStateManager作成）の場合は専用ヘッダーを表示
   const renderTabNode = (node: TabNode): React.ReactNode => {
-    // グループノードの場合は専用コンポーネントでレンダリング
-    if (isGroupNode(node)) {
-      return (
-        <TreeGroupNodeHeader
-          key={node.id}
-          node={node}
-          onToggle={onToggleExpand}
-          renderChildren={() => (
-            <>
-              {node.children.map((child) => renderTabNode(child))}
-            </>
-          )}
-        />
-      );
-    }
-
     if (isDraggable) {
       return (
         <DraggableTreeNodeItem
@@ -1292,20 +1132,10 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
   const content = (
     <div ref={containerRef} className={containerClassName} data-drag-container>
-      {/* グループとそのタブを表示 */}
-      {groups && onGroupToggle && Object.entries(groups).map(([groupId, group]) => {
-        const childNodes = groupedNodes[groupId] || [];
-        return (
-          <div key={groupId}>
-            <GroupNodeHeader group={group} onToggle={onGroupToggle} />
-            {/* グループ内のタブ（展開時のみ表示） */}
-            {group.isExpanded && childNodes.map((node) => renderTabNode(node))}
-          </div>
-        );
+      {/* ツリー順序に従ってノードを表示 */}
+      {filteredNodes.map((node) => {
+        return renderTabNode(node);
       })}
-
-      {/* グループに属さないタブを表示 */}
-      {ungroupedNodes.map((node) => renderTabNode(node))}
       {/* ドロップインジケーター表示 */}
       {/* topPositionを渡して正しい位置にインジケーターを表示 */}
       {dropIndicatorPosition && (

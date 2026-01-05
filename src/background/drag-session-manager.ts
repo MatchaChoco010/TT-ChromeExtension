@@ -122,9 +122,6 @@ export class DragSessionManager {
       this.session.state === 'pending_cross_window' &&
       elapsed > this.CROSS_WINDOW_TIMEOUT_MS
     ) {
-      console.warn(
-        '[DragSession] Cross-window move timeout, reverting to local drag',
-      );
       this.session.state = 'dragging_local';
       this.session.isLocked = false;
       this.session.updatedAt = Date.now();
@@ -132,7 +129,6 @@ export class DragSessionManager {
 
     // 全体のタイムアウト
     if (elapsed > this.SESSION_TIMEOUT_MS) {
-      console.warn('[DragSession] Session timeout, ending session');
       void this.endSession('TIMEOUT');
     }
   }
@@ -199,7 +195,6 @@ export class DragSessionManager {
       }
     }
 
-    console.log(`[DragSession] Started: ${this.session.sessionId}`);
     return this.session;
   }
 
@@ -296,12 +291,8 @@ export class DragSessionManager {
    *
    * @param reason - 終了理由
    */
-  async endSession(reason: string = 'COMPLETED'): Promise<void> {
+  async endSession(_reason: string = 'COMPLETED'): Promise<void> {
     if (this.session) {
-      console.log(
-        `[DragSession] Ended: ${this.session.sessionId}, reason: ${reason}`,
-      );
-
       // keep-aliveアラームをクリア
       if (typeof chrome !== 'undefined' && chrome.alarms) {
         try {
@@ -322,7 +313,6 @@ export class DragSessionManager {
    */
   handleWindowRemoved(windowId: number): void {
     if (this.session && this.session.currentWindowId === windowId) {
-      console.log('[DragSession] Window closed during drag, ending session');
       void this.endSession('WINDOW_CLOSED');
     }
   }
@@ -334,7 +324,6 @@ export class DragSessionManager {
    */
   handleTabRemoved(tabId: number): void {
     if (this.session && this.session.tabId === tabId) {
-      console.log('[DragSession] Tab removed during drag, ending session');
       void this.endSession('TAB_REMOVED');
     }
   }
@@ -347,9 +336,7 @@ export class DragSessionManager {
   handleAlarm(alarm: chrome.alarms.Alarm): void {
     if (alarm.name === this.KEEP_ALIVE_ALARM_NAME) {
       // セッションがアクティブな間はService Workerを維持
-      if (this.session) {
-        console.log('[DragSession] Keep-alive ping');
-      } else {
+      if (!this.session) {
         // セッションがない場合はアラームをクリア
         if (typeof chrome !== 'undefined' && chrome.alarms) {
           void chrome.alarms.clear(this.KEEP_ALIVE_ALARM_NAME);
@@ -367,7 +354,6 @@ export class DragSessionManager {
 
     this.session.isOutsideTree = true;
     this.session.updatedAt = Date.now();
-    console.log('[DragSession] Drag moved outside tree view');
   }
 
   /**
@@ -399,9 +385,6 @@ export class DragSessionManager {
     ) {
       try {
         await chrome.windows.update(windowId, { focused: true });
-        console.log(
-          `[DragSession] Focused window ${windowId} for cross-window drag`,
-        );
       } catch (_error) {
         // フォーカス移動に失敗しても続行（ウィンドウが既に閉じられている等）
       }

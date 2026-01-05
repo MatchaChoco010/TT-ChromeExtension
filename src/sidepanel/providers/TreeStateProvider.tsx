@@ -1211,8 +1211,27 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     const node = treeState.nodes[nodeId];
     if (!node) return;
 
+    // グループノードを取得して深さを計算
+    const groupNode = treeState.nodes[groupId];
+    const groupDepth = groupNode?.depth ?? 0;
+
     const updatedNodes = { ...treeState.nodes };
-    updatedNodes[nodeId] = { ...node, groupId };
+    updatedNodes[nodeId] = {
+      ...node,
+      groupId,
+      parentId: groupId,  // グループノードを親として設定
+      depth: groupDepth + 1,  // グループの深さ + 1
+    };
+
+    // グループノードのchildrenに追加
+    if (groupNode) {
+      const updatedGroupNode = {
+        ...groupNode,
+        children: [...groupNode.children, updatedNodes[nodeId]],
+      };
+      updatedNodes[groupId] = updatedGroupNode;
+    }
+
     updateTreeState({ ...treeState, nodes: updatedNodes });
   }, [treeState, updateTreeState]);
 
@@ -1226,8 +1245,26 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     if (!node) return;
 
     const updatedNodes = { ...treeState.nodes };
-    const updatedNode = { ...node, groupId: undefined };
+
+    // グループノードからchildrenを削除
+    if (node.groupId && updatedNodes[node.groupId]) {
+      const groupNode = updatedNodes[node.groupId];
+      const updatedGroupNode = {
+        ...groupNode,
+        children: groupNode.children.filter((child) => child.id !== nodeId),
+      };
+      updatedNodes[node.groupId] = updatedGroupNode;
+    }
+
+    // ノードをルートレベルに戻す
+    const updatedNode = {
+      ...node,
+      groupId: undefined,
+      parentId: null,
+      depth: 0,
+    };
     updatedNodes[nodeId] = updatedNode;
+
     updateTreeState({ ...treeState, nodes: updatedNodes });
   }, [treeState, updateTreeState]);
 

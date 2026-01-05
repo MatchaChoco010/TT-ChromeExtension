@@ -18,5 +18,7 @@ export const testPathAlias = (): void => {
     color: '#000000',
   };
 
-  console.log('Path alias test:', testNode, testView);
+  // パスエイリアスの動作確認用（testNodeとtestViewを使用）
+  void testNode;
+  void testView;
 };

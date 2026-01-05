@@ -91,10 +91,14 @@ export const useMenuActions = () => {
 
         case 'group':
           // グループ化 (Service Worker に委譲)
-          await chrome.runtime.sendMessage({
-            type: 'CREATE_GROUP',
-            payload: { tabIds },
-          });
+          try {
+            await chrome.runtime.sendMessage({
+              type: 'CREATE_GROUP',
+              payload: { tabIds },
+            });
+          } catch (_err) {
+            // グループ化に失敗
+          }
           break;
 
         case 'ungroup':

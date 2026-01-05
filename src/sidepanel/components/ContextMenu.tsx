@@ -285,7 +285,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           グループを解除
         </button>
       ) : isMultipleSelection ? (
-        // 複数選択時: 従来通りのグループ化ボタン
+        // 複数選択時
         <button
           role="menuitem"
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
@@ -295,14 +295,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         </button>
       ) : (
         // 単一タブ選択時
-        // 単一タブ選択時は「グループ化」オプションを無効化（グレーアウト）
         <>
-          {/* 単一タブ選択時はグループ化ボタンを無効化（グレーアウト） */}
           <button
             role="menuitem"
-            className="w-full px-4 py-2 text-left text-sm text-gray-500 cursor-not-allowed"
-            disabled
-            aria-disabled="true"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
+            onClick={() => handleMenuItemClick('group')}
           >
             タブをグループ化
           </button>

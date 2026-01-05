@@ -1360,9 +1360,20 @@ describe('TabTreeView', () => {
       mockGetTabInfo.mockReset();
     });
 
+    // グループテスト用のgroupsオブジェクトを生成するヘルパー
+    const createMockGroups = (groupId: string) => ({
+      [groupId]: {
+        id: groupId,
+        name: 'テストグループ',
+        color: '#f59e0b',
+        isExpanded: true,
+      },
+    });
+
     /**
-     * TreeStateManagerで作成されたグループノードを模擬するヘルパー関数
-     * グループノードは負のtabIdを持ち、idが'group-'で始まる
+     * グループノードを模擬するヘルパー関数
+     * グループノードは実タブIDを持ち、idが'group-'で始まる
+     * グループノードは通常のタブノードと同じように表示される
      */
     const createMockGroupNode = (
       id: string,
@@ -1377,26 +1388,25 @@ describe('TabTreeView', () => {
       isExpanded: true,
       depth: 0,
       viewId,
-      groupId: id, // グループノード自体にgroupIdを設定
+      groupId: id,
     });
 
-    it('グループノード（group-で始まるID、負のtabId）がグループヘッダーとして表示されること', () => {
-      // TreeStateManager.createGroupFromTabsで作成されるグループノードを模擬
-      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
+    it('グループノード（group-で始まるID）が通常のタブノードと同じ形式で表示されること', () => {
+      const groupNode = createMockGroupNode('group-100', 100, 'default');
       const childNode1: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-1234567890-abc123',
+        groupId: 'group-100',
       };
       const childNode2: TabNode = {
-        ...createMockNode('node-2', 2, 'default', 'group-1234567890-abc123'),
+        ...createMockNode('node-2', 2, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-1234567890-abc123',
+        groupId: 'group-100',
       };
       groupNode.children = [childNode1, childNode2];
 
-      // 通常のタブ情報を返す（グループノードはgetTabInfoが呼ばれない）
       mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         if (tabId === 2) return { id: 2, title: 'Tab 2', url: 'https://example.com/2', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         return undefined;
@@ -1409,47 +1419,29 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
+          groups={createMockGroups('group-100')}
         />
       );
 
-      // グループノードがグループヘッダーとして表示されること
-      expect(screen.getByTestId('group-header-group-1234567890-abc123')).toBeInTheDocument();
+      // グループノードがtree-nodeとして表示されること
+      expect(screen.getByTestId('tree-node-100')).toBeInTheDocument();
       // 子タブが表示されること
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
 
-    it('グループヘッダーが通常のタブとは異なる専用の表示スタイルを持つこと', () => {
-      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
-
-      mockGetTabInfo.mockReturnValue(undefined);
-
-      render(
-        <TabTreeView
-          nodes={[groupNode]}
-          currentViewId="default"
-          onNodeClick={mockOnNodeClick}
-          onToggleExpand={mockOnToggleExpand}
-          getTabInfo={mockGetTabInfo}
-        />
-      );
-
-      // グループヘッダーにはグループを示す専用のスタイル/クラスが適用されること
-      const groupHeader = screen.getByTestId('group-header-group-1234567890-abc123');
-      expect(groupHeader).toHaveClass('bg-gray-800');
-    });
-
-    it('グループヘッダーの展開/折りたたみボタンクリック時にonToggleExpandが呼ばれること', async () => {
+    it('グループノードの展開/折りたたみボタンクリック時にonToggleExpandが呼ばれること', async () => {
       const user = userEvent.setup();
-      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
+      const groupNode = createMockGroupNode('group-100', 100, 'default');
       const childNode: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-1234567890-abc123',
+        groupId: 'group-100',
       };
       groupNode.children = [childNode];
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         return undefined;
       });
@@ -1461,32 +1453,47 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
+          groups={createMockGroups('group-100')}
         />
       );
 
-      // 展開/折りたたみボタンをクリック
-      const toggleButton = screen.getByTestId('toggle-expand-group-1234567890-abc123');
-      await user.click(toggleButton);
+      // グループノード内の展開/折りたたみボタンをクリック
+      const groupNodeElement = screen.getByTestId('tree-node-100');
+      const toggleButton = groupNodeElement.querySelector('[data-testid="expand-button"]');
+      expect(toggleButton).not.toBeNull();
+      await user.click(toggleButton!);
 
-      expect(mockOnToggleExpand).toHaveBeenCalledWith('group-1234567890-abc123');
+      // onToggleExpandが呼ばれる
+      expect(mockOnToggleExpand).toHaveBeenCalledWith('group-100');
     });
 
     it('折りたたまれたグループノードの子タブが非表示になること', () => {
       const groupNode: TabNode = {
-        ...createMockGroupNode('group-1234567890-abc123', -1234567890, 'default'),
+        ...createMockGroupNode('group-100', 100, 'default'),
         isExpanded: false,
       };
       const childNode: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-1234567890-abc123',
+        groupId: 'group-100',
       };
       groupNode.children = [childNode];
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         return undefined;
       });
+
+      // 折りたたまれた状態のグループ
+      const collapsedGroups = {
+        'group-100': {
+          id: 'group-100',
+          name: 'テストグループ',
+          color: '#f59e0b',
+          isExpanded: false,
+        },
+      };
 
       render(
         <TabTreeView
@@ -1495,22 +1502,23 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
+          groups={collapsedGroups}
         />
       );
 
-      // グループヘッダーは表示される
-      expect(screen.getByTestId('group-header-group-1234567890-abc123')).toBeInTheDocument();
+      // グループノードは表示される
+      expect(screen.getByTestId('tree-node-100')).toBeInTheDocument();
       // 子タブは非表示
       expect(screen.queryByTestId('tree-node-1')).not.toBeInTheDocument();
     });
 
     it('グループノードと通常のタブノードが混在する場合、両方が正しくレンダリングされること', () => {
       // グループノード
-      const groupNode = createMockGroupNode('group-1234567890-abc123', -1234567890, 'default');
+      const groupNode = createMockGroupNode('group-100', 100, 'default');
       const groupChildNode: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-1234567890-abc123'),
+        ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-1234567890-abc123',
+        groupId: 'group-100',
       };
       groupNode.children = [groupChildNode];
 
@@ -1518,6 +1526,7 @@ describe('TabTreeView', () => {
       const regularNode = createMockNode('node-2', 2, 'default');
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
+        if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         if (tabId === 1) return { id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         if (tabId === 2) return { id: 2, title: 'Tab 2', url: 'https://example.com/2', status: 'complete', isPinned: false, windowId: 1, discarded: false };
         return undefined;
@@ -1530,11 +1539,12 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
+          groups={createMockGroups('group-100')}
         />
       );
 
-      // グループヘッダーが表示される
-      expect(screen.getByTestId('group-header-group-1234567890-abc123')).toBeInTheDocument();
+      // グループノードが表示される
+      expect(screen.getByTestId('tree-node-100')).toBeInTheDocument();
       // グループの子タブが表示される
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       // 通常のタブも表示される

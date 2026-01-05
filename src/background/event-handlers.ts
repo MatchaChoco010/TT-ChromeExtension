@@ -59,6 +59,15 @@ const pendingTabParents = new Map<number, number>();
 // When a tab is duplicated, we want the new tab to be placed as a sibling, not a child
 const pendingDuplicateSources = new Set<number>();
 
+// Track group tabs being created
+// Set<tabId>
+// Group tabs are created via createGroupWithRealTab and should be skipped in handleTabCreated
+const pendingGroupTabIds = new Set<number>();
+
+// Flag to indicate that a group tab is currently being created
+// Used to handle race condition between chrome.tabs.create and onCreated event
+let isCreatingGroupTab = false;
+
 /**
  * システムページ判定
  *
@@ -85,10 +94,13 @@ declare global {
   // eslint-disable-next-line no-var
   var pendingDuplicateSources: Set<number>;
   // eslint-disable-next-line no-var
+  var pendingGroupTabIds: Set<number>;
+  // eslint-disable-next-line no-var
   var treeStateManager: TreeStateManager;
 }
 globalThis.pendingTabParents = pendingTabParents;
 globalThis.pendingDuplicateSources = pendingDuplicateSources;
+globalThis.pendingGroupTabIds = pendingGroupTabIds;
 globalThis.treeStateManager = treeStateManager;
 
 /**
@@ -146,6 +158,31 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
   if (!tab.id) return;
 
   // グループタブはcreateGroupWithRealTabで処理されるため、ここではスキップ
+  // グループタブ作成中フラグが設定されている場合は待機してからチェック
+  if (isCreatingGroupTab) {
+    // グループタブ作成完了を待機（chrome.tabs.create()のPromise解決まで）
+    await new Promise(resolve => setTimeout(resolve, 50));
+    // pendingGroupTabIdsをチェック
+    if (pendingGroupTabIds.has(tab.id)) {
+      pendingGroupTabIds.delete(tab.id);
+      return;
+    }
+    // URLを再取得してチェック
+    try {
+      const refreshedTab = await chrome.tabs.get(tab.id);
+      if (isGroupTabUrl(refreshedTab.url) || isGroupTabUrl(refreshedTab.pendingUrl)) {
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
+
+  // pendingGroupTabIdsで追跡されているタブID、またはgroup.html URLを持つタブをスキップ
+  if (pendingGroupTabIds.has(tab.id)) {
+    pendingGroupTabIds.delete(tab.id);
+    return;
+  }
   if (isGroupTabUrl(tab.url) || isGroupTabUrl(tab.pendingUrl)) {
     return;
   }
@@ -969,17 +1006,20 @@ async function handleCreateGroup(
       return;
     }
 
-    // 最初のタブからウィンドウIDを取得
+    // 最初のタブからウィンドウIDとインデックスを取得
     let windowId: number | undefined;
+    let firstTabIndex: number | undefined;
     try {
       const firstTab = await chrome.tabs.get(tabIds[0]);
       windowId = firstTab.windowId;
+      firstTabIndex = firstTab.index;
     } catch (_err) {
-      // タブ取得に失敗した場合はデフォルトウィンドウを使用
+      // 最初のタブの取得に失敗
     }
 
     // 1. グループタブをバックグラウンドで作成（active: false）
     // URLにはtabIdパラメータを使用（GroupPage.tsxがtabIdを使用）
+    // グループタブはグループ化対象タブの先頭位置に配置
     const createOptions: chrome.tabs.CreateProperties = {
       url: `chrome-extension://${chrome.runtime.id}/group.html`,  // tabIdは作成後に追加
       active: false,  // まだアクティブにしない
@@ -987,16 +1027,26 @@ async function handleCreateGroup(
     if (windowId !== undefined) {
       createOptions.windowId = windowId;
     }
+    if (firstTabIndex !== undefined) {
+      createOptions.index = firstTabIndex;
+    }
 
+    // グループタブ作成中フラグを設定（handleTabCreatedでの競合回避）
+    isCreatingGroupTab = true;
     const groupTab = await chrome.tabs.create(createOptions);
 
     if (!groupTab.id) {
+      isCreatingGroupTab = false;
       sendResponse({
         success: false,
         error: 'Failed to create group tab',
       });
       return;
     }
+
+    // グループタブIDをpendingに追加（handleTabCreatedでスキップするため）
+    pendingGroupTabIds.add(groupTab.id);
+    isCreatingGroupTab = false;
 
     // URLにtabIdパラメータを追加（タブ作成後にIDが確定）
     const groupPageUrl = `chrome-extension://${chrome.runtime.id}/group.html?tabId=${groupTab.id}`;
