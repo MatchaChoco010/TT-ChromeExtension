@@ -175,7 +175,7 @@ describe('ContextMenu Integration with MenuActions', () => {
       expect(chromeMock.tabs.reload).toHaveBeenNthCalledWith(2, 2);
     });
 
-    it('「新しいウィンドウで開く」をクリックすると新しいウィンドウが作成される', async () => {
+    it('「別のウィンドウに移動」サブメニューから「新しいウィンドウ」をクリックすると新しいウィンドウが作成される', async () => {
       const user = userEvent.setup();
       chromeMock.windows.create.mockResolvedValue({ id: 2 } as chrome.windows.Window);
 
@@ -198,10 +198,13 @@ describe('ContextMenu Integration with MenuActions', () => {
 
       render(<ContextMenuWrapper />);
 
-      const newWindowButton = screen.getByRole('menuitem', {
-        name: /新しいウィンドウで開く/,
-      });
-      await user.click(newWindowButton);
+      // 別のウィンドウに移動のサブメニュートリガーにホバー
+      const moveToWindowItem = screen.getByTestId('context-menu-move-to-window');
+      await user.hover(moveToWindowItem);
+
+      // サブメニューが表示されるのを待つ
+      const newWindowSubItem = await screen.findByText('新しいウィンドウ');
+      await user.click(newWindowSubItem);
 
       expect(chromeMock.windows.create).toHaveBeenCalledWith({ tabId: 1 });
     });

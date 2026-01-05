@@ -69,9 +69,22 @@ beforeEach(() => {
       // Add onMoved mock for pinned tab reorder sync
       onMoved: mockTabsOnMoved,
     },
-    // Add windows.getCurrent mock
+    // Add windows mocks
     windows: {
       getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
+      getAll: vi.fn().mockResolvedValue([]),
+      onCreated: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      onRemoved: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      onFocusChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
     },
     runtime: {
       sendMessage: mockRuntimeSendMessage,

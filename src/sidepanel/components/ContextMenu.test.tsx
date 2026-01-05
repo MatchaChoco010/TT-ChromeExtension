@@ -89,7 +89,8 @@ describe('ContextMenu', () => {
       expect(screen.getByRole('menuitem', { name: /閉じる/i })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: /複製/i })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: /再読み込み/i })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: /新しいウィンドウで開く/i })).toBeInTheDocument();
+      // 別のウィンドウに移動サブメニューが表示されることを確認
+      expect(screen.getByTestId('context-menu-move-to-window')).toBeInTheDocument();
     });
 
     it('ピン留めされていないタブにはピン留めメニューを表示する', () => {
@@ -231,7 +232,7 @@ describe('ContextMenu', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('新しいウィンドウで開くメニューをクリックするとnewWindowアクションが実行される', async () => {
+    it('別のウィンドウに移動サブメニューから新しいウィンドウを選択するとnewWindowアクションが実行される', async () => {
       const user = userEvent.setup();
       const onAction = vi.fn();
       const onClose = vi.fn();
@@ -245,8 +246,13 @@ describe('ContextMenu', () => {
         />
       );
 
-      const newWindowItem = screen.getByRole('menuitem', { name: /新しいウィンドウで開く/i });
-      await user.click(newWindowItem);
+      // 別のウィンドウに移動のサブメニュートリガーにホバー
+      const moveToWindowItem = screen.getByTestId('context-menu-move-to-window');
+      await user.hover(moveToWindowItem);
+
+      // サブメニューが表示されるのを待つ
+      const newWindowSubItem = await screen.findByText('新しいウィンドウ');
+      await user.click(newWindowSubItem);
 
       expect(onAction).toHaveBeenCalledWith('newWindow');
       expect(onClose).toHaveBeenCalledTimes(1);

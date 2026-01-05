@@ -19,10 +19,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onMoveToView,
   groups,
   onAddToGroup,
+  currentWindowId: _currentWindowId,
+  otherWindows,
+  onMoveToWindow,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const moveToViewButtonRef = useRef<HTMLDivElement>(null);
   const addToGroupButtonRef = useRef<HTMLDivElement>(null);
+  const moveToWindowButtonRef = useRef<HTMLDivElement>(null);
   const isMultipleSelection = targetTabIds.length > 1;
 
   // サブメニューの表示状態（ビュー移動用）
@@ -32,6 +36,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   // グループ追加サブメニューの表示状態
   const [isGroupSubMenuOpen, setIsGroupSubMenuOpen] = useState(false);
   const [groupSubMenuParentRect, setGroupSubMenuParentRect] = useState<DOMRect | null>(null);
+  // 別のウィンドウに移動サブメニューの表示状態
+  const [isWindowSubMenuOpen, setIsWindowSubMenuOpen] = useState(false);
+  const [windowSubMenuParentRect, setWindowSubMenuParentRect] = useState<DOMRect | null>(null);
 
   // 画面端での位置調整
   const adjustedPosition = React.useMemo(() => {
@@ -178,6 +185,59 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     setIsGroupSubMenuOpen(false);
   }, []);
 
+  // 「別のウィンドウに移動」サブメニュー用の項目リスト
+  const windowSubMenuItems = useMemo((): SubMenuItem[] => {
+    const items: SubMenuItem[] = [];
+    // 他のウィンドウを追加
+    if (otherWindows) {
+      for (const win of otherWindows) {
+        items.push({
+          id: `window-${win.id}`,
+          label: `ウィンドウ ${win.id} (${win.tabCount}タブ)`,
+        });
+      }
+    }
+    // 常に「新しいウィンドウ」オプションを追加
+    items.push({
+      id: 'new-window',
+      label: '新しいウィンドウ',
+    });
+    return items;
+  }, [otherWindows]);
+
+  // 「別のウィンドウに移動」のホバーハンドラ
+  const handleMoveToWindowMouseEnter = useCallback(() => {
+    if (moveToWindowButtonRef.current) {
+      setWindowSubMenuParentRect(moveToWindowButtonRef.current.getBoundingClientRect());
+    } else {
+      setWindowSubMenuParentRect(new DOMRect(adjustedPosition.x, adjustedPosition.y, 200, 36));
+    }
+    setIsWindowSubMenuOpen(true);
+  }, [adjustedPosition]);
+
+  const handleMoveToWindowMouseLeave = useCallback(() => {
+    // SubMenuの外に出た時のみ閉じる
+  }, []);
+
+  const handleWindowSubMenuClose = useCallback(() => {
+    setIsWindowSubMenuOpen(false);
+  }, []);
+
+  // サブメニューでウィンドウを選択したときのハンドラ
+  const handleWindowSelect = useCallback((itemId: string) => {
+    if (itemId === 'new-window') {
+      // 新しいウィンドウで開く
+      onAction('newWindow');
+    } else if (itemId.startsWith('window-')) {
+      // 既存ウィンドウに移動
+      const windowId = parseInt(itemId.replace('window-', ''), 10);
+      if (onMoveToWindow && !isNaN(windowId)) {
+        onMoveToWindow(windowId, targetTabIds);
+      }
+    }
+    onClose();
+  }, [onAction, onMoveToWindow, targetTabIds, onClose]);
+
   return (
     <div
       ref={menuRef}
@@ -264,14 +324,26 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
       <div className="border-t border-gray-700 my-1" />
 
-      {/* 新しいウィンドウで開く */}
-      <button
-        role="menuitem"
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
-        onClick={() => handleMenuItemClick('newWindow')}
+      {/* 別のウィンドウに移動 */}
+      <div
+        ref={moveToWindowButtonRef}
+        className="relative w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100 flex items-center justify-between cursor-default"
+        onMouseEnter={handleMoveToWindowMouseEnter}
+        onMouseLeave={handleMoveToWindowMouseLeave}
+        data-testid="context-menu-move-to-window"
       >
-        新しいウィンドウで開く
-      </button>
+        <span>別のウィンドウに移動</span>
+        <span className="ml-2">▶</span>
+        {isWindowSubMenuOpen && windowSubMenuParentRect && (
+          <SubMenu
+            label="別のウィンドウに移動"
+            items={windowSubMenuItems}
+            onSelect={handleWindowSelect}
+            onClose={handleWindowSubMenuClose}
+            parentRect={windowSubMenuParentRect}
+          />
+        )}
+      </div>
 
       <div className="border-t border-gray-700 my-1" />
 

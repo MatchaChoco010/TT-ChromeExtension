@@ -100,9 +100,8 @@ Chrome Extension Manifest V3アーキテクチャ。Service WorkerとSide Panel�
 | `pinTab` | `assertTabStructure` + `assertPinnedTabStructure` |
 | `unpinTab` | `assertTabStructure` + `assertPinnedTabStructure` |
 | `activateTab` | `assertTabStructure` |
-| `startCrossWindowDrag` | `assertTabStructure`（ドラッグ元ウィンドウ） |
-| `triggerCrossWindowDragEnter` | `assertTabStructure`（移動元・移動先両ウィンドウ） |
-| `completeCrossWindowDrop` | `assertTabStructure`（移動元・移動先両ウィンドウ） |
+| `moveTabToWindowViaContextMenu` | `assertTabStructure`（移動元・移動先両ウィンドウ） |
+| `moveTabToNewWindowViaContextMenu` | `assertTabStructure` + `assertWindowExists` |
 | その他タブ操作系関数 | `assertTabStructure`（該当する場合は他のassert系も併用） |
 
 **違反パターンの検出方法**: 上記関数の呼び出し行を検索し、直後の行にassert系関数がなければ違反
@@ -308,39 +307,44 @@ npm run test:e2e   # Playwright E2Eテスト
 - **Service Worker**: バックグラウンドでのタブイベント監視とツリー同期
 - **Path Alias `@/`**: `./src/`へのエイリアス
 - **複数ウィンドウ対応**: TreeStateProviderでwindowIdを取得し各ウィンドウで自身のタブのみをフィルタリング表示
-- **DragSessionManager**: クロスウィンドウドラッグでService Workerを中継点として使用
+- **ウィンドウ間タブ移動**: コンテキストメニューから「別のウィンドウに移動」「新しいウィンドウに移動」で実現
 
 ---
 
-## マルチウィンドウドラッグ&ドロップ設計
+## 技術的制約
 
-### 背景・制約
+### クロスウィンドウドラッグ&ドロップは実装不可能
 
-ブラウザのドラッグ&ドロップAPIは、各サイドパネルのコンテキストを超えることができない。そのため、通常のD&D実装ではウィンドウ間でのタブ移動を実現できない。
+**結論**: ブラウザ拡張機能において、ドラッグ&ドロップでウィンドウ間のタブ移動を実現することは技術的に不可能である。
 
-### 設計アプローチ
+**調査結果**:
 
-Service Workerを中継点として使用し、マルチウィンドウでのD&Dを実現する。
+1. **OSレベルのマウスキャプチャ**
+   - ブラウザでドラッグ操作が開始されると、OSがマウスイベントをキャプチャする
+   - ドラッグ中は別ウィンドウの`mouseenter`, `mouseover`, `mousemove`などのマウスイベントが一切発火しない
+   - `pointerenter`, `pointermove`なども同様に発火しない
+   - `setPointerCapture()`は`dragstart`後に呼び出しても機能しない
 
-**フロー**:
-1. **ウィンドウAでドラッグ開始**: `onDragStart`発火 → Service Workerに`START_DRAG_SESSION`を送信し、ドラッグ中のタブIDを保存
-2. **ウィンドウBにマウス移動**: `mouseenter`イベント発火 → `useCrossWindowDrag`フックがService Workerからセッションを取得
-3. **クロスウィンドウ検知**: セッションの`sourceWindowId`と現在のウィンドウIDを比較し、別ウィンドウからのドラッグと判定
-4. **タブ移動**: `BEGIN_CROSS_WINDOW_MOVE`でタブをウィンドウBに移動し、ウィンドウBでドラッグ状態を継続
-5. **ドロップ完了**: ウィンドウBでマウスアップ → 通常のドロップ処理
+2. **HTML5 Drag and Drop APIの制限**
+   - `dragenter`, `dragover`イベントは内部的には発火するが、Chrome拡張のサイドパネル間では検知できない
+   - `dataTransfer`を使用した方法もサイドパネル間では機能しない
 
-**主要コンポーネント**:
-- `DragSessionManager`（`src/background/drag-session-manager.ts`）: セッション状態管理
-- `useCrossWindowDrag`（`src/sidepanel/hooks/useCrossWindowDrag.ts`）: mouseenter検知とセッション取得
-- `CrossWindowDragHandler`（`src/sidepanel/components/CrossWindowDragHandler.tsx`）: UIラッパー
+3. **`preventDefault()`の無効性**
+   - `dragstart`イベントで`preventDefault()`を呼んでも、マウスボタンを押したまま移動するとOSレベルのドラッグが開始される
+   - これはブラウザとOSの相互作用によるもので、JavaScript側で制御できない
 
-### E2Eテストでの検証方法
+4. **VSCode/Electronの事例**
+   - VSCodeもウィンドウ間タブD&Dを完全には実装できていない
+   - Electronアプリでこれを実現するには、Win32 API（Windows）やCocoa/AppKit（macOS）などのネイティブコードが必要
+   - Chrome拡張機能はネイティブコードを実行できないため、この方法は使用不可能
 
-Playwrightでは各ページのマウス状態が独立しているため、以下のフローでテスト可能:
-1. ウィンドウAのSide Panelでドラッグ開始（`mousedown` + 8px移動） → Service Workerにセッション保存
-2. ウィンドウBのツリービューで`mouseenter`イベントを発火 → クロスウィンドウ移動トリガー
-3. ウィンドウBでドロップ位置にmove → `mouseup`でドロップ完了
-4. 両ウィンドウのタブ構造を`assertTabStructure`で検証
+**代替実装**:
+- コンテキストメニューから「別のウィンドウに移動」を選択してタブを移動
+- コンテキストメニューから「新しいウィンドウに移動」を選択して新規ウィンドウを作成
+
+**参考資料**:
+- Electron Issue: "Dragging tabs between windows" - ネイティブコード必須と結論
+- MDN Web Docs: Drag and Drop API - イベントキャプチャの制限について記載
 
 ---
 _Document standards and patterns, not every dependency_

@@ -306,6 +306,14 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     setDragState(initialDragState);
   }, []);
 
+  // dragstartイベントハンドラをrefで保持
+  // ブラウザのデフォルトドラッグ動作をキャンセルして、
+  // カスタムドラッグ動作が正しく機能するようにする
+  const handleDragStartRef = useRef<(e: DragEvent) => void>((e: DragEvent) => {
+    e.preventDefault();
+    console.log('[useDragDrop] dragstart prevented');
+  });
+
   // イベントハンドラをrefで保持（循環依存を回避）
   const handlersRef = useRef<{
     handleMouseMove: (e: MouseEvent) => void;
@@ -376,6 +384,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       // イベントリスナーを削除
       document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
       document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
+      document.removeEventListener('dragstart', handleDragStartRef.current);
 
       // 潜在的ドラッグ中（まだドラッグ開始していない）の場合はリセット
       if (currentState.isPotentialDrag) {
@@ -443,6 +452,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     // グローバルイベントリスナーを設定
     document.addEventListener('mousemove', handlersRef.current.handleMouseMove);
     document.addEventListener('mouseup', handlersRef.current.handleMouseUp);
+    // ブラウザのデフォルトドラッグをキャンセル
+    document.addEventListener('dragstart', handleDragStartRef.current);
   }, []);
 
   /**
@@ -451,6 +462,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   const cancelDrag = useCallback(() => {
     document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
     document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
+    document.removeEventListener('dragstart', handleDragStartRef.current);
     resetDragState();
     callbacksRef.current.onDragCancel?.();
   }, [resetDragState]);
@@ -525,6 +537,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     return () => {
       document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
       document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
+      document.removeEventListener('dragstart', handleDragStartRef.current);
     };
   }, []);
 
@@ -533,11 +546,19 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   useEffect(() => {
     const handleMessage = (message: { type: string }) => {
       if (message.type === 'DRAG_SESSION_ENDED') {
+        console.log('[useDragDrop] DRAG_SESSION_ENDED received', {
+          isDragging: dragStateRef.current.isDragging,
+          isPotentialDrag: dragStateRef.current.isPotentialDrag,
+          draggedItemId: dragStateRef.current.draggedItemId,
+          draggedTabId: dragStateRef.current.draggedTabId,
+        });
         const currentState = dragStateRef.current;
         // ドラッグ中の場合のみキャンセル
         if (currentState.isDragging || currentState.isPotentialDrag) {
+          console.log('[useDragDrop] Resetting drag state due to DRAG_SESSION_ENDED');
           document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
           document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
+          document.removeEventListener('dragstart', handleDragStartRef.current);
           resetDragState();
         }
       }

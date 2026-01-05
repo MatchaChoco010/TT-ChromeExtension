@@ -7,14 +7,16 @@
  * - "タブを閉じる" 機能
  * - "サブツリーを閉じる" 機能
  * - "グループに追加" 機能
- * - "新しいウィンドウで開く" 機能
+ * - "別のウィンドウに移動" サブメニュー機能（新しいウィンドウ / 既存ウィンドウ）
  * - "URLをコピー" 機能
  * - メニュー外クリックでメニューが閉じること
  */
 
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
-import { assertTabStructure, assertWindowCount } from './utils/assertion-utils';
+import { createWindow, openSidePanelForWindow } from './utils/window-utils';
+import { assertTabStructure, assertWindowCount, assertWindowExists } from './utils/assertion-utils';
+import { waitForSidePanelReady } from './utils/polling-utils';
 
 test.describe('コンテキストメニュー操作', () => {
   test('タブノードを右クリックした場合、コンテキストメニューが表示される', async ({
@@ -264,7 +266,7 @@ test.describe('コンテキストメニュー操作', () => {
     ], 0);
   });
 
-  test('コンテキストメニューから"新しいウィンドウで開く"を選択した場合、タブが新しいウィンドウに移動する', async ({
+  test('コンテキストメニューから「別のウィンドウに移動」→「新しいウィンドウ」を選択した場合、タブが新しいウィンドウに移動する', async ({
     extensionContext,
     sidePanelPage,
     serviceWorker,
@@ -306,8 +308,16 @@ test.describe('コンテキストメニュー操作', () => {
     await tabNode.click({ button: 'right' });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
-    // "新しいウィンドウで開く"をクリック
-    await sidePanelPage.getByRole('menuitem', { name: '新しいウィンドウで開く' }).click();
+    // 「別のウィンドウに移動」サブメニューにホバー
+    const moveToWindowTrigger = sidePanelPage.locator('[data-testid="context-menu-move-to-window"]');
+    await moveToWindowTrigger.hover();
+
+    // サブメニューが表示されるのを待つ
+    const newWindowOption = sidePanelPage.getByRole('menuitem', { name: '新しいウィンドウ' });
+    await expect(newWindowOption).toBeVisible({ timeout: 3000 });
+
+    // 「新しいウィンドウ」をクリック
+    await newWindowOption.click();
 
     // コンテキストメニューが閉じるまで待機（UIインタラクション結果）
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
@@ -318,6 +328,130 @@ test.describe('コンテキストメニュー操作', () => {
     ], 0);
 
     // 新しいウィンドウが作成されたことを確認（初期ウィンドウ1 + 新ウィンドウ1 = 2）
+    await assertWindowCount(extensionContext, 2);
+  });
+
+  test('コンテキストメニューから「別のウィンドウに移動」→既存ウィンドウを選択した場合、タブがそのウィンドウに移動する', async ({
+    extensionContext,
+    sidePanelPage,
+    serviceWorker,
+  }) => {
+    // 最初のウィンドウIDと擬似サイドパネルタブIDを取得
+    const window1Id = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId1 = await getPseudoSidePanelTabId(serviceWorker, window1Id);
+
+    // ブラウザ起動時のデフォルトタブを閉じる
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, window1Id);
+    await closeTab(extensionContext, initialBrowserTabId);
+
+    // 初期状態を検証（擬似サイドパネルタブのみ）
+    await assertTabStructure(sidePanelPage, window1Id, [
+      { tabId: pseudoSidePanelTabId1, depth: 0 },
+    ], 0);
+
+    // 移動対象のタブを作成
+    const tabToMove = await createTab(extensionContext, 'about:blank');
+    await assertTabStructure(sidePanelPage, window1Id, [
+      { tabId: pseudoSidePanelTabId1, depth: 0 },
+      { tabId: tabToMove, depth: 0 },
+    ], 0);
+
+    // 2つ目のウィンドウを作成
+    const window2Id = await createWindow(extensionContext);
+    const sidePanelPage2 = await openSidePanelForWindow(extensionContext, window2Id);
+    await waitForSidePanelReady(sidePanelPage2, serviceWorker);
+
+    // ウィンドウが2つあることを確認
+    await assertWindowCount(extensionContext, 2);
+
+    // 2つ目のウィンドウの擬似サイドパネルタブIDを取得
+    const pseudoSidePanelTabId2 = await getPseudoSidePanelTabId(serviceWorker, window2Id);
+    await assertWindowExists(extensionContext, window2Id);
+
+    // window2のデフォルトタブを閉じる（擬似サイドパネルタブだけにする）
+    const window2Tabs: chrome.tabs.Tab[] = await serviceWorker.evaluate(
+      (wId) => chrome.tabs.query({ windowId: wId }),
+      window2Id
+    );
+    const defaultTabInWindow2 = window2Tabs.find(
+      (t) => t.id !== pseudoSidePanelTabId2
+    );
+    if (defaultTabInWindow2?.id) {
+      await closeTab(extensionContext, defaultTabInWindow2.id);
+    }
+
+    // 2つ目のウィンドウの構造を検証
+    await assertTabStructure(sidePanelPage2, window2Id, [
+      { tabId: pseudoSidePanelTabId2, depth: 0 },
+    ], 0);
+
+    // 最初のウィンドウのサイドパネルにフォーカスを戻す
+    await sidePanelPage.bringToFront();
+
+    // window2が作成されたイベントがsidePanelPageに反映されるのを待つ
+    // ウィンドウフォーカス変更でotherWindowsが更新されるので少し待機
+    await sidePanelPage.waitForTimeout(500);
+
+    const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabToMove}"]`);
+
+    // 要素のバウンディングボックスが安定するまで待機
+    await sidePanelPage.waitForFunction(
+      (tabId) => {
+        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+        if (!node) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      },
+      tabToMove,
+      { timeout: 5000 }
+    );
+
+    // 右クリックでコンテキストメニューを開く
+    await tabNode.click({ button: 'right' });
+    await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
+
+    // 「別のウィンドウに移動」サブメニューにホバー
+    const moveToWindowTrigger = sidePanelPage.locator('[data-testid="context-menu-move-to-window"]');
+    await moveToWindowTrigger.hover();
+
+    // サブメニューが表示されるのを待つ
+    const newWindowOption = sidePanelPage.getByRole('menuitem', { name: '新しいウィンドウ' });
+    await expect(newWindowOption).toBeVisible({ timeout: 3000 });
+
+    // 既存ウィンドウのオプションが表示されるまで待機してクリック
+    // window2Idを含むオプションを探してクリック
+    const existingWindowOption = sidePanelPage.locator('[role="menuitem"]').filter({
+      hasText: new RegExp(`ウィンドウ ${window2Id}.*タブ`)
+    });
+    await expect(existingWindowOption).toBeVisible({ timeout: 5000 });
+    await existingWindowOption.click();
+
+    // コンテキストメニューが閉じるまで待機
+    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
+
+    // タブ移動が完了するまで待機
+    // (サービスワーカーへのメッセージ送信とChrome API呼び出しが完了するまで)
+    await sidePanelPage.waitForTimeout(500);
+
+    // サイドパネルをリロードして変更を反映
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
+    await sidePanelPage2.reload();
+    await waitForSidePanelReady(sidePanelPage2, serviceWorker);
+
+    // Assert: タブが元のウィンドウから消えていることを確認
+    await assertTabStructure(sidePanelPage, window1Id, [
+      { tabId: pseudoSidePanelTabId1, depth: 0 },
+    ], 0);
+
+    // タブがウィンドウ2に移動していることを確認
+    await sidePanelPage2.bringToFront();
+    await assertTabStructure(sidePanelPage2, window2Id, [
+      { tabId: pseudoSidePanelTabId2, depth: 0 },
+      { tabId: tabToMove, depth: 0 },
+    ], 0);
+
+    // ウィンドウが2つあることを再確認
     await assertWindowCount(extensionContext, 2);
   });
 

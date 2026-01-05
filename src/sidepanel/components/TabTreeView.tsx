@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
-import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, Group, View } from '@/types';
+import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, Group, View, WindowInfo } from '@/types';
 import { useDragDrop, type DropTarget, DropTargetType } from '../hooks/useDragDrop';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { DragOverlay } from './DragOverlay';
@@ -120,6 +120,10 @@ interface TreeNodeItemProps {
   // グループ追加サブメニュー用
   groups?: Record<string, Group>;
   onAddToGroup?: (groupId: string, tabIds: number[]) => void;
+  // 別のウィンドウに移動サブメニュー用
+  currentWindowId?: number;
+  otherWindows?: WindowInfo[];
+  onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
   // 自前D&D実装用のprops
   /** getItemPropsから取得したprops */
   dragItemProps?: {
@@ -167,6 +171,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   onMoveToView,
   groups,
   onAddToGroup,
+  currentWindowId,
+  otherWindows,
+  onMoveToWindow,
   dragItemProps,
   isDragging: isDraggingProp,
   getItemPropsForNode,
@@ -372,6 +379,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onMoveToView={onMoveToView}
           groups={groups}
           onAddToGroup={onAddToGroup}
+          currentWindowId={currentWindowId}
+          otherWindows={otherWindows}
+          onMoveToWindow={onMoveToWindow}
         />
       )}
 
@@ -400,6 +410,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               onMoveToView={onMoveToView}
               groups={groups}
               onAddToGroup={onAddToGroup}
+              currentWindowId={currentWindowId}
+              otherWindows={otherWindows}
+              onMoveToWindow={onMoveToWindow}
               dragItemProps={getItemPropsForNode?.(child.id, child.tabId)}
               isDragging={isNodeDragging?.(child.id)}
               getItemPropsForNode={getItemPropsForNode}
@@ -436,6 +449,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   onMoveToView,
   groups,
   onAddToGroup,
+  currentWindowId,
+  otherWindows,
+  onMoveToWindow,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -604,6 +620,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onMoveToView={onMoveToView}
           groups={groups}
           onAddToGroup={onAddToGroup}
+          currentWindowId={currentWindowId}
+          otherWindows={otherWindows}
+          onMoveToWindow={onMoveToWindow}
         />
       )}
 
@@ -628,6 +647,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               views={views}
               currentViewId={currentViewId}
               onMoveToView={onMoveToView}
+              currentWindowId={currentWindowId}
+              otherWindows={otherWindows}
+              onMoveToWindow={onMoveToWindow}
             />
           ))}
         </div>
@@ -675,6 +697,10 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   // ビュー移動サブメニュー用
   views,
   onMoveToView,
+  // 別のウィンドウに移動サブメニュー用
+  currentWindowId,
+  otherWindows,
+  onMoveToWindow,
   // ツリー外ドロップで新規ウィンドウ作成
   onExternalDrop,
   // ツリービュー外へのドロップ検知
@@ -1099,6 +1125,9 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           onMoveToView={onMoveToView}
           groups={groups}
           onAddToGroup={onAddToGroup}
+          currentWindowId={currentWindowId}
+          otherWindows={otherWindows}
+          onMoveToWindow={onMoveToWindow}
           dragItemProps={getItemPropsForNode(node.id, node.tabId)}
           isDragging={isNodeDragging(node.id)}
           getItemPropsForNode={getItemPropsForNode}
@@ -1124,6 +1153,9 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         views={views}
         currentViewId={currentViewId}
         onMoveToView={onMoveToView}
+        currentWindowId={currentWindowId}
+        otherWindows={otherWindows}
+        onMoveToWindow={onMoveToWindow}
         groups={groups}
         onAddToGroup={onAddToGroup}
       />

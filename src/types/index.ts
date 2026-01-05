@@ -330,6 +330,10 @@ export interface TabTreeViewProps {
   // ビュー移動サブメニュー用
   views?: View[];
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
+  // 別のウィンドウに移動サブメニュー用
+  currentWindowId?: number;
+  otherWindows?: WindowInfo[];
+  onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
   // ツリー外ドロップで新規ウィンドウ作成
   onExternalDrop?: (tabId: number) => void;
   // ツリービュー外へのドロップ検知
@@ -349,11 +353,21 @@ export type MenuAction =
   | 'pin'
   | 'unpin'
   | 'newWindow'
+  | 'moveToWindow'
   | 'group'
   | 'ungroup'
   | 'reload'
   | 'copyUrl'
   | 'snapshot';
+
+/** ウィンドウ情報（コンテキストメニュー用） */
+export interface WindowInfo {
+  id: number;
+  /** ウィンドウ内のタブ数 */
+  tabCount: number;
+  /** ウィンドウのフォーカス状態 */
+  focused: boolean;
+}
 
 export interface ContextMenuProps {
   targetTabIds: number[];
@@ -374,6 +388,12 @@ export interface ContextMenuProps {
   groups?: Record<string, Group>;
   /** タブをグループに追加するコールバック */
   onAddToGroup?: (groupId: string, tabIds: number[]) => void;
+  /** 現在のウィンドウID */
+  currentWindowId?: number;
+  /** 他のウィンドウ一覧（別ウィンドウへ移動用） */
+  otherWindows?: WindowInfo[];
+  /** タブを別のウィンドウに移動するコールバック */
+  onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
 }
 
 // SubMenu types

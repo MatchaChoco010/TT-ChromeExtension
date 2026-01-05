@@ -78,8 +78,10 @@ export class ChromeMock {
   windows = {
     onCreated: new MockEvent<(window: chrome.windows.Window) => void>(),
     onRemoved: new MockEvent<(windowId: number) => void>(),
+    onFocusChanged: new MockEvent<(windowId: number) => void>(),
     create: vi.fn<(createData?: chrome.windows.CreateData) => Promise<chrome.windows.Window>>(() => Promise.resolve({} as chrome.windows.Window)),
     get: vi.fn<(windowId: number, getInfo?: { populate?: boolean }) => Promise<chrome.windows.Window>>(() => Promise.resolve({} as chrome.windows.Window)),
+    getAll: vi.fn<(getInfo?: { populate?: boolean }) => Promise<chrome.windows.Window[]>>(() => Promise.resolve([])),
     getCurrent: vi.fn<(getInfo?: { populate?: boolean }) => Promise<chrome.windows.Window>>(() => Promise.resolve({ id: 1 } as chrome.windows.Window)),
     remove: vi.fn<(windowId: number) => Promise<void>>(() => Promise.resolve()),
   };
@@ -154,6 +156,7 @@ export class ChromeMock {
     this.tabs.onActivated.clear();
     this.windows.onCreated.clear();
     this.windows.onRemoved.clear();
+    this.windows.onFocusChanged.clear();
     this.runtime.onMessage.clear();
     this.storage.onChanged.addListener.mockClear();
     this.storage.onChanged.removeListener.mockClear();

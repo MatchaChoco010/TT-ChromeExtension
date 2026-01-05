@@ -4,7 +4,6 @@ import { TreeStateManager } from '@/services/TreeStateManager';
 import { UnreadTracker } from '@/services/UnreadTracker';
 import { TitlePersistenceService } from '@/services/TitlePersistenceService';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
-import { dragSessionManager } from './drag-session-manager';
 
 // Global instances
 const storageService = new StorageService();
@@ -129,17 +128,6 @@ export function registerMessageListener(): void {
   chrome.runtime.onMessage.addListener(handleMessage);
 }
 
-/**
- * Register Chrome alarms listener (for DragSessionManager keep-alive)
- * chrome.alarmsによるService Worker keep-alive
- */
-export function registerAlarmListener(): void {
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    dragSessionManager.handleAlarm(alarm);
-  });
-  // Start timeout check for drag session
-  dragSessionManager.startTimeoutCheck();
-}
 
 /**
  * グループタブ判定
@@ -341,10 +329,6 @@ export async function handleTabRemoved(
     // This ensures we don't overwrite parent-child relationships set by Side Panel's drag & drop
     await treeStateManager.loadState();
 
-    // ドラッグセッションのクリーンアップ
-    // ドラッグ中のタブが削除された場合はセッションを終了
-    dragSessionManager.handleTabRemoved(tabId);
-
     // Get user settings for child tab behavior
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
     const childTabBehavior = settings?.childTabBehavior || 'promote';
@@ -379,13 +363,7 @@ export async function handleTabRemoved(
 
     // 空ウィンドウ自動クローズ（ウィンドウ自体が閉じられている場合は処理スキップ）
     if (!isWindowClosing) {
-      // ドラッグセッション中は自動クローズを抑止
-      const dragSession = await dragSessionManager.getSession(0);
-      if (!dragSession || dragSession.sourceWindowId !== windowId) {
-        // ドラッグ中でなければ空ウィンドウを閉じる
-        await tryCloseEmptyWindow(windowId);
-      }
-      // Note: ドラッグ中の場合はドラッグ完了時にクローズ処理を行う
+      await tryCloseEmptyWindow(windowId);
     }
   } catch (_error) {
     // Error in handleTabRemoved silently
@@ -485,12 +463,8 @@ async function handleWindowCreated(window: chrome.windows.Window): Promise<void>
   }
 }
 
-function handleWindowRemoved(windowId: number): void {
+function handleWindowRemoved(_windowId: number): void {
   try {
-    // ドラッグセッションのクリーンアップ
-    // ウィンドウクローズ時にセッションを終了
-    dragSessionManager.handleWindowRemoved(windowId);
-
     // UIに状態更新を通知
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((_error) => {
       // Ignore errors when no listeners are available
@@ -588,35 +562,9 @@ function handleMessage(
         handleRegisterDuplicateSource(message.payload.sourceTabId, sendResponse);
         break;
 
-      // クロスウィンドウドラッグセッション管理
-      case 'START_DRAG_SESSION':
-        handleStartDragSession(message.payload, sendResponse);
-        break;
-
-      case 'GET_DRAG_SESSION':
-        handleGetDragSession(sendResponse);
-        break;
-
-      case 'END_DRAG_SESSION':
-        handleEndDragSession(message.payload?.reason, sendResponse);
-        break;
-
-      case 'BEGIN_CROSS_WINDOW_MOVE':
-        handleBeginCrossWindowMove(message.payload.targetWindowId, sendResponse);
-        break;
-
       // グループ情報取得
       case 'GET_GROUP_INFO':
         handleGetGroupInfo(message.payload.tabId, sendResponse);
-        break;
-
-      // ツリービュー上のホバー検知
-      case 'NOTIFY_TREE_VIEW_HOVER':
-        handleNotifyTreeViewHover(message.payload.windowId, sendResponse);
-        break;
-
-      case 'NOTIFY_DRAG_OUT':
-        handleNotifyDragOut(sendResponse);
         break;
 
       default:
@@ -1154,131 +1102,3 @@ async function handleGetGroupInfo(
   }
 }
 
-/**
- * ドラッグセッション開始
- */
-async function handleStartDragSession(
-  payload: { tabId: number; windowId: number; treeData: TabNode[] },
-  sendResponse: (response: MessageResponse<unknown>) => void,
-): Promise<void> {
-  try {
-    const { tabId, windowId, treeData } = payload;
-    const session = await dragSessionManager.startSession(tabId, windowId, treeData);
-    sendResponse({ success: true, data: session });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-/**
- * ドラッグセッション取得
- */
-async function handleGetDragSession(
-  sendResponse: (response: MessageResponse<unknown>) => void,
-): Promise<void> {
-  try {
-    const session = await dragSessionManager.getSession();
-    sendResponse({ success: true, data: session });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-/**
- * ドラッグセッション終了
- * ドラッグ完了時の空ウィンドウ自動クローズ
- * 全ウィンドウにドラッグ終了を通知（プレースホルダークリーンアップ）
- */
-async function handleEndDragSession(
-  reason: string | undefined,
-  sendResponse: (response: MessageResponse<unknown>) => void,
-): Promise<void> {
-  try {
-    // ドラッグ完了時の空ウィンドウ自動クローズ
-    // セッション終了前にソースウィンドウIDを取得
-    const session = await dragSessionManager.getSession(0);
-    const sourceWindowId = session?.sourceWindowId;
-
-    await dragSessionManager.endSession(reason || 'COMPLETED');
-
-    // 全ウィンドウにドラッグセッション終了を通知
-    // これにより、元ウィンドウのプレースホルダーやドラッグ状態がクリーンアップされる
-    chrome.runtime.sendMessage({ type: 'DRAG_SESSION_ENDED' }).catch((_error) => {
-      // Ignore errors when no listeners are available
-    });
-
-    // ドラッグ完了時にソースウィンドウが空なら自動クローズ
-    if (sourceWindowId !== undefined) {
-      await tryCloseEmptyWindow(sourceWindowId);
-    }
-
-    sendResponse({ success: true, data: null });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-/**
- * クロスウィンドウ移動開始
- */
-async function handleBeginCrossWindowMove(
-  targetWindowId: number,
-  sendResponse: (response: MessageResponse<unknown>) => void,
-): Promise<void> {
-  try {
-    await dragSessionManager.beginCrossWindowMove(targetWindowId);
-    sendResponse({ success: true, data: null });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-/**
- * ツリービュー上のホバー通知
- * 別ウィンドウのツリービュー領域上にマウスがある場合に呼び出す
- * バックグラウンドスロットリング回避のため、対象ウィンドウにフォーカスを移動する
- */
-async function handleNotifyTreeViewHover(
-  windowId: number,
-  sendResponse: (response: MessageResponse<unknown>) => void,
-): Promise<void> {
-  try {
-    await dragSessionManager.notifyTreeViewHover(windowId);
-    sendResponse({ success: true, data: null });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-/**
- * ドラッグアウト通知
- * ドラッグ中のタブがツリービュー領域を離れた際に呼び出す
- */
-function handleNotifyDragOut(
-  sendResponse: (response: MessageResponse<unknown>) => void,
-): void {
-  try {
-    dragSessionManager.notifyDragOut();
-    sendResponse({ success: true, data: null });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}

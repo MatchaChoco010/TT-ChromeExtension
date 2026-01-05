@@ -2,7 +2,6 @@ export { default as SidePanelRoot } from './SidePanelRoot';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as TabTreeView } from './TabTreeView';
 export { default as TreeNode } from './TreeNode';
-export { default as CrossWindowDragHandler } from './CrossWindowDragHandler';
 export { ViewSwitcher } from './ViewSwitcher';
 export { default as UnreadBadge } from './UnreadBadge';
 export { default as CloseButton } from './CloseButton';

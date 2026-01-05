@@ -52,11 +52,6 @@ interface TreeStateContextType {
   moveTabsToView: (viewId: string, tabIds: number[]) => void;
   // 現在のウィンドウID（複数ウィンドウ対応）
   currentWindowId: number | null;
-  // クロスウィンドウドラッグ&ドロップ
-  // 別ウィンドウのツリービュー上でのドロップでタブを移動
-  handleCrossWindowDragStart: (tabId: number, treeData: TabNode[]) => Promise<void>;
-  handleCrossWindowDrop: () => Promise<boolean>;
-  clearCrossWindowDragState: () => Promise<void>;
 }
 
 const TreeStateContext = createContext<TreeStateContextType | undefined>(
@@ -1507,85 +1502,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     updateTreeState(newTreeState);
   }, [treeState, updateTreeState]);
 
-  /**
-   * クロスウィンドウドラッグ開始
-   * ドラッグ開始時にService WorkerにDragSessionを開始
-   */
-  const handleCrossWindowDragStart = useCallback(async (tabId: number, treeData: TabNode[]) => {
-    if (currentWindowId === null) return;
-
-    return new Promise<void>((resolve) => {
-      chrome.runtime.sendMessage(
-        {
-          type: 'START_DRAG_SESSION',
-          payload: {
-            tabId,
-            windowId: currentWindowId,
-            treeData,
-          },
-        },
-        () => {
-          resolve();
-        }
-      );
-    });
-  }, [currentWindowId]);
-
-  /**
-   * クロスウィンドウドロップ処理
-   * ドロップ時に別ウィンドウからのドラッグかどうかを確認し、タブを移動
-   * @returns true if cross-window drop was handled, false otherwise
-   */
-  const handleCrossWindowDrop = useCallback(async (): Promise<boolean> => {
-    if (currentWindowId === null) return false;
-
-    return new Promise<boolean>((resolve) => {
-      chrome.runtime.sendMessage(
-        { type: 'GET_DRAG_SESSION' },
-        (response: { success: boolean; data: { tabId: number; sourceWindowId: number; state: string } | null }) => {
-          if (!response.success || !response.data) {
-            resolve(false);
-            return;
-          }
-
-          const dragSession = response.data;
-
-          // 同じウィンドウからのドラッグは通常のドラッグとして処理
-          if (dragSession.sourceWindowId === currentWindowId) {
-            resolve(false);
-            return;
-          }
-
-          // 別ウィンドウからのドロップ: タブを現在のウィンドウに移動
-          chrome.runtime.sendMessage(
-            {
-              type: 'MOVE_TAB_TO_WINDOW',
-              payload: { tabId: dragSession.tabId, windowId: currentWindowId },
-            },
-            () => {
-              // ドラッグセッションを終了
-              chrome.runtime.sendMessage({ type: 'END_DRAG_SESSION', payload: { reason: 'COMPLETED' } }, () => {
-                resolve(true);
-              });
-            }
-          );
-        }
-      );
-    });
-  }, [currentWindowId]);
-
-  /**
-   * クロスウィンドウドラッグ状態をクリア
-   * ドラッグ終了時にService WorkerのDragSessionを終了
-   */
-  const clearCrossWindowDragState = useCallback(async () => {
-    return new Promise<void>((resolve) => {
-      chrome.runtime.sendMessage({ type: 'END_DRAG_SESSION', payload: { reason: 'CANCELLED' } }, () => {
-        resolve();
-      });
-    });
-  }, []);
-
   return (
     <TreeStateContext.Provider
       value={{
@@ -1627,9 +1543,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         viewTabCounts,
         moveTabsToView,
         currentWindowId,
-        handleCrossWindowDragStart,
-        handleCrossWindowDrop,
-        clearCrossWindowDragState,
       }}
     >
       {children}

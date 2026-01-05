@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { ThemeProvider } from '../providers/ThemeProvider';
 import ErrorBoundary from './ErrorBoundary';
@@ -11,7 +11,7 @@ import { useMenuActions } from '../hooks/useMenuActions';
 import { indexedDBService } from '@/storage/IndexedDBService';
 import { storageService } from '@/storage/StorageService';
 import { SnapshotManager } from '@/services/SnapshotManager';
-import type { TabNode, MenuAction } from '@/types';
+import type { TabNode, MenuAction, WindowInfo } from '@/types';
 
 interface SidePanelRootProps {
   children?: React.ReactNode;
@@ -44,13 +44,75 @@ const TreeViewContent: React.FC = () => {
     viewTabCounts,
     moveTabsToView,
     currentWindowId,
-    handleCrossWindowDragStart,
-    handleCrossWindowDrop,
-    clearCrossWindowDragState,
   } = useTreeState();
 
   // サイドパネル境界参照（ドラッグアウト判定に使用）
   const sidePanelRef = useRef<HTMLDivElement>(null);
+
+  // 他のウィンドウ一覧（コンテキストメニュー用）
+  const [otherWindows, setOtherWindows] = useState<WindowInfo[]>([]);
+
+  // 他のウィンドウ一覧を取得
+  useEffect(() => {
+    const fetchOtherWindows = async () => {
+      if (currentWindowId === null) return;
+      try {
+        const windows = await chrome.windows.getAll({ populate: true });
+        const others: WindowInfo[] = [];
+        for (const win of windows) {
+          if (win.id !== undefined && win.id !== currentWindowId && win.type === 'normal') {
+            others.push({
+              id: win.id,
+              tabCount: win.tabs?.length ?? 0,
+              focused: win.focused ?? false,
+            });
+          }
+        }
+        setOtherWindows(others);
+      } catch (error) {
+        console.error('Failed to fetch windows:', error);
+        setOtherWindows([]);
+      }
+    };
+
+    fetchOtherWindows();
+
+    // ウィンドウイベントリスナー
+    const handleWindowCreated = () => {
+      fetchOtherWindows();
+    };
+    const handleWindowRemoved = () => {
+      fetchOtherWindows();
+    };
+    const handleWindowFocusChanged = () => {
+      fetchOtherWindows();
+    };
+
+    chrome.windows.onCreated.addListener(handleWindowCreated);
+    chrome.windows.onRemoved.addListener(handleWindowRemoved);
+    chrome.windows.onFocusChanged.addListener(handleWindowFocusChanged);
+
+    return () => {
+      chrome.windows.onCreated.removeListener(handleWindowCreated);
+      chrome.windows.onRemoved.removeListener(handleWindowRemoved);
+      chrome.windows.onFocusChanged.removeListener(handleWindowFocusChanged);
+    };
+  }, [currentWindowId]);
+
+  // タブを別のウィンドウに移動するハンドラ
+  const handleMoveToWindow = useCallback(async (targetWindowId: number, tabIds: number[]) => {
+    try {
+      // サブツリーごと移動
+      for (const tabId of tabIds) {
+        await chrome.runtime.sendMessage({
+          type: 'MOVE_SUBTREE_TO_WINDOW',
+          payload: { tabId, windowId: targetWindowId },
+        });
+      }
+    } catch (error) {
+      console.error('Failed to move tabs to window:', error);
+    }
+  }, []);
 
   // スナップショット取得ハンドラ
   const handleSnapshot = useCallback(async () => {
@@ -200,102 +262,77 @@ const TreeViewContent: React.FC = () => {
       type: 'CREATE_WINDOW_WITH_SUBTREE',
       payload: { tabId, sourceWindowId: currentWindowId ?? undefined },
     });
-    // クロスウィンドウドラッグ状態をクリア
-    clearCrossWindowDragState();
-  }, [clearCrossWindowDragState, currentWindowId]);
-
-  // クロスウィンドウドラッグ開始ハンドラ
-  const handleTreeDragStart = useCallback((event: { active: { id: string | number } }) => {
-    // ドラッグ開始時にクロスウィンドウドラッグ状態を設定
-    const nodeId = event.active.id as string;
-    // ノードからタブIDを取得
-    const node = treeState?.nodes[nodeId];
-    if (node) {
-      handleCrossWindowDragStart(node.tabId, nodes);
-    }
-  }, [treeState, nodes, handleCrossWindowDragStart]);
-
-  // クロスウィンドウドロップを含むドラッグ終了ハンドラ
-  const handleTreeDragEnd = useCallback(async (event: Parameters<typeof handleDragEnd>[0]) => {
-    // まずクロスウィンドウドロップかどうかを確認
-    const wasCrossWindowDrop = await handleCrossWindowDrop();
-
-    if (wasCrossWindowDrop) {
-      // クロスウィンドウドロップが処理された場合は終了
-      return;
-    }
-
-    // クロスウィンドウドロップでない場合は通常のドラッグ終了処理
-    await handleDragEnd(event);
-
-    // ドラッグ状態をクリア
-    await clearCrossWindowDragState();
-  }, [handleDragEnd, handleCrossWindowDrop, clearCrossWindowDragState]);
+  }, [currentWindowId]);
 
   return (
     <div className="flex flex-col h-full bg-gray-900">
-      {/* ビュースイッチャー */}
-      {treeState && (
-        <ViewSwitcher
-          views={treeState.views}
-          currentViewId={treeState.currentViewId}
-          tabCounts={viewTabCounts}
-          onViewSwitch={switchView}
-          onViewCreate={createView}
-          onViewDelete={deleteView}
-          onViewUpdate={updateView}
+        {/* ビュースイッチャー */}
+        {treeState && (
+          <ViewSwitcher
+            views={treeState.views}
+            currentViewId={treeState.currentViewId}
+            tabCounts={viewTabCounts}
+            onViewSwitch={switchView}
+            onViewCreate={createView}
+            onViewDelete={deleteView}
+            onViewUpdate={updateView}
+          />
+        )}
+        {/* ピン留めタブセクション */}
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={handlePinnedTabClick}
+          onContextMenu={handlePinnedTabContextMenu}
+          activeTabId={activeTabId}
+          onPinnedTabReorder={handlePinnedTabReorder}
         />
-      )}
-      {/* ピン留めタブセクション */}
-      <PinnedTabsSection
-        pinnedTabIds={pinnedTabIds}
-        tabInfoMap={tabInfoMap}
-        onTabClick={handlePinnedTabClick}
-        onContextMenu={handlePinnedTabContextMenu}
-        activeTabId={activeTabId}
-        onPinnedTabReorder={handlePinnedTabReorder}
-      />
-      {/* ピン留めタブのコンテキストメニュー */}
-      {pinnedContextMenu && (
-        <ContextMenu
-          targetTabIds={[pinnedContextMenu.tabId]}
-          position={pinnedContextMenu.position}
-          onAction={handlePinnedContextMenuAction}
-          onClose={handlePinnedContextMenuClose}
-          isPinned={true}
-          tabUrl={tabInfoMap[pinnedContextMenu.tabId]?.url}
-        />
-      )}
-      {/* タブツリービュー */}
-      <div ref={sidePanelRef} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
-        <TabTreeView
-          nodes={nodes}
-          currentViewId={treeState?.currentViewId || 'default'}
-          onNodeClick={handleNodeClick}
-          onToggleExpand={handleToggleExpand}
-          onDragStart={handleTreeDragStart}
-          onDragEnd={handleTreeDragEnd}
-          onSiblingDrop={handleSiblingDrop}
-          isTabUnread={isTabUnread}
-          getUnreadChildCount={getUnreadChildCount}
-          activeTabId={activeTabId ?? undefined}
-          getTabInfo={getTabInfo}
-          isNodeSelected={isNodeSelected}
-          onSelect={selectNode}
-          getSelectedTabIds={getSelectedTabIds}
-          onSnapshot={handleSnapshot}
-          groups={groups}
-          onGroupToggle={toggleGroupExpanded}
-          onAddToGroup={handleAddToGroup}
-          views={treeState?.views}
-          onMoveToView={moveTabsToView}
-          onExternalDrop={handleExternalDrop}
-          sidePanelRef={sidePanelRef}
-        />
-        {/* 新規タブ追加ボタン */}
-        <NewTabButton />
+        {/* ピン留めタブのコンテキストメニュー */}
+        {pinnedContextMenu && (
+          <ContextMenu
+            targetTabIds={[pinnedContextMenu.tabId]}
+            position={pinnedContextMenu.position}
+            onAction={handlePinnedContextMenuAction}
+            onClose={handlePinnedContextMenuClose}
+            isPinned={true}
+            tabUrl={tabInfoMap[pinnedContextMenu.tabId]?.url}
+            currentWindowId={currentWindowId ?? undefined}
+            otherWindows={otherWindows}
+            onMoveToWindow={handleMoveToWindow}
+          />
+        )}
+        {/* タブツリービュー */}
+        <div ref={sidePanelRef} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
+          <TabTreeView
+            nodes={nodes}
+            currentViewId={treeState?.currentViewId || 'default'}
+            onNodeClick={handleNodeClick}
+            onToggleExpand={handleToggleExpand}
+            onDragEnd={handleDragEnd}
+            onSiblingDrop={handleSiblingDrop}
+            isTabUnread={isTabUnread}
+            getUnreadChildCount={getUnreadChildCount}
+            activeTabId={activeTabId ?? undefined}
+            getTabInfo={getTabInfo}
+            isNodeSelected={isNodeSelected}
+            onSelect={selectNode}
+            getSelectedTabIds={getSelectedTabIds}
+            onSnapshot={handleSnapshot}
+            groups={groups}
+            onGroupToggle={toggleGroupExpanded}
+            onAddToGroup={handleAddToGroup}
+            views={treeState?.views}
+            onMoveToView={moveTabsToView}
+            currentWindowId={currentWindowId ?? undefined}
+            otherWindows={otherWindows}
+            onMoveToWindow={handleMoveToWindow}
+            onExternalDrop={handleExternalDrop}
+            sidePanelRef={sidePanelRef}
+          />
+          {/* 新規タブ追加ボタン */}
+          <NewTabButton />
+        </div>
       </div>
-    </div>
   );
 };
 
