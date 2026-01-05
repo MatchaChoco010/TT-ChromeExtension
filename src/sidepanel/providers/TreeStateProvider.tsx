@@ -787,7 +787,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     const newViewId = `view_${Date.now()}`;
     const newView: View = {
       id: newViewId,
-      name: 'New View',
+      name: 'View',
       color: newColor,
     };
 
@@ -800,6 +800,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   /**
    * ビューを削除
+   * 削除されるビューのタブは配列上の前のビューに移動
    */
   const deleteView = useCallback((viewId: string) => {
     if (!treeState) return;
@@ -807,16 +808,39 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     // デフォルトビューは削除不可
     if (viewId === 'default') return;
 
+    // 削除対象ビューのインデックスを取得
+    const viewIndex = treeState.views.findIndex(v => v.id === viewId);
+    if (viewIndex === -1) return;
+
+    // 移動先ビューを決定（配列上の前のビュー、なければdefault）
+    const targetViewId = viewIndex > 0
+      ? treeState.views[viewIndex - 1].id
+      : 'default';
+
+    // 削除対象ビューのタブを移動先ビューに移動
+    const updatedNodes = { ...treeState.nodes };
+    for (const nodeId of Object.keys(updatedNodes)) {
+      const node = updatedNodes[nodeId];
+      if (node.viewId === viewId) {
+        updatedNodes[nodeId] = {
+          ...node,
+          viewId: targetViewId,
+          parentId: null,
+        };
+      }
+    }
+
     const newViews = treeState.views.filter(v => v.id !== viewId);
 
-    // 削除されたビューが現在のビューだった場合、デフォルトビューに切り替え
+    // 削除されたビューが現在のビューだった場合、移動先ビューに切り替え
     const newCurrentViewId = treeState.currentViewId === viewId
-      ? 'default'
+      ? targetViewId
       : treeState.currentViewId;
 
     const newState: TreeState = {
       ...treeState,
       views: newViews,
+      nodes: updatedNodes,
       currentViewId: newCurrentViewId,
     };
     updateTreeState(newState);

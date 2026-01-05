@@ -26,7 +26,7 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -101,7 +101,7 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -148,7 +148,7 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
       // ViewSwitcher内のビューボタンにカスタムアイコンが表示されることを確認
       // ビューボタン自体を再取得（aria-labelは変わらない）
       const updatedViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(updatedViewButton).toBeVisible({ timeout: 5000 });
 
@@ -184,7 +184,7 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -248,7 +248,7 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 

@@ -136,7 +136,7 @@ test.describe('UX改善機能', () => {
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: 100 });
 
-      // 次のビュー（New View）がアクティブになることを確認
+      // 次のビュー（View）がアクティブになることを確認
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -163,7 +163,7 @@ test.describe('UX改善機能', () => {
 
       // 新しいビューに切り替え
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await newViewButton.click();
       await assertViewStructure(sidePanelPage, windowId, [
@@ -231,7 +231,7 @@ test.describe('UX改善機能', () => {
 
       // 新しいビューに切り替え
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await newViewButton.click();
       await assertViewStructure(sidePanelPage, windowId, [
@@ -243,7 +243,7 @@ test.describe('UX改善機能', () => {
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: 100 });
 
-      // New Viewがまだアクティブ（変化なし）
+      // Viewがまだアクティブ（変化なし）
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -307,10 +307,10 @@ test.describe('UX改善機能', () => {
       await expect(moveToViewItem).toBeVisible({ timeout: 5000 });
       await moveToViewItem.hover();
 
-      // サブメニューが表示され、New Viewが存在することを確認（機能テスト固有の検証）
+      // サブメニューが表示され、Viewが存在することを確認（機能テスト固有の検証）
       const subMenu = sidePanelPage.locator('[data-testid="submenu"]');
       await expect(subMenu).toBeVisible({ timeout: 5000 });
-      const subMenuItem = subMenu.locator('text=New View');
+      const subMenuItem = subMenu.locator('text=View');
       await expect(subMenuItem).toBeVisible();
 
       // クリーンアップ: メニューを閉じてからタブを閉じる
@@ -379,16 +379,16 @@ test.describe('UX改善機能', () => {
       const subMenu = sidePanelPage.locator('[data-testid="submenu"]');
       await expect(subMenu).toBeVisible({ timeout: 5000 });
 
-      // サブメニュー内の "New View" をクリック
-      const newViewMenuItem = subMenu.locator('text=New View');
+      // サブメニュー内の "View" をクリック
+      const newViewMenuItem = subMenu.locator('text=View');
       await newViewMenuItem.click();
 
       // コンテキストメニューが閉じることを確認（機能テスト固有の検証）
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-      // New Viewに切り替え、タブがNew Viewに移動していることを確認
+      // Viewに切り替え、タブがViewに移動していることを確認
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await newViewButton.click();
       await assertViewStructure(sidePanelPage, windowId, [
@@ -396,9 +396,9 @@ test.describe('UX改善機能', () => {
         { viewIdentifier: '#10B981' },
       ], 1);
 
-      // タブがNew Viewに移動していることを確認
+      // タブがViewに移動していることを確認
       // 注意: pseudoSidePanelTabIdはオリジナルビュー（index 0）に残り、
-      // tabIdのみがNew View（index 1）に移動する
+      // tabIdのみがView（index 1）に移動する
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: tabId, depth: 0 },
       ], 1);

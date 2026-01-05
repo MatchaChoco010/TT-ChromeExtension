@@ -55,7 +55,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいビューボタンが追加されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -89,7 +89,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -147,9 +147,9 @@ test.describe('ビュー切り替え機能', () => {
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
 
-      // 新しいビュー "New View" が表示されるまで待機
+      // 新しいビュー "View" が表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
     });
@@ -169,7 +169,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -279,7 +279,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -295,7 +295,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいタブを開く（createTabユーティリティを使用）
       const newTabId = await createTab(extensionContext, 'about:blank');
-      // activeViewIndex=1: 新しいビュー（New View）がアクティブ
+      // activeViewIndex=1: 新しいビュー（View）がアクティブ
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: newTabId, depth: 0 },
       ], 1);
@@ -313,7 +313,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
@@ -325,7 +325,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいビューが永続化されていることを確認
       const persistedViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(persistedViewButton).toBeVisible({ timeout: 5000 });
     });
@@ -341,7 +341,7 @@ test.describe('ビュー切り替え機能', () => {
       await addButton.click();
       await addButton.click();
 
-      // 2つ目のビューボタンが表示されるまで待機（2つ目のビューは "New View" ではなく "New View" となる）
+      // 2つ目のビューボタンが表示されるまで待機（2つ目のビューは "View" ではなく "View" となる）
       const viewButtons = sidePanelPage.locator('[aria-label^="Switch to"]');
       await waitForCondition(
         async () => {
@@ -383,7 +383,7 @@ test.describe('ビュー切り替え機能', () => {
 
       // 新しいビューボタンが表示されるまで待機
       const newViewButton = sidePanelPage.locator(
-        '[aria-label="Switch to New View view"]'
+        '[aria-label="Switch to View view"]'
       );
       await expect(newViewButton).toBeVisible({ timeout: 5000 });
 
