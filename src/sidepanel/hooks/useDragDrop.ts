@@ -528,6 +528,31 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     };
   }, []);
 
+  // DRAG_SESSION_ENDEDメッセージを受信したらドラッグをキャンセル
+  // クロスウィンドウドラッグ終了時に元ウィンドウのプレースホルダーをクリーンアップ
+  useEffect(() => {
+    const handleMessage = (message: { type: string }) => {
+      if (message.type === 'DRAG_SESSION_ENDED') {
+        const currentState = dragStateRef.current;
+        // ドラッグ中の場合のみキャンセル
+        if (currentState.isDragging || currentState.isPotentialDrag) {
+          document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
+          document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
+          resetDragState();
+        }
+      }
+    };
+
+    // chrome.runtime.onMessage が存在する場合のみリスナーを追加
+    // テスト環境では存在しない場合がある
+    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+      chrome.runtime.onMessage.addListener(handleMessage);
+      return () => {
+        chrome.runtime.onMessage.removeListener(handleMessage);
+      };
+    }
+  }, [resetDragState]);
+
   return {
     dragState,
     getItemProps,

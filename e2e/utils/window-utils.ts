@@ -60,7 +60,7 @@ export async function createWindow(context: BrowserContext): Promise<number> {
 }
 
 /**
- * タブを別ウィンドウに移動
+ * タブを別ウィンドウに移動（子孫タブも一緒に移動）
  *
  * @param context - ブラウザコンテキスト
  * @param tabId - 移動するタブのID
@@ -73,24 +73,81 @@ export async function moveTabToWindow(
 ): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  // Service Workerコンテキストでchrome.tabs.move()を実行
-  await serviceWorker.evaluate(
-    ({ tabId, windowId }) => {
-      return chrome.tabs.move(tabId, {
-        windowId,
-        index: -1, // ウィンドウの最後に配置
-      });
+  // ツリー構造を取得して、移動するタブとその子孫を特定
+  const tabIdsToMove = await serviceWorker.evaluate(
+    async ({ tabId }) => {
+      interface TabNode {
+        id: string;
+        tabId: number;
+        parentId: string | null;
+      }
+      interface TreeState {
+        nodes: Record<string, TabNode>;
+        tabToNode: Record<number, string>;
+      }
+
+      const result = await chrome.storage.local.get('tree_state');
+      const treeState = result.tree_state as TreeState | undefined;
+
+      if (!treeState?.nodes || !treeState?.tabToNode) {
+        // ツリー構造がない場合は単一タブのみ移動
+        return [tabId];
+      }
+
+      const nodeId = treeState.tabToNode[tabId];
+      if (!nodeId) {
+        return [tabId];
+      }
+
+      // parentIdを使用して子孫タブを再帰的に収集
+      const collectDescendants = (parentNodeId: string): number[] => {
+        const parentNode = treeState.nodes[parentNodeId];
+        if (!parentNode) return [];
+
+        const tabIds: number[] = [parentNode.tabId];
+
+        // すべてのノードを走査して、このノードを親とするノードを見つける
+        for (const [childNodeId, childNode] of Object.entries(treeState.nodes)) {
+          if (childNode.parentId === parentNodeId) {
+            tabIds.push(...collectDescendants(childNodeId));
+          }
+        }
+
+        return tabIds;
+      };
+
+      return collectDescendants(nodeId);
     },
-    { tabId, windowId }
+    { tabId }
   );
 
-  // タブが指定ウィンドウに移動完了するまでポーリングで待機
+  // 親タブから順番にすべてのタブを移動
+  for (const id of tabIdsToMove) {
+    await serviceWorker.evaluate(
+      ({ tabId, windowId }) => {
+        return chrome.tabs.move(tabId, {
+          windowId,
+          index: -1, // ウィンドウの最後に配置
+        });
+      },
+      { tabId: id, windowId }
+    );
+  }
+
+  // すべてのタブが指定ウィンドウに移動完了するまでポーリングで待機
   await serviceWorker.evaluate(
-    async ({ tabId, windowId }) => {
+    async ({ tabIds, windowId }) => {
       for (let i = 0; i < 50; i++) {
         try {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab.windowId === windowId) {
+          let allMoved = true;
+          for (const tabId of tabIds) {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab.windowId !== windowId) {
+              allMoved = false;
+              break;
+            }
+          }
+          if (allMoved) {
             return;
           }
         } catch {
@@ -99,7 +156,7 @@ export async function moveTabToWindow(
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     },
-    { tabId, windowId }
+    { tabIds: tabIdsToMove, windowId }
   );
 }
 

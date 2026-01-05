@@ -1193,6 +1193,7 @@ async function handleGetDragSession(
 /**
  * ドラッグセッション終了
  * ドラッグ完了時の空ウィンドウ自動クローズ
+ * 全ウィンドウにドラッグ終了を通知（プレースホルダークリーンアップ）
  */
 async function handleEndDragSession(
   reason: string | undefined,
@@ -1205,6 +1206,12 @@ async function handleEndDragSession(
     const sourceWindowId = session?.sourceWindowId;
 
     await dragSessionManager.endSession(reason || 'COMPLETED');
+
+    // 全ウィンドウにドラッグセッション終了を通知
+    // これにより、元ウィンドウのプレースホルダーやドラッグ状態がクリーンアップされる
+    chrome.runtime.sendMessage({ type: 'DRAG_SESSION_ENDED' }).catch((_error) => {
+      // Ignore errors when no listeners are available
+    });
 
     // ドラッグ完了時にソースウィンドウが空なら自動クローズ
     if (sourceWindowId !== undefined) {

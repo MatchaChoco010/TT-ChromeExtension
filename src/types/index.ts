@@ -223,7 +223,9 @@ export type MessageType =
   | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
   // ツリービュー上のホバー検知
   | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
-  | { type: 'NOTIFY_DRAG_OUT' };
+  | { type: 'NOTIFY_DRAG_OUT' }
+  // ドラッグセッション終了通知（全ウィンドウへのブロードキャスト）
+  | { type: 'DRAG_SESSION_ENDED' };
 
 export type MessageResponse<T> =
   | { success: true; data: T }

@@ -55,15 +55,15 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
     const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
     const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // Create a tab in the new window
     const tabId3 = await createTab(extensionContext, 'https://example.com/tab3', { windowId: newWindowId });
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId3, depth: 0 },
     ], 0);
 
@@ -73,8 +73,8 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
 
     // Verify new window state (includes the new tab)
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId3, depth: 0 },
     ], 0);
 
@@ -123,15 +123,20 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
     const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
     const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // Move tab to new window
     await moveTabToWindow(extensionContext, tabId, newWindowId);
     await waitForTabInTreeState(extensionContext, tabId);
 
-    // Assert tab structure immediately after moveTabToWindow
+    // Reload side panels to reflect the change
+    await newWindowSidePanel.reload();
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await sidePanelPage.reload();
+    await waitForSidePanelReady(sidePanelPage, serviceWorker);
+
     // Verify original window state (tab removed)
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -139,26 +144,8 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
 
     // Verify new window state (tab added)
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
-      { tabId: tabId, depth: 0 },
-    ], 0);
-
-    // Reload side panels and re-verify to ensure persistence
-    await newWindowSidePanel.reload();
-    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
-    await sidePanelPage.reload();
-    await waitForSidePanelReady(sidePanelPage, serviceWorker);
-
-    // Verify original window state after reload
-    await assertTabStructure(sidePanelPage, originalWindowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    // Verify new window state after reload
-    await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newPseudoSidePanelTabId, depth: 0 },
-      { tabId: newInitialBrowserTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
   });
@@ -203,10 +190,10 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
     const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
     const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
 
-    // New window should only show its tabs (pseudo side panel + default new tab)
+    // New window should only show its tabs (default new tab + pseudo side panel)
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 });

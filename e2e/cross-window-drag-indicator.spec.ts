@@ -151,8 +151,8 @@ test.describe('Cross-Window Drag Indicator', () => {
       const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
       const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
       await assertTabStructure(newSidePanel, newWindowId, [
-        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       // Start drag session from original window's side panel (simulating drag start)
@@ -252,15 +252,15 @@ test.describe('Cross-Window Drag Indicator', () => {
       const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
       const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
       await assertTabStructure(newSidePanel, newWindowId, [
-        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       // Create a tab in the new window for the tree to show
       const tabInNewWindow = await createTab(extensionContext, 'https://example.org', { windowId: newWindowId });
       await assertTabStructure(newSidePanel, newWindowId, [
-        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: tabInNewWindow, depth: 0 },
       ], 0);
 
@@ -270,8 +270,8 @@ test.describe('Cross-Window Drag Indicator', () => {
 
       // Verify new window state with new tab
       await assertTabStructure(newSidePanel, newWindowId, [
-        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: tabInNewWindow, depth: 0 },
       ], 0);
 
@@ -382,8 +382,8 @@ test.describe('Cross-Window Drag Indicator', () => {
       const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
       const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
       await assertTabStructure(newSidePanel, newWindowId, [
-        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       // Start drag session from original window
@@ -499,8 +499,8 @@ test.describe('Cross-Window Drag Indicator', () => {
       const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
       const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
       await assertTabStructure(newSidePanel, newWindowId, [
-        { tabId: newPseudoSidePanelTabId, depth: 0 },
         { tabId: newInitialBrowserTabId, depth: 0 },
+        { tabId: newPseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       // Start drag session

@@ -52,8 +52,8 @@ test.describe('Cross-Window Drag & Drop', () => {
 
     // Verify new window initial state
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // Move tab to the new window
@@ -73,13 +73,13 @@ test.describe('Cross-Window Drag & Drop', () => {
 
     // Verify new window state (tab added)
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
   });
 
-  test('Moving parent tab to another window moves only the parent (Chrome API behavior)', async ({
+  test('Moving parent tab to another window moves the entire subtree', async ({
     sidePanelPage,
     extensionContext,
     serviceWorker,
@@ -124,15 +124,15 @@ test.describe('Cross-Window Drag & Drop', () => {
     const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
     await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
 
-    // Get new window's tabs
+    // Get new window's tabs BEFORE moving (important: avoid "found 2" error)
     const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
     const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // Move parent tab to the new window
+    // Move parent tab to the new window (children are moved together)
     await moveTabToWindow(extensionContext, parentTabId, newWindowId);
     await waitForTabInTreeState(extensionContext, parentTabId);
 
@@ -142,18 +142,18 @@ test.describe('Cross-Window Drag & Drop', () => {
     await sidePanelPage.reload();
     await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
-    // Verify original window state (parent moved, children remain but now at depth 0)
+    // Verify original window state (parent and children moved)
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: childTabId1, depth: 0 },
-      { tabId: childTabId2, depth: 0 },
     ], 0);
 
-    // Verify new window state (parent added)
+    // Verify new window state (parent and children added with hierarchy preserved)
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId1, depth: 1 },
+      { tabId: childTabId2, depth: 1 },
     ], 0);
   });
 
@@ -206,8 +206,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     const newPseudo1 = await getPseudoSidePanelTabId(serviceWorker, newWindowId1);
     const newInitial1 = await getInitialBrowserTabId(serviceWorker, newWindowId1);
     await assertTabStructure(newWindowSidePanel1, newWindowId1, [
-      { tabId: newPseudo1, depth: 0 },
       { tabId: newInitial1, depth: 0 },
+      { tabId: newPseudo1, depth: 0 },
     ], 0);
 
     const newWindowSidePanel2 = await openSidePanelForWindow(extensionContext, newWindowId2);
@@ -215,8 +215,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     const newPseudo2 = await getPseudoSidePanelTabId(serviceWorker, newWindowId2);
     const newInitial2 = await getInitialBrowserTabId(serviceWorker, newWindowId2);
     await assertTabStructure(newWindowSidePanel2, newWindowId2, [
-      { tabId: newPseudo2, depth: 0 },
       { tabId: newInitial2, depth: 0 },
+      { tabId: newPseudo2, depth: 0 },
     ], 0);
 
     // Move tab1 to window1
@@ -236,8 +236,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     ], 0);
 
     await assertTabStructure(newWindowSidePanel1, newWindowId1, [
-      { tabId: newPseudo1, depth: 0 },
       { tabId: newInitial1, depth: 0 },
+      { tabId: newPseudo1, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
@@ -257,8 +257,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     ], 0);
 
     await assertTabStructure(newWindowSidePanel2, newWindowId2, [
-      { tabId: newPseudo2, depth: 0 },
       { tabId: newInitial2, depth: 0 },
+      { tabId: newPseudo2, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
   });
@@ -294,8 +294,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
     const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // Move tab to the new window
@@ -313,8 +313,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     ], 0);
 
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
 
@@ -334,8 +334,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     ], 0);
 
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
@@ -370,8 +370,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
     const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // Move tab to the new window
@@ -389,8 +389,8 @@ test.describe('Cross-Window Drag & Drop', () => {
     ], 0);
 
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: newInitialBrowserTabId, depth: 0 },
+      { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
 

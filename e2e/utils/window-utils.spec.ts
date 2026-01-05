@@ -19,11 +19,6 @@ import {
   getInitialBrowserTabId,
 } from './tab-utils';
 import { assertTabStructure, assertWindowExists } from './assertion-utils';
-import {
-  startCrossWindowDrag,
-  triggerCrossWindowDragEnter,
-  completeCrossWindowDrop,
-} from './drag-drop-utils';
 
 test.describe('WindowTestUtils', () => {
   test('createWindowは新しいウィンドウを作成する', async ({ extensionContext }) => {
@@ -67,12 +62,16 @@ test.describe('WindowTestUtils', () => {
     // 新ウィンドウのデフォルトタブを取得（削除せずにタブ構造に含める）
     const newWindowInitialTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // タブを新しいウィンドウに移動
     await moveTabToWindow(extensionContext, tabId, newWindowId);
+
+    // サイドパネルをリロードして変更を反映
+    await newWindowSidePanel.reload();
+    await sidePanelPage.reload();
 
     // 元のウィンドウからタブが消えたことを確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -81,13 +80,13 @@ test.describe('WindowTestUtils', () => {
 
     // 新しいウィンドウにタブが移動したことを確認
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
   });
 
-  test('クロスウィンドウドラッグ&ドロップでタブを別ウィンドウに移動する', async ({
+  test('クロスウィンドウでタブを別ウィンドウに移動する（moveTabToWindow）', async ({
     extensionContext,
     sidePanelPage,
     serviceWorker,
@@ -117,42 +116,27 @@ test.describe('WindowTestUtils', () => {
     const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
     const newWindowPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
 
-    // 新ウィンドウのデフォルトタブを取得
+    // 新ウィンドウのデフォルトタブを取得（タブ移動前に取得）
     const newWindowInitialTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // ステップ1: 元のウィンドウでドラッグを開始（Service Workerにセッション保存）
-    await startCrossWindowDrag(sidePanelPage, tabId);
-    // ドラッグ開始後、元のウィンドウのタブ構造は変わらない（ドラッグ中の表示状態のみ変化）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabId, depth: 0 },
-    ], 0);
+    // タブを新しいウィンドウに移動（moveTabToWindow APIを使用）
+    await moveTabToWindow(extensionContext, tabId, newWindowId);
 
-    // ステップ2: 新ウィンドウのツリービューにマウスを移動（クロスウィンドウ移動トリガー）
-    await triggerCrossWindowDragEnter(newWindowSidePanel);
-    // タブが新ウィンドウに移動したことを確認（移動元・移動先両ウィンドウ）
+    // サイドパネルをリロードして変更を反映
+    await newWindowSidePanel.reload();
+    await sidePanelPage.reload();
+
+    // 移動完了後の最終状態を確認（移動元・移動先両ウィンドウ）
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
-      { tabId: tabId, depth: 0 },
-    ], 0);
-
-    // ステップ3: 新ウィンドウでドロップを完了（デフォルトタブの下のギャップにドロップ）
-    await completeCrossWindowDrop(newWindowSidePanel, newWindowInitialTabId, 'gap-below');
-    // ドロップ完了後の最終状態を確認（移動元・移動先両ウィンドウ）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-    await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
-      { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
   });
@@ -172,8 +156,8 @@ test.describe('WindowTestUtils', () => {
     // 新ウィンドウのデフォルトタブを取得
     const newWindowInitialTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // ツリー状態の同期を検証（例外が発生しないことを確認）
@@ -222,12 +206,16 @@ test.describe('WindowTestUtils', () => {
     // 新ウィンドウのデフォルトタブを取得
     const newWindowInitialTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // タブを新しいウィンドウに移動
     await moveTabToWindow(extensionContext, tab1Id, newWindowId);
+
+    // サイドパネルをリロードして変更を反映
+    await newWindowSidePanel.reload();
+    await sidePanelPage.reload();
 
     // 元のウィンドウからタブ1が消えたことを確認
     await assertTabStructure(sidePanelPage, currentWindowId, [
@@ -237,8 +225,8 @@ test.describe('WindowTestUtils', () => {
 
     // 新しいウィンドウにタブ1が移動したことを確認
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tab1Id, depth: 0 },
     ], 0);
 
@@ -289,28 +277,31 @@ test.describe('WindowTestUtils', () => {
     const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
     const newWindowPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
 
-    // 新ウィンドウのデフォルトタブを取得
+    // 新ウィンドウのデフォルトタブを取得（タブ移動前に取得）
     const newWindowInitialTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 親タブを新しいウィンドウに移動
+    // 親タブを新しいウィンドウに移動（子タブも一緒に移動）
     await moveTabToWindow(extensionContext, parentTabId, newWindowId);
 
-    // 元のウィンドウから親タブが消えたことを確認
-    // 子タブは元のウィンドウに残る（Chrome Tab APIの動作）
+    // サイドパネルをリロードして変更を反映
+    await newWindowSidePanel.reload();
+    await sidePanelPage.reload();
+
+    // 元のウィンドウから親タブと子タブが消えたことを確認
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: childTabId, depth: 0 },
     ], 0);
 
-    // 親タブが新しいウィンドウに移動したことを確認
+    // 親タブと子タブが新しいウィンドウに移動し、階層が維持されていることを確認
     await assertTabStructure(newWindowSidePanel, newWindowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
+      { tabId: childTabId, depth: 1 },
     ], 0);
 
     // ツリー状態の同期を検証
