@@ -111,6 +111,8 @@ export function registerTabEventListeners(): void {
   chrome.tabs.onMoved.addListener(handleTabMoved);
   chrome.tabs.onUpdated.addListener(handleTabUpdated);
   chrome.tabs.onActivated.addListener(handleTabActivated);
+  chrome.tabs.onDetached.addListener(handleTabDetached);
+  chrome.tabs.onAttached.addListener(handleTabAttached);
 }
 
 /**
@@ -442,6 +444,42 @@ async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promis
     }
   } catch (_error) {
     // Error in handleTabActivated silently
+  }
+}
+
+/**
+ * タブがウィンドウから取り外されたときのハンドラ
+ * ウィンドウ間のタブ移動で発火する（onMovedはウィンドウ内移動のみ）
+ */
+function handleTabDetached(
+  _tabId: number,
+  _detachInfo: chrome.tabs.TabDetachInfo,
+): void {
+  try {
+    // UIに状態更新を通知（元のウィンドウのツリービューを更新）
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((_error) => {
+      // Ignore errors when no listeners are available
+    });
+  } catch (_error) {
+    // Error in handleTabDetached silently
+  }
+}
+
+/**
+ * タブが別のウィンドウにアタッチされたときのハンドラ
+ * ウィンドウ間のタブ移動で発火する（onMovedはウィンドウ内移動のみ）
+ */
+function handleTabAttached(
+  _tabId: number,
+  _attachInfo: chrome.tabs.TabAttachInfo,
+): void {
+  try {
+    // UIに状態更新を通知（新しいウィンドウのツリービューを更新）
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch((_error) => {
+      // Ignore errors when no listeners are available
+    });
+  } catch (_error) {
+    // Error in handleTabAttached silently
   }
 }
 

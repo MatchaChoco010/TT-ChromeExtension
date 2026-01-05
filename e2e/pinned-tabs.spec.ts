@@ -170,10 +170,12 @@ test.describe('ピン留めタブセクション', () => {
       }).toPass({ timeout: 10000 });
 
       // ピン留めを解除
+      // 注意: Chromeはピン留め解除時にタブを最初の非ピン留め位置（index 0）に配置する
+      // そのためtabIdがpseudoSidePanelTabIdより前に表示される
       await unpinTab(extensionContext, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
@@ -538,11 +540,13 @@ test.describe('ピン留めタブセクション', () => {
       await expect(contextMenu).toBeVisible();
 
       // 「ピン留めを解除」をクリック
+      // 注意: Chromeはピン留め解除時にタブを最初の非ピン留め位置（index 0）に配置する
+      // そのためtabIdがpseudoSidePanelTabIdより前に表示される
       const unpinMenuItem = sidePanelPage.locator('[role="menuitem"]').filter({ hasText: 'ピン留めを解除' });
       await unpinMenuItem.click();
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 

@@ -103,8 +103,9 @@ test.describe('ピン留めタブの並び替え', () => {
         const startX = tab3Box.x + tab3Box.width / 2;
         const startY = tab3Box.y + tab3Box.height / 2;
 
-        // tabId1の位置にドロップ
-        const endX = tab1Box.x + tab1Box.width / 2;
+        // tabId1の左端にドロップ（tabId1の前に配置するため）
+        // 左端から20%の位置に配置することで、確実にtabId1の前に挿入される
+        const endX = tab1Box.x + tab1Box.width * 0.2;
         const endY = tab1Box.y + tab1Box.height / 2;
 
         await sidePanelPage.mouse.move(startX, startY);

@@ -336,6 +336,8 @@ test.describe('chrome.tabs API統合', () => {
       ], 0);
 
       // ピン留めを解除
+      // 注意: Chromeはピン留め解除時にタブを最初の非ピン留め位置（index 0）に配置する
+      // そのためtabIdがpseudoSidePanelTabIdより前に表示される
       await serviceWorker.evaluate(async (id) => {
         return await chrome.tabs.update(id, { pinned: false });
       }, tabId);
@@ -343,8 +345,8 @@ test.describe('chrome.tabs API統合', () => {
       // ピン留め解除後の構造を検証（タブが通常セクションに戻る）
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });

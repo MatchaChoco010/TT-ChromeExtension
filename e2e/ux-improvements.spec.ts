@@ -397,16 +397,15 @@ test.describe('UX改善機能', () => {
       ], 1);
 
       // タブがNew Viewに移動していることを確認
+      // 注意: pseudoSidePanelTabIdはオリジナルビュー（index 0）に残り、
+      // tabIdのみがNew View（index 1）に移動する
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 1);
 
       // クリーンアップ
       await closeTab(extensionContext, tabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 1);
+      await assertTabStructure(sidePanelPage, windowId, [], 1);
     });
 
     test('現在のビューはサブメニューに表示されない', async ({

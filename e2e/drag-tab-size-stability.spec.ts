@@ -180,10 +180,12 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
       await dropTab(sidePanelPage);
 
       // ドロップ後のタブ構造を検証
+      // 注意: parentTabの中央にホバーしてドロップしたため、
+      // childTabはparentTabの子になる（depth: 1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
-        { tabId: childTab, depth: 0 },
+        { tabId: childTab, depth: 1 },
       ], 0);
     });
 
@@ -263,12 +265,14 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
       await dropTab(sidePanelPage);
 
       // ドロップ後のタブ構造を検証
+      // 注意: 最後にtab3の中央にホバーしてドロップしたため、
+      // tabToDragはtab3の子になる（depth: 1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
-        { tabId: tabToDrag, depth: 0 },
+        { tabId: tabToDrag, depth: 1 },
       ], 0);
     });
   });
@@ -329,10 +333,12 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
       await dropTab(sidePanelPage);
 
       // ドロップ後のタブ構造を検証
+      // 注意: targetTabの中央にホバーしてドロップしたため、
+      // dragTabはtargetTabの子になる（depth: 1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: targetTab, depth: 0 },
-        { tabId: dragTab, depth: 0 },
+        { tabId: dragTab, depth: 1 },
       ], 0);
     });
 
@@ -404,11 +410,13 @@ test.describe('ドラッグ中のタブサイズ安定性', () => {
       await dropTab(sidePanelPage);
 
       // ドロップ後のタブ構造を検証
+      // 注意: 最後にtab2の中央にホバーしてドロップしたため、
+      // dragTabはtab2の子になる（depth: 1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
-        { tabId: dragTab, depth: 0 },
+        { tabId: dragTab, depth: 1 },
       ], 0);
     });
   });

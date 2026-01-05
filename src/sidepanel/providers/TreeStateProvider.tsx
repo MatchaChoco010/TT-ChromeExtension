@@ -67,6 +67,21 @@ export const useTreeState = () => {
 };
 
 /**
+ * ビューの色パレット
+ * 新しいビューを作成するたびに、順番に色を割り当てる
+ */
+const VIEW_COLOR_PALETTE = [
+  '#3B82F6', // blue (default)
+  '#10B981', // green
+  '#F59E0B', // yellow
+  '#EF4444', // red
+  '#8B5CF6', // purple
+  '#EC4899', // pink
+  '#06B6D4', // cyan
+  '#F97316', // orange
+];
+
+/**
  * デフォルトビューを持つviews配列を返す
  */
 function getDefaultViews(): View[] {
@@ -74,7 +89,7 @@ function getDefaultViews(): View[] {
     {
       id: 'default',
       name: 'Default',
-      color: '#3b82f6',
+      color: '#3B82F6',
     },
   ];
 }
@@ -645,6 +660,66 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, [loadTreeState]);
 
+  // chrome.tabs.onDetachedでタブがウィンドウから取り外されたときにtabInfoMapを更新
+  useEffect(() => {
+    const handleTabDetached = (
+      tabId: number,
+      _detachInfo: chrome.tabs.TabDetachInfo
+    ) => {
+      // タブがウィンドウから取り外されたとき、tabInfoMapを更新
+      // 新しいウィンドウIDはonAttachedで更新される
+      setTabInfoMap(prev => {
+        if (!prev[tabId]) return prev;
+        return {
+          ...prev,
+          [tabId]: {
+            ...prev[tabId],
+            windowId: -1, // 一時的にウィンドウから外れた状態
+          },
+        };
+      });
+      // ツリー状態を再読み込み
+      loadTreeState();
+      loadTabInfoMap();
+    };
+
+    chrome.tabs.onDetached.addListener(handleTabDetached);
+
+    return () => {
+      chrome.tabs.onDetached.removeListener(handleTabDetached);
+    };
+  }, [loadTreeState, loadTabInfoMap]);
+
+  // chrome.tabs.onAttachedでタブが新しいウィンドウにアタッチされたときにtabInfoMapを更新
+  useEffect(() => {
+    const handleTabAttached = async (
+      tabId: number,
+      attachInfo: chrome.tabs.TabAttachInfo
+    ) => {
+      // タブが新しいウィンドウにアタッチされたとき、tabInfoMapを更新
+      setTabInfoMap(prev => {
+        if (!prev[tabId]) return prev;
+        return {
+          ...prev,
+          [tabId]: {
+            ...prev[tabId],
+            windowId: attachInfo.newWindowId,
+            index: attachInfo.newPosition,
+          },
+        };
+      });
+      // ツリー状態を再読み込み
+      loadTreeState();
+      loadTabInfoMap();
+    };
+
+    chrome.tabs.onAttached.addListener(handleTabAttached);
+
+    return () => {
+      chrome.tabs.onAttached.removeListener(handleTabAttached);
+    };
+  }, [loadTreeState, loadTabInfoMap]);
+
   useEffect(() => {
     // chrome.storage.onChanged をリッスン
     const storageListener = (
@@ -705,11 +780,15 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const createView = useCallback(() => {
     if (!treeState) return;
 
+    // 既存のビュー数に基づいて色パレットから次の色を選択
+    const colorIndex = treeState.views.length % VIEW_COLOR_PALETTE.length;
+    const newColor = VIEW_COLOR_PALETTE[colorIndex];
+
     const newViewId = `view_${Date.now()}`;
     const newView: View = {
       id: newViewId,
       name: 'New View',
-      color: '#6b7280', // gray-500
+      color: newColor,
     };
 
     const newState: TreeState = {

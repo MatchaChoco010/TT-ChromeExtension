@@ -53,24 +53,26 @@ test.describe('chrome.windows API統合', () => {
     const newWindowPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
     const newWindowInitialTabId = await getInitialBrowserTabId(serviceWorker, windowId);
 
-    // 初期状態を検証（擬似サイドパネルタブと初期タブ）
+    // 初期状態を検証（初期タブと擬似サイドパネルタブ）
+    // 注意: 初期タブはウィンドウ作成時にindex 0で作成され、
+    // 擬似サイドパネルタブは後で開かれるためindex 1以降になる
     await assertTabStructure(newWindowSidePanel, windowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // 新しいウィンドウにタブを作成（createTabを使用）
     const tabId1 = await createTab(extensionContext, 'https://example.com', { windowId, active: false });
     await assertTabStructure(newWindowSidePanel, windowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
     const tabId2 = await createTab(extensionContext, 'https://example.org', { windowId, active: false });
     await assertTabStructure(newWindowSidePanel, windowId, [
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: newWindowInitialTabId, depth: 0 },
+      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
@@ -186,30 +188,32 @@ test.describe('chrome.windows API統合', () => {
     const initialTabId2 = await getInitialBrowserTabId(serviceWorker, windowId2);
 
     // ウィンドウ1の初期状態を検証
+    // 注意: 初期タブはウィンドウ作成時にindex 0で作成され、
+    // 擬似サイドパネルタブは後で開かれるためindex 1以降になる
     await assertTabStructure(sidePanel1, windowId1, [
-      { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: initialTabId1, depth: 0 },
+      { tabId: pseudoSidePanelTabId1, depth: 0 },
     ], 0);
 
     // ウィンドウ2の初期状態を検証
     await assertTabStructure(sidePanel2, windowId2, [
-      { tabId: pseudoSidePanelTabId2, depth: 0 },
       { tabId: initialTabId2, depth: 0 },
+      { tabId: pseudoSidePanelTabId2, depth: 0 },
     ], 0);
 
     // ウィンドウ1にタブを作成（createTabを使用）
     const tabId1 = await createTab(extensionContext, 'https://example.com', { windowId: windowId1, active: false });
     await assertTabStructure(sidePanel1, windowId1, [
-      { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: initialTabId1, depth: 0 },
+      { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
     // ウィンドウ2にタブを作成（createTabを使用）
     const tabId2 = await createTab(extensionContext, 'https://example.org', { windowId: windowId2, active: false });
     await assertTabStructure(sidePanel2, windowId2, [
-      { tabId: pseudoSidePanelTabId2, depth: 0 },
       { tabId: initialTabId2, depth: 0 },
+      { tabId: pseudoSidePanelTabId2, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
 

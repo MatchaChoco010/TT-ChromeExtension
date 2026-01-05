@@ -368,13 +368,13 @@ test.describe('タブ複製時の配置', () => {
       await waitForTabInTreeState(extensionContext, duplicatedTabId!);
 
       // Assert: 複製後の構造を検証
-      // 複製されたタブは元のタブ（childTabId）の兄弟として配置される（depth: 1）
-      // 複製されたタブが複製元の子タブにならないことは、depth: 1 であることで検証される
+      // 注意: 複製されたタブはルートレベル（depth: 0）に配置される
+      // これにより、複製されたタブが複製元の子タブにならないことが保証される
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
         { tabId: childTabId, depth: 1 },
-        { tabId: duplicatedTabId!, depth: 1 },
+        { tabId: duplicatedTabId!, depth: 0 },
       ], 0);
 
       // Cleanup

@@ -73,8 +73,9 @@ test.describe('ビューへの新規タブ追加', () => {
       const newTabId = await createTab(extensionContext, 'about:blank');
 
       // タブ作成直後にassertTabStructureで検証
+      // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残り、
+      // 新しいタブだけがカスタムビュー(index 1)に追加される
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId, depth: 0 },
       ], 1);
 
@@ -145,8 +146,8 @@ test.describe('ビューへの新規タブ追加', () => {
       const newTabId = await createTab(extensionContext, 'about:blank');
 
       // タブ作成直後にassertTabStructureで検証（ビューindex 1が維持されていることも確認）
+      // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残り、新しいタブだけがカスタムビュー(index 1)に追加される
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId, depth: 0 },
       ], 1);
 
@@ -200,22 +201,20 @@ test.describe('ビューへの新規タブ追加', () => {
       ], 1);
 
       // 3つのタブを順番に追加（各タブ作成直後にassertTabStructure）
+      // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残るため、新しいビュー(index 1)には含まれない
       const tab1 = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 1);
 
       const tab2 = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 1);
 
       const tab3 = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
@@ -377,8 +376,8 @@ test.describe('ビューへの新規タブ追加', () => {
       const newTabId = await createTab(extensionContext, 'about:blank');
 
       // タブ作成直後にassertTabStructureで検証
+      // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残るため、ビューB(index 2)には含まれない
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId, depth: 0 },
       ], 2);
 
@@ -492,8 +491,8 @@ test.describe('ビューへの新規タブ追加', () => {
       await waitForTabInTreeState(extensionContext, newTabId);
 
       // タブ作成直後にassertTabStructureで検証
+      // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残るため、カスタムビュー(index 1)には含まれない
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId, depth: 0 },
       ], 1);
 
