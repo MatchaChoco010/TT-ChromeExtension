@@ -1,12 +1,3 @@
-/**
- * Text Selection E2E Tests
- *
- * テキスト選択禁止機能の E2E テスト
- *
- * - ツリービュー内の全てのテキスト要素がユーザー選択不可（user-select: none）に設定されていること
- * - Shift+クリックでの複数タブ選択時にテキスト選択が発生しないこと
- */
-
 import { test, expect } from './fixtures/extension';
 import {
   createTab,

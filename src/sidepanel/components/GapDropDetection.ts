@@ -1,11 +1,4 @@
 /**
- * タブとタブ間の隙間ドロップ判定ユーティリティ
- *
- * ドラッグ中のマウスY座標からドロップ先がタブ上か隙間上かを判定し、
- * 適切なビジュアルフィードバックを表示するための情報を提供する
- */
-
-/**
  * ドロップターゲットの種類
  */
 export enum DropTargetType {
@@ -125,29 +118,24 @@ function calculateAdjacentNodeIdsFromOriginal(
     return { aboveNodeId: undefined, belowNodeId: undefined };
   }
 
-  // 最初のタブより上
   const firstTab = tabPositions[0];
   if (mouseY < firstTab.top) {
     return { aboveNodeId: undefined, belowNodeId: firstTab.nodeId };
   }
 
-  // 最後のタブより下
   const lastTab = tabPositions[tabPositions.length - 1];
   if (mouseY >= lastTab.bottom) {
     return { aboveNodeId: lastTab.nodeId, belowNodeId: undefined };
   }
 
-  // 各タブを検索
   for (let i = 0; i < tabPositions.length; i++) {
     const tab = tabPositions[i];
     const tabHeight = tab.bottom - tab.top;
     const gapThreshold = tabHeight * gapThresholdRatio;
 
-    // タブの範囲内かチェック
     if (mouseY >= tab.top && mouseY < tab.bottom) {
       const relativeY = mouseY - tab.top;
 
-      // 上端の隙間領域
       if (relativeY < gapThreshold) {
         const aboveTab = i > 0 ? tabPositions[i - 1] : undefined;
         return {
@@ -156,7 +144,6 @@ function calculateAdjacentNodeIdsFromOriginal(
         };
       }
 
-      // 下端の隙間領域
       if (relativeY >= tabHeight - gapThreshold) {
         const belowTab = i < tabPositions.length - 1 ? tabPositions[i + 1] : undefined;
         return {
@@ -165,7 +152,6 @@ function calculateAdjacentNodeIdsFromOriginal(
         };
       }
 
-      // 中央領域（タブドロップ）- 隣接ノードとしてはこのタブの上下を返す
       const aboveTab = i > 0 ? tabPositions[i - 1] : undefined;
       const belowTab = i < tabPositions.length - 1 ? tabPositions[i + 1] : undefined;
       return {
@@ -175,7 +161,6 @@ function calculateAdjacentNodeIdsFromOriginal(
     }
   }
 
-  // タブ間の隙間（タブが離れている場合）
   for (let i = 0; i < tabPositions.length - 1; i++) {
     const currentTab = tabPositions[i];
     const nextTab = tabPositions[i + 1];
@@ -206,7 +191,6 @@ export function calculateDropTarget(
   gapThresholdRatioOrOptions: number | DropTargetOptions = DEFAULT_GAP_THRESHOLD_RATIO,
   containerBounds?: ContainerBounds
 ): DropTarget {
-  // オプションオブジェクトまたは個別パラメータを処理
   let gapThresholdRatio: number;
   let bounds: ContainerBounds | undefined;
   let draggedNodeId: string | undefined;
@@ -222,7 +206,6 @@ export function calculateDropTarget(
     bounds = containerBounds;
   }
 
-  // ドラッグ中のノードとそのサブツリーを除外したタブ位置リストを作成
   let effectiveTabPositions = tabPositions;
   let draggedSubtreeNodeIds: Set<string> | undefined;
 
@@ -232,31 +215,24 @@ export function calculateDropTarget(
     effectiveTabPositions = tabPositions.filter(pos => !draggedSubtreeNodeIds!.has(pos.nodeId));
   }
 
-  // タブリストが空の場合（元のリストまたは有効リスト）
   if (effectiveTabPositions.length === 0) {
     return { type: DropTargetType.None };
   }
 
-  // コンテナ境界チェック
-  // 境界が指定されている場合、マウスがコンテナ外にある場合はNoneを返す
   if (bounds) {
     if (mouseY < bounds.minY || mouseY > bounds.maxY) {
       return { type: DropTargetType.None };
     }
   }
 
-  // 元のtabPositionsでの隣接ノードIDを計算（プレースホルダー表示用）
-  // これにより、ドラッグ中のタブがあっても正しい位置にプレースホルダーが表示される
   const originalAdjacentNodeIds = calculateAdjacentNodeIdsFromOriginal(
     mouseY,
     tabPositions,
     gapThresholdRatio
   );
 
-  // Y座標が最初のタブより上の場合
   const firstTab = effectiveTabPositions[0];
   if (mouseY < firstTab.top) {
-    // 元のtabPositionsでの最初のタブを取得
     const originalFirstTab = tabPositions[0];
     return {
       type: DropTargetType.Gap,
@@ -269,10 +245,8 @@ export function calculateDropTarget(
     };
   }
 
-  // Y座標が最後のタブより下の場合
   const lastTab = effectiveTabPositions[effectiveTabPositions.length - 1];
   if (mouseY >= lastTab.bottom) {
-    // 元のtabPositionsでの最後のタブを取得
     const originalLastTab = tabPositions[tabPositions.length - 1];
     return {
       type: DropTargetType.Gap,
@@ -285,22 +259,16 @@ export function calculateDropTarget(
     };
   }
 
-  // 各タブを検索（有効なタブリストを使用）
   for (let i = 0; i < effectiveTabPositions.length; i++) {
     const tab = effectiveTabPositions[i];
     const tabHeight = tab.bottom - tab.top;
     const gapThreshold = tabHeight * gapThresholdRatio;
 
-    // タブの範囲内かチェック
     if (mouseY >= tab.top && mouseY < tab.bottom) {
-      // タブ内での相対位置
       const relativeY = mouseY - tab.top;
 
-      // 上端の隙間領域
       if (relativeY < gapThreshold) {
         const aboveTab = i > 0 ? effectiveTabPositions[i - 1] : undefined;
-        // adjacentDepthsはeffectiveTabPositionsベース（ドロップ処理用）
-        // adjacentNodeIdsは元のtabPositionsベース（プレースホルダー表示用）
         return {
           type: DropTargetType.Gap,
           gapIndex: i,
@@ -312,7 +280,6 @@ export function calculateDropTarget(
         };
       }
 
-      // 下端の隙間領域
       if (relativeY >= tabHeight - gapThreshold) {
         const belowTab = i < effectiveTabPositions.length - 1 ? effectiveTabPositions[i + 1] : undefined;
         return {
@@ -326,7 +293,6 @@ export function calculateDropTarget(
         };
       }
 
-      // 中央領域（タブドロップ）
       return {
         type: DropTargetType.Tab,
         targetNodeId: tab.nodeId,
@@ -353,18 +319,14 @@ export function calculateIndicatorY(
     return 0;
   }
 
-  // 最初の隙間（最初のタブの上）
   if (gapIndex === 0) {
     return tabPositions[0].top;
   }
 
-  // 最後の隙間（最後のタブの下）
   if (gapIndex >= tabPositions.length) {
     return tabPositions[tabPositions.length - 1].bottom;
   }
 
-  // タブ間の隙間
-  // 上のタブの下端と下のタブの上端の中間
   const aboveTab = tabPositions[gapIndex - 1];
   const belowTab = tabPositions[gapIndex];
   return (aboveTab.bottom + belowTab.top) / 2;
@@ -389,7 +351,6 @@ export function calculateIndicatorYByNodeIds(
     return 0;
   }
 
-  // 上のノードと下のノードを検索
   const aboveTab = aboveNodeId
     ? tabPositions.find(t => t.nodeId === aboveNodeId)
     : undefined;
@@ -397,22 +358,18 @@ export function calculateIndicatorYByNodeIds(
     ? tabPositions.find(t => t.nodeId === belowNodeId)
     : undefined;
 
-  // 先頭の場合（aboveNodeIdがundefined）
   if (!aboveTab && belowTab) {
     return belowTab.top;
   }
 
-  // 末尾の場合（belowNodeIdがundefined）
   if (aboveTab && !belowTab) {
     return aboveTab.bottom;
   }
 
-  // タブ間の隙間
   if (aboveTab && belowTab) {
     return (aboveTab.bottom + belowTab.top) / 2;
   }
 
-  // フォールバック
   return 0;
 }
 
@@ -441,12 +398,10 @@ export function calculateHorizontalDropTarget(
   mouseX: number,
   tabPositions: HorizontalTabPosition[]
 ): DropTarget {
-  // タブリストが空の場合
   if (tabPositions.length === 0) {
     return { type: DropTargetType.None };
   }
 
-  // X座標が最初のタブより左の場合
   const firstTab = tabPositions[0];
   if (mouseX < firstTab.left) {
     return {
@@ -455,7 +410,6 @@ export function calculateHorizontalDropTarget(
     };
   }
 
-  // X座標が最後のタブより右の場合
   const lastTab = tabPositions[tabPositions.length - 1];
   if (mouseX >= lastTab.right) {
     return {
@@ -464,22 +418,18 @@ export function calculateHorizontalDropTarget(
     };
   }
 
-  // 各タブを検索して挿入位置を決定
   for (let i = 0; i < tabPositions.length; i++) {
     const tab = tabPositions[i];
     const tabWidth = tab.right - tab.left;
     const tabCenter = tab.left + tabWidth / 2;
 
-    // タブの範囲内かチェック
     if (mouseX >= tab.left && mouseX < tab.right) {
-      // タブの中心より左なら、このタブの前に挿入
       if (mouseX < tabCenter) {
         return {
           type: DropTargetType.HorizontalGap,
           insertIndex: i,
         };
       }
-      // タブの中心より右なら、このタブの後に挿入
       return {
         type: DropTargetType.HorizontalGap,
         insertIndex: i + 1,
@@ -506,17 +456,14 @@ export function calculateHorizontalIndicatorX(
     return 0;
   }
 
-  // 先頭に挿入
   if (insertIndex === 0) {
     return tabPositions[0].left;
   }
 
-  // 末尾に挿入
   if (insertIndex >= tabPositions.length) {
     return tabPositions[tabPositions.length - 1].right;
   }
 
-  // タブ間に挿入
   const leftTab = tabPositions[insertIndex - 1];
   const rightTab = tabPositions[insertIndex];
   return (leftTab.right + rightTab.left) / 2;

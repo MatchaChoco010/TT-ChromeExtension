@@ -1,14 +1,7 @@
-/**
- * スクロールバースタイル改善のテスト
- * - スクロールバーの表示/非表示でレイアウトがシフトしない
- * - スクロールバーのスタイルをダークモードに対応させる
- * - スクロールバーにオーバーレイスタイルを適用し、コンテンツ幅に影響を与えない
- */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import SidePanelRoot from './SidePanelRoot';
 
-// chrome API のモック
 const mockChrome = {
   tabs: {
     query: vi.fn().mockResolvedValue([]),
@@ -17,6 +10,8 @@ const mockChrome = {
     onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
     onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
     onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
+    onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+    onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
     update: vi.fn(),
     remove: vi.fn(),
     sendMessage: vi.fn(),
@@ -57,6 +52,7 @@ const mockChrome = {
   windows: {
     getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
     create: vi.fn(),
+    onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
   },
   i18n: {
     getMessage: vi.fn().mockReturnValue(''),
@@ -68,7 +64,6 @@ const mockChrome = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // globalにchromeを設定
   (globalThis as Record<string, unknown>).chrome = mockChrome;
 });
 
@@ -77,10 +72,8 @@ describe('スクロールバースタイル改善', () => {
     it('SidePanelRootコンテナにカスタムスクロールバークラスが適用されること', async () => {
       render(<SidePanelRoot />);
 
-      // 非同期状態更新の完了を待機
       await waitFor(() => {
         const sidePanelRoot = screen.getByTestId('side-panel-root');
-        // custom-scrollbarクラスが適用されていることを確認
         expect(sidePanelRoot.classList.contains('custom-scrollbar')).toBe(true);
       });
     });
@@ -88,10 +81,8 @@ describe('スクロールバースタイル改善', () => {
     it('タブツリーコンテナにカスタムスクロールバークラスが適用されること', async () => {
       render(<SidePanelRoot />);
 
-      // ローディング完了を待つ（tab-tree-rootが表示されるまで）
       await waitFor(() => {
         const tabTreeRoot = screen.getByTestId('tab-tree-root');
-        // custom-scrollbarクラスが適用されていることを確認
         expect(tabTreeRoot.classList.contains('custom-scrollbar')).toBe(true);
       }, { timeout: 3000 });
     });

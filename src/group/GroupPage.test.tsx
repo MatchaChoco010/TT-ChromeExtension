@@ -1,24 +1,17 @@
-/**
- * GroupPage コンポーネントのテスト
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { GroupPage } from './GroupPage';
 
-// chrome.runtime をモック
 const mockSendMessage = vi.fn();
 vi.mock('@/types', () => ({}));
 
-// chrome.runtime.sendMessage のモック
 beforeEach(() => {
-  // chrome API のモック
   globalThis.chrome = {
     runtime: {
       sendMessage: mockSendMessage,
     },
   } as unknown as typeof chrome;
 
-  // location.search のモック
   Object.defineProperty(window, 'location', {
     value: { search: '?tabId=123' },
     writable: true,
@@ -32,12 +25,10 @@ afterEach(() => {
 describe('GroupPage', () => {
   describe('ローディング表示', () => {
     it('グループ情報取得中にローディング表示を行うこと', async () => {
-      // 遅延するPromiseを返す
       mockSendMessage.mockReturnValue(new Promise(() => {}));
 
       render(<GroupPage />);
 
-      // ローディング表示を確認
       expect(screen.getByText('読み込み中...')).toBeInTheDocument();
     });
   });
@@ -123,16 +114,13 @@ describe('GroupPage', () => {
 
       render(<GroupPage />);
 
-      // エラー表示を待つ
       await waitFor(() => {
         expect(screen.getByText('グループ情報の取得に失敗しました')).toBeInTheDocument();
       });
 
-      // リトライボタンをクリック
       const retryButton = screen.getByRole('button', { name: '再試行' });
       retryButton.click();
 
-      // グループ情報が表示されることを確認
       await waitFor(() => {
         expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('テストグループ');
       });
@@ -164,19 +152,16 @@ describe('GroupPage', () => {
 
       render(<GroupPage />);
 
-      // 初期表示を確認（Promiseを解決するために手動でタイマーを進める）
       await act(async () => {
         await vi.runAllTimersAsync();
       });
 
       expect(screen.getAllByRole('listitem')).toHaveLength(1);
 
-      // ポーリング間隔を経過させる (2秒)
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2000);
       });
 
-      // 更新された情報が表示されることを確認
       expect(screen.getAllByRole('listitem')).toHaveLength(2);
 
       vi.useRealTimers();

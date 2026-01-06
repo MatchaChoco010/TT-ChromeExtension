@@ -1,8 +1,5 @@
 /**
- * Test for Tailwind CSS configuration
- * タブツリー背景色の無彩色化
- * - grayパレットがneutralで上書きされていること
- * - ダークブルーではなく無彩色が適用されること
+ * Tailwind CSS設定のテスト
  */
 import { describe, it, expect } from 'vitest';
 import type { Config } from 'tailwindcss';
@@ -10,7 +7,6 @@ import type { Config } from 'tailwindcss';
 import tailwindConfig from '../../tailwind.config.js';
 import colors from 'tailwindcss/colors';
 
-// Type the imported config
 const config = tailwindConfig as Config;
 
 interface ExtendedColors {
@@ -20,7 +16,6 @@ interface ExtendedColors {
 describe('Tailwind CSS Configuration', () => {
   describe('Gray Palette Override', () => {
     it('should have gray palette overridden with neutral colors', () => {
-      // Check that the config has the extend.colors.gray setting
       const extendedColors = config.theme?.extend?.colors as ExtendedColors | undefined;
       expect(extendedColors?.gray).toBeDefined();
     });
@@ -29,16 +24,12 @@ describe('Tailwind CSS Configuration', () => {
       const extendedColors = config.theme?.extend?.colors as ExtendedColors | undefined;
       const grayOverride = extendedColors?.gray;
 
-      // Verify gray is set to neutral
       expect(grayOverride).toBe(colors.neutral);
     });
 
     it('should have neutral palette with no blue tint', () => {
-      // Neutral palette should be truly achromatic (no blue tint)
-      // Check some key shades to ensure they are neutral
       const neutralShades = colors.neutral;
 
-      // Neutral colors should exist
       expect(neutralShades).toBeDefined();
       expect(neutralShades['50']).toBeDefined();
       expect(neutralShades['100']).toBeDefined();

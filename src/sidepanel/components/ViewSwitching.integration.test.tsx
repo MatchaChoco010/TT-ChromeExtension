@@ -14,9 +14,6 @@ import { StorageService } from '@/storage/StorageService';
 import type { View } from '@/types';
 import type { MockChrome, MockStorageLocal, MockStorage } from '@/test/test-types';
 
-/**
- * ViewManager と TreeStateManager を使用したビュー切り替えのテストハーネス
- */
 const ViewSwitchingTestHarness: React.FC = () => {
   const [views, setViews] = React.useState<View[]>([]);
   const [currentViewId, setCurrentViewId] = React.useState<string>('default-view');
@@ -25,7 +22,6 @@ const ViewSwitchingTestHarness: React.FC = () => {
     return new ViewManager(storageService);
   });
 
-  // ViewManagerの状態を定期的に同期
   React.useEffect(() => {
     const syncState = () => {
       setViews(viewManager.getViews());
@@ -34,7 +30,7 @@ const ViewSwitchingTestHarness: React.FC = () => {
 
     syncState();
 
-    // 状態変更を監視するための簡易的なポーリング
+    // ポーリングによりViewManagerの状態をReactコンポーネントに同期
     const interval = setInterval(syncState, 100);
     return () => clearInterval(interval);
   }, [viewManager]);
@@ -74,9 +70,7 @@ const ViewSwitchingTestHarness: React.FC = () => {
         onViewDelete={handleViewDelete}
         onViewUpdate={handleViewUpdate}
       />
-      {/* 現在のビューIDを表示（テスト確認用） */}
       <div data-testid="current-view-id">{currentViewId}</div>
-      {/* ビュー数を表示（テスト確認用） */}
       <div data-testid="view-count">{views.length}</div>
     </div>
   );
@@ -84,7 +78,6 @@ const ViewSwitchingTestHarness: React.FC = () => {
 
 describe('ビュー切り替えの統合テスト', () => {
   beforeEach(() => {
-    // モックのchrome.storageを設定
     const mockStorageLocal: MockStorageLocal = {
       get: vi.fn().mockResolvedValue({}),
       set: vi.fn().mockResolvedValue(undefined),
@@ -111,42 +104,32 @@ describe('ビュー切り替えの統合テスト', () => {
     it('新しいビューを作成ボタンから作成できる', async () => {
       render(<ViewSwitchingTestHarness />);
 
-      // 初期状態ではビューが0個
       expect(screen.getByTestId('view-count')).toHaveTextContent('0');
 
-      // 新しいビュー追加ボタンをクリック
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       fireEvent.click(addButton);
 
-      // ビューが作成されたことを確認（少し待つ）
       await waitFor(() => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('1');
       });
 
-      // ビューがファビコンサイズアイコンボタンとして表示されることを確認
-      // ビュー名はaria-labelで確認（テキスト表示はなくなった）
       expect(screen.getByRole('button', { name: /Switch to New View 1/i })).toBeInTheDocument();
     });
 
     it('複数の新しいビューを作成できる', async () => {
       render(<ViewSwitchingTestHarness />);
 
-      // 初期状態ではビューが0個
       expect(screen.getByTestId('view-count')).toHaveTextContent('0');
 
-      // 新しいビューを3つ作成
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       fireEvent.click(addButton);
       fireEvent.click(addButton);
       fireEvent.click(addButton);
 
-      // 3つのビューが作成されたことを確認
       await waitFor(() => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('3');
       });
 
-      // すべてのビューがファビコンサイズアイコンボタンとして表示されることを確認
-      // ビュー名はaria-labelで確認（テキスト表示はなくなった）
       expect(screen.getByRole('button', { name: /Switch to New View 1/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Switch to New View 2/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Switch to New View 3/i })).toBeInTheDocument();
@@ -155,7 +138,6 @@ describe('ビュー切り替えの統合テスト', () => {
     it('作成されたビューには一意のIDが割り当てられる', async () => {
       render(<ViewSwitchingTestHarness />);
 
-      // 新しいビューを2つ作成
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       fireEvent.click(addButton);
       fireEvent.click(addButton);
@@ -164,13 +146,11 @@ describe('ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('2');
       });
 
-      // 各ビューボタンが一意のaria-labelを持つことを確認
       const viewButtons = screen.getAllByRole('button', {
         name: /Switch to New View/i,
       });
       expect(viewButtons).toHaveLength(2);
 
-      // ボタンが異なることを確認（同じボタンではない）
       expect(viewButtons[0]).not.toBe(viewButtons[1]);
     });
   });
@@ -179,12 +159,10 @@ describe('ビュー切り替えの統合テスト', () => {
     it('ビューを切り替えると currentViewId が更新される', async () => {
       render(<ViewSwitchingTestHarness />);
 
-      // 初期状態ではデフォルトビュー
       expect(screen.getByTestId('current-view-id')).toHaveTextContent(
         'default-view',
       );
 
-      // 新しいビューを作成
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       fireEvent.click(addButton);
 
@@ -192,13 +170,11 @@ describe('ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('1');
       });
 
-      // 作成したビューに切り替え
       const newViewButton = screen.getByRole('button', {
         name: /Switch to New View 1/i,
       });
       fireEvent.click(newViewButton);
 
-      // currentViewIdが更新されることを確認
       await waitFor(() => {
         const currentViewId = screen.getByTestId('current-view-id').textContent;
         expect(currentViewId).not.toBe('default-view');
@@ -209,7 +185,6 @@ describe('ビュー切り替えの統合テスト', () => {
     it('複数のビュー間を切り替えられる', async () => {
       render(<ViewSwitchingTestHarness />);
 
-      // 2つの新しいビューを作成
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       fireEvent.click(addButton);
       fireEvent.click(addButton);
@@ -218,7 +193,6 @@ describe('ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('2');
       });
 
-      // 最初のビューに切り替え
       const view1Button = screen.getByRole('button', {
         name: /Switch to New View 1/i,
       });
@@ -231,7 +205,6 @@ describe('ビュー切り替えの統合テスト', () => {
 
       const firstViewId = screen.getByTestId('current-view-id').textContent;
 
-      // 2番目のビューに切り替え
       const view2Button = screen.getByRole('button', {
         name: /Switch to New View 2/i,
       });
@@ -247,7 +220,6 @@ describe('ビュー切り替えの統合テスト', () => {
     it('切り替えたビューがアクティブとしてハイライトされる', async () => {
       render(<ViewSwitchingTestHarness />);
 
-      // 新しいビューを作成
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       fireEvent.click(addButton);
 
@@ -255,13 +227,11 @@ describe('ビュー切り替えの統合テスト', () => {
         expect(screen.getByTestId('view-count')).toHaveTextContent('1');
       });
 
-      // 作成したビューに切り替え
       const newViewButton = screen.getByRole('button', {
         name: /Switch to New View 1/i,
       });
       fireEvent.click(newViewButton);
 
-      // ビューがアクティブとしてハイライトされることを確認
       await waitFor(() => {
         expect(newViewButton).toHaveAttribute('data-active', 'true');
       });

@@ -1,15 +1,12 @@
 /**
  * DragDropUtils
  *
- * 自前D&D実装用のドラッグ&ドロップ操作シミュレーションユーティリティ
- * - dnd-kit固有のセレクタを使用しない
- * - マウスイベントベースのドラッグ操作シミュレーション
+ * ドラッグ&ドロップ操作シミュレーションユーティリティ
  */
 import type { Page, Worker } from '@playwright/test';
 
 /**
  * 要素のバウンディングボックスを取得
- * Playwrightの自動待機を活用
  *
  * @param page - Page
  * @param selector - 要素のセレクタ
@@ -46,7 +43,6 @@ async function waitForDragState(page: Page, maxWait: number = 2000): Promise<boo
     if (hasDragClass) {
       return true;
     }
-    // 短い間隔でポーリング
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
   }
   return false;
@@ -63,10 +59,8 @@ async function waitForDragState(page: Page, maxWait: number = 2000): Promise<boo
 export async function startDrag(page: Page, sourceTabId: number): Promise<void> {
   const selector = `[data-testid="tree-node-${sourceTabId}"]`;
 
-  // 要素のバウンディングボックスを取得
   const box = await getBoundingBox(page, selector);
 
-  // マウスを要素の中央に移動
   const startX = box.x + box.width / 2;
   const startY = box.y + box.height / 2;
 
@@ -74,17 +68,12 @@ export async function startDrag(page: Page, sourceTabId: number): Promise<void> 
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // マウスを開始位置に移動
   await page.mouse.move(startX, startY, { steps: 3 });
 
-  // マウスボタンを押下
   await page.mouse.down();
 
-  // 自前D&D実装は8px移動でドラッグを開始するため、10px移動
-  // steps: 5 でドラッグを確実に検出できるようにする
   await page.mouse.move(startX + 10, startY, { steps: 5 });
 
-  // ドラッグ状態が確立されるまで待機
   await waitForDragState(page);
 }
 
@@ -97,17 +86,14 @@ export async function startDrag(page: Page, sourceTabId: number): Promise<void> 
 export async function hoverOverTab(page: Page, targetTabId: number): Promise<void> {
   const selector = `[data-testid="tree-node-${targetTabId}"]`;
 
-  // 要素のバウンディングボックスを取得
   const box = await getBoundingBox(page, selector);
 
   // バックグラウンドスロットリングを回避するためにページをフォーカス
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // ターゲットノードの中央にマウスを移動（steps: 10 でホバーを確実に検出）
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
 
-  // Reactの状態更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
@@ -121,7 +107,6 @@ export async function hoverOverTab(page: Page, targetTabId: number): Promise<voi
  */
 export async function moveTo(page: Page, x: number, y: number): Promise<void> {
   await page.mouse.move(x, y, { steps: 5 });
-  // Reactの状態更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
@@ -131,10 +116,8 @@ export async function moveTo(page: Page, x: number, y: number): Promise<void> {
  * @param page - Side PanelのPage
  */
 export async function dropTab(page: Page): Promise<void> {
-  // マウスアップイベントでドロップを実行
   await page.mouse.up();
 
-  // ドロップ後の状態更新を待機 - DOMの更新が完了するまで待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
@@ -155,47 +138,38 @@ export async function reorderTabs(
   const sourceSelector = `[data-testid="tree-node-${sourceTabId}"]`;
   const targetSelector = `[data-testid="tree-node-${targetTabId}"]`;
 
-  // ソース要素とターゲット要素のバウンディングボックスを取得
-  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
-  const targetBox = await getBoundingBox(page, targetSelector, 5000);
-
-  // ソース要素の中央座標
-  const sourceX = sourceBox.x + sourceBox.width / 2;
-  const sourceY = sourceBox.y + sourceBox.height / 2;
-
-  // ターゲット要素の座標（位置に応じて上部または下部）
-  const targetX = targetBox.x + targetBox.width / 2;
-  const targetY = position === 'before'
-    ? targetBox.y + targetBox.height * 0.15  // 上部15%の位置（Gap判定領域）
-    : targetBox.y + targetBox.height * 0.85; // 下部85%の位置（Gap判定領域）
-
   // バックグラウンドスロットリングを回避するためにページをフォーカス
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // 1. マウスをソース位置に移動
+  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
+
+  const sourceX = sourceBox.x + sourceBox.width / 2;
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+
   await page.mouse.move(sourceX, sourceY, { steps: 3 });
 
-  // 2. マウスボタンを押下
   await page.mouse.down();
 
-  // 3. 8px以上移動してドラッグを開始
   await page.mouse.move(sourceX + 10, sourceY, { steps: 5 });
 
-  // 4. ドラッグ状態が確立されるまで待機
   await waitForDragState(page);
 
-  // 5. ターゲット位置に移動
-  await page.mouse.move(targetX, targetY, { steps: 10 });
-
-  // 6. Reactの状態更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-  // 7. マウスをリリースしてドロップ
+  const targetBox = await getBoundingBox(page, targetSelector, 5000);
+  const targetX = targetBox.x + targetBox.width / 2;
+  const targetY = position === 'before'
+    ? targetBox.y + targetBox.height * 0.15
+    : targetBox.y + targetBox.height * 0.85;
+
+  await page.mouse.move(targetX, targetY, { steps: 15 });
+
+  await waitForDropIndicator(page, 2000);
+
   await page.mouse.up();
 
-  // D&D後のDOM更新を待機
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await waitForDragEnd(page, 2000);
 }
 
 /**
@@ -215,51 +189,63 @@ export async function moveTabToParent(
   const sourceSelector = `[data-testid="tree-node-${childTabId}"]`;
   const targetSelector = `[data-testid="tree-node-${parentTabId}"]`;
 
-  // ソース要素とターゲット要素のバウンディングボックスを取得
-  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
-  const targetBox = await getBoundingBox(page, targetSelector, 5000);
-
-  // ソース要素の中央座標
-  const sourceX = sourceBox.x + sourceBox.width / 2;
-  const sourceY = sourceBox.y + sourceBox.height / 2;
-
-  // ターゲット要素の中央座標（タブの中央にドロップすると子タブになる）
-  const targetX = targetBox.x + targetBox.width / 2;
-  const targetY = targetBox.y + targetBox.height / 2;
-
   // バックグラウンドスロットリングを回避するためにページをフォーカス
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // 1. マウスをソース位置に移動
+  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
+
+  const sourceX = sourceBox.x + sourceBox.width / 2;
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+
   await page.mouse.move(sourceX, sourceY, { steps: 3 });
 
-  // 2. マウスボタンを押下
   await page.mouse.down();
 
-  // 3. 8px以上移動してドラッグを開始
   await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
 
-  // 4. ドラッグ状態が確立されるまで待機
   await waitForDragState(page);
 
-  // 5. ターゲット位置に移動（steps: 10で確実にホバーを検出）
-  await page.mouse.move(targetX, targetY, { steps: 10 });
-
-  // 6. ホバー状態を安定させるための待機（並列実行時のタイミング問題対策）
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
-
-  // 7. Reactの状態更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-  // 8. マウスをリリースしてドロップ
+  const targetBox = await getBoundingBox(page, targetSelector, 5000);
+  const targetX = targetBox.x + targetBox.width / 2;
+  const targetY = targetBox.y + targetBox.height / 2;
+
+  await page.mouse.move(targetX, targetY, { steps: 15 });
+
+  await waitForTargetHighlight(page, parentTabId, 2000);
+
   await page.mouse.up();
 
-  // 9. D&D後のDOM更新を待機
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-
-  // 10. ドラッグ状態が完全に解除されるまで待機
   await waitForDragEnd(page, 2000);
+
+  await page.evaluate(async (childId, parentId) => {
+    interface TreeNode {
+      id: string;
+      tabId: number;
+      parentId: string | null;
+    }
+    interface LocalTreeState {
+      nodes: Record<string, TreeNode>;
+    }
+    for (let i = 0; i < 20; i++) {
+      const result = await chrome.storage.local.get('tree_state');
+      const treeState = result.tree_state as LocalTreeState | undefined;
+      if (treeState?.nodes) {
+        const childNode = Object.values(treeState.nodes).find(
+          (n: TreeNode) => n.tabId === childId
+        );
+        const parentNode = Object.values(treeState.nodes).find(
+          (n: TreeNode) => n.tabId === parentId
+        );
+        if (childNode && parentNode && childNode.parentId === parentNode.id) {
+          return;
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }, childTabId, parentTabId);
 }
 
 /**
@@ -276,17 +262,13 @@ export async function dragOutside(
 ): Promise<void> {
   const sourceSelector = `[data-testid="tree-node-${sourceTabId}"]`;
 
-  // ソース要素のバウンディングボックスを取得
   const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
 
-  // ソース要素の中央座標
   const sourceX = sourceBox.x + sourceBox.width / 2;
   const sourceY = sourceBox.y + sourceBox.height / 2;
 
-  // ビューポートサイズを取得
   const viewport = page.viewportSize() || { width: 800, height: 600 };
 
-  // ドラッグアウト先の座標を計算
   let targetX: number;
   let targetY: number;
   switch (direction) {
@@ -312,28 +294,20 @@ export async function dragOutside(
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // 1. マウスをソース位置に移動
   await page.mouse.move(sourceX, sourceY, { steps: 3 });
 
-  // 2. マウスボタンを押下
   await page.mouse.down();
 
-  // 3. 8px以上移動してドラッグを開始
   await page.mouse.move(sourceX + 10, sourceY, { steps: 5 });
 
-  // 4. ドラッグ状態が確立されるまで待機
   await waitForDragState(page);
 
-  // 5. ツリービュー外の位置に移動
   await page.mouse.move(targetX, targetY, { steps: 10 });
 
-  // 6. Reactの状態更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
-  // 7. マウスをリリースしてドロップ（外部ドロップ発火）
   await page.mouse.up();
 
-  // D&D後のDOM更新を待機
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
@@ -368,6 +342,52 @@ export async function waitForDragEnd(page: Page, maxWait: number = 2000): Promis
 }
 
 /**
+ * ドロップインジケーターが表示されるまでポーリングで待機
+ * ギャップドロップ時に使用
+ *
+ * @param page - Side PanelのPage
+ * @param maxWait - 最大待機時間（ミリ秒）
+ */
+async function waitForDropIndicator(page: Page, maxWait: number = 2000): Promise<boolean> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWait) {
+    const indicator = page.locator('[data-testid="drop-indicator"]');
+    const isVisible = await indicator.isVisible().catch(() => false);
+    if (isVisible) {
+      return true;
+    }
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
+  }
+  return false;
+}
+
+
+/**
+ * ターゲットタブがハイライトされるまでポーリングで待機
+ * タブ中央へのドロップ（子タブ化）時に使用
+ * ハイライト時はring-2クラスが付与される
+ *
+ * @param page - Side PanelのPage
+ * @param targetTabId - ターゲットタブのID
+ * @param maxWait - 最大待機時間（ミリ秒）
+ */
+async function waitForTargetHighlight(page: Page, targetTabId: number, maxWait: number = 2000): Promise<boolean> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWait) {
+    const targetNode = page.locator(`[data-testid="tree-node-${targetTabId}"]`);
+    const isHighlighted = await targetNode.evaluate((el) =>
+      el.classList.contains('ring-2') && el.classList.contains('ring-gray-400')
+    ).catch(() => false);
+    if (isHighlighted) {
+      return true;
+    }
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
+  }
+  return false;
+}
+
+
+/**
  * タブをルートレベルに移動（親子関係を解消）
  *
  * 子タブをドラッグして、別のタブの上部ギャップ（兄弟として挿入される位置）にドロップする
@@ -385,47 +405,37 @@ export async function moveTabToRoot(
   const sourceSelector = `[data-testid="tree-node-${childTabId}"]`;
   const targetSelector = `[data-testid="tree-node-${targetTabId}"]`;
 
-  // ソース要素とターゲット要素のバウンディングボックスを取得
-  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
-  const targetBox = await getBoundingBox(page, targetSelector, 5000);
-
-  // ソース要素の中央座標
-  const sourceX = sourceBox.x + sourceBox.width / 2;
-  const sourceY = sourceBox.y + sourceBox.height / 2;
-
-  // ターゲット要素の上部ギャップ位置（上部15%）とルートレベルのX座標（左端付近）
-  const targetX = targetBox.x + 30;  // ルートレベルの位置（インデントなし）
-  const targetY = targetBox.y + targetBox.height * 0.15;  // 上部ギャップ
-
   // バックグラウンドスロットリングを回避するためにページをフォーカス
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  // 1. マウスをソース位置に移動
+  const sourceBox = await getBoundingBox(page, sourceSelector, 5000);
+
+  const sourceX = sourceBox.x + sourceBox.width / 2;
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+
   await page.mouse.move(sourceX, sourceY, { steps: 3 });
 
-  // 2. マウスボタンを押下
   await page.mouse.down();
 
-  // 3. 8px以上移動してドラッグを開始
   await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
 
-  // 4. ドラッグ状態が確立されるまで待機
   await waitForDragState(page);
 
-  // 5. ターゲット位置（上部ギャップ）に移動
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+  const targetBox = await getBoundingBox(page, targetSelector, 5000);
+  const targetX = targetBox.x + 30;
+  const targetY = targetBox.y + targetBox.height * 0.15;
+
   await page.mouse.move(targetX, targetY, { steps: 10 });
 
-  // 6. Reactの状態更新を待機
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await waitForDropIndicator(page, 2000);
 
-  // 7. マウスをリリースしてドロップ
   await page.mouse.up();
 
-  // D&D後のDOM更新を待機
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await waitForDragEnd(page, 2000);
 
-  // ストレージへの親子関係解消の反映をポーリングで待機
   await page.evaluate(async (childId) => {
     interface TreeNode {
       id: string;
@@ -442,7 +452,6 @@ export async function moveTabToRoot(
         const childNode = Object.values(treeState.nodes).find(
           (n: TreeNode) => n.tabId === childId
         );
-        // 子ノードのparentIdがnullになっていることを確認
         if (childNode && childNode.parentId === null) {
           return;
         }
@@ -451,4 +460,5 @@ export async function moveTabToRoot(
     }
   }, childTabId);
 }
+
 

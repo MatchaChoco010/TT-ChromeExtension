@@ -39,12 +39,10 @@ export async function sendMessageToServiceWorker(
     throw new Error('Invalid message: message cannot be null or undefined');
   }
 
-  // タイムアウト処理を含むPromiseを作成
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error('Message timeout')), timeout);
   });
 
-  // Pageコンテキストからchrome.runtime.sendMessage()を実行
   const messagePromise = page.evaluate(
     (msg) => {
       return new Promise((resolve, reject) => {
@@ -64,7 +62,6 @@ export async function sendMessageToServiceWorker(
     message
   );
 
-  // タイムアウトまたはメッセージレスポンスを待機
   return Promise.race([messagePromise, timeoutPromise]);
 }
 
@@ -83,12 +80,10 @@ export async function waitForMessageFromServiceWorker(
 ): Promise<Record<string, unknown>> {
   const { timeout = 5000 } = options;
 
-  // タイムアウト処理を含むPromiseを作成
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error('Wait for message timeout')), timeout);
   });
 
-  // Service Workerコンテキストでメッセージリスナーを設定
   const messagePromise = worker.evaluate(
     (type) => {
       return new Promise<Record<string, unknown>>((resolve) => {
@@ -104,7 +99,6 @@ export async function waitForMessageFromServiceWorker(
     expectedType
   );
 
-  // タイムアウトまたはメッセージ受信を待機
   return Promise.race([messagePromise, timeoutPromise]);
 }
 
@@ -116,9 +110,7 @@ export async function waitForMessageFromServiceWorker(
 export async function assertEventListenersRegistered(
   worker: Worker
 ): Promise<void> {
-  // Service Workerが必要なイベントリスナーを持っているか検証
   const hasListeners = await worker.evaluate(() => {
-    // chrome.tabs.onCreated, onRemoved, onUpdated, onActivatedのリスナーが存在するか確認
     return {
       onCreated: chrome.tabs.onCreated.hasListeners(),
       onRemoved: chrome.tabs.onRemoved.hasListeners(),
@@ -127,7 +119,6 @@ export async function assertEventListenersRegistered(
     };
   });
 
-  // すべてのリスナーが登録されているか確認
   const allRegistered = Object.values(hasListeners).every((registered) => registered);
 
   if (!allRegistered) {
@@ -145,19 +136,16 @@ export async function assertEventListenersRegistered(
 export async function assertServiceWorkerLifecycle(
   context: BrowserContext
 ): Promise<void> {
-  // Service Workerが存在するか確認
   let [serviceWorker] = context.serviceWorkers();
   if (!serviceWorker) {
     serviceWorker = await context.waitForEvent('serviceworker', { timeout: 10000 });
   }
 
-  // Service WorkerのURLを検証
   const workerUrl = serviceWorker.url();
   if (!workerUrl.includes('chrome-extension://') || !workerUrl.includes('service-worker')) {
     throw new Error(`Invalid Service Worker URL: ${workerUrl}`);
   }
 
-  // Service Workerが評価可能な状態であることを検証
   const isActive = await serviceWorker.evaluate(() => {
     return typeof chrome !== 'undefined' && chrome.runtime !== undefined;
   });

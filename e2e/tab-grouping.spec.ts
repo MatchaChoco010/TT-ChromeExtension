@@ -1,17 +1,3 @@
-/**
- * Tab Grouping E2E Tests
- *
- * タブグループ化機能の E2E テスト
- *
- * - 複数タブを選択してグループ化した際にグループ親タブが作成されることを検証
- * - グループ親タブが専用のタブとして表示されることを検証
- * - 単一タブをグループに追加できることを検証
- * - コンテキストメニューからのグループ化操作を検証
- * - 単一タブのグループ化を検証
- * - 複数タブ選択時のグループ化を検証
- * - グループ化後の親子関係を検証
- */
-
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { waitForCondition } from './utils/polling-utils';
@@ -19,26 +5,20 @@ import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('タブグループ化機能', () => {
   test.describe('複数タブのグループ化', () => {
-    /**
-     * 複数タブを選択してコンテキストメニューからグループ化
-     */
     test('複数タブを選択してグループ化した際にグループ親タブが作成される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -52,21 +32,17 @@ test.describe('タブグループ化機能', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // 最初のタブを選択
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
       await expect(tabNode1).toHaveClass(/bg-gray-500/);
 
-      // Ctrl+クリックで2番目のタブを追加選択
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
       await tabNode2.click({ modifiers: ['Control'] });
       await expect(tabNode2).toHaveClass(/bg-gray-500/);
 
-      // 要素のバウンディングボックスが安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -78,24 +54,17 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // Act: 右クリックでコンテキストメニューを開く
       await tabNode2.click({ button: 'right' });
 
-      // コンテキストメニューが表示されることを確認
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
-      // 「選択されたタブをグループ化」をクリック
       const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
       await expect(groupMenuItem).toBeVisible();
       await groupMenuItem.click();
 
-      // コンテキストメニューが閉じるまで待機
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-      // Assert: グループ親タブ（group-で始まるノード）が作成されていることを確認
-      // ストレージをポーリングでチェック
-      // 実装は実タブ（正のtabId）を使用するため、tabId > 0をチェック
       await waitForCondition(
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
@@ -103,7 +72,6 @@ test.describe('タブグループ化機能', () => {
             return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
           });
           if (!treeState?.nodes) return false;
-          // group-で始まるIDを持つノードが存在するか確認（実タブを使用するためtabId > 0）
           return Object.values(treeState.nodes).some(
             (node) => node.id.startsWith('group-') && node.tabId > 0
           );
@@ -111,7 +79,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
       );
 
-      // グループタブのIDを取得
       const groupTabId = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
@@ -122,19 +89,17 @@ test.describe('タブグループ化機能', () => {
         return groupNode?.tabId ?? null;
       });
 
-      // グループタブと子タブの構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       await closeTab(extensionContext, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
@@ -147,28 +112,20 @@ test.describe('タブグループ化機能', () => {
   });
 
   test.describe('複数タブ選択によるグループ化の追加テスト', () => {
-    /**
-     * - コンテキストメニューからのグループ化操作を検証
-     * - 複数タブのグループ化を検証
-     * - グループ化後の親子関係を検証
-     */
     test('複数タブを新しいグループにグループ化できる', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange: 複数のタブを作成
       const tabId1 = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -182,14 +139,12 @@ test.describe('タブグループ化機能', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -201,24 +156,19 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // 複数タブを選択
       await tabNode1.click();
       await tabNode2.click({ modifiers: ['Control'] });
 
-      // Act: 右クリックでコンテキストメニューを開く
       await tabNode2.click({ button: 'right' });
 
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
-      // 「選択されたタブをグループ化」メニュー項目が表示されることを確認
       const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
       await expect(groupMenuItem).toBeVisible();
 
-      // 「選択されたタブをグループ化」をクリック
       await groupMenuItem.click();
 
-      // コンテキストメニューが閉じるまで待機
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       // Assert: グループ親タブが作成されていることを確認（実タブを使用するためtabId > 0）
@@ -230,7 +180,6 @@ test.describe('タブグループ化機能', () => {
             return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
           });
           if (!treeState?.nodes) return false;
-          // group-で始まるIDを持つノードが存在するか確認（実タブを使用するためtabId > 0）
           const groupNode = Object.values(treeState.nodes).find(
             (node) => node.id.startsWith('group-') && node.tabId > 0
           );
@@ -243,15 +192,13 @@ test.describe('タブグループ化機能', () => {
         { timeout: 10000, timeoutMessage: 'Group parent node was not created from multiple tabs' }
       );
 
-      // グループタブと子タブの構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // 元のタブがグループの子として配置されていることを確認
       await waitForCondition(
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
@@ -269,18 +216,16 @@ test.describe('タブグループ化機能', () => {
           const tabNodeState = treeState.nodes[tabNodeId];
           if (!tabNodeState) return false;
 
-          // タブがグループに属していることを確認（parentIdまたはgroupIdで判定）
           return (tabNodeState.parentId !== null && tabNodeState.parentId.startsWith('group-')) ||
                  (tabNodeState.groupId !== undefined && tabNodeState.groupId.startsWith('group-'));
         },
         { timeout: 10000, timeoutMessage: 'Tab was not added as child of group' }
       );
 
-      // クリーンアップ
       await closeTab(extensionContext, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
@@ -291,21 +236,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * グループのデフォルト名設定検証
-     */
     test('複数タブのグループ化時にデフォルト名「新しいグループ」が設定される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -331,7 +271,6 @@ test.describe('タブグループ化機能', () => {
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -343,7 +282,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // 複数タブを選択
       await tabNode1.click();
       await tabNode2.click({ modifiers: ['Control'] });
 
@@ -364,13 +302,11 @@ test.describe('タブグループ化機能', () => {
             return result.groups as Record<string, { id: string; name: string }> | undefined;
           });
           if (!groups) return false;
-          // 「新しいグループ」という名前のグループが存在することを確認
           return Object.values(groups).some((group) => group.name === '新しいグループ');
         },
         { timeout: 10000, timeoutMessage: 'Group with default name "新しいグループ" was not created' }
       );
 
-      // グループタブのIDを取得
       const groupTabId = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
@@ -381,11 +317,10 @@ test.describe('タブグループ化機能', () => {
         return groupNode?.tabId ?? null;
       });
 
-      // クリーンアップ
       await closeTab(extensionContext, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
@@ -408,13 +343,11 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -433,7 +366,6 @@ test.describe('タブグループ化機能', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      // 追加でグループに追加する3番目のタブを作成
       const tabId3 = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -446,13 +378,11 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // 最初の2つのタブを選択してグループ化
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
       await tabNode2.click({ modifiers: ['Control'] });
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -464,13 +394,11 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // グループ化
       await tabNode2.click({ button: 'right' });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
       await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // グループが作成されるまで待機（実タブを使用するためtabId > 0）
       let groupId: string | undefined;
       let groupTabId: number | undefined;
       await waitForCondition(
@@ -503,19 +431,16 @@ test.describe('タブグループ化機能', () => {
         } catch { /* ignore */ }
       });
 
-      // グループタブと子タブの構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
         { tabId: tabId3, depth: 0 },
       ], 0);
 
-      // 3番目のタブを選択解除して単独で選択
       const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -533,25 +458,17 @@ test.describe('タブグループ化機能', () => {
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
-      // 「グループに追加」メニュー項目を見つける
       const addToGroupItem = sidePanelPage.locator('text=グループに追加');
       await expect(addToGroupItem).toBeVisible({ timeout: 3000 });
 
-      // サブメニューを開くためにホバー
       await addToGroupItem.hover();
 
-      // サブメニュー（グループ一覧）が表示されるまで待機
-      // SubMenuコンポーネントはホバーで開く
       await expect(async () => {
-        // グループ名を含むサブメニュー項目が表示されることを確認
         const subMenuItems = sidePanelPage.locator('[role="menu"] [role="menu"]');
         const count = await subMenuItems.count();
         expect(count).toBeGreaterThan(0);
       }).toPass({ timeout: 5000 });
 
-      // サブメニュー内のグループを選択
-      // SubMenuのアイテムはbutton要素として表示される
-      // グループ名は「グループ」（TreeStateManager.createGroupFromTabsで設定されるデフォルト名）
       const subMenu = sidePanelPage.locator('[data-testid="submenu"]');
       await expect(subMenu).toBeVisible({ timeout: 3000 });
 
@@ -562,9 +479,6 @@ test.describe('タブグループ化機能', () => {
       // メニューが閉じるまで待機（first()を使用してメインメニューのみを対象）
       await expect(contextMenu.first()).not.toBeVisible({ timeout: 5000 });
 
-      // Assert: タブがグループに追加されていることを確認
-      // TreeStateProviderのaddTabToGroupはgroupIdフィールドを設定する
-      // またはparentIdがグループノードになる場合もある
       await waitForCondition(
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
@@ -582,17 +496,15 @@ test.describe('タブグループ化機能', () => {
           const tab3Node = treeState.nodes[tab3NodeId];
           if (!tab3Node) return false;
 
-          // タブ3がグループに属していることを確認（parentIdまたはgroupIdで判定）
           return tab3Node.parentId === groupId || tab3Node.groupId === groupId;
         },
         { timeout: 10000, timeoutMessage: 'Tab was not added to group' }
       );
 
-      // クリーンアップ
       await closeTab(extensionContext, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
         { tabId: tabId3, depth: 1 },
       ], 0);
@@ -600,7 +512,7 @@ test.describe('タブグループ化機能', () => {
       await closeTab(extensionContext, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId3, depth: 1 },
       ], 0);
 
@@ -616,13 +528,11 @@ test.describe('タブグループ化機能', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -640,7 +550,6 @@ test.describe('タブグループ化機能', () => {
 
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -658,24 +567,18 @@ test.describe('タブグループ化機能', () => {
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
-      // Assert: 「グループに追加」メニュー項目が無効化されていることを確認
-      // グループがない場合、「グループに追加」はグレーアウト表示される
       const addToGroupItem = sidePanelPage.locator('text=グループに追加');
       await expect(addToGroupItem).toBeVisible();
 
-      // 無効化されているかどうかを確認（text-gray-500クラスで無効化状態を示す）
       const parentDiv = addToGroupItem.locator('..');
       await expect(parentDiv).toHaveClass(/text-gray-500|cursor-not-allowed/);
 
-      // サブメニューが表示されないことを確認（矢印が表示されない）
       const arrow = parentDiv.locator('text=▶');
       await expect(arrow).not.toBeVisible();
 
-      // メニューを閉じる
       await sidePanelPage.keyboard.press('Escape');
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-      // クリーンアップ
       await closeTab(extensionContext, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -683,29 +586,17 @@ test.describe('タブグループ化機能', () => {
     });
   });
 
-  /**
-   * 実タブグループ化機能のE2Eテスト
-   * - グループタブのURLが拡張機能専用ページであることを検証
-   * - グループ化後に親タブの存在を検証
-   * - グループ化後の親子関係を検証
-   * - テストが安定して10回連続成功すること
-   */
   test.describe('実タブグループ化機能', () => {
-    /**
-     * グループタブのURLがchrome-extension://であることを検証
-     */
     test('グループ化するとchrome-extension://スキームのグループタブが作成される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -731,7 +622,6 @@ test.describe('タブグループ化機能', () => {
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -743,7 +633,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // 複数タブを選択
       await tabNode1.click();
       await tabNode2.click({ modifiers: ['Control'] });
 
@@ -766,13 +655,11 @@ test.describe('タブグループ化機能', () => {
             const treeState = storage.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
             if (!treeState?.nodes) return { found: false };
 
-            // group-で始まるIDを持ち、正のtabIdを持つノード（実タブ）を探す
             const groupNode = Object.values(treeState.nodes).find(
               (node) => node.id.startsWith('group-') && node.tabId > 0
             );
             if (!groupNode) return { found: false };
 
-            // グループタブのURLを確認
             try {
               const tab = await chrome.tabs.get(groupNode.tabId);
               const urlMatch = tab.url?.startsWith('chrome-extension://') && tab.url?.includes('group.html');
@@ -790,15 +677,13 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group tab was not created with chrome-extension:// URL' }
       );
 
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
@@ -820,21 +705,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * グループ化後に親タブ（グループタブ）が存在することを検証
-     */
     test('グループ化後にグループ親タブが実際のブラウザタブとして存在する', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -871,7 +751,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // 複数タブを選択
       await tabNode1.click();
       await tabNode2.click({ modifiers: ['Control'] });
 
@@ -904,7 +783,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group node with real tab ID was not found' }
       );
 
-      // グループタブがChrome APIで取得できることを確認
       const tabExists = await serviceWorker.evaluate(async (tabId) => {
         try {
           const tab = await chrome.tabs.get(tabId);
@@ -916,15 +794,13 @@ test.describe('タブグループ化機能', () => {
 
       expect(tabExists).toBe(true);
 
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
@@ -946,21 +822,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * グループ化後の親子関係を検証
-     */
     test('グループ化後にタブがグループタブの子として配置される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -997,7 +868,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // 複数タブを選択
       await tabNode1.click();
       await tabNode2.click({ modifiers: ['Control'] });
 
@@ -1008,9 +878,6 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-      // Assert: 親子関係が正しく設定されていることを確認
-      // Note: TreeStateManager.persistState()はchildren配列を空で保存し、loadStateで再構築する設計のため、
-      //       parentIdを使って親子関係を確認する
       let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -1024,13 +891,11 @@ test.describe('タブグループ化機能', () => {
               return { found: false };
             }
 
-            // グループノードを探す（正のtabId）
             const groupNode = Object.values(treeState.nodes).find(
               (node) => node.id.startsWith('group-') && node.tabId > 0
             );
             if (!groupNode) return { found: false };
 
-            // 子タブがグループノードの子として配置されていることを確認（parentIdで判定）
             const tabNodeId = treeState.tabToNode[targetTabId];
             if (!tabNodeId) return { found: false, reason: 'tabNodeId not found' };
 
@@ -1050,15 +915,13 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Parent-child relationship was not established correctly' }
       );
 
-      // UIで子タブの深さが正しく表示されていることを確認（depth=1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
@@ -1080,21 +943,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * 複数タブのグループ化で実タブが作成されることを検証
-     */
     test('複数タブをグループ化すると実タブのグループ親が作成される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -1131,7 +989,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // 複数タブを選択
       await tabNode1.click();
       await tabNode2.click({ modifiers: ['Control'] });
 
@@ -1167,7 +1024,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Real tab group parent was not created for multiple tabs' }
       );
 
-      // グループタブのURLを確認
       const groupTabUrl = await serviceWorker.evaluate(async (tabId) => {
         const tab = await chrome.tabs.get(tabId);
         return tab.url;
@@ -1175,15 +1031,13 @@ test.describe('タブグループ化機能', () => {
 
       expect(groupTabUrl).toMatch(/^chrome-extension:\/\/.*\/group\.html/);
 
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
@@ -1205,21 +1059,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * グループノードがストレージに正しく保存されることを検証
-     */
     test('グループ化後にグループノードがストレージに正しく保存される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -1256,7 +1105,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // 複数タブを選択
       await tabNode1.click();
       await tabNode2.click({ modifiers: ['Control'] });
 
@@ -1278,13 +1126,11 @@ test.describe('タブグループ化機能', () => {
             } | undefined;
             if (!treeState?.nodes) return { found: false };
 
-            // group-で始まるIDを持ち、正のtabIdを持つノード（実タブ）を探す
             const groupNode = Object.values(treeState.nodes).find(
               (node) => node.id.startsWith('group-') && node.tabId > 0
             );
             if (!groupNode) return { found: false };
 
-            // グループノードにgroupIdが設定されていることを確認
             return {
               found: true,
               groupTabId: groupNode.tabId,
@@ -1300,15 +1146,13 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group node was not saved correctly to storage' }
       );
 
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
@@ -1331,28 +1175,17 @@ test.describe('タブグループ化機能', () => {
     });
   });
 
-  /**
-   * タブグループ化機能の追加E2Eテスト
-   * - グループ化機能はE2Eテストで検証されること
-   * - グループタブの生成と正しい位置への挿入、子タブの順序維持、グループタブの展開状態、単一タブのグループ化を検証すること
-   * - `--repeat-each=10`で安定して通過すること
-   */
   test.describe('タブグループ化 追加検証', () => {
-    /**
-     * 単一タブ選択時に「グループ化」オプションが有効で、クリックするとグループ親タブが作成されること
-     */
     test('単一タブを選択してグループ化するとグループ親タブが作成される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -1370,7 +1203,6 @@ test.describe('タブグループ化機能', () => {
 
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -1393,10 +1225,8 @@ test.describe('タブグループ化機能', () => {
       await expect(groupMenuItem).toBeVisible();
       await expect(groupMenuItem).not.toBeDisabled();
 
-      // グループ化を実行
       await groupMenuItem.click();
 
-      // コンテキストメニューが閉じるまで待機
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       // Assert: グループ親タブが作成されていることを確認
@@ -1414,7 +1244,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
       );
 
-      // グループタブのIDを取得
       const groupTabId = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
@@ -1425,14 +1254,12 @@ test.describe('タブグループ化機能', () => {
         return groupNode?.tabId ?? null;
       });
 
-      // グループタブと子タブの構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       await closeTab(extensionContext, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -1440,21 +1267,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * グループ化後にグループタブが展開状態であること
-     */
     test('グループ化後にグループタブは展開状態である', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -1477,13 +1299,11 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // 複数タブを選択
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
       await tabNode2.click({ modifiers: ['Control'] });
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -1495,7 +1315,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // グループ化を実行
       await tabNode2.click({ button: 'right' });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
       await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
@@ -1512,7 +1331,6 @@ test.describe('タブグループ化機能', () => {
             } | undefined;
             if (!treeState?.nodes) return { found: false };
 
-            // group-で始まるIDを持ち、正のtabIdを持つノード（実タブ）を探す
             const groupNode = Object.values(treeState.nodes).find(
               (node) => node.id.startsWith('group-') && node.tabId > 0
             );
@@ -1533,15 +1351,13 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group node is not expanded after creation' }
       );
 
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1、展開状態であることも検証）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
@@ -1563,21 +1379,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * グループ化後に子タブの順序が維持されること
-     */
     test('グループ化後に子タブの元の順序が維持される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -1608,7 +1419,6 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // すべてのタブを選択（順序: tabId1, tabId2, tabId3）
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
@@ -1616,7 +1426,6 @@ test.describe('タブグループ化機能', () => {
       const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);
       await tabNode3.click({ modifiers: ['Control'] });
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -1628,7 +1437,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // グループ化を実行
       await tabNode3.click({ button: 'right' });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
       await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
@@ -1646,13 +1454,11 @@ test.describe('タブグループ化機能', () => {
             } | undefined;
             if (!treeState?.nodes || !treeState?.tabToNode) return { found: false };
 
-            // グループノードを探す
             const groupNode = Object.values(treeState.nodes).find(
               (node) => node.id.startsWith('group-') && node.tabId > 0
             );
             if (!groupNode) return { found: false };
 
-            // 子タブがすべてグループノードの子として設定されていることを確認
             const childrenParentIds = tabIds.map(tabId => {
               const nodeId = treeState.tabToNode![tabId];
               if (!nodeId) return null;
@@ -1663,7 +1469,6 @@ test.describe('タブグループ化機能', () => {
             const allAreChildren = childrenParentIds.every(parentId => parentId === groupNode.id);
             if (!allAreChildren) return { found: false };
 
-            // 順序を確認（Chrome APIのtabs.queryで実際のタブ順序を取得）
             const tabs = await chrome.tabs.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
             const tabOrder = tabIds.map(tabId => tabs.findIndex(t => t.id === tabId));
 
@@ -1686,16 +1491,14 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Child tab order was not maintained after grouping' }
       );
 
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
         { tabId: tabId3, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
@@ -1725,23 +1528,16 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
 
-    /**
-     * グループタブが生成され、子タブがその子として配置されること
-     * Note: 現在の実装ではグループタブはビューの末尾に追加されます。
-     * 位置の最適化は将来の改善として対応予定です。
-     */
     test('グループタブが生成され子タブが正しく配置される', async ({
       extensionContext,
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト環境セットアップ
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -1764,13 +1560,11 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // 両方のタブを選択
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
       await tabNode2.click({ modifiers: ['Control'] });
 
-      // 要素が安定するまで待機
       await sidePanelPage.waitForFunction(
         (tabId) => {
           const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
@@ -1782,7 +1576,6 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      // グループ化を実行
       await tabNode2.click({ button: 'right' });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
       await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
@@ -1800,13 +1593,11 @@ test.describe('タブグループ化機能', () => {
             } | undefined;
             if (!treeState?.nodes || !treeState?.tabToNode) return { found: false };
 
-            // グループノードを探す
             const groupNode = Object.values(treeState.nodes).find(
               (node) => node.id.startsWith('group-') && node.tabId > 0
             );
             if (!groupNode) return { found: false };
 
-            // 子タブがグループノードの子として配置されていることを確認
             const tab1NodeId = treeState.tabToNode[tabIds[0]];
             const tab2NodeId = treeState.tabToNode[tabIds[1]];
             if (!tab1NodeId || !tab2NodeId) return { found: false };
@@ -1836,15 +1627,13 @@ test.describe('タブグループ化機能', () => {
         { timeout: 15000, timeoutMessage: 'Group tab was not created with children correctly' }
       );
 
-      // 子タブの深さがUIで正しく表示されていることを確認（depth=1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: groupTabId!, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
       ], 0);
 
-      // クリーンアップ
       if (groupTabId) {
         await closeTab(extensionContext, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [

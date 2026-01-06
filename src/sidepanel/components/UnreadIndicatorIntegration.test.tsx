@@ -4,19 +4,11 @@ import TreeNode from './TreeNode';
 import { UnreadTracker } from '@/services/UnreadTracker';
 import type { TabNode, TabInfo, IStorageService } from '@/types';
 
-/**
- * 統合テスト: UnreadBadge + UnreadTracker + UserSettings
- *
- * - TreeNode に未読インジケータ（バッジまたは色変更）を表示
- * - 未読タブ数のカウント表示機能
- * - 設定による未読インジケータの表示/非表示切り替え
- */
 describe('UnreadIndicator 統合テスト', () => {
   let mockStorageService: IStorageService;
   let unreadTracker: UnreadTracker;
 
   beforeEach(() => {
-    // モックストレージサービス
     mockStorageService = {
       get: vi.fn().mockResolvedValue(null),
       set: vi.fn().mockResolvedValue(undefined),
@@ -25,7 +17,6 @@ describe('UnreadIndicator 統合テスト', () => {
     };
 
     unreadTracker = new UnreadTracker(mockStorageService);
-    // 起動完了フラグを設定（テストでは起動後の挙動をシミュレート）
     unreadTracker.setInitialLoadComplete();
   });
 
@@ -56,7 +47,6 @@ describe('UnreadIndicator 統合テスト', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, '未読タブ');
 
-      // タブを未読としてマーク
       await unreadTracker.markAsUnread(tab.id);
       const isUnread = unreadTracker.isUnread(tab.id);
 
@@ -73,7 +63,6 @@ describe('UnreadIndicator 統合テスト', () => {
         />,
       );
 
-      // 未読バッジが表示されることを確認
       expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
       expect(screen.getByTestId('unread-badge')).toHaveAttribute(
         'aria-label',
@@ -87,7 +76,6 @@ describe('UnreadIndicator 統合テスト', () => {
       const node = createMockNode('node-1', 1);
       const tab = createMockTab(1, 'アクティブ化するタブ');
 
-      // 最初は未読
       await unreadTracker.markAsUnread(tab.id);
       expect(unreadTracker.isUnread(tab.id)).toBe(true);
 
@@ -104,14 +92,11 @@ describe('UnreadIndicator 統合テスト', () => {
         />,
       );
 
-      // 未読バッジが表示される
       expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
 
-      // タブをアクティブ化（既読にする）
       await unreadTracker.markAsRead(tab.id);
       expect(unreadTracker.isUnread(tab.id)).toBe(false);
 
-      // 再レンダリング
       rerender(
         <TreeNode
           node={node}
@@ -125,7 +110,6 @@ describe('UnreadIndicator 統合テスト', () => {
         />,
       );
 
-      // 未読バッジが削除される
       expect(screen.queryByTestId('unread-badge')).not.toBeInTheDocument();
     });
   });
@@ -168,7 +152,6 @@ describe('UnreadIndicator 統合テスト', () => {
         />,
       );
 
-      // バッジが表示されない
       expect(screen.queryByTestId('unread-badge')).not.toBeInTheDocument();
     });
   });
@@ -189,7 +172,6 @@ describe('UnreadIndicator 統合テスト', () => {
       await unreadTracker.markAsUnread(3);
       expect(unreadTracker.getUnreadCount()).toBe(3);
 
-      // タブ2を既読にする
       await unreadTracker.markAsRead(2);
       expect(unreadTracker.getUnreadCount()).toBe(2);
       expect(unreadTracker.isUnread(1)).toBe(true);
@@ -212,7 +194,6 @@ describe('UnreadIndicator 統合テスト', () => {
     });
 
     it('ストレージから未読状態をロードできる', async () => {
-      // ストレージに未読タブがある状態をシミュレート
       mockStorageService.get = vi.fn().mockResolvedValue([5, 6, 7]);
 
       await unreadTracker.loadFromStorage();

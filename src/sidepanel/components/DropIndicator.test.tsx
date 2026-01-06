@@ -1,7 +1,3 @@
-/**
- * DropIndicator コンポーネントのユニットテスト
- * DropIndicatorコンポーネントを作成する
- */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import DropIndicator from './DropIndicator';

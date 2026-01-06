@@ -1,9 +1,5 @@
 /**
  * ドラッグホバー時のブランチ自動展開のテスト
- *
- * このテストは以下をカバーします:
- * - ホバー検出とタイマー管理
- * - ホバー時間が閾値(1秒)を超えた場合に折りたたまれたブランチを展開
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -51,7 +47,7 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
   });
 
   it('折りたたまれたブランチを持つノードが正しくレンダリングされる', () => {
-    vi.useRealTimers(); // このテストではリアルタイマーを使用
+    vi.useRealTimers();
 
     const handleToggleExpand = vi.fn();
     const handleDragEnd = vi.fn();
@@ -88,19 +84,15 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
       />
     );
 
-    // node-3 (tabId=3) のトグルボタンが▶であることを確認（折りたたまれている）
-    // TabTreeViewは data-testid="tree-node-{tabId}" を使用
     const parentNode = screen.getByTestId('tree-node-3');
     expect(parentNode).toBeInTheDocument();
 
-    // トグルボタンは data-testid="expand-button" を使用
     const toggleButton = screen.getByTestId('expand-button');
     expect(toggleButton.textContent).toBe('▶');
 
-    // 子ノードnode-4 (tabId=4) は表示されていない（折りたたまれているため）
     expect(screen.queryByTestId('tree-node-4')).not.toBeInTheDocument();
 
-    vi.useFakeTimers(); // フェイクタイマーに戻す
+    vi.useFakeTimers();
   });
 
   it('ドラッグ中のホバー検出が設定されていることを確認', () => {
@@ -129,10 +121,6 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
       />
     );
 
-    // ドラッグコンテナが正しくレンダリングされていることを確認
     expect(container).toBeTruthy();
-
-    // タイマーが存在することを確認（実装にsetTimeoutが含まれている）
-    // このテストは実装の存在を確認するためのもの
   });
 });

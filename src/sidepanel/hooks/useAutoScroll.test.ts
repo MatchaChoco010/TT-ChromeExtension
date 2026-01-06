@@ -1,8 +1,3 @@
-/**
- * useAutoScrollフックの単体テスト
- * ドラッグ中の自動スクロールとスクロール制限
- */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAutoScroll } from './useAutoScroll';
@@ -15,28 +10,25 @@ describe('useAutoScroll', () => {
   let rafCallbacks: Array<FrameRequestCallback>;
 
   beforeEach(() => {
-    // コンテナ要素を作成
     containerElement = document.createElement('div');
     document.body.appendChild(containerElement);
 
-    // モックのスクロール関連プロパティを設定
     Object.defineProperty(containerElement, 'scrollTop', {
       value: 100,
       writable: true,
       configurable: true,
     });
     Object.defineProperty(containerElement, 'scrollHeight', {
-      value: 1000, // 総コンテンツ高さ
+      value: 1000,
       writable: true,
       configurable: true,
     });
     Object.defineProperty(containerElement, 'clientHeight', {
-      value: 400, // 表示領域の高さ
+      value: 400,
       writable: true,
       configurable: true,
     });
 
-    // モックのBoundingClientRectを設定
     vi.spyOn(containerElement, 'getBoundingClientRect').mockReturnValue({
       top: 0,
       left: 0,
@@ -51,7 +43,6 @@ describe('useAutoScroll', () => {
 
     containerRef = { current: containerElement };
 
-    // requestAnimationFrameをモック
     rafCallbacks = [];
     originalRAF = globalThis.requestAnimationFrame;
     originalCAF = globalThis.cancelAnimationFrame;
@@ -75,13 +66,11 @@ describe('useAutoScroll', () => {
     globalThis.cancelAnimationFrame = originalCAF;
   });
 
-  // RAFコールバックを実行するヘルパー（将来のrAFベース実装用）
   const _flushRAF = () => {
     const callbacks = [...rafCallbacks];
     rafCallbacks = [];
     callbacks.forEach((cb) => cb(performance.now()));
   };
-  // 未使用警告を抑制（将来使用予定）
   void _flushRAF;
 
   describe('初期状態', () => {
@@ -104,12 +93,10 @@ describe('useAutoScroll', () => {
       const containerRect = containerElement.getBoundingClientRect();
 
       act(() => {
-        // 上端から30px（threshold 50px内）
         result.current.handleAutoScroll(30, containerRect);
       });
 
-      // scrollTopが減少しているはず
-      expect(containerElement.scrollTop).toBe(92); // 100 - 8
+      expect(containerElement.scrollTop).toBe(92);
     });
 
     it('scrollTop=0のとき上スクロールしない', () => {
@@ -134,7 +121,7 @@ describe('useAutoScroll', () => {
 
     it('scrollTopが負にならない', () => {
       Object.defineProperty(containerElement, 'scrollTop', {
-        value: 3, // 小さい値
+        value: 3,
         writable: true,
         configurable: true,
       });
@@ -149,7 +136,7 @@ describe('useAutoScroll', () => {
         result.current.handleAutoScroll(30, containerRect);
       });
 
-      expect(containerElement.scrollTop).toBe(0); // 0にクランプ
+      expect(containerElement.scrollTop).toBe(0);
     });
   });
 
@@ -162,17 +149,15 @@ describe('useAutoScroll', () => {
       const containerRect = containerElement.getBoundingClientRect();
 
       act(() => {
-        // 下端(400)から30px上 = 370
         result.current.handleAutoScroll(370, containerRect);
       });
 
-      expect(containerElement.scrollTop).toBe(108); // 100 + 8
+      expect(containerElement.scrollTop).toBe(108);
     });
 
     it('clampToContent=trueの場合、maxScrollを超えない', () => {
-      // maxScroll = scrollHeight - clientHeight = 1000 - 400 = 600
       Object.defineProperty(containerElement, 'scrollTop', {
-        value: 598, // maxScrollに近い
+        value: 598,
         writable: true,
         configurable: true,
       });
@@ -187,7 +172,6 @@ describe('useAutoScroll', () => {
         result.current.handleAutoScroll(370, containerRect);
       });
 
-      // maxScroll = 600にクランプされる
       expect(containerElement.scrollTop).toBe(600);
     });
 
@@ -208,7 +192,6 @@ describe('useAutoScroll', () => {
         result.current.handleAutoScroll(370, containerRect);
       });
 
-      // クランプしないので 598 + 8 = 606
       expect(containerElement.scrollTop).toBe(606);
     });
 
@@ -221,7 +204,6 @@ describe('useAutoScroll', () => {
 
       const { result } = renderHook(() =>
         useAutoScroll(containerRef, { threshold: 50, speed: 8 })
-        // clampToContentを指定しない → デフォルトtrue
       );
 
       const containerRect = containerElement.getBoundingClientRect();
@@ -243,11 +225,10 @@ describe('useAutoScroll', () => {
       const containerRect = containerElement.getBoundingClientRect();
 
       act(() => {
-        // 中央付近 (200) - threshold(50)より内側
         result.current.handleAutoScroll(200, containerRect);
       });
 
-      expect(containerElement.scrollTop).toBe(100); // 変更なし
+      expect(containerElement.scrollTop).toBe(100);
     });
 
     it('threshold境界上ではスクロールしない', () => {
@@ -258,11 +239,10 @@ describe('useAutoScroll', () => {
       const containerRect = containerElement.getBoundingClientRect();
 
       act(() => {
-        // ちょうどthreshold境界 (mouseY = 50)
         result.current.handleAutoScroll(50, containerRect);
       });
 
-      expect(containerElement.scrollTop).toBe(100); // 変更なし (境界上はスクロールしない)
+      expect(containerElement.scrollTop).toBe(100);
     });
   });
 
@@ -275,7 +255,6 @@ describe('useAutoScroll', () => {
       const containerRect = containerElement.getBoundingClientRect();
 
       act(() => {
-        // threshold=100なので、80pxの位置でも上スクロールが発生
         result.current.handleAutoScroll(80, containerRect);
       });
 
@@ -293,20 +272,19 @@ describe('useAutoScroll', () => {
         result.current.handleAutoScroll(30, containerRect);
       });
 
-      expect(containerElement.scrollTop).toBe(80); // 100 - 20
+      expect(containerElement.scrollTop).toBe(80);
     });
 
     it('デフォルト値が使用される', () => {
       const { result } = renderHook(() => useAutoScroll(containerRef));
 
-      // デフォルト: threshold=50, speed=8
       const containerRect = containerElement.getBoundingClientRect();
 
       act(() => {
         result.current.handleAutoScroll(30, containerRect);
       });
 
-      expect(containerElement.scrollTop).toBe(92); // 100 - 8
+      expect(containerElement.scrollTop).toBe(92);
     });
   });
 
@@ -314,28 +292,20 @@ describe('useAutoScroll', () => {
     it('stopAutoScrollを呼んでもエラーにならない', () => {
       const { result } = renderHook(() => useAutoScroll(containerRef));
 
-      // 停止を呼んでもエラーにならない（animationFrameIdがnullの場合）
       act(() => {
         result.current.stopAutoScroll();
       });
 
-      // エラーなく実行される
       expect(true).toBe(true);
     });
 
     it('animationFrameIdが設定されている場合cancelAnimationFrameが呼ばれる', () => {
       const { result } = renderHook(() => useAutoScroll(containerRef));
 
-      // 内部的にanimationFrameRef.currentを設定するシナリオは
-      // 将来のrAFベース連続スクロール実装で必要になる
-      // 現在は同期的な実装なのでこのテストはスキップ
-
       act(() => {
         result.current.stopAutoScroll();
       });
 
-      // 現在の実装ではanimationFrameIdがnullなのでcancelAnimationFrameは呼ばれない
-      // 将来のrAF実装時にこのテストを有効化する
       expect(true).toBe(true);
     });
   });
@@ -359,12 +329,10 @@ describe('useAutoScroll', () => {
         toJSON: () => ({}),
       } as DOMRect;
 
-      // エラーなく実行される
       act(() => {
         result.current.handleAutoScroll(30, containerRect);
       });
 
-      // 何もしない（エラーが投げられない）
       expect(true).toBe(true);
     });
   });
@@ -396,8 +364,6 @@ describe('useAutoScroll', () => {
 
   describe('スクロール可能量を超えるスクロールを防止', () => {
     it('タブツリー全体の高さを超えてスクロールできない', () => {
-      // scrollHeight = 500, clientHeight = 400
-      // maxScroll = 500 - 400 = 100
       Object.defineProperty(containerElement, 'scrollHeight', {
         value: 500,
         writable: true,
@@ -409,7 +375,7 @@ describe('useAutoScroll', () => {
         configurable: true,
       });
       Object.defineProperty(containerElement, 'scrollTop', {
-        value: 95, // maxScrollに近い
+        value: 95,
         writable: true,
         configurable: true,
       });
@@ -424,12 +390,10 @@ describe('useAutoScroll', () => {
         result.current.handleAutoScroll(370, containerRect);
       });
 
-      // maxScroll = 100にクランプ
       expect(containerElement.scrollTop).toBe(100);
     });
 
     it('スクロール不要な場合（コンテンツがビューポートより小さい）はスクロールしない', () => {
-      // scrollHeight = 300, clientHeight = 400 → スクロール不要
       Object.defineProperty(containerElement, 'scrollHeight', {
         value: 300,
         writable: true,
@@ -456,7 +420,6 @@ describe('useAutoScroll', () => {
         result.current.handleAutoScroll(370, containerRect);
       });
 
-      // maxScroll = max(0, 300 - 400) = 0 → スクロールしない
       expect(containerElement.scrollTop).toBe(0);
     });
   });

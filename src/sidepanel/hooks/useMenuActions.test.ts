@@ -3,7 +3,6 @@ import { renderHook, act } from '@testing-library/react';
 import { useMenuActions } from './useMenuActions';
 import type { MenuAction } from '@/types';
 
-// Chrome API のモック
 const chromeMock = {
   tabs: {
     remove: vi.fn(),
@@ -20,7 +19,6 @@ const chromeMock = {
   },
 };
 
-// vi.stubGlobalを使用してグローバルchromeをモック
 vi.stubGlobal('chrome', chromeMock);
 
 describe('useMenuActions', () => {

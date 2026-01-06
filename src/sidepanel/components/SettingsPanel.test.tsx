@@ -97,14 +97,12 @@ describe('SettingsPanel', () => {
 
       const input = screen.getByLabelText(/警告閾値/i) as HTMLInputElement;
 
-      // 0は受け付けない
       fireEvent.change(input, { target: { value: '0' } });
       expect(onSettingsChange).not.toHaveBeenCalledWith({
         ...defaultSettings,
         closeWarningThreshold: 0,
       });
 
-      // 負の数は受け付けない
       fireEvent.change(input, { target: { value: '-1' } });
       expect(onSettingsChange).not.toHaveBeenCalledWith({
         ...defaultSettings,
@@ -181,7 +179,6 @@ describe('SettingsPanel', () => {
       const select = screen.getByLabelText(
         /リンククリックから開かれたタブの位置/i
       ) as HTMLSelectElement;
-      // デフォルトは 'child'
       expect(select.value).toBe('child');
     });
 
@@ -196,7 +193,6 @@ describe('SettingsPanel', () => {
       const select = screen.getByLabelText(
         /手動で開かれたタブの位置/i
       ) as HTMLSelectElement;
-      // デフォルトは 'end'
       expect(select.value).toBe('end');
     });
 
@@ -242,7 +238,6 @@ describe('SettingsPanel', () => {
         />
       );
 
-      // 各オプションが存在することを確認(複数のセレクトで同じテキストが使われているため getAllByText を使用)
       expect(screen.getAllByText(/現在のタブの子/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/現在のタブの隣/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/リストの最後/i).length).toBeGreaterThan(0);
@@ -282,7 +277,6 @@ describe('SettingsPanel', () => {
         />
       );
 
-      // タブ動作セクションがある
       expect(screen.getByText(/タブの動作/i)).toBeInTheDocument();
     });
   });
@@ -511,7 +505,6 @@ describe('SettingsPanel', () => {
     });
 
     it('should toggle auto-save enabled state when clicked', () => {
-      // autoSnapshotInterval が 0 の場合は無効
       const settingsWithDisabled = {
         ...defaultSettings,
         autoSnapshotInterval: 0,
@@ -527,7 +520,6 @@ describe('SettingsPanel', () => {
       const toggle = screen.getByLabelText(/自動保存を有効にする/i);
       fireEvent.click(toggle);
 
-      // 有効にするとデフォルトの間隔（10分）が設定される
       expect(onSettingsChange).toHaveBeenCalledWith({
         ...settingsWithDisabled,
         autoSnapshotInterval: 10,
@@ -550,7 +542,6 @@ describe('SettingsPanel', () => {
       const toggle = screen.getByLabelText(/自動保存を有効にする/i);
       fireEvent.click(toggle);
 
-      // 無効にするとintervalが0になる
       expect(onSettingsChange).toHaveBeenCalledWith({
         ...settingsWithEnabled,
         autoSnapshotInterval: 0,
@@ -623,7 +614,6 @@ describe('SettingsPanel', () => {
       const input = screen.getByLabelText(/自動保存の間隔/i);
       fireEvent.change(input, { target: { value: '0' } });
 
-      // 0以下は受け付けない
       expect(onSettingsChange).not.toHaveBeenCalledWith({
         ...settingsWithInterval,
         autoSnapshotInterval: 0,
@@ -698,7 +688,6 @@ describe('SettingsPanel', () => {
       const input = screen.getByLabelText(/最大スナップショット数/i);
       fireEvent.change(input, { target: { value: '0' } });
 
-      // 0以下は受け付けない
       expect(onSettingsChange).not.toHaveBeenCalledWith({
         ...defaultSettings,
         maxSnapshots: 0,

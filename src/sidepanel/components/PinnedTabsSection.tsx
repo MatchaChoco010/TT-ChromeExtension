@@ -15,10 +15,6 @@ interface PinnedTabsSectionProps {
   onPinnedTabReorder?: (tabId: number, newIndex: number) => void;
 }
 
-/**
- * ピン留めタブアイテムコンポーネント
- * dnd-kit削除、自前D&D実装に移行
- */
 interface PinnedTabItemProps {
   tabId: number;
   tabInfo: { title: string; favIconUrl?: string };
@@ -61,14 +57,12 @@ const PinnedTabItem: React.FC<PinnedTabItemProps> = ({
       onContextMenu={(e) => onContextMenu(tabId, e)}
       onMouseDown={isDraggable ? onMouseDown : undefined}
     >
-      {/* ファビコン */}
       {tabInfo.favIconUrl ? (
         <img
           src={tabInfo.favIconUrl}
           alt={tabInfo.title}
           className="w-4 h-4"
           onError={(e) => {
-            // ファビコンの読み込みに失敗した場合は非表示にしてデフォルトアイコンを表示
             e.currentTarget.style.display = 'none';
             const defaultIcon = e.currentTarget.parentElement?.querySelector('[data-default-icon]');
             if (defaultIcon) {
@@ -82,22 +76,10 @@ const PinnedTabItem: React.FC<PinnedTabItemProps> = ({
           className="w-4 h-4 bg-gray-400 rounded"
         />
       )}
-      {/* 閉じるボタンは表示しない */}
     </div>
   );
 };
 
-/**
- * ピン留めタブセクションコンポーネント
- *
- * - ピン留めタブをツリービュー上部に配置
- * - ファビコンサイズで横並びグリッド表示
- * - 通常タブとの間に区切り線
- * - ピン留めタブが0件の場合は非表示
- * - 閉じるボタンは表示しない
- * - ピン留めタブに対する閉じる操作は無効化
- * - ドラッグ＆ドロップによる並び替え機能（自前D&D実装、水平モード）
- */
 const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
   pinnedTabIds,
   tabInfoMap,
@@ -106,26 +88,20 @@ const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
   activeTabId,
   onPinnedTabReorder,
 }) => {
-  // コンテナの参照
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // ピン留めタブが0件の場合は何も表示しない
   if (pinnedTabIds.length === 0) {
     return null;
   }
 
-  // tabInfoMapに存在するピン留めタブのみをフィルタリング
   const validPinnedTabs = pinnedTabIds.filter(tabId => tabInfoMap[tabId]);
 
-  // 有効なピン留めタブがない場合も非表示
   if (validPinnedTabs.length === 0) {
     return null;
   }
 
-  // ドラッグ可能かどうか
   const isDraggable = !!onPinnedTabReorder;
 
-  // 自前D&Dフックに渡すアイテムリスト
   const items = validPinnedTabs.map(tabId => ({
     id: `pinned-${tabId}`,
     tabId,
@@ -146,9 +122,6 @@ const PinnedTabsSection: React.FC<PinnedTabsSectionProps> = ({
   );
 };
 
-/**
- * ピン留めタブセクションのコンテンツ（フック使用のため分離）
- */
 interface PinnedTabsSectionContentProps {
   validPinnedTabs: number[];
   tabInfoMap: TabInfoMap;
@@ -172,21 +145,15 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
   items,
   containerRef,
 }) => {
-  // refコールバックでcontainerRefに値を設定
   const setContainerRef = useCallback((node: HTMLDivElement | null) => {
     (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
   }, [containerRef]);
 
-  /**
-   * ドラッグ終了ハンドラ
-   * 自前D&D実装でピン留めタブの順序変更
-   */
   const handleDragEnd = useCallback((itemId: string, dropTarget: { type: string; insertIndex?: number } | null) => {
     if (!dropTarget || dropTarget.type !== DropTargetType.HorizontalGap || !onPinnedTabReorder) {
       return;
     }
 
-    // ピン留めタブのIDを抽出（"pinned-123" -> 123）
     if (!itemId.startsWith('pinned-')) {
       return;
     }
@@ -195,25 +162,21 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
     const newIndex = dropTarget.insertIndex;
 
     if (newIndex !== undefined && newIndex !== -1) {
-      // 元のインデックスを取得
       const oldIndex = validPinnedTabs.indexOf(draggedTabId);
 
-      // 挿入位置を調整（自分より後ろに移動する場合は-1）
       let adjustedIndex = newIndex;
       if (oldIndex < newIndex) {
         adjustedIndex = newIndex - 1;
       }
 
-      // 同じ位置なら何もしない
       if (oldIndex !== adjustedIndex) {
         onPinnedTabReorder(draggedTabId, adjustedIndex);
       }
     }
   }, [onPinnedTabReorder, validPinnedTabs]);
 
-  // 自前D&Dフック（水平モード）
   const { dragState, getItemProps } = useDragDrop({
-    activationDistance: 5, // 5px移動でドラッグ開始
+    activationDistance: 5,
     direction: 'horizontal',
     containerRef,
     items,
@@ -224,10 +187,6 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
     onTabClick(tabId);
   };
 
-  /**
-   * 右クリックハンドラ
-   * ピン留めタブを右クリックした場合にコンテキストメニューを表示するため
-   */
   const handleContextMenu = (tabId: number, event: React.MouseEvent) => {
     event.preventDefault();
     if (onContextMenu) {
@@ -235,13 +194,11 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
     }
   };
 
-  // ドラッグ中のタブ情報を取得
   const draggedTabId = dragState.draggedTabId;
   const draggedTabInfo = draggedTabId ? tabInfoMap[draggedTabId] : null;
 
   return (
     <>
-      {/* ピン留めタブセクション */}
       <div
         ref={setContainerRef}
         data-testid="pinned-tabs-section"
@@ -249,7 +206,6 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
       >
         {validPinnedTabs.map((tabId, index) => {
           const tabInfo = tabInfoMap[tabId];
-          // アクティブタブの判定
           const isActive = activeTabId === tabId;
           const itemId = `pinned-${tabId}`;
           const itemProps = isDraggable ? getItemProps(itemId, tabId) : { onMouseDown: () => {}, style: {}, 'data-dragging': false };
@@ -272,7 +228,6 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
         })}
       </div>
 
-      {/* ドラッグオーバーレイ */}
       {isDraggable && draggedTabInfo && (
         <DragOverlay
           isDragging={dragState.isDragging}
@@ -293,7 +248,6 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
         </DragOverlay>
       )}
 
-      {/* 区切り線 */}
       <div
         data-testid="pinned-tabs-separator"
         className="border-b border-gray-700 mx-2"

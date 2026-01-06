@@ -16,7 +16,6 @@ import type { TabNode, ExtendedTabInfo } from '@/types';
 vi.mock('@anthropic/sdk', () => ({}));
 
 beforeEach(() => {
-  // chrome.tabs.removeのモック
   vi.stubGlobal('chrome', {
     tabs: {
       remove: vi.fn().mockResolvedValue(undefined),
@@ -391,14 +390,11 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         />
       );
 
-      // 親タブがレンダリングされている
       const parentNode = screen.getByTestId('tree-node-1');
       expect(parentNode).toBeInTheDocument();
 
-      // 折りたたまれているので子タブは表示されていない
       expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
 
-      // 展開ボタンが表示されている
       const expandButton = within(parentNode).getByTestId('expand-button');
       expect(expandButton).toBeInTheDocument();
       expect(expandButton).toHaveTextContent('▶');
@@ -438,11 +434,9 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         />
       );
 
-      // 親タブと子タブがレンダリングされている
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
 
-      // 展開ボタンが展開状態を示している
       const parentNode = screen.getByTestId('tree-node-1');
       const expandButton = within(parentNode).getByTestId('expand-button');
       expect(expandButton).toHaveTextContent('▼');

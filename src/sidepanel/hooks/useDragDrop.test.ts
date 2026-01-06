@@ -1,14 +1,7 @@
-/**
- * useDragDropフックの単体テスト
- * mousedown/mousemove/mouseupイベントでドラッグ操作を処理
- * 8px移動検知によるドラッグ開始
- */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDragDrop } from './useDragDrop';
 
-// モックイベントヘルパー
 const createMouseEvent = (
   type: string,
   clientX: number,
@@ -24,13 +17,11 @@ const createMouseEvent = (
   });
 };
 
-// createReactMouseEventを追加
 const createReactMouseEvent = (
   clientX: number,
   clientY: number
 ): React.MouseEvent => {
   const targetDiv = document.createElement('div');
-  // getBoundingClientRectをモック
   vi.spyOn(targetDiv, 'getBoundingClientRect').mockReturnValue({
     top: 0,
     left: 0,
@@ -62,13 +53,11 @@ describe('useDragDrop', () => {
   let containerRef: React.RefObject<HTMLDivElement>;
 
   beforeEach(() => {
-    // コンテナ要素を作成
     containerElement = document.createElement('div');
     containerElement.style.width = '200px';
     containerElement.style.height = '400px';
     document.body.appendChild(containerElement);
 
-    // モックのBoundingClientRectを設定
     vi.spyOn(containerElement, 'getBoundingClientRect').mockReturnValue({
       top: 0,
       left: 0,
@@ -152,7 +141,7 @@ describe('useDragDrop', () => {
       });
 
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 105, 100)); // 5px移動
+        document.dispatchEvent(createMouseEvent('mousemove', 105, 100));
       });
 
       expect(result.current.dragState.isPotentialDrag).toBe(true);
@@ -176,7 +165,7 @@ describe('useDragDrop', () => {
       });
 
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 110, 100)); // 10px移動
+        document.dispatchEvent(createMouseEvent('mousemove', 110, 100));
       });
 
       expect(result.current.dragState.isDragging).toBe(true);
@@ -202,13 +191,13 @@ describe('useDragDrop', () => {
       });
 
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 110, 100)); // 10px移動（まだ足りない）
+        document.dispatchEvent(createMouseEvent('mousemove', 110, 100));
       });
 
       expect(result.current.dragState.isDragging).toBe(false);
 
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 120, 100)); // 20px移動
+        document.dispatchEvent(createMouseEvent('mousemove', 120, 100));
       });
 
       expect(result.current.dragState.isDragging).toBe(true);
@@ -272,7 +261,6 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('node-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(100, 100));
       });
@@ -283,14 +271,12 @@ describe('useDragDrop', () => {
 
       expect(result.current.dragState.isDragging).toBe(true);
 
-      // ドラッグ終了
       act(() => {
         document.dispatchEvent(createMouseEvent('mouseup', 110, 100));
       });
 
       expect(result.current.dragState.isDragging).toBe(false);
       expect(result.current.dragState.draggedItemId).toBeNull();
-      // dropTargetは空の場合 { type: 'none' } を返す
       expect(onDragEnd).toHaveBeenCalledWith('node-1', { type: 'none' });
     });
 
@@ -306,7 +292,6 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('node-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(100, 100));
       });
@@ -317,7 +302,6 @@ describe('useDragDrop', () => {
 
       expect(result.current.dragState.isDragging).toBe(true);
 
-      // キャンセル
       act(() => {
         result.current.cancelDrag();
       });
@@ -366,7 +350,6 @@ describe('useDragDrop', () => {
         props.onMouseDown(createReactMouseEvent(100, 100));
       });
 
-      // 斜め移動: (6, 6) -> sqrt(36+36) ≈ 8.49
       act(() => {
         document.dispatchEvent(createMouseEvent('mousemove', 106, 106));
       });
@@ -388,7 +371,6 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('node-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(100, 100));
       });
@@ -397,7 +379,6 @@ describe('useDragDrop', () => {
         document.dispatchEvent(createMouseEvent('mousemove', 110, 100));
       });
 
-      // コンテナ外（x: 250）でmouseup
       act(() => {
         document.dispatchEvent(createMouseEvent('mouseup', 250, 100));
       });
@@ -527,7 +508,6 @@ describe('useDragDrop', () => {
         props.onMouseDown(createReactMouseEvent(100, 100));
       });
 
-      // 垂直方向に10px移動しても、水平は0px移動なのでドラッグ開始しない
       act(() => {
         document.dispatchEvent(createMouseEvent('mousemove', 100, 110));
       });
@@ -535,7 +515,6 @@ describe('useDragDrop', () => {
       expect(result.current.dragState.isDragging).toBe(false);
       expect(result.current.dragState.isPotentialDrag).toBe(true);
 
-      // 水平方向に8px移動するとドラッグ開始
       act(() => {
         document.dispatchEvent(createMouseEvent('mousemove', 108, 110));
       });
@@ -544,7 +523,6 @@ describe('useDragDrop', () => {
     });
 
     it('水平モードで水平方向のドロップターゲットが計算される', async () => {
-      // ピン留めタブ用のコンテナ要素を作成（水平レイアウト）
       const horizontalContainer = document.createElement('div');
       horizontalContainer.style.display = 'flex';
       horizontalContainer.style.flexDirection = 'row';
@@ -552,7 +530,6 @@ describe('useDragDrop', () => {
       horizontalContainer.style.height = '40px';
       document.body.appendChild(horizontalContainer);
 
-      // 3つのピン留めタブを追加
       const tab1 = document.createElement('div');
       tab1.setAttribute('data-node-id', 'pinned-1');
       tab1.setAttribute('data-pinned-index', '0');
@@ -574,7 +551,6 @@ describe('useDragDrop', () => {
       tab3.style.height = '40px';
       horizontalContainer.appendChild(tab3);
 
-      // BoundingClientRectをモック
       vi.spyOn(horizontalContainer, 'getBoundingClientRect').mockReturnValue({
         top: 0,
         left: 0,
@@ -617,28 +593,23 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('pinned-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(20, 20));
       });
 
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 50, 20)); // 水平に30px移動
+        document.dispatchEvent(createMouseEvent('mousemove', 50, 20));
       });
 
       expect(result.current.dragState.isDragging).toBe(true);
 
-      // ドロップターゲットが水平位置に基づいて計算されている
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 60, 20)); // tab2の位置
+        document.dispatchEvent(createMouseEvent('mousemove', 60, 20));
       });
 
-      // onDragMoveが呼ばれていることを確認
       expect(onDragMove).toHaveBeenCalled();
-      // ドロップターゲットが設定されている
       expect(result.current.dragState.dropTarget).toBeDefined();
 
-      // クリーンアップ
       document.body.removeChild(horizontalContainer);
     });
 
@@ -646,7 +617,6 @@ describe('useDragDrop', () => {
       const horizontalContainer = document.createElement('div');
       document.body.appendChild(horizontalContainer);
 
-      // 3つのピン留めタブを追加
       const tabs = [1, 2, 3].map((i) => {
         const tab = document.createElement('div');
         tab.setAttribute('data-node-id', `pinned-${i}`);
@@ -683,18 +653,16 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('pinned-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(20, 20));
       });
 
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 100, 20)); // tab2とtab3の間
+        document.dispatchEvent(createMouseEvent('mousemove', 100, 20));
       });
 
       expect(result.current.dragState.isDragging).toBe(true);
 
-      // ドロップ
       act(() => {
         document.dispatchEvent(createMouseEvent('mouseup', 100, 20));
       });
@@ -708,7 +676,6 @@ describe('useDragDrop', () => {
       const horizontalContainer = document.createElement('div');
       document.body.appendChild(horizontalContainer);
 
-      // 3つのピン留めタブを追加
       const tabs = [1, 2, 3].map((i) => {
         const tab = document.createElement('div');
         tab.setAttribute('data-node-id', `pinned-${i}`);
@@ -743,18 +710,16 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('pinned-3', 3);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(100, 20));
       });
 
       act(() => {
-        document.dispatchEvent(createMouseEvent('mousemove', 5, 20)); // 先頭付近へ
+        document.dispatchEvent(createMouseEvent('mousemove', 5, 20));
       });
 
       expect(result.current.dragState.isDragging).toBe(true);
       expect(result.current.dragState.dropTarget).not.toBeNull();
-      // 水平モードではdropTarget.typeが'horizontal_gap'であることを確認
       expect(result.current.dragState.dropTarget?.type).toBe('horizontal_gap');
 
       document.body.removeChild(horizontalContainer);
@@ -764,7 +729,6 @@ describe('useDragDrop', () => {
       const horizontalContainer = document.createElement('div');
       document.body.appendChild(horizontalContainer);
 
-      // 3つのピン留めタブを追加
       const tabs = [1, 2, 3].map((i) => {
         const tab = document.createElement('div');
         tab.setAttribute('data-node-id', `pinned-${i}`);
@@ -799,14 +763,10 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('pinned-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(20, 20));
       });
 
-      // tab2の左寄り（中心より左）の位置にドラッグ
-      // tab2: left=40, right=80, center=60
-      // mouseX=50 は中心より左なので、tab2の前（insertIndex=1）に挿入
       act(() => {
         document.dispatchEvent(createMouseEvent('mousemove', 50, 20));
       });
@@ -814,7 +774,6 @@ describe('useDragDrop', () => {
       expect(result.current.dragState.isDragging).toBe(true);
       expect(result.current.dragState.dropTarget).not.toBeNull();
       expect(result.current.dragState.dropTarget?.type).toBe('horizontal_gap');
-      // tab2の前（インデックス1）への挿入
       expect(result.current.dragState.dropTarget?.insertIndex).toBe(1);
 
       document.body.removeChild(horizontalContainer);
@@ -824,7 +783,6 @@ describe('useDragDrop', () => {
       const horizontalContainer = document.createElement('div');
       document.body.appendChild(horizontalContainer);
 
-      // 3つのピン留めタブを追加
       const tabs = [1, 2, 3].map((i) => {
         const tab = document.createElement('div');
         tab.setAttribute('data-node-id', `pinned-${i}`);
@@ -859,14 +817,10 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('pinned-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(20, 20));
       });
 
-      // tab2の右寄り（中心より右）の位置にドラッグ
-      // tab2: left=40, right=80, center=60
-      // mouseX=70 は中心より右なので、tab2の後（insertIndex=2）に挿入
       act(() => {
         document.dispatchEvent(createMouseEvent('mousemove', 70, 20));
       });
@@ -874,7 +828,6 @@ describe('useDragDrop', () => {
       expect(result.current.dragState.isDragging).toBe(true);
       expect(result.current.dragState.dropTarget).not.toBeNull();
       expect(result.current.dragState.dropTarget?.type).toBe('horizontal_gap');
-      // tab2の後（インデックス2）への挿入
       expect(result.current.dragState.dropTarget?.insertIndex).toBe(2);
 
       document.body.removeChild(horizontalContainer);

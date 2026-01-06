@@ -1,8 +1,3 @@
-/**
- * ViewSwitcher コンポーネントのテスト
- * ViewSwitcher UI コンポーネントの実装
- */
-
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { View } from '@/types';
@@ -38,8 +33,6 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // ファビコンサイズのアイコンボタンになったため、ビュー名はtitle属性/aria-labelで確認
-      // すべてのビューのボタンが表示されることを確認
       expect(screen.getByRole('button', { name: 'Switch to Work view' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Switch to Personal view' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Switch to Research view' })).toBeInTheDocument();
@@ -57,7 +50,6 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // 新しいビュー追加ボタンが表示されることを確認
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       expect(addButton).toBeInTheDocument();
     });
@@ -74,7 +66,6 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // 新しいビュー追加ボタンが表示されることを確認
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       expect(addButton).toBeInTheDocument();
     });
@@ -93,13 +84,10 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // アクティブなビューのボタンを取得（Switch to Work view を指定）
       const workButton = screen.getByRole('button', {
         name: 'Switch to Work view',
       });
 
-      // アクティブなビューがハイライトされていることを確認
-      // data-active 属性で判定
       expect(workButton).toHaveAttribute('data-active', 'true');
     });
 
@@ -115,7 +103,6 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // アクティブでないビューのボタンを取得
       const personalButton = screen.getByRole('button', {
         name: 'Switch to Personal view',
       });
@@ -123,7 +110,6 @@ describe('ViewSwitcher', () => {
         name: 'Switch to Research view',
       });
 
-      // アクティブでないビューがハイライトされていないことを確認
       expect(personalButton).toHaveAttribute('data-active', 'false');
       expect(researchButton).toHaveAttribute('data-active', 'false');
     });
@@ -142,13 +128,11 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // Personal ビューをクリック
       const personalButton = screen.getByRole('button', {
         name: 'Switch to Personal view',
       });
       fireEvent.click(personalButton);
 
-      // onViewSwitch が正しいIDで呼ばれることを確認
       expect(mockOnViewSwitch).toHaveBeenCalledWith('view-2');
       expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
     });
@@ -165,13 +149,11 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // 現在アクティブな Work ビューをクリック
       const workButton = screen.getByRole('button', {
         name: 'Switch to Work view',
       });
       fireEvent.click(workButton);
 
-      // onViewSwitch が呼ばれることを確認
       expect(mockOnViewSwitch).toHaveBeenCalledWith('view-1');
     });
   });
@@ -189,11 +171,9 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // 新しいビュー追加ボタンをクリック
       const addButton = screen.getByRole('button', { name: 'Add new view' });
       fireEvent.click(addButton);
 
-      // onViewCreate が呼ばれることを確認
       expect(mockOnViewCreate).toHaveBeenCalledTimes(1);
     });
   });
@@ -215,8 +195,6 @@ describe('ViewSwitcher', () => {
         name: 'Switch to Work view',
       });
 
-      // ビューの色がスタイルに含まれることを確認
-      // data-color 属性で色を管理
       expect(workButton).toHaveAttribute('data-color', '#ef4444');
     });
   });
@@ -234,11 +212,9 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // ビューコンテナが存在することを確認
       const viewSwitcherContainer = container.querySelector('[data-testid="view-switcher-container"]');
       expect(viewSwitcherContainer).toBeInTheDocument();
 
-      // 子要素のビューリストコンテナに overflow-x-auto クラスが設定されていることを確認
       const viewListContainer = viewSwitcherContainer?.querySelector('.overflow-x-auto');
       expect(viewListContainer).toBeInTheDocument();
       expect(viewListContainer).toHaveClass('overflow-x-auto');
@@ -262,7 +238,6 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // すべてのビューのボタンが表示されることを確認
       manyViews.forEach((view) => {
         const button = screen.getByRole('button', { name: `Switch to ${view.name} view` });
         expect(button).toBeInTheDocument();
@@ -284,13 +259,11 @@ describe('ViewSwitcher', () => {
         />
       );
 
-      // Research ビューに切り替え
       const researchButton = screen.getByRole('button', {
         name: 'Switch to Research view',
       });
       fireEvent.click(researchButton);
 
-      // onViewSwitch が正しく呼ばれることを確認（実際のタブツリー表示は TreeStateProvider が担当）
       expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
     });
   });
@@ -347,12 +320,9 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // ファビコンサイズ(約16px-24px)のアイコンボタンが表示されることを確認
-        // ビュー名テキストは表示されない（アイコンのみ）
         const viewButtons = screen.getAllByRole('button', { name: /switch to .* view/i });
         expect(viewButtons.length).toBe(mockViews.length);
 
-        // 各ボタンにはファビコンサイズのスタイルが適用されている
         viewButtons.forEach((button) => {
           expect(button).toHaveClass('w-8', 'h-8');
         });
@@ -370,7 +340,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // カラーサークル要素が存在することを確認
         const colorCircles = document.querySelectorAll('[data-testid="view-color-circle"]');
         expect(colorCircles.length).toBe(mockViews.length);
       });
@@ -392,13 +361,10 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // アイコン画像が表示されることを確認
         const iconImage = screen.getByRole('img', { name: /work/i });
         expect(iconImage).toBeInTheDocument();
         expect(iconImage).toHaveAttribute('src', 'https://example.com/icon.png');
 
-        // アイコンがあるビューはカラーサークルが非表示（hiddenクラス付き）
-        // アイコンがないビューはカラーサークルが表示（hiddenクラスなし）
         const allColorCircles = document.querySelectorAll('[data-testid="view-color-circle"]');
         const visibleColorCircles = Array.from(allColorCircles).filter(
           (circle) => !circle.classList.contains('hidden')
@@ -426,11 +392,9 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // アイコン画像が2つ表示される
         const iconImages = screen.getAllByRole('img');
         expect(iconImages.length).toBe(2);
 
-        // カラーサークルは全ビュー分存在するが、アイコンがあるビューは非表示
         const allColorCircles = document.querySelectorAll('[data-testid="view-color-circle"]');
         const visibleColorCircles = Array.from(allColorCircles).filter(
           (circle) => !circle.classList.contains('hidden')
@@ -452,7 +416,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集ボタンが存在しないことを確認
         const editButtons = screen.queryAllByLabelText(/edit view/i);
         expect(editButtons.length).toBe(0);
       });
@@ -469,7 +432,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 編集フォームが存在しないことを確認
         expect(screen.queryByTestId('view-edit-form')).not.toBeInTheDocument();
       });
     });
@@ -489,7 +451,6 @@ describe('ViewSwitcher', () => {
 
         const activeButton = screen.getByRole('button', { name: /switch to work view/i });
         expect(activeButton).toHaveAttribute('data-active', 'true');
-        // アクティブボタンにはリング表示がある
         expect(activeButton).toHaveClass('ring-2');
       });
     });
@@ -530,7 +491,6 @@ describe('ViewSwitcher', () => {
         const workButton = screen.getByRole('button', { name: /switch to work view/i });
         fireEvent.contextMenu(workButton);
 
-        // コンテキストメニューが表示されることを確認
         expect(screen.getByTestId('view-context-menu')).toBeInTheDocument();
       });
 
@@ -590,7 +550,6 @@ describe('ViewSwitcher', () => {
         const editMenuItem = screen.getByRole('menuitem', { name: /ビューを編集/i });
         fireEvent.click(editMenuItem);
 
-        // ViewEditModal が表示されることを確認
         expect(screen.getByTestId('view-edit-modal')).toBeInTheDocument();
       });
 
@@ -612,12 +571,10 @@ describe('ViewSwitcher', () => {
         const editMenuItem = screen.getByRole('menuitem', { name: /ビューを編集/i });
         fireEvent.click(editMenuItem);
 
-        // queueMicrotaskによる状態更新を待つ
         await waitFor(() => {
           expect(screen.getByLabelText('View Name')).toHaveValue('Work');
         });
 
-        // モーダル内で保存ボタンをクリック
         const saveButton = screen.getByRole('button', { name: /save/i });
         fireEvent.click(saveButton);
 
@@ -690,7 +647,6 @@ describe('ViewSwitcher', () => {
 
         expect(screen.getByTestId('view-context-menu')).toBeInTheDocument();
 
-        // 非同期でイベントリスナーが登録されるのを待つ
         await new Promise((resolve) => setTimeout(resolve, 10));
 
         const outsideElement = container.querySelector('[data-testid="outside"]');
@@ -744,7 +700,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 各ビューのタブ数バッジが表示されることを確認
         expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('5');
         expect(screen.getByTestId('tab-count-badge-view-2')).toHaveTextContent('3');
         expect(screen.getByTestId('tab-count-badge-view-3')).toHaveTextContent('10');
@@ -769,7 +724,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // タブ数が0のビューにはバッジが表示されない
         expect(screen.queryByTestId('tab-count-badge-view-1')).not.toBeInTheDocument();
         expect(screen.getByTestId('tab-count-badge-view-2')).toHaveTextContent('5');
         expect(screen.queryByTestId('tab-count-badge-view-3')).not.toBeInTheDocument();
@@ -796,7 +750,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // ビューボタンのサイズは維持される
         const viewButtons = screen.getAllByRole('button', { name: /switch to .* view/i });
         viewButtons.forEach((button) => {
           expect(button).toHaveClass('w-8', 'h-8');
@@ -822,7 +775,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // バッジが小さいサイズで表示される
         const badge = screen.getByTestId('tab-count-badge-view-1');
         expect(badge).toHaveClass('text-xs');
       });
@@ -848,10 +800,8 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 初期値の確認
         expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('5');
 
-        // タブ数が変化
         const updatedTabCounts = {
           'view-1': 8,
           'view-2': 3,
@@ -870,7 +820,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 更新後の値の確認
         expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('8');
       });
     });
@@ -888,9 +837,7 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // クラッシュせずにレンダリングされる
         expect(screen.getByRole('button', { name: 'Switch to Work view' })).toBeInTheDocument();
-        // バッジは表示されない
         expect(screen.queryByTestId('tab-count-badge-view-1')).not.toBeInTheDocument();
       });
     });
@@ -915,7 +862,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // バッジがmin-w-[20px]を持つことを確認（16pxから20pxに拡大）
         const badge = screen.getByTestId('tab-count-badge-view-1');
         expect(badge).toHaveClass('min-w-[20px]');
       });
@@ -937,7 +883,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // バッジが-top-0.5と-right-0.5で内側に配置されることを確認
         const badge = screen.getByTestId('tab-count-badge-view-1');
         expect(badge).toHaveClass('-top-0.5');
         expect(badge).toHaveClass('-right-0.5');
@@ -961,10 +906,8 @@ describe('ViewSwitcher', () => {
 
         const container = screen.getByTestId('view-switcher-container');
 
-        // マウスホイールを上にスクロール (deltaY < 0)
         fireEvent.wheel(container, { deltaY: -100 });
 
-        // 前のビュー (view-1: Work) に切り替わる
         expect(mockOnViewSwitch).toHaveBeenCalledWith('view-1');
         expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
       });
@@ -985,10 +928,8 @@ describe('ViewSwitcher', () => {
 
         const container = screen.getByTestId('view-switcher-container');
 
-        // マウスホイールを下にスクロール (deltaY > 0)
         fireEvent.wheel(container, { deltaY: 100 });
 
-        // 次のビュー (view-3: Research) に切り替わる
         expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
         expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
       });
@@ -1009,10 +950,8 @@ describe('ViewSwitcher', () => {
 
         const container = screen.getByTestId('view-switcher-container');
 
-        // マウスホイールを上にスクロール
         fireEvent.wheel(container, { deltaY: -100 });
 
-        // 最初のビューなので切り替わらない
         expect(mockOnViewSwitch).not.toHaveBeenCalled();
       });
 
@@ -1030,10 +969,8 @@ describe('ViewSwitcher', () => {
 
         const container = screen.getByTestId('view-switcher-container');
 
-        // マウスホイールを下にスクロール
         fireEvent.wheel(container, { deltaY: 100 });
 
-        // 最後のビューなので切り替わらない
         expect(mockOnViewSwitch).not.toHaveBeenCalled();
       });
     });
@@ -1053,11 +990,9 @@ describe('ViewSwitcher', () => {
 
         const container = screen.getByTestId('view-switcher-container');
 
-        // 下スクロール: view-1 -> view-2
         fireEvent.wheel(container, { deltaY: 100 });
         expect(mockOnViewSwitch).toHaveBeenCalledWith('view-2');
 
-        // 状態を更新してリレンダー
         rerender(
           <ViewSwitcher
             views={mockViews}
@@ -1069,7 +1004,6 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        // 下スクロール: view-2 -> view-3
         fireEvent.wheel(container, { deltaY: 100 });
         expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
       });
@@ -1092,11 +1026,9 @@ describe('ViewSwitcher', () => {
 
         const container = screen.getByTestId('view-switcher-container');
 
-        // 上スクロール
         fireEvent.wheel(container, { deltaY: -100 });
         expect(mockOnViewSwitch).not.toHaveBeenCalled();
 
-        // 下スクロール
         fireEvent.wheel(container, { deltaY: 100 });
         expect(mockOnViewSwitch).not.toHaveBeenCalled();
       });
@@ -1117,7 +1049,6 @@ describe('ViewSwitcher', () => {
 
         const container = screen.getByTestId('view-switcher-container');
 
-        // deltaY = 0
         fireEvent.wheel(container, { deltaY: 0 });
         expect(mockOnViewSwitch).not.toHaveBeenCalled();
       });

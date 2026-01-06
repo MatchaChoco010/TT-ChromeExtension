@@ -1,10 +1,3 @@
-/**
- * 設定ページコンポーネント
- * 設定画面用の新規エントリポイントを作成する
- *
- * 設定画面を新規ブラウザタブとして開き、全幅レイアウトで表示します。
- * 既存のSettingsPanelコンポーネントを再利用します。
- */
 import React, { useEffect, useState } from 'react';
 import SettingsPanel from '@/sidepanel/components/SettingsPanel';
 import { storageService } from '@/storage/StorageService';
@@ -25,7 +18,6 @@ export const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 設定をストレージから読み込み
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -43,7 +35,6 @@ export const SettingsPage: React.FC = () => {
     loadSettings();
   }, []);
 
-  // ストレージの変更を監視
   useEffect(() => {
     const unsubscribe = storageService.onChange((changes) => {
       if (changes.user_settings?.newValue) {
@@ -54,7 +45,6 @@ export const SettingsPage: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // 設定変更をストレージに保存
   const handleSettingsChange = async (newSettings: UserSettings) => {
     setSettings(newSettings);
     try {

@@ -1,23 +1,10 @@
-/**
- * 設定画面を新規タブで開くボタンコンポーネント
- * 設定画面を新規タブで開く機能を実装する
- *
- * chrome.tabs.create を使用して設定画面を新規ブラウザタブとして開きます。
- */
 import React, { useCallback } from 'react';
 
-/**
- * 設定画面を新規タブで開く関数
- * chrome.tabs.create を使用して settings.html を新しいタブで開きます。
- */
 export async function openSettingsInNewTab(): Promise<void> {
   const settingsUrl = chrome.runtime.getURL('settings.html');
   await chrome.tabs.create({ url: settingsUrl });
 }
 
-/**
- * 設定画面を新規タブで開くボタンコンポーネント
- */
 export const OpenSettingsButton: React.FC = () => {
   const handleClick = useCallback(async () => {
     try {

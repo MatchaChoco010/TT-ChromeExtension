@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import SidePanelRoot from './SidePanelRoot';
 
-// Mock chrome.storage for tests
 const mockStorageGet = vi.fn();
 const mockStorageSet = vi.fn();
 const mockStorageOnChanged = {
@@ -10,7 +9,6 @@ const mockStorageOnChanged = {
   removeListener: vi.fn(),
 };
 
-// Mock chrome.tabs for tests
 const mockTabsQuery = vi.fn();
 const mockTabsUpdate = vi.fn();
 const mockTabsOnActivated = {
@@ -21,7 +19,6 @@ const mockTabsOnUpdated = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
-// Add onCreated and onRemoved mocks
 const mockTabsOnCreated = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
@@ -30,24 +27,28 @@ const mockTabsOnRemoved = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
-// Add onMoved mock for pinned tab reorder sync
 const mockTabsOnMoved = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
+const mockTabsOnDetached = {
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+};
+const mockTabsOnAttached = {
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+};
 
-// Mock chrome.runtime for tests
 const mockRuntimeSendMessage = vi.fn();
 const mockRuntimeOnMessage = {
   addListener: vi.fn(),
   removeListener: vi.fn(),
 };
 
-// chrome.tabs.create のモック
 const mockTabsCreate = vi.fn();
 
 beforeEach(() => {
-  // Setup chrome API mocks
   vi.stubGlobal('chrome', {
     storage: {
       local: {
@@ -59,17 +60,15 @@ beforeEach(() => {
     tabs: {
       query: mockTabsQuery,
       update: mockTabsUpdate,
-      // chrome.tabs.create のモック
       create: mockTabsCreate,
       onActivated: mockTabsOnActivated,
       onUpdated: mockTabsOnUpdated,
-      // Add onCreated and onRemoved mocks
       onCreated: mockTabsOnCreated,
       onRemoved: mockTabsOnRemoved,
-      // Add onMoved mock for pinned tab reorder sync
       onMoved: mockTabsOnMoved,
+      onDetached: mockTabsOnDetached,
+      onAttached: mockTabsOnAttached,
     },
-    // Add windows mocks
     windows: {
       getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
       getAll: vi.fn().mockResolvedValue([]),
@@ -92,12 +91,10 @@ beforeEach(() => {
     },
   });
 
-  // Default mock responses
   mockStorageGet.mockResolvedValue({});
   mockStorageSet.mockResolvedValue(undefined);
   mockTabsQuery.mockResolvedValue([]);
   mockTabsUpdate.mockResolvedValue({});
-  // chrome.tabs.create のデフォルトレスポンス
   mockTabsCreate.mockResolvedValue({ id: 999, windowId: 1 });
   mockRuntimeSendMessage.mockResolvedValue({ success: true });
 });
@@ -127,7 +124,6 @@ describe('SidePanelRoot', () => {
     await act(async () => {
       render(<SidePanelRoot />);
     });
-    // プロバイダーが存在することを確認するため、子コンポーネントがレンダリングされることを確認
     await waitFor(() => {
       expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
     });
@@ -137,7 +133,6 @@ describe('SidePanelRoot', () => {
     await act(async () => {
       render(<SidePanelRoot />);
     });
-    // テーマプロバイダーが存在することを確認
     await waitFor(() => {
       expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
     });
@@ -147,7 +142,6 @@ describe('SidePanelRoot', () => {
     await act(async () => {
       render(<SidePanelRoot />);
     });
-    // ヘッダーテキスト「Vivaldi-TT」が表示されないことを確認
     expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
   });
 
@@ -155,22 +149,18 @@ describe('SidePanelRoot', () => {
     await act(async () => {
       render(<SidePanelRoot />);
     });
-    // ExternalDropZoneのdata-testidが存在しないことを確認
     expect(screen.queryByTestId('external-drop-zone')).not.toBeInTheDocument();
   });
 
   it('エラー境界が設定されていること', async () => {
-    // エラーをスローするコンポーネント
     const ErrorComponent = () => {
       throw new Error('Test error');
     };
 
-    // コンソールエラーをモック（テスト中のエラー出力を抑制）
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    // エラー境界でエラーをキャッチすることを確認
     await act(async () => {
       render(
         <SidePanelRoot>
@@ -191,9 +181,7 @@ describe('SidePanelRoot', () => {
       await waitFor(() => {
         const tabTreeRoot = screen.getByTestId('tab-tree-root');
         expect(tabTreeRoot).toBeInTheDocument();
-        // overflow-y-autoは垂直スクロールを許可
         expect(tabTreeRoot).toHaveClass('overflow-y-auto');
-        // overflow-x-hiddenは水平スクロールを禁止
         expect(tabTreeRoot).toHaveClass('overflow-x-hidden');
       });
     });

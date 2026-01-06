@@ -30,13 +30,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
 
   useEffect(() => {
-    // 初期化時にストレージから設定をロード
     const loadSettings = async () => {
       const result = await chrome.storage.local.get('user_settings');
       if (result.user_settings) {
         setSettings(result.user_settings);
       } else {
-        // デフォルト設定
         const defaultSettings: UserSettings = {
           fontSize: 14,
           fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -54,8 +52,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
     loadSettings();
 
-    // ストレージ変更イベントをリスン
-    // 設定が変更されたときにリアルタイムで反映されるようにする
     const handleStorageChange = (changes: {
       [key: string]: chrome.storage.StorageChange;
     }) => {
@@ -76,18 +72,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     chrome.storage.local.set({ user_settings: newSettings });
   };
 
-  // カスタムCSSとフォント設定を適用
   useEffect(() => {
     if (!settings) return;
 
     const style = document.createElement('style');
     style.id = 'vivaldi-tt-theme';
 
-    // Vivaldiのテーマ設定と調和するデフォルトスタイル
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const vivaldiTheme = isDarkMode
       ? `
-        /* Vivaldi Dark Theme */
         :root {
           --vivaldi-bg-primary: #1e1e1e;
           --vivaldi-bg-secondary: #2d2d2d;
@@ -102,7 +95,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         }
       `
       : `
-        /* Vivaldi Light Theme */
         :root {
           --vivaldi-bg-primary: #ffffff;
           --vivaldi-bg-secondary: #f5f5f5;
@@ -129,12 +121,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       }
     `;
 
-    // カスタムCSSのエラー検出
     let hasError = false;
     if (settings.customCSS) {
       try {
-        // CSSの基本的な構文チェック
-        // 開き括弧と閉じ括弧の数をチェック
         const openBraces = (settings.customCSS.match(/\{/g) || []).length;
         const closeBraces = (settings.customCSS.match(/\}/g) || []).length;
 
@@ -142,14 +131,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           hasError = true;
         }
 
-        // セミコロンの後に不正な文字がないかチェック
         if (!hasError && /\{[^}]*[^;\s}][^}]*\}/.test(settings.customCSS)) {
-          // 一時的なスタイル要素を作成してブラウザにパースさせる
           const tempStyle = document.createElement('style');
           tempStyle.textContent = settings.customCSS;
           document.head.appendChild(tempStyle);
 
-          // CSSOMでエラーチェック
           if (tempStyle.sheet && tempStyle.sheet.cssRules.length === 0 && settings.customCSS.trim() !== '') {
             hasError = true;
           }
@@ -173,7 +159,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
     document.head.appendChild(style);
 
-    // CSSエラー通知の表示/削除
     const existingError = document.getElementById('vivaldi-tt-css-error');
     if (hasError) {
       if (!existingError) {

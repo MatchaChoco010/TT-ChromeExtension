@@ -1,8 +1,5 @@
 import React from 'react';
 
-/**
- * NewTabButton コンポーネントのプロパティ
- */
 interface NewTabButtonProps {
   /**
    * 新規タブ追加後に呼び出されるコールバック
@@ -16,28 +13,19 @@ interface NewTabButtonProps {
  * タブツリーの末尾に表示され、クリックで新しいタブを作成する
  */
 const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
-  /**
-   * ボタンクリック時のハンドラ
-   * chrome.tabs.create を呼び出して新規タブを作成し、アクティブにする
-   */
   const handleClick = async (e: React.MouseEvent) => {
-    // イベントの伝播を停止
     e.stopPropagation();
 
     try {
-      // 新しいタブをアクティブにする
-      // Vivaldiスタートページを開く
       await chrome.tabs.create({
         active: true,
         url: 'chrome://vivaldi-webui/startpage',
       });
 
-      // コールバックが提供されている場合は呼び出す
       if (onNewTab) {
         onNewTab();
       }
     } catch (error) {
-      // エラーをログに出力するが、ユーザーに影響を与えないようにする
       console.error('Failed to create new tab:', error);
     }
   };

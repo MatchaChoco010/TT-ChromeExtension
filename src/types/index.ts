@@ -1,5 +1,3 @@
-// Type definitions for Vivaldi-TT
-
 export interface TabNode {
   id: string;
   tabId: number;
@@ -8,7 +6,6 @@ export interface TabNode {
   isExpanded: boolean;
   depth: number;
   viewId: string;
-  // グループ機能
   groupId?: string;
 }
 
@@ -20,18 +17,13 @@ export interface TabInfo {
   status: 'loading' | 'complete';
 }
 
-// 拡張タブ情報（ピン状態を含む）
-// windowIdを追加（複数ウィンドウ対応）
-// discardedを追加（休止タブの視覚的区別）
-// indexを追加（ピン留めタブの順序同期）
 export interface ExtendedTabInfo extends TabInfo {
   isPinned: boolean;
   windowId: number;
   discarded: boolean; // 休止状態のタブ（まだ読み込まれていない）
-  index: number; // タブのインデックス（ピン留めタブの順序同期に使用）
+  index: number;
 }
 
-// タブ情報マップ
 export interface TabInfoMap {
   [tabId: number]: ExtendedTabInfo;
 }
@@ -58,15 +50,12 @@ export interface UserSettings {
   closeWarningThreshold: number;
   showUnreadIndicator: boolean;
   autoSnapshotInterval: number; // minutes, 0 = disabled
-  childTabBehavior: 'promote' | 'close_all'; // 親タブ閉じ時の子タブ処理方法
-  // タブ開き方別の位置ルール
-  newTabPositionFromLink?: 'child' | 'sibling' | 'end'; // リンククリックから開かれたタブ
-  newTabPositionManual?: 'child' | 'sibling' | 'end'; // 手動で開かれたタブ(アドレスバー、新規タブボタンなど)
-  // スナップショット最大保持数
+  childTabBehavior: 'promote' | 'close_all';
+  newTabPositionFromLink?: 'child' | 'sibling' | 'end';
+  newTabPositionManual?: 'child' | 'sibling' | 'end';
   maxSnapshots?: number; // デフォルト: 10
 }
 
-// Storage types
 export type StorageChanges = {
   [key: string]: { oldValue: unknown; newValue: unknown };
 };
@@ -76,11 +65,11 @@ export type StorageChanges = {
  * タブの順序とURLを使って、ブラウザ再起動後の親子関係復元に使用
  */
 export interface TreeStructureEntry {
-  url: string;              // タブのURL
-  parentIndex: number | null; // 親エントリのインデックス（nullはルート）
-  index: number;            // Chromeタブのインデックス（タブバーでの位置）
-  viewId: string;           // ビューID
-  isExpanded: boolean;      // 展開状態
+  url: string;
+  parentIndex: number | null;
+  index: number;
+  viewId: string;
+  isExpanded: boolean;
 }
 
 export interface TreeState {
@@ -106,9 +95,7 @@ export interface StorageSchema {
   user_settings: UserSettings;
   unread_tabs: number[];
   groups: Record<string, Group>;
-  /** タブタイトル永続化 */
   tab_titles: TabTitlesMap;
-  /** ファビコン永続化 */
   tab_favicons: TabFaviconsMap;
 }
 
@@ -121,7 +108,6 @@ export interface IStorageService {
   onChange(callback: (changes: StorageChanges) => void): () => void;
 }
 
-// Snapshot types
 export interface TabSnapshot {
   url: string;
   title: string;
@@ -151,7 +137,6 @@ export interface IIndexedDBService {
   deleteOldSnapshots(keepCount: number): Promise<void>;
 }
 
-// UnreadTracker Service Interface
 export interface IUnreadTracker {
   markAsUnread(tabId: number): Promise<void>;
   markAsRead(tabId: number): Promise<void>;
@@ -159,13 +144,10 @@ export interface IUnreadTracker {
   getUnreadCount(): number;
   loadFromStorage(): Promise<void>;
   clear(): Promise<void>;
-  /** 起動完了フラグを設定 */
   setInitialLoadComplete(): void;
-  /** 起動完了かどうかを取得 */
   isInitialLoadComplete(): boolean;
 }
 
-// Service Worker Message Types
 export interface TreeUpdatePayload {
   nodeId: string;
   newParentId: string | null;
@@ -182,7 +164,6 @@ export type MessageType =
     }
   | {
       type: 'CREATE_WINDOW_WITH_SUBTREE';
-      // sourceWindowIdを追加（空ウィンドウ自動クローズ用）
       payload: { tabId: number; sourceWindowId?: number };
     }
   | {
@@ -201,14 +182,10 @@ export type MessageType =
   | { type: 'SYNC_TABS' }
   | { type: 'REFRESH_TREE_STRUCTURE' }
   | { type: 'STATE_UPDATED' }
-  // グループ化機能
   | { type: 'CREATE_GROUP'; payload: { tabIds: number[] } }
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
-  // ポップアップからスナップショット取得
   | { type: 'CREATE_SNAPSHOT' }
-  // タブ複製時の兄弟配置
   | { type: 'REGISTER_DUPLICATE_SOURCE'; payload: { sourceTabId: number } }
-  // クロスウィンドウドラッグセッション管理
   | {
       type: 'START_DRAG_SESSION';
       payload: { tabId: number; windowId: number; treeData: TabNode[] };
@@ -219,33 +196,21 @@ export type MessageType =
       type: 'BEGIN_CROSS_WINDOW_MOVE';
       payload: { targetWindowId: number };
     }
-  // グループ情報取得
   | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
-  // ツリービュー上のホバー検知
   | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
   | { type: 'NOTIFY_DRAG_OUT' }
-  // ドラッグセッション終了通知（全ウィンドウへのブロードキャスト）
   | { type: 'DRAG_SESSION_ENDED' };
 
 export type MessageResponse<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-// Drag and Drop types - 自前D&D実装用の型定義
-// dnd-kitを削除し自前の型を使用
-
-/**
- * ドラッグ開始イベント
- */
 export interface DragStartEvent {
   active: {
     id: string;
   };
 }
 
-/**
- * ドラッグ中のイベント（ホバー時）
- */
 export interface DragOverEvent {
   active: {
     id: string;
@@ -255,9 +220,6 @@ export interface DragOverEvent {
   } | null;
 }
 
-/**
- * ドラッグ終了イベント
- */
 export interface DragEndEvent {
   active: {
     id: string;
@@ -303,48 +265,30 @@ export interface TabTreeViewProps {
   onToggleExpand: (nodeId: string) => void;
   onDragEnd?: (event: DragEndEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
-  // ドラッグ開始/終了コールバック（外部ドロップ連携用）
   onDragStart?: (event: DragStartEvent) => void;
   onDragCancel?: () => void;
-  // 兄弟としてドロップ（Gapドロップ）時のコールバック
   onSiblingDrop?: (info: SiblingDropInfo) => Promise<void>;
-  // 未読状態管理
   isTabUnread?: (tabId: number) => boolean;
   getUnreadChildCount?: (nodeId: string) => number;
-  // アクティブタブID
   activeTabId?: number;
-  // タブ情報取得関数
   getTabInfo?: (tabId: number) => ExtendedTabInfo | undefined;
-  // 選択状態管理（複数選択対応）
   isNodeSelected?: (nodeId: string) => boolean;
   onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
-  // 選択されたすべてのタブIDを取得する関数
   getSelectedTabIds?: () => number[];
-  // スナップショット取得コールバック
   onSnapshot?: () => Promise<void>;
-  // グループ機能をツリー内に統合表示
   groups?: Record<string, Group>;
   onGroupToggle?: (groupId: string) => void;
-  // タブをグループに追加するコールバック
   onAddToGroup?: (groupId: string, tabIds: number[]) => void;
-  // ビュー移動サブメニュー用
   views?: View[];
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
-  // 別のウィンドウに移動サブメニュー用
   currentWindowId?: number;
   otherWindows?: WindowInfo[];
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
-  // ツリー外ドロップで新規ウィンドウ作成
   onExternalDrop?: (tabId: number) => void;
-  // ツリービュー外へのドロップ検知
-  // ドラッグ中にマウスがツリービュー外に移動したかどうかを通知するコールバック
   onOutsideTreeChange?: (isOutside: boolean) => void;
-  // サイドパネル境界参照
-  // ドラッグアウト判定はサイドパネル全体の境界を基準にする
   sidePanelRef?: React.RefObject<HTMLElement | null>;
 }
 
-// Context Menu types
 export type MenuAction =
   | 'close'
   | 'closeOthers'
@@ -360,12 +304,9 @@ export type MenuAction =
   | 'copyUrl'
   | 'snapshot';
 
-/** ウィンドウ情報（コンテキストメニュー用） */
 export interface WindowInfo {
   id: number;
-  /** ウィンドウ内のタブ数 */
   tabCount: number;
-  /** ウィンドウのフォーカス状態 */
   focused: boolean;
 }
 
@@ -378,50 +319,26 @@ export interface ContextMenuProps {
   isGrouped?: boolean;
   hasChildren?: boolean;
   tabUrl?: string;
-  /** ビュー移動サブメニュー用 - 全ビューリスト */
   views?: View[];
-  /** 現在のビューID（サブメニューで除外する） */
   currentViewId?: string;
-  /** タブをビューに移動するコールバック */
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
-  /** グループ一覧（シングルタブのグループ追加用） */
   groups?: Record<string, Group>;
-  /** タブをグループに追加するコールバック */
   onAddToGroup?: (groupId: string, tabIds: number[]) => void;
-  /** 現在のウィンドウID */
   currentWindowId?: number;
-  /** 他のウィンドウ一覧（別ウィンドウへ移動用） */
   otherWindows?: WindowInfo[];
-  /** タブを別のウィンドウに移動するコールバック */
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
 }
 
-// SubMenu types
-
-/**
- * サブメニュー項目
- */
 export interface SubMenuItem {
-  /** 項目のID */
   id: string;
-  /** 表示ラベル */
   label: string;
-  /** 無効化フラグ */
   disabled?: boolean;
 }
 
-/**
- * SubMenuコンポーネントのProps
- */
 export interface SubMenuProps {
-  /** サブメニューのラベル */
   label: string;
-  /** サブメニュー項目 */
   items: SubMenuItem[];
-  /** 項目選択時のコールバック */
   onSelect: (itemId: string) => void;
-  /** メニューを閉じるコールバック */
   onClose: () => void;
-  /** 親メニューからの相対位置 */
   parentRect: DOMRect;
 }

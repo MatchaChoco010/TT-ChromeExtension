@@ -15,7 +15,6 @@ export class ViewManager {
   private currentViewId: string = 'default-view';
   private treeStateManager: TreeStateManager | null = null;
 
-  // デフォルトビュー
   private readonly defaultView: View = {
     id: 'default-view',
     name: 'Default',
@@ -23,7 +22,6 @@ export class ViewManager {
   };
 
   constructor(private storageService: IStorageService) {
-    // デフォルトビューを初期化
     this.views.set(this.defaultView.id, this.defaultView);
   }
 
@@ -57,7 +55,6 @@ export class ViewManager {
 
     this.views.set(viewId, newView);
 
-    // ストレージに永続化（非同期だが待たない）
     void this.persistState();
 
     return newView;
@@ -70,19 +67,16 @@ export class ViewManager {
    * @param viewId - 削除するビューのID
    */
   deleteView(viewId: string): void {
-    // デフォルトビューは削除できない
     if (viewId === this.defaultView.id) {
       return;
     }
 
-    // 削除されたビューがカレントビューだった場合、デフォルトビューに切り替える
     if (this.currentViewId === viewId) {
       this.currentViewId = this.defaultView.id;
     }
 
     this.views.delete(viewId);
 
-    // ストレージに永続化（非同期だが待たない）
     void this.persistState();
   }
 
@@ -92,14 +86,12 @@ export class ViewManager {
    * @param viewId - 切り替え先のビューID
    */
   switchView(viewId: string): void {
-    // 存在しないビューIDの場合は何もしない
     if (!this.views.has(viewId)) {
       return;
     }
 
     this.currentViewId = viewId;
 
-    // ストレージに永続化（非同期だが待たない）
     void this.persistState();
   }
 
@@ -117,7 +109,6 @@ export class ViewManager {
       return;
     }
 
-    // ビュー情報を更新
     const updatedView: View = {
       ...view,
       ...updates,
@@ -125,7 +116,6 @@ export class ViewManager {
 
     this.views.set(viewId, updatedView);
 
-    // ストレージに永続化（非同期だが待たない）
     void this.persistState();
   }
 
@@ -137,7 +127,6 @@ export class ViewManager {
   getCurrentView(): View {
     const currentView = this.views.get(this.currentViewId);
 
-    // currentViewIdが不正な場合はデフォルトビューを返す
     if (!currentView) {
       return this.defaultView;
     }
@@ -151,7 +140,6 @@ export class ViewManager {
    * @returns ビューの配列（デフォルトビューを除く）
    */
   getViews(): View[] {
-    // デフォルトビューを除外してビューを返す
     return Array.from(this.views.values()).filter(
       (view) => view.id !== this.defaultView.id,
     );
@@ -169,14 +157,6 @@ export class ViewManager {
 
   /**
    * 指定ビューのタブを取得
-   * タブを別のビューに移動する
-   *
-   * 注意: この実装は TreeStateManager と連携が必要です。
-   * 現在は ViewManager 単体では TabNode を管理していないため、
-   * TreeStateManager.getTree(viewId) を使用してタブを取得する必要があります。
-   *
-   * このメソッドはインターフェース定義のみで、実際の取得は
-   * TreeStateManager に委譲されます。
    *
    * @param viewId - ビューID
    * @returns タブノードの配列
@@ -190,8 +170,6 @@ export class ViewManager {
 
   /**
    * タブを別のビューに移動
-   * ビュー間のタブ移動
-   * ユーザーがタブを別のビューに移動する
    *
    * @param tabId - 移動するタブのID
    * @param sourceViewId - 移動元のビューID
@@ -202,22 +180,18 @@ export class ViewManager {
     sourceViewId: string,
     targetViewId: string,
   ): Promise<void> {
-    // 移動元と移動先が同じ場合は何もしない
     if (sourceViewId === targetViewId) {
       return;
     }
 
-    // 移動先のビューが存在するか確認
     if (!this.views.has(targetViewId)) {
       return;
     }
 
-    // TreeStateManagerが設定されていない場合は何もしない
     if (!this.treeStateManager) {
       return;
     }
 
-    // TreeStateManagerにタブの移動を委譲
     await this.treeStateManager.moveSubtreeToView(tabId, targetViewId);
   }
 
@@ -226,11 +200,9 @@ export class ViewManager {
    */
   private async persistState(): Promise<void> {
     try {
-      // 現在のツリー状態を取得
       const currentTreeState =
         await this.storageService.get(STORAGE_KEYS.TREE_STATE);
 
-      // ツリー状態を更新（ビュー情報とカレントビューIDのみ）
       const updatedTreeState: TreeState = {
         views: this.getAllViews(),
         currentViewId: this.currentViewId,
@@ -255,7 +227,6 @@ export class ViewManager {
         return;
       }
 
-      // ビューを復元
       this.views.clear();
       this.views.set(this.defaultView.id, this.defaultView);
 
@@ -265,7 +236,6 @@ export class ViewManager {
         }
       }
 
-      // カレントビューを復元
       if (treeState.currentViewId && this.views.has(treeState.currentViewId)) {
         this.currentViewId = treeState.currentViewId;
       }

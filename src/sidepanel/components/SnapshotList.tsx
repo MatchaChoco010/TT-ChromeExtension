@@ -1,9 +1,6 @@
 import React, { useRef } from 'react';
 import type { Snapshot } from '@/types';
 
-/**
- * SnapshotList コンポーネントのプロパティ
- */
 interface SnapshotListProps {
   snapshots: Snapshot[];
   onRestore: (snapshotId: string) => void;
@@ -13,18 +10,6 @@ interface SnapshotListProps {
   processingSnapshotId?: string;
 }
 
-/**
- * スナップショット履歴管理コンポーネント
- *
- * スナップショット履歴管理
- * スナップショット一覧表示、削除、エクスポート/インポート機能
- *
- * 機能:
- * - スナップショット一覧の表示（新しいものから順に）
- * - 自動保存バッジの表示
- * - スナップショットの復元、削除、エクスポート
- * - JSONファイルからのインポート
- */
 const SnapshotList: React.FC<SnapshotListProps> = ({
   snapshots,
   onRestore,
@@ -35,16 +20,10 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /**
-   * インポートボタンクリック時の処理
-   */
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
 
-  /**
-   * ファイル選択時の処理
-   */
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -54,7 +33,6 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
     try {
       const text = await file.text();
       onImport(text);
-      // ファイル入力をリセット
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -63,9 +41,6 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
     }
   };
 
-  /**
-   * 日付をフォーマット
-   */
   const formatDate = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -77,7 +52,6 @@ const SnapshotList: React.FC<SnapshotListProps> = ({
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
-  // スナップショットが空の場合
   if (snapshots.length === 0) {
     return (
       <div className="snapshot-list p-4 bg-gray-900">

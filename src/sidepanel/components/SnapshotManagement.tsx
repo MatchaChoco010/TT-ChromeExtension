@@ -3,27 +3,12 @@ import SnapshotList from './SnapshotList';
 import type { Snapshot, IIndexedDBService } from '@/types';
 import type { SnapshotManager } from '@/services/SnapshotManager';
 
-/**
- * SnapshotManagement コンポーネントのプロパティ
- */
 interface SnapshotManagementProps {
   snapshotManager: SnapshotManager;
   indexedDBService: IIndexedDBService;
-  maxSnapshots?: number; // 最大保持スナップショット数（デフォルト: 10）
+  maxSnapshots?: number;
 }
 
-/**
- * スナップショット管理統合コンポーネント
- *
- * スナップショット履歴管理
- * スナップショット一覧表示、削除、エクスポート/インポート、古いスナップショット削除機能
- *
- * 機能:
- * - SnapshotManager を使用してスナップショットを管理
- * - SnapshotList コンポーネントで一覧表示
- * - 古いスナップショット削除機能（最新N件を保持）
- * - スナップショット数が上限を超えた場合の警告表示
- */
 const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
   snapshotManager,
   indexedDBService,
@@ -35,9 +20,6 @@ const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
     string | undefined
   >(undefined);
 
-  /**
-   * スナップショット一覧を読み込み
-   */
   const loadSnapshots = async () => {
     try {
       setIsLoading(true);
@@ -50,21 +32,14 @@ const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
     }
   };
 
-  /**
-   * 初期読み込み
-   */
   useEffect(() => {
     loadSnapshots();
   }, []);
 
-  /**
-   * スナップショットを復元
-   */
   const handleRestore = async (snapshotId: string) => {
     try {
       setProcessingSnapshotId(snapshotId);
       await snapshotManager.restoreSnapshot(snapshotId);
-      // 復元成功後、必要に応じてUIを更新
     } catch (error) {
       console.error('Failed to restore snapshot:', error);
     } finally {
@@ -72,14 +47,10 @@ const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
     }
   };
 
-  /**
-   * スナップショットを削除
-   */
   const handleDelete = async (snapshotId: string) => {
     try {
       setProcessingSnapshotId(snapshotId);
       await snapshotManager.deleteSnapshot(snapshotId);
-      // 削除後、一覧を再読み込み
       await loadSnapshots();
     } catch (error) {
       console.error('Failed to delete snapshot:', error);
@@ -88,15 +59,11 @@ const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
     }
   };
 
-  /**
-   * スナップショットをエクスポート
-   */
   const handleExport = async (snapshotId: string) => {
     try {
       setProcessingSnapshotId(snapshotId);
       const jsonData = await snapshotManager.exportSnapshot(snapshotId);
 
-      // JSONファイルとしてダウンロード
       const blob = new Blob([jsonData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -111,27 +78,18 @@ const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
     }
   };
 
-  /**
-   * スナップショットをインポート
-   */
   const handleImport = async (jsonData: string) => {
     try {
       await snapshotManager.importSnapshot(jsonData);
-      // インポート後、一覧を再読み込み
       await loadSnapshots();
     } catch (error) {
       console.error('Failed to import snapshot:', error);
     }
   };
 
-  /**
-   * 古いスナップショットを削除
-   * 最新N件を保持、それ以外を削除
-   */
   const handleCleanupOldSnapshots = async () => {
     try {
       await indexedDBService.deleteOldSnapshots(maxSnapshots);
-      // 削除後、一覧を再読み込み
       await loadSnapshots();
     } catch (error) {
       console.error('Failed to cleanup old snapshots:', error);

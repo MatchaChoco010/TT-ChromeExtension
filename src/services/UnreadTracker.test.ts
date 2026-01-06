@@ -189,7 +189,6 @@ describe('UnreadTracker', () => {
     });
   });
 
-  // 復元タブの未読インジケーター非表示
   describe('ブラウザ復元時の未読状態', () => {
     it('clear()でストレージの未読状態を全てクリアできる', async () => {
       // ストレージに前回セッションの未読タブがある状態をシミュレート
@@ -237,7 +236,6 @@ describe('UnreadTracker', () => {
     });
   });
 
-  // 起動時の未読バッジ制御
   describe('initialLoadComplete', () => {
     it('初期状態ではisInitialLoadCompleteがfalseを返す', () => {
       expect(unreadTracker.isInitialLoadComplete()).toBe(false);

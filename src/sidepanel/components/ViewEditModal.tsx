@@ -1,21 +1,7 @@
-/**
- * ViewEditModal コンポーネント
- * ビュー編集モーダルダイアログの実装
- * IconPicker統合
- *
- * ビュー名、色、アイコンを編集するためのモーダルダイアログを提供します。
- * モーダルオーバーレイで表示され、保存/キャンセル操作が可能です。
- * IconPickerを統合してカスタムアイコン選択に対応します。
- */
-
 import React, { useState, useCallback, useEffect } from 'react';
 import type { View } from '@/types';
 import { IconPicker, getIconByName, isCustomIcon } from './IconPicker';
 
-/**
- * プリセットカラーの配列
- * ダークテーマに合う色を選定
- */
 const PRESET_COLORS = [
   '#ef4444', // Red
   '#f97316', // Orange
@@ -64,17 +50,11 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
   onClose,
   onImmediateUpdate,
 }) => {
-  // フォーム状態
-  // Note: 親コンポーネントでkey={view?.id}を使用することで、
-  // viewが変わるたびにコンポーネントが再マウントされ、初期値が適用される
   const [name, setName] = useState(view?.name ?? '');
   const [color, setColor] = useState(view?.color ?? '#3b82f6');
   const [icon, setIcon] = useState(view?.icon ?? '');
-
-  // IconPicker表示状態
   const [showIconPicker, setShowIconPicker] = useState(false);
 
-  // Escapeキーでモーダルを閉じる
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
@@ -91,11 +71,9 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
     };
   }, [handleKeyDown]);
 
-  // IconPicker選択ハンドラ - アイコン選択時に即座に反映
   const handleIconSelect = useCallback((selectedIcon: string) => {
     setIcon(selectedIcon);
     setShowIconPicker(false);
-    // 即座にビューを更新して変更を反映（モーダルは閉じない）
     if (view && name.trim() && onImmediateUpdate) {
       onImmediateUpdate({
         id: view.id,
@@ -106,17 +84,14 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
     }
   }, [view, name, color, onImmediateUpdate]);
 
-  // IconPickerキャンセルハンドラ
   const handleIconPickerCancel = useCallback(() => {
     setShowIconPicker(false);
   }, []);
 
-  // アイコンクリアハンドラ
   const handleIconClear = useCallback(() => {
     setIcon('');
   }, []);
 
-  // 保存処理
   const handleSave = () => {
     if (!view || !name.trim()) {
       return;
@@ -130,14 +105,12 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
     });
   };
 
-  // オーバーレイクリックでモーダルを閉じる
   const handleOverlayClick = (event: React.MouseEvent) => {
     if (event.target === event.currentTarget) {
       onClose();
     }
   };
 
-  // モーダルを表示しない条件
   if (!isOpen || !view) {
     return null;
   }
@@ -157,7 +130,6 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
         data-testid-content="modal-content"
       >
         <div data-testid="modal-content" onClick={(e) => e.stopPropagation()}>
-          {/* ヘッダー */}
           <div className="px-6 py-4 border-b border-gray-700">
             <h2
               id="modal-title"
@@ -167,9 +139,7 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
             </h2>
           </div>
 
-          {/* フォーム */}
           <div className="px-6 py-4 space-y-4">
-            {/* ビュー名 */}
             <div>
               <label
                 htmlFor="view-name"
@@ -187,7 +157,6 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
               />
             </div>
 
-            {/* 色選択 */}
             <div>
               <label
                 htmlFor="view-color"
@@ -212,7 +181,6 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
                 />
               </div>
 
-              {/* プリセットカラー */}
               <div className="mt-2 flex flex-wrap gap-1">
                 {PRESET_COLORS.map((presetColor) => (
                   <button
@@ -232,7 +200,6 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
               </div>
             </div>
 
-            {/* アイコン選択 */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
                 Icon (optional)
@@ -245,14 +212,12 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
                 />
               ) : (
                 <div className="flex items-center gap-3">
-                  {/* アイコンプレビュー/選択ボタン */}
                   <button
                     type="button"
                     data-testid="icon-select-button"
                     onClick={() => setShowIconPicker(true)}
                     className="flex items-center gap-2 px-3 py-2 border border-gray-600 rounded-md shadow-sm hover:bg-gray-600 bg-gray-700 text-gray-100 text-sm"
                   >
-                    {/* 現在のアイコンプレビュー */}
                     <div className="w-6 h-6 flex items-center justify-center bg-gray-600 rounded">
                       {icon.trim() ? (
                         isCustomIcon(icon) ? (
@@ -293,7 +258,6 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
                     </span>
                   </button>
 
-                  {/* クリアボタン */}
                   {icon.trim() && (
                     <button
                       type="button"
@@ -322,7 +286,6 @@ export const ViewEditModal: React.FC<ViewEditModalProps> = ({
             </div>
           </div>
 
-          {/* フッター */}
           <div className="px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
             <button
               type="button"

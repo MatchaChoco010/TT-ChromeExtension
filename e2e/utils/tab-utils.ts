@@ -6,7 +6,6 @@
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 import type { TestGlobals } from '../types';
 
-// globalThis 拡張の型定義
 declare const globalThis: typeof globalThis & TestGlobals;
 
 /**
@@ -56,7 +55,6 @@ export async function createTab(
   parentTabIdOrOptions?: number | CreateTabOptions,
   options: CreateTabOptions = {}
 ): Promise<number> {
-  // Handle both old signature (parentTabId as number) and new signature (options object)
   let parentTabId: number | undefined;
   let resolvedOptions: CreateTabOptions;
 
@@ -74,12 +72,10 @@ export async function createTab(
   const { active = true, index, windowId } = resolvedOptions;
   const serviceWorker = await getServiceWorker(context);
 
-  // Service Workerコンテキストでchrome.tabs.create()を実行
   const tab = await serviceWorker.evaluate(
     async ({ url, parentTabId, active, index, windowId }) => {
-      // IMPORTANT: Chrome doesn't reliably include openerTabId in the onCreated event
-      // To work around this, we call chrome.tabs.create and immediately get the tab object
-      // which DOES include the openerTabId, then we can handle parent relationship properly
+      // Note: chrome.tabs.createで作成直後のタブオブジェクトにはopenerTabIdが含まれるが、
+      // onCreatedイベントでは含まれないことがあるため、親子関係を別途設定する
       const createdTab = await chrome.tabs.create({
         url,
         active,
@@ -88,11 +84,7 @@ export async function createTab(
         ...(windowId !== undefined && { windowId }),
       });
 
-      // If we have a parent and the created tab has an ID, ensure the relationship is preserved
-      // by letting the event handler know about the openerTabId explicitly
       if (parentTabId !== undefined && createdTab.id) {
-        // Store the parent relationship in a global variable accessible to the event handler
-        // We use globalThis to ensure it's accessible across different execution contexts
         if (!globalThis.pendingTabParents) {
           globalThis.pendingTabParents = new Map();
         }
@@ -104,17 +96,13 @@ export async function createTab(
     { url, parentTabId, active, index, windowId }
   );
 
-  // IMPORTANT: Wait for the tab to be fully added to TreeStateManager
-  // Chrome's onCreated event is asynchronous, so we need to wait for it to complete
   await serviceWorker.evaluate(
     async (tabId) => {
-      // Poll storage until the tab appears in tree_state
-      // 50ms interval x 40 iterations = 2 seconds max
       for (let i = 0; i < 40; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
         if (treeState?.tabToNode?.[tabId!]) {
-          return; // Tab found in tree
+          return;
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
@@ -123,10 +111,7 @@ export async function createTab(
     tab.id
   );
 
-  // If a parent tab was specified, manually update the tree state to set the parent relationship
-  // This is needed because Chrome's openerTabId is not always reliably passed to the onCreated event
   if (parentTabId !== undefined) {
-    // Update storage and treeStateManager to set parent relationship
     await serviceWorker.evaluate(
       async ({ tabId, parentTabId }) => {
         interface TreeNode {
@@ -138,7 +123,6 @@ export async function createTab(
           nodes: Record<string, TreeNode>;
         }
 
-        // First, wait for any pending persistState to complete
         await new Promise(resolve => setTimeout(resolve, 100));
 
         const result = await chrome.storage.local.get('tree_state');
@@ -149,12 +133,9 @@ export async function createTab(
         const parentNodeId = treeState.tabToNode[parentTabId];
 
         if (childNodeId && parentNodeId && treeState.nodes[childNodeId] && treeState.nodes[parentNodeId]) {
-          // Set parent relationship
           treeState.nodes[childNodeId].parentId = parentNodeId;
-          // Recalculate depth
           const parentDepth = treeState.nodes[parentNodeId].depth || 0;
           treeState.nodes[childNodeId].depth = parentDepth + 1;
-          // Save updated state
           await chrome.storage.local.set({ tree_state: treeState });
 
           // IMPORTANT: Reload treeStateManager from storage to sync the in-memory state
@@ -163,12 +144,10 @@ export async function createTab(
           if (globalThis.treeStateManager) {
             // @ts-expect-error accessing global treeStateManager
             await globalThis.treeStateManager.loadState();
-            // Call syncWithChromeTabs to trigger persistState which rebuilds treeStructure
             // @ts-expect-error accessing global treeStateManager
             await globalThis.treeStateManager.syncWithChromeTabs();
           }
 
-          // Notify Side Panel about the state update
           try {
             await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
           } catch {
@@ -179,8 +158,6 @@ export async function createTab(
       { tabId: tab.id, parentTabId }
     );
 
-    // Wait for the parent-child relationship to be reflected in storage
-    // 50ms interval x 20 iterations = 1 second max
     await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
@@ -199,7 +176,7 @@ export async function createTab(
             if (parentNodeId && childNodeId) {
               const childNode = treeState.nodes[childNodeId];
               if (childNode && childNode.parentId === parentNodeId) {
-                return; // Parent-child relationship confirmed
+                return;
               }
             }
           }
@@ -222,19 +199,17 @@ export async function createTab(
 export async function closeTab(context: BrowserContext, tabId: number): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  // Service Workerコンテキストでchrome.tabs.remove()を実行
   await serviceWorker.evaluate((tabId) => {
     return chrome.tabs.remove(tabId);
   }, tabId);
 
-  // タブがツリーから削除されるまでポーリングで待機
   await serviceWorker.evaluate(
     async (tabId) => {
       for (let i = 0; i < 50; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
         if (!treeState?.tabToNode?.[tabId]) {
-          return; // Tab removed from tree
+          return;
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
@@ -255,18 +230,16 @@ export async function activateTab(
 ): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  // Service Workerコンテキストでchrome.tabs.update()を実行
   await serviceWorker.evaluate((tabId) => {
     return chrome.tabs.update(tabId, { active: true });
   }, tabId);
 
-  // タブがアクティブになるまでポーリングで待機
   await serviceWorker.evaluate(
     async (tabId) => {
       for (let i = 0; i < 50; i++) {
         const tab = await chrome.tabs.get(tabId);
         if (tab.active) {
-          return; // Tab is now active
+          return;
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
@@ -288,7 +261,6 @@ export async function pinTab(context: BrowserContext, tabId: number): Promise<vo
     await chrome.tabs.update(id, { pinned: true });
   }, tabId);
 
-  // ピン留め状態が反映されるまでポーリングで待機
   await serviceWorker.evaluate(
     async (id) => {
       for (let i = 0; i < 50; i++) {
@@ -316,7 +288,6 @@ export async function unpinTab(context: BrowserContext, tabId: number): Promise<
     await chrome.tabs.update(id, { pinned: false });
   }, tabId);
 
-  // ピン留め解除が反映されるまでポーリングで待機
   await serviceWorker.evaluate(
     async (id) => {
       for (let i = 0; i < 50; i++) {
@@ -345,7 +316,6 @@ export async function updateTabUrl(context: BrowserContext, tabId: number, url: 
     await chrome.tabs.update(id, { url: newUrl });
   }, { id: tabId, newUrl: url });
 
-  // URL更新が反映されるまでポーリングで待機
   await serviceWorker.evaluate(
     async ({ id, expectedUrl }) => {
       for (let i = 0; i < 100; i++) {
@@ -372,7 +342,6 @@ export async function refreshSidePanel(
 ): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  // STATE_UPDATEDメッセージを送信してSide Panelを更新
   await serviceWorker.evaluate(async () => {
     try {
       await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
@@ -381,7 +350,6 @@ export async function refreshSidePanel(
     }
   });
 
-  // UIの更新を待機 - DOMの更新が完了するまで待機
   await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
 }
 
@@ -453,7 +421,6 @@ export async function getInitialBrowserTabId(serviceWorker: Worker, windowId: nu
       .filter(t => !t.pinned)
       .filter(t => {
         const url = t.url || t.pendingUrl || '';
-        // 擬似サイドパネルタブは除外
         return !url.startsWith(sidePanelUrlPrefix);
       });
 

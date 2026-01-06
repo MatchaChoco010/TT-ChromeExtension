@@ -1,16 +1,3 @@
-/**
- * Chrome Storage API E2E Tests
- *
- * chrome.storage APIとの統合を検証するE2Eテスト
- * chrome.storage API統合の実装とテスト
- *
- * テスト対象:
- * - chrome.storage.local.set()で設定を保存
- * - chrome.storage.local.get()で設定を読み込み
- * - chrome.storage.onChangedイベントハンドリングとUIの更新
- * - 複数の設定項目を一括で保存
- */
-
 import { test, expect } from './fixtures/extension';
 
 test.describe('chrome.storage API統合', () => {
@@ -19,7 +6,6 @@ test.describe('chrome.storage API統合', () => {
       extensionContext,
       serviceWorker,
     }) => {
-      // Arrange: テスト用の設定データ
       const testSettings = {
         fontSize: 16,
         fontFamily: 'Arial, sans-serif',
@@ -27,7 +13,6 @@ test.describe('chrome.storage API統合', () => {
         indentWidth: 20,
       };
 
-      // Act: Service Workerでchrome.storage.local.setを実行
       const saveResult = await serviceWorker.evaluate(async (settings) => {
         return new Promise<{ success: boolean; error?: string }>((resolve) => {
           chrome.storage.local.set({ userSettings: settings }, () => {
@@ -40,11 +25,9 @@ test.describe('chrome.storage API統合', () => {
         });
       }, testSettings);
 
-      // Assert: 保存が成功する
       expect(saveResult.success).toBe(true);
       expect(saveResult.error).toBeUndefined();
 
-      // Verify: データが永続化されていることを確認
       const verifyResult = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean; data?: Record<string, unknown> }>((resolve) => {
           chrome.storage.local.get(['userSettings'], (result) => {
@@ -64,7 +47,6 @@ test.describe('chrome.storage API統合', () => {
     test('chrome.storage.local.get()で設定を読み込んだ場合、保存された設定値が取得される', async ({
       serviceWorker,
     }) => {
-      // Arrange: 先にデータを保存
       const testData = {
         testKey: 'testValue',
         testNumber: 42,
@@ -81,7 +63,6 @@ test.describe('chrome.storage API統合', () => {
         });
       }, testData);
 
-      // Act: chrome.storage.local.getで読み込み
       const result = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean; data?: unknown }>((resolve) => {
           chrome.storage.local.get(['storageTest'], (result) => {
@@ -94,7 +75,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: 保存したデータが正しく取得できる
       expect(result.success).toBe(true);
       expect(result.data).toEqual(testData);
     });
@@ -102,7 +82,6 @@ test.describe('chrome.storage API統合', () => {
     test('存在しないキーを取得した場合、undefinedが返される', async ({
       serviceWorker,
     }) => {
-      // Act: 存在しないキーを取得
       const result = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean; data?: Record<string, unknown> }>((resolve) => {
           chrome.storage.local.get(['nonExistentKey'], (result) => {
@@ -115,7 +94,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: 成功するがデータはundefined
       expect(result.success).toBe(true);
       expect(result.data?.nonExistentKey).toBeUndefined();
     });
@@ -123,7 +101,6 @@ test.describe('chrome.storage API統合', () => {
     test('デフォルト値を指定して取得した場合、存在しないキーにはデフォルト値が返される', async ({
       serviceWorker,
     }) => {
-      // Arrange: 一部のデータのみ保存
       await serviceWorker.evaluate(async () => {
         return new Promise<void>((resolve) => {
           chrome.storage.local.set({ existingKey: 'existingValue' }, () => {
@@ -132,7 +109,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Act: デフォルト値を指定して取得
       const result = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean; data?: Record<string, unknown> }>((resolve) => {
           chrome.storage.local.get(
@@ -148,7 +124,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: 存在するキーは実際の値、存在しないキーはデフォルト値
       expect(result.success).toBe(true);
       expect(result.data?.existingKey).toBe('existingValue');
       expect(result.data?.nonExistentKey).toBe('defaultValue');
@@ -161,7 +136,6 @@ test.describe('chrome.storage API統合', () => {
       extensionId,
       serviceWorker,
     }) => {
-      // 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
       const settingsPage = await extensionContext.newPage();
       await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
 
@@ -169,9 +143,6 @@ test.describe('chrome.storage API統合', () => {
       await settingsPage.waitForSelector('.settings-page-container', { timeout: 5000 });
 
       const fontSizeInput = settingsPage.locator('input#fontSize');
-
-      // Act: Service Workerからchrome.storageを更新
-      // Note: ThemeProviderは 'user_settings' キーを使用している
       await serviceWorker.evaluate(async () => {
         return new Promise<void>((resolve) => {
           chrome.storage.local.set(
@@ -194,13 +165,11 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: UIが更新される（onChangedイベントにより）
       await expect(async () => {
         const currentValue = await fontSizeInput.inputValue();
         expect(currentValue).toBe('22');
       }).toPass({ timeout: 5000 });
 
-      // クリーンアップ
       await settingsPage.close();
     });
 
@@ -209,15 +178,12 @@ test.describe('chrome.storage API統合', () => {
       extensionId,
       serviceWorker,
     }) => {
-      // 設定ページを直接URLで開く（サイドパネルの設定ボタンは削除済み）
       const settingsPage = await extensionContext.newPage();
       await settingsPage.goto(`chrome-extension://${extensionId}/settings.html`);
 
       await settingsPage.waitForLoadState('domcontentloaded');
       await settingsPage.waitForSelector('.settings-page-container', { timeout: 5000 });
 
-      // Act: 複数の設定を同時に更新
-      // Note: ThemeProviderは 'user_settings' キーを使用している
       const newSettings = {
         fontSize: 18,
         fontFamily: 'Consolas, monospace',
@@ -237,7 +203,6 @@ test.describe('chrome.storage API統合', () => {
         });
       }, newSettings);
 
-      // Assert: すべての設定がUIに反映される（両方を同時にチェック）
       await expect(async () => {
         const fontSizeValue = await settingsPage.locator('input#fontSize').inputValue();
         const fontFamilyValue = await settingsPage.locator('input#fontFamily').inputValue();
@@ -245,7 +210,6 @@ test.describe('chrome.storage API統合', () => {
         expect(fontFamilyValue).toContain('Consolas');
       }).toPass({ timeout: 5000 });
 
-      // クリーンアップ
       await settingsPage.close();
     });
   });
@@ -254,7 +218,6 @@ test.describe('chrome.storage API統合', () => {
     test('複数の設定項目を一括で保存した場合、トランザクション的に処理される', async ({
       serviceWorker,
     }) => {
-      // Arrange: 複数の設定項目を準備
       const multipleSettings = {
         setting1: { value: 'value1', timestamp: Date.now() },
         setting2: { value: 'value2', timestamp: Date.now() },
@@ -263,7 +226,6 @@ test.describe('chrome.storage API統合', () => {
         setting5: { value: 'value5', timestamp: Date.now() },
       };
 
-      // Act: 一括で保存
       const saveResult = await serviceWorker.evaluate(async (settings) => {
         return new Promise<{ success: boolean; error?: string }>((resolve) => {
           chrome.storage.local.set(settings, () => {
@@ -276,10 +238,8 @@ test.describe('chrome.storage API統合', () => {
         });
       }, multipleSettings);
 
-      // Assert: 保存が成功する
       expect(saveResult.success).toBe(true);
 
-      // Verify: すべての設定が保存されていることを確認
       const verifyResult = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean; data?: Record<string, unknown> }>((resolve) => {
           chrome.storage.local.get(
@@ -306,7 +266,6 @@ test.describe('chrome.storage API統合', () => {
     test('一括保存後に個別に読み込んでも整合性が保たれる', async ({
       serviceWorker,
     }) => {
-      // Arrange: テストデータを保存
       const testData = {
         config1: { id: 1, name: 'Config 1' },
         config2: { id: 2, name: 'Config 2' },
@@ -320,7 +279,6 @@ test.describe('chrome.storage API統合', () => {
         });
       }, testData);
 
-      // Act: 個別に読み込み
       const result1 = await serviceWorker.evaluate(async () => {
         return new Promise<unknown>((resolve) => {
           chrome.storage.local.get(['config1'], (result) => {
@@ -337,7 +295,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: 整合性が保たれている
       expect(result1).toEqual(testData.config1);
       expect(result2).toEqual(testData.config2);
     });
@@ -347,7 +304,6 @@ test.describe('chrome.storage API統合', () => {
     test('指定したキーのデータを削除できる', async ({
       serviceWorker,
     }) => {
-      // Arrange: データを保存
       await serviceWorker.evaluate(async () => {
         return new Promise<void>((resolve) => {
           chrome.storage.local.set({ toBeDeleted: 'value', toRemain: 'value' }, () => {
@@ -356,7 +312,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Act: 特定のキーを削除
       const removeResult = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean }>((resolve) => {
           chrome.storage.local.remove(['toBeDeleted'], () => {
@@ -369,10 +324,8 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: 削除が成功する
       expect(removeResult.success).toBe(true);
 
-      // Verify: 削除されたキーはundefined、残ったキーは値がある
       const verifyResult = await serviceWorker.evaluate(async () => {
         return new Promise<Record<string, unknown>>((resolve) => {
           chrome.storage.local.get(['toBeDeleted', 'toRemain'], (result) => {
@@ -390,7 +343,6 @@ test.describe('chrome.storage API統合', () => {
     test('すべてのデータをクリアできる', async ({
       serviceWorker,
     }) => {
-      // Arrange: 複数のデータを保存
       await serviceWorker.evaluate(async () => {
         return new Promise<void>((resolve) => {
           chrome.storage.local.set(
@@ -406,7 +358,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Act: すべてのデータをクリア
       const clearResult = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean }>((resolve) => {
           chrome.storage.local.clear(() => {
@@ -419,10 +370,8 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: クリアが成功する
       expect(clearResult.success).toBe(true);
 
-      // Verify: すべてのデータが削除されている
       const verifyResult = await serviceWorker.evaluate(async () => {
         return new Promise<Record<string, unknown>>((resolve) => {
           chrome.storage.local.get(['clearTest1', 'clearTest2', 'clearTest3'], (result) => {
@@ -441,7 +390,6 @@ test.describe('chrome.storage API統合', () => {
     test('chrome.storage.local.getBytesInUse()で使用容量を取得できる', async ({
       serviceWorker,
     }) => {
-      // Arrange: データを保存
       await serviceWorker.evaluate(async () => {
         return new Promise<void>((resolve) => {
           chrome.storage.local.set({ bytesTestData: 'Some test data for bytes calculation' }, () => {
@@ -450,7 +398,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Act: 使用容量を取得
       const bytesResult = await serviceWorker.evaluate(async () => {
         return new Promise<{ success: boolean; bytes?: number }>((resolve) => {
           chrome.storage.local.getBytesInUse(['bytesTestData'], (bytes) => {
@@ -463,7 +410,6 @@ test.describe('chrome.storage API統合', () => {
         });
       });
 
-      // Assert: 使用容量が取得できる
       expect(bytesResult.success).toBe(true);
       expect(bytesResult.bytes).toBeGreaterThan(0);
     });

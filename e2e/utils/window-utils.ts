@@ -1,8 +1,3 @@
-/**
- * WindowTestUtils
- *
- * マルチウィンドウ操作とクロスウィンドウドラッグ&ドロップ検証のヘルパー関数
- */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 export type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
@@ -30,7 +25,6 @@ async function getServiceWorker(context: BrowserContext): Promise<Worker> {
 export async function createWindow(context: BrowserContext): Promise<number> {
   const serviceWorker = await getServiceWorker(context);
 
-  // Service Workerコンテキストでchrome.windows.create()を実行
   const window = await serviceWorker.evaluate(() => {
     return chrome.windows.create({
       focused: false,
@@ -40,7 +34,6 @@ export async function createWindow(context: BrowserContext): Promise<number> {
 
   const windowId = window.id as number;
 
-  // ウィンドウがChrome内部状態に完全に登録されるまでポーリングで待機
   await serviceWorker.evaluate(async (windowId: number) => {
     for (let i = 0; i < 50; i++) {
       try {
@@ -73,7 +66,6 @@ export async function moveTabToWindow(
 ): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  // ツリー構造を取得して、移動するタブとその子孫を特定
   const tabIdsToMove = await serviceWorker.evaluate(
     async ({ tabId }) => {
       interface TabNode {
@@ -90,7 +82,6 @@ export async function moveTabToWindow(
       const treeState = result.tree_state as TreeState | undefined;
 
       if (!treeState?.nodes || !treeState?.tabToNode) {
-        // ツリー構造がない場合は単一タブのみ移動
         return [tabId];
       }
 
@@ -99,14 +90,12 @@ export async function moveTabToWindow(
         return [tabId];
       }
 
-      // parentIdを使用して子孫タブを再帰的に収集
       const collectDescendants = (parentNodeId: string): number[] => {
         const parentNode = treeState.nodes[parentNodeId];
         if (!parentNode) return [];
 
         const tabIds: number[] = [parentNode.tabId];
 
-        // すべてのノードを走査して、このノードを親とするノードを見つける
         for (const [childNodeId, childNode] of Object.entries(treeState.nodes)) {
           if (childNode.parentId === parentNodeId) {
             tabIds.push(...collectDescendants(childNodeId));
@@ -121,20 +110,18 @@ export async function moveTabToWindow(
     { tabId }
   );
 
-  // 親タブから順番にすべてのタブを移動
   for (const id of tabIdsToMove) {
     await serviceWorker.evaluate(
       ({ tabId, windowId }) => {
         return chrome.tabs.move(tabId, {
           windowId,
-          index: -1, // ウィンドウの最後に配置
+          index: -1,
         });
       },
       { tabId: id, windowId }
     );
   }
 
-  // すべてのタブが指定ウィンドウに移動完了するまでポーリングで待機
   await serviceWorker.evaluate(
     async ({ tabIds, windowId }) => {
       for (let i = 0; i < 50; i++) {
@@ -172,7 +159,6 @@ export async function assertWindowTreeSync(
 ): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  // ウィンドウのタブがストレージに同期されるまでポーリングで待機
   await serviceWorker.evaluate(async (windowId: number) => {
     for (let i = 0; i < 50; i++) {
       try {
@@ -182,7 +168,6 @@ export async function assertWindowTreeSync(
 
         const tabToNode = treeState?.tabToNode;
         if (tabToNode && tabs.length > 0) {
-          // すべてのタブがツリー状態に存在することを確認
           const allTabsSynced = tabs.every(
             (tab: chrome.tabs.Tab) => tab.id && tabToNode[tab.id]
           );
@@ -197,7 +182,6 @@ export async function assertWindowTreeSync(
     }
   }, windowId);
 
-  // 最終的にタブが存在することを確認
   const tabs = await serviceWorker.evaluate((windowId) => {
     return chrome.tabs.query({ windowId });
   }, windowId);
@@ -223,10 +207,8 @@ export async function openSidePanelForWindow(
 ): Promise<Page> {
   const serviceWorker = await getServiceWorker(context);
 
-  // Extension IDを取得
   const extensionId = serviceWorker.url().split('/')[2];
 
-  // ウィンドウをアクティブにする
   await serviceWorker.evaluate(
     ({ windowId }) => {
       return chrome.windows.update(windowId, { focused: true });
@@ -234,22 +216,13 @@ export async function openSidePanelForWindow(
     { windowId }
   );
 
-  // 少し待機してウィンドウのフォーカスが確定するのを待つ
   await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 200)));
 
-  // 新しいページを作成し、サイドパネルURLを開く
-  // サイドパネルは現在アクティブなウィンドウに対応するため、
-  // windowIdをクエリパラメータとして渡してウィンドウを特定する
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
 
-  // DOMContentLoadedイベントを待機
   await page.waitForLoadState('domcontentloaded');
-
-  // Reactのルート要素が表示されるまで待機
   await page.waitForSelector('#root', { timeout: 5000 });
-
-  // Side Panelのルート要素が安定するまで待機
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
 
   return page;

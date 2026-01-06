@@ -1,26 +1,9 @@
-/**
- * 未読インジケーター復元時制御のE2Eテスト
- *
- * - ブラウザ復元時のタブに未読インジケーターを表示しない
- * - 復元されたタブがアクティブ化された後に非アクティブになった場合、通常の未読判定ルールに従う
- *
- * 注: このテストは未読インジケーターの表示状態を検証するものであり、
- * 標準の初期化パターン（デフォルトタブを閉じる）を使用していない。
- * 起動時の既存タブの挙動をテストするため、意図的にこの形式を採用している。
- */
 import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
 import { createTab, activateTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 extensionTest.describe('未読インジケーター復元時制御', () => {
-  /**
-   * ブラウザを再起動してタブが復元された場合、復元されたタブに未読インジケーターを表示しないこと
-   *
-   * テスト方法:
-   * - Side Panel初期化時点で存在する初期タブに未読バッジが表示されていないことを確認
-   * - 初期タブは「復元されたタブ」と同等の扱い（起動完了前に存在していたタブ）
-   */
   extensionTest(
     'ブラウザ起動時の既存タブに未読インジケーターが表示されない',
     async ({ extensionContext, sidePanelPage }) => {
@@ -80,16 +63,6 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
     }
   );
 
-  /**
-   * 復元されたタブがアクティブ化された後に非アクティブになった場合、通常の未読判定ルールに従うこと
-   *
-   * テスト方法:
-   * 1. 起動完了後にバックグラウンドで新しいタブを作成（未読になるはず）
-   * 2. そのタブをアクティブ化（既読になる）
-   * 3. 別のタブに切り替え
-   * 4. バックグラウンドでコンテンツが更新された場合に再度未読になるか確認
-   *    （注: この部分はコンテンツ更新の検出機能に依存するため、ここでは単純化）
-   */
   extensionTest(
     '起動完了後に作成されたバックグラウンドタブに未読インジケーターが表示される',
     async ({ extensionContext, sidePanelPage, serviceWorker }) => {
@@ -137,9 +110,6 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
     }
   );
 
-  /**
-   * 起動完了後にタブをアクティブ化すると未読が解除されることを確認
-   */
   extensionTest(
     '起動完了後のタブをアクティブ化すると未読インジケーターが消える',
     async ({ extensionContext, sidePanelPage, serviceWorker }) => {
@@ -197,9 +167,6 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
     }
   );
 
-  /**
-   * 複数のバックグラウンドタブを同時に作成した場合も正しく未読インジケーターが表示されることを確認
-   */
   extensionTest(
     '複数のバックグラウンドタブを同時に作成した場合も正しく未読インジケーターが表示される',
     async ({ extensionContext, sidePanelPage, serviceWorker }) => {
@@ -267,9 +234,6 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
     }
   );
 
-  /**
-   * アクティブとして作成されたタブには未読インジケーターが表示されないことを確認
-   */
   extensionTest(
     'アクティブとして作成されたタブには未読インジケーターが表示されない',
     async ({ extensionContext, sidePanelPage, serviceWorker }) => {

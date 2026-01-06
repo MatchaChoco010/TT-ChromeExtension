@@ -17,7 +17,6 @@ interface SidePanelRootProps {
   children?: React.ReactNode;
 }
 
-// ツリービューを表示するコンポーネント
 const TreeViewContent: React.FC = () => {
   const {
     treeState,
@@ -46,13 +45,10 @@ const TreeViewContent: React.FC = () => {
     currentWindowId,
   } = useTreeState();
 
-  // サイドパネル境界参照（ドラッグアウト判定に使用）
   const sidePanelRef = useRef<HTMLDivElement>(null);
 
-  // 他のウィンドウ一覧（コンテキストメニュー用）
   const [otherWindows, setOtherWindows] = useState<WindowInfo[]>([]);
 
-  // 他のウィンドウ一覧を取得
   useEffect(() => {
     const fetchOtherWindows = async () => {
       if (currentWindowId === null) return;
@@ -77,7 +73,6 @@ const TreeViewContent: React.FC = () => {
 
     fetchOtherWindows();
 
-    // ウィンドウイベントリスナー
     const handleWindowCreated = () => {
       fetchOtherWindows();
     };
@@ -99,10 +94,8 @@ const TreeViewContent: React.FC = () => {
     };
   }, [currentWindowId]);
 
-  // タブを別のウィンドウに移動するハンドラ
   const handleMoveToWindow = useCallback(async (targetWindowId: number, tabIds: number[]) => {
     try {
-      // サブツリーごと移動
       for (const tabId of tabIds) {
         await chrome.runtime.sendMessage({
           type: 'MOVE_SUBTREE_TO_WINDOW',
@@ -114,7 +107,6 @@ const TreeViewContent: React.FC = () => {
     }
   }, []);
 
-  // スナップショット取得ハンドラ
   const handleSnapshot = useCallback(async () => {
     try {
       const snapshotManager = new SnapshotManager(indexedDBService, storageService);
@@ -126,7 +118,6 @@ const TreeViewContent: React.FC = () => {
     }
   }, []);
 
-  // タブをグループに追加するハンドラ
   const handleAddToGroup = useCallback((groupId: string, tabIds: number[]) => {
     if (!treeState) return;
     for (const tabId of tabIds) {
@@ -138,14 +129,12 @@ const TreeViewContent: React.FC = () => {
   }, [treeState, addTabToGroup]);
 
   const handleNodeClick = (tabId: number) => {
-    // タブをアクティブ化
     chrome.tabs.update(tabId, { active: true });
   };
 
   const handleToggleExpand = (nodeId: string) => {
     if (!treeState) return;
 
-    // ノードの展開状態をトグル
     const updatedNodes = { ...treeState.nodes };
     const node = updatedNodes[nodeId];
     if (node) {
@@ -154,13 +143,11 @@ const TreeViewContent: React.FC = () => {
     }
   };
 
-  // ノードをツリー構造に変換（ピン留めタブを除外、現在のウィンドウのみ表示）
   const buildTree = (): TabNode[] => {
     if (!treeState) return [];
 
     const pinnedTabIdSet = new Set(pinnedTabIds);
 
-    // 現在のウィンドウに属するタブのIDセットを作成
     const currentWindowTabIds = new Set<number>();
     const shouldFilterByWindow = currentWindowId !== null;
     if (shouldFilterByWindow) {
@@ -171,16 +158,12 @@ const TreeViewContent: React.FC = () => {
       });
     }
 
-    // 各ノードに対して children 配列を再構築（ピン留めタブと他ウィンドウのタブを除外）
     const nodesWithChildren: Record<string, TabNode> = {};
 
-    // すべてのノードのコピーを作成（children は空配列で初期化）
     Object.entries(treeState.nodes).forEach(([id, node]) => {
-      // ピン留めタブは除外
       if (pinnedTabIdSet.has(node.tabId)) {
         return;
       }
-      // 現在のウィンドウに属さないタブを除外（グループノード（tabId < 0）は除く）
       if (shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId)) {
         return;
       }
@@ -190,23 +173,18 @@ const TreeViewContent: React.FC = () => {
       };
     });
 
-    // 親子関係を構築（元のchildren配列の順序を維持）
     Object.entries(treeState.nodes).forEach(([parentId, parentNode]) => {
-      // 親ノードがnodesWithChildrenに存在しない場合はスキップ
       if (!nodesWithChildren[parentId]) {
         return;
       }
-      // 元のchildren配列の順序で子ノードを追加
       for (const child of parentNode.children) {
         const childId = child.id;
-        // 子ノードがnodesWithChildrenに存在する場合のみ追加
         if (nodesWithChildren[childId]) {
           nodesWithChildren[parentId].children.push(nodesWithChildren[childId]);
         }
       }
     });
 
-    // ルートノードのみを返す
     const rootNodes: TabNode[] = [];
     Object.values(nodesWithChildren).forEach((node) => {
       if (!node.parentId) {
@@ -214,7 +192,6 @@ const TreeViewContent: React.FC = () => {
       }
     });
 
-    // ブラウザタブのインデックス順でソート
     rootNodes.sort((a, b) => {
       const indexA = tabInfoMap[a.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
       const indexB = tabInfoMap[b.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
@@ -226,12 +203,10 @@ const TreeViewContent: React.FC = () => {
 
   const nodes = buildTree();
 
-  // ピン留めタブのクリックハンドラ
   const handlePinnedTabClick = (tabId: number) => {
     chrome.tabs.update(tabId, { active: true });
   };
 
-  // ピン留めタブのコンテキストメニュー機能
   const [pinnedContextMenu, setPinnedContextMenu] = useState<{
     tabId: number;
     position: { x: number; y: number };
@@ -256,7 +231,6 @@ const TreeViewContent: React.FC = () => {
     }
   }, [pinnedContextMenu, tabInfoMap, executeAction, handleSnapshot]);
 
-  // ツリー外ドロップで新規ウィンドウ作成（サブツリーごと移動、空ウィンドウは自動クローズ）
   const handleExternalDrop = useCallback((tabId: number) => {
     chrome.runtime.sendMessage({
       type: 'CREATE_WINDOW_WITH_SUBTREE',
@@ -266,7 +240,6 @@ const TreeViewContent: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-gray-900">
-        {/* ビュースイッチャー */}
         {treeState && (
           <ViewSwitcher
             views={treeState.views}
@@ -278,7 +251,6 @@ const TreeViewContent: React.FC = () => {
             onViewUpdate={updateView}
           />
         )}
-        {/* ピン留めタブセクション */}
         <PinnedTabsSection
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
@@ -287,7 +259,6 @@ const TreeViewContent: React.FC = () => {
           activeTabId={activeTabId}
           onPinnedTabReorder={handlePinnedTabReorder}
         />
-        {/* ピン留めタブのコンテキストメニュー */}
         {pinnedContextMenu && (
           <ContextMenu
             targetTabIds={[pinnedContextMenu.tabId]}
@@ -301,7 +272,6 @@ const TreeViewContent: React.FC = () => {
             onMoveToWindow={handleMoveToWindow}
           />
         )}
-        {/* タブツリービュー */}
         <div ref={sidePanelRef} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
           <TabTreeView
             nodes={nodes}
@@ -329,14 +299,12 @@ const TreeViewContent: React.FC = () => {
             onExternalDrop={handleExternalDrop}
             sidePanelRef={sidePanelRef}
           />
-          {/* 新規タブ追加ボタン */}
           <NewTabButton />
         </div>
       </div>
   );
 };
 
-// ローディング状態を表示するコンポーネント
 const LoadingWrapper: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {

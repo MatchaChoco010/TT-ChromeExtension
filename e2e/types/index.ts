@@ -5,7 +5,6 @@
  * evaluate() 内では使用できないが、戻り値のキャストに使用する
  */
 
-// メインの型定義を再エクスポート
 export type {
   TabNode,
   TreeState,
@@ -77,9 +76,6 @@ export interface E2ETabNode {
   groupId?: string;
 }
 
-/**
- * Group 型を再定義
- */
 export interface E2EGroup {
   id: string;
   name: string;
@@ -87,10 +83,8 @@ export interface E2EGroup {
   isExpanded: boolean;
 }
 
-// TreeState をインポートして E2ETreeState と互換性を保つ
 import type { TreeState } from '../../src/types';
 
-// 型ガード関数
 export function isTreeState(value: unknown): value is TreeState {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
@@ -109,7 +103,6 @@ export function isTreeState(value: unknown): value is TreeState {
 declare global {
   interface Window extends TestGlobals {}
 
-  // globalThis用の型拡張
   // eslint-disable-next-line no-var
   var receivedMessages: TestGlobals['receivedMessages'];
   // eslint-disable-next-line no-var

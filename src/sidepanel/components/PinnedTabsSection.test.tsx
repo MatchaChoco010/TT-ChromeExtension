@@ -21,8 +21,8 @@ describe('PinnedTabsSection', () => {
     status: 'complete',
     isPinned,
     windowId: 1,
-    discarded: false, // 休止タブ状態
-    index, // ピン留めタブの順序同期
+    discarded: false,
+    index,
   });
 
   beforeEach(() => {
@@ -114,7 +114,6 @@ describe('PinnedTabsSection', () => {
 
       const separator = screen.getByTestId('pinned-tabs-separator');
       expect(separator).toBeInTheDocument();
-      // 区切り線はborder-b classを持つ
       expect(separator).toHaveClass('border-b');
     });
   });

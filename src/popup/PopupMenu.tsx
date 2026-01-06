@@ -1,17 +1,5 @@
-/**
- * PopupMenuコンポーネント
- * ポップアップメニューを新規作成
- * スナップショット取得ボタンを追加
- *
- * ブラウザツールバーの拡張機能アイコンをクリックした際に表示されるポップアップメニュー。
- * 「設定を開く」ボタンと「スナップショットを取得」ボタンを提供する。
- */
 import React, { useState } from 'react';
 
-/**
- * 設定アイコンのSVGコンポーネント
- * lucide-reactの代わりにSVGを直接定義
- */
 const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     className={className}
@@ -27,9 +15,6 @@ const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-/**
- * カメラアイコンのSVGコンポーネント（スナップショット用）
- */
 const CameraIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     className={className}
@@ -45,30 +30,15 @@ const CameraIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-/**
- * スナップショット取得の状態
- */
 type SnapshotStatus = 'idle' | 'loading' | 'success' | 'error';
 
-/**
- * ポップアップメニューコンポーネント
- * 拡張機能アイコンクリック時に表示されるメニューUI
- */
 export const PopupMenu: React.FC = () => {
   const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus>('idle');
 
-  /**
-   * 設定ページを開く
-   * chrome.runtime.openOptionsPage()を使用してOptions Pageを新規タブで開く
-   */
   const handleOpenSettings = () => {
     chrome.runtime.openOptionsPage();
   };
 
-  /**
-   * スナップショットを取得
-   * Service Workerにメッセージを送信してスナップショットを作成
-   */
   const handleCreateSnapshot = async () => {
     setSnapshotStatus('loading');
     try {
@@ -83,9 +53,6 @@ export const PopupMenu: React.FC = () => {
     }
   };
 
-  /**
-   * スナップショットボタンのテキストを取得
-   */
   const getSnapshotButtonText = (): string => {
     switch (snapshotStatus) {
       case 'loading':

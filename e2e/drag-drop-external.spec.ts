@@ -1,17 +1,3 @@
-/**
- * ツリービュー外へのドラッグ&ドロップテスト
- *
- * - ドラッグアウトシナリオを自前D&D用に再実装
- * - サイドパネル内外の両ケースを検証
- *
- * このテストスイートでは、以下を検証します:
- * 1. タブをサイドパネル外にドロップした際に新しいウィンドウが作成されること
- * 2. ドロップしたタブが新しいウィンドウに正確に移動されること
- * 3. 子タブを持つ親タブをドラッグアウトした場合、サブツリー全体が移動すること
- * 4. サイドパネル内の空白領域へのドラッグでは新規ウィンドウを作成しないこと
- *
- * Note: ヘッドレスモードで実行すること（npm run test:e2e）
- */
 import { test } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { dragOutside, startDrag, moveTo, dropTab } from './utils/drag-drop-utils';
@@ -109,22 +95,6 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
     await assertWindowExists(extensionContext, newWindowId);
   });
 
-  /**
-   * Note: サブツリー全体の移動テストは Phase 3 (クロスウィンドウ機能) で実装予定
-   * 現在の実装では TreeStateManager.getSubtree() がメモリ上の children 配列を
-   * 正しく構築できていないため、サブツリー移動が機能していない。
-   * この問題は Phase 3 のタスク 13.1-13.3 で修正される予定。
-   *
-   * 参照: docs/specs/tab-tree-bugfix-2/tasks.md - Phase 3
-   */
-
-  /**
-   * ドラッグアウト判定の修正
-   * サイドパネル内の空白領域（タブツリー下部）へのドラッグでは新規ウィンドウを作成しない
-   *
-   * このテストでは、タブをサイドパネル内の空白領域（タブツリー下部）にドラッグした場合、
-   * 新規ウィンドウが作成されず、タブが元のウィンドウに留まることを検証します。
-   */
   test('サイドパネル内の空白領域（タブツリー下部）へのドラッグでは新規ウィンドウを作成しないこと', async ({
     extensionContext,
     sidePanelPage,

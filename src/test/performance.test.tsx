@@ -1,10 +1,5 @@
 /**
  * パフォーマンステスト
- *
- * このテストファイルは以下のパフォーマンス要件を検証します:
- * - 100タブ以上でのレンダリング性能を測定（目標: 500ms以内）
- * - ドラッグ中のフレームレート測定（目標: 60fps維持）
- * - IndexedDB操作の性能測定（目標: 100ms以内）
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -13,7 +8,6 @@ import SidePanelRoot from '@/sidepanel/components/SidePanelRoot';
 import { IndexedDBService } from '@/storage/IndexedDBService';
 import type { TabNode, Snapshot } from '@/types';
 
-// パフォーマンス測定用のヘルパー関数
 function measurePerformance(fn: () => void | Promise<void>): number {
   const start = performance.now();
   fn();
@@ -28,7 +22,6 @@ async function measureAsyncPerformance(fn: () => Promise<void>): Promise<number>
   return end - start;
 }
 
-// 大量のタブデータを生成するヘルパー関数
 function generateMockTabs(count: number): TabNode[] {
   const tabs: TabNode[] = [];
   for (let i = 0; i < count; i++) {
@@ -50,7 +43,6 @@ describe('パフォーマンステスト', () => {
     it('100タブのレンダリングが500ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(100);
 
-      // Chrome API のモック
       const chromeMock = {
         runtime: {
           sendMessage: vi.fn().mockResolvedValue({
@@ -177,7 +169,6 @@ describe('パフォーマンステスト', () => {
         });
       });
 
-      // 200タブなので少し余裕を持たせる
       expect(renderTime).toBeLessThan(1000);
     });
   });
@@ -273,26 +264,18 @@ describe('パフォーマンステスト', () => {
 
   describe('ドラッグ&ドロップのパフォーマンス', () => {
     it('ドラッグ操作中のフレームレートが60fps（16.67ms以下）を維持すること', () => {
-      // ドラッグ中のフレーム処理時間をシミュレート
       const mockTabs = generateMockTabs(100);
       let frameCount = 0;
       let totalFrameTime = 0;
 
-      // 60フレーム分（1秒間）のドラッグ操作をシミュレート
       for (let i = 0; i < 60; i++) {
         const frameTime = measurePerformance(() => {
-          // ドラッグ中に実行される処理をシミュレート
-          // - ドラッグ位置の更新
-          // - ホバー検出
-          // - ドロップライン表示の計算
           const draggedNodeId = `node-${i % 100}`;
           const hoveredNodeId = `node-${(i + 1) % 100}`;
 
-          // ノード検索
           mockTabs.find((tab) => tab.id === draggedNodeId);
           mockTabs.find((tab) => tab.id === hoveredNodeId);
 
-          // ツリー構造の再計算（簡易版）
           const newTree = [...mockTabs];
           newTree.sort((a, b) => a.depth - b.depth);
         });
@@ -302,7 +285,7 @@ describe('パフォーマンステスト', () => {
       }
 
       const averageFrameTime = totalFrameTime / frameCount;
-      const targetFrameTime = 1000 / 60; // 60fps = 16.67ms per frame
+      const targetFrameTime = 1000 / 60; // ms
 
       expect(averageFrameTime).toBeLessThan(targetFrameTime);
     });
@@ -321,19 +304,16 @@ describe('パフォーマンステスト', () => {
       };
       vi.stubGlobal('chrome', chromeMock);
 
-      // 100回の連続した書き込みをシミュレート
       const writeOperations = Array.from({ length: 100 }, (_, i) => ({
         key: 'tree_state',
         value: { updateCount: i },
       }));
 
       const totalTime = await measureAsyncPerformance(async () => {
-        // デバウンス処理をシミュレート（最後の書き込みのみ実行）
         await new Promise((resolve) => setTimeout(resolve, 10));
         await mockStorage.set(writeOperations[writeOperations.length - 1].key, writeOperations[writeOperations.length - 1].value);
       });
 
-      // デバウンスにより1回の書き込みに集約されることを確認
       expect(mockStorage.set).toHaveBeenCalledTimes(1);
       expect(totalTime).toBeLessThan(50);
     });

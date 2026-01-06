@@ -38,7 +38,6 @@ export class SnapshotManager {
     name: string,
     isAutoSave: boolean = false,
   ): Promise<Snapshot> {
-    // 現在の状態を取得
     const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
     const groupsRecord = await this.storageService.get(STORAGE_KEYS.GROUPS);
 
@@ -46,20 +45,16 @@ export class SnapshotManager {
       throw new Error('Tree state not found');
     }
 
-    // ビューを取得
     const views: View[] = treeState.views || [];
 
-    // グループを取得
     const groups: Group[] = groupsRecord
       ? Object.values(groupsRecord)
       : [];
 
-    // タブスナップショットを作成
     const tabs: TabSnapshot[] = await this.createTabSnapshots(
       treeState.nodes,
     );
 
-    // スナップショットオブジェクトを作成
     const snapshot: Snapshot = {
       id: this.generateSnapshotId(),
       createdAt: new Date(),
@@ -72,7 +67,6 @@ export class SnapshotManager {
       },
     };
 
-    // IndexedDBに保存
     await this.indexedDBService.saveSnapshot(snapshot);
 
     return snapshot;
@@ -85,18 +79,13 @@ export class SnapshotManager {
    * @param snapshotId - 復元するスナップショットのID
    */
   async restoreSnapshot(snapshotId: string): Promise<void> {
-    // スナップショットを取得
     const snapshot = await this.indexedDBService.getSnapshot(snapshotId);
 
     if (!snapshot) {
       throw new Error('Snapshot not found');
     }
 
-    // タブを復元
     await this.restoreTabsFromSnapshot(snapshot.data.tabs);
-
-    // ビューを復元（将来実装）
-    // グループを復元（将来実装）
   }
 
   /**
@@ -130,7 +119,6 @@ export class SnapshotManager {
       throw new Error('Snapshot not found');
     }
 
-    // Date を ISO文字列に変換してシリアライズ可能にする
     const exportData = {
       ...snapshot,
       createdAt: snapshot.createdAt.toISOString(),
@@ -148,13 +136,11 @@ export class SnapshotManager {
   async importSnapshot(jsonData: string): Promise<Snapshot> {
     const parsed = JSON.parse(jsonData);
 
-    // Date オブジェクトに変換
     const snapshot: Snapshot = {
       ...parsed,
       createdAt: new Date(parsed.createdAt),
     };
 
-    // IndexedDBに保存
     await this.indexedDBService.saveSnapshot(snapshot);
 
     return snapshot;
@@ -171,11 +157,9 @@ export class SnapshotManager {
   ): Promise<TabSnapshot[]> {
     const tabSnapshots: TabSnapshot[] = [];
 
-    // chrome.tabs APIでタブ情報を取得
     const tabs = await chrome.tabs.query({});
     const tabMap = new Map(tabs.map((tab) => [tab.id, tab]));
 
-    // 各ノードからスナップショットを作成
     for (const node of Object.values(nodes)) {
       const tab = tabMap.get(node.tabId);
 
@@ -200,7 +184,6 @@ export class SnapshotManager {
   private async restoreTabsFromSnapshot(
     tabs: TabSnapshot[],
   ): Promise<void> {
-    // タブを順番に作成
     for (const tabSnapshot of tabs) {
       await chrome.tabs.create({
         url: tabSnapshot.url,
@@ -229,31 +212,25 @@ export class SnapshotManager {
    * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
    */
   startAutoSnapshot(intervalMinutes: number, maxSnapshots?: number): void {
-    // 既存のアラームとリスナーをクリア
     chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
     if (this.alarmListener) {
       chrome.alarms.onAlarm.removeListener(this.alarmListener);
       this.alarmListener = null;
     }
 
-    // maxSnapshotsを保存
     this.currentMaxSnapshots = maxSnapshots;
 
-    // intervalが0の場合は無効化（アラームを作成しない）
     if (intervalMinutes === 0) {
       return;
     }
 
-    // アラームリスナーを作成
     this.alarmListener = async (alarm: chrome.alarms.Alarm) => {
       if (alarm.name === SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME) {
         try {
-          // 自動スナップショットを作成
           const timestamp = new Date().toISOString().split('T')[0];
           const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
           await this.createSnapshot(name, true);
 
-          // 最大保持数を超えた古いスナップショットを自動削除
           if (this.currentMaxSnapshots && this.currentMaxSnapshots > 0) {
             try {
               await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
@@ -267,10 +244,8 @@ export class SnapshotManager {
       }
     };
 
-    // アラームリスナーを登録
     chrome.alarms.onAlarm.addListener(this.alarmListener);
 
-    // アラームを作成
     chrome.alarms.create(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME, {
       periodInMinutes: intervalMinutes,
     });
@@ -284,7 +259,6 @@ export class SnapshotManager {
    * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
    */
   updateAutoSnapshotSettings(intervalMinutes: number, maxSnapshots?: number): void {
-    // startAutoSnapshotを呼び出して設定を再適用
     this.startAutoSnapshot(intervalMinutes, maxSnapshots);
   }
 
@@ -292,10 +266,8 @@ export class SnapshotManager {
    * 自動スナップショット機能を停止
    */
   async stopAutoSnapshot(): Promise<void> {
-    // アラームをクリア
     await chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
 
-    // リスナーを削除
     if (this.alarmListener) {
       chrome.alarms.onAlarm.removeListener(this.alarmListener);
       this.alarmListener = null;

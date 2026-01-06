@@ -1,11 +1,5 @@
 /**
  * エラーハンドリングとエッジケースのテスト
- *
- * このテストファイルは以下のエラーハンドリングをカバー:
- * - タブAPI失敗時の挙動確認
- * - ストレージ容量超過時の警告表示確認
- * - 循環参照検出の動作確認
- * - カスタムCSSエラー時のフォールバック確認
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -27,11 +21,9 @@ describe('エラーハンドリングとエッジケース', () => {
     });
 
     it('chrome.tabs.get が失敗してもクラッシュしない', async () => {
-      // タブ取得APIをモック（エラーを投げる）
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.tabs.get).mockRejectedValue(new Error('Tab not found'));
 
-      // エラーが発生しても例外を投げないことを確認
       await expect(async () => {
         try {
           await chrome.tabs.get(999);
@@ -64,11 +56,9 @@ describe('エラーハンドリングとエッジケース', () => {
 
       await treeStateManager.addTab(tab, null, 'view-1');
 
-      // moveNode が失敗しても状態が壊れないことを確認
       const nodeBeforeMove = treeStateManager.getNodeByTabId(1);
       expect(nodeBeforeMove).not.toBeNull();
 
-      // moveNodeを呼び出しても失敗を適切にハンドリング
       try {
         await treeStateManager.moveNode('node-1', null, 0);
       } catch (error) {
@@ -76,7 +66,6 @@ describe('エラーハンドリングとエッジケース', () => {
         expect(error).toBeDefined();
       }
 
-      // ノードは依然として存在する
       const nodeAfterMove = treeStateManager.getNodeByTabId(1);
       expect(nodeAfterMove).not.toBeNull();
     });
@@ -118,8 +107,6 @@ describe('エラーハンドリングとエッジケース', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.storage.local.set).mockRejectedValue(quotaError);
 
-      // 大きなデータを保存しようとする
-      // 実際の型に関係なく、set が呼ばれたことで reject されることを確認
       const largeData = {
         views: Array(1000).fill({
           id: 'view-1',
@@ -140,7 +127,6 @@ describe('エラーハンドリングとエッジケース', () => {
       const { IndexedDBService } = await import('@/storage/IndexedDBService');
       const idbService = new IndexedDBService();
 
-      // 大量のスナップショットを保存しようとする
       const largeSnapshot = {
         id: 'snapshot-1',
         createdAt: new Date(),
@@ -153,8 +139,6 @@ describe('エラーハンドリングとエッジケース', () => {
         },
       };
 
-      // 実際のIndexedDB操作は成功すると仮定し、容量チェックのみテスト
-      // （実環境では容量制限に達する可能性がある）
       try {
         await idbService.saveSnapshot(largeSnapshot);
       } catch (_error: unknown) {
@@ -171,14 +155,12 @@ describe('エラーハンドリングとエッジケース', () => {
       storageService = new StorageService();
       treeStateManager = new TreeStateManager(storageService);
 
-      // ストレージAPIをモック
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.storage.local.get).mockResolvedValue({});
       vi.mocked(mockChrome.storage.local.set).mockResolvedValue(undefined);
     });
 
     it('親ノードを自分の子として移動しようとした場合、操作をキャンセル', async () => {
-      // ノードツリーを構築: A -> B -> C
       const tabA: chrome.tabs.Tab = {
         id: 1,
         index: 0,
@@ -221,11 +203,10 @@ describe('エラーハンドリングとエッジケース', () => {
         groupId: -1,
       };
 
-      await treeStateManager.addTab(tabA, null, 'view-1'); // A (root)
-      await treeStateManager.addTab(tabB, 'node-1', 'view-1'); // B (child of A)
-      await treeStateManager.addTab(tabC, 'node-2', 'view-1'); // C (child of B)
+      await treeStateManager.addTab(tabA, null, 'view-1');
+      await treeStateManager.addTab(tabB, 'node-1', 'view-1');
+      await treeStateManager.addTab(tabC, 'node-2', 'view-1');
 
-      // 構造を確認: A -> B -> C
       const nodeA = treeStateManager.getNodeByTabId(1);
       const nodeB = treeStateManager.getNodeByTabId(2);
       const nodeC = treeStateManager.getNodeByTabId(3);
@@ -234,17 +215,14 @@ describe('エラーハンドリングとエッジケース', () => {
       expect(nodeB?.parentId).toBe('node-1');
       expect(nodeC?.parentId).toBe('node-2');
 
-      // A を C の子に移動しようとする（これは循環参照になる）
-      // TreeStateManager は循環参照を検出し、操作をキャンセルする
       await treeStateManager.moveNode('node-1', 'node-3', 0);
 
-      // 元の構造が維持されていることを確認（循環参照が防止された証拠）
       const nodeAAfter = treeStateManager.getNodeByTabId(1);
-      expect(nodeAAfter?.parentId).toBeNull(); // A は依然としてルート
+      expect(nodeAAfter?.parentId).toBeNull();
       const nodeBAfter = treeStateManager.getNodeByTabId(2);
-      expect(nodeBAfter?.parentId).toBe('node-1'); // B は依然として A の子
+      expect(nodeBAfter?.parentId).toBe('node-1');
       const nodeCAfter = treeStateManager.getNodeByTabId(3);
-      expect(nodeCAfter?.parentId).toBe('node-2'); // C は依然として B の子
+      expect(nodeCAfter?.parentId).toBe('node-2');
     });
 
     it('ノードを自分自身の親にしようとした場合、操作をキャンセル', async () => {
@@ -264,22 +242,14 @@ describe('エラーハンドリングとエッジケース', () => {
 
       await treeStateManager.addTab(tab, null, 'view-1');
 
-      // 自分自身を親にしようとする（循環参照の特殊ケース）
       await treeStateManager.moveNode('node-1', 'node-1', 0);
 
-      // 元の構造が維持されていることを確認（自己参照が防止された証拠）
       const node = treeStateManager.getNodeByTabId(1);
-      expect(node?.parentId).toBeNull(); // 親は依然としてnull
+      expect(node?.parentId).toBeNull();
     });
 
-    // 代替テスト: 循環参照検出機能が存在することを確認
     it('TreeStateManagerに循環参照検出機能が実装されていることを確認', () => {
-      // isDescendantメソッドが実装されていることを確認
-      // （privateメソッドなので直接テストはできないが、コードレビューで確認済み）
       expect(treeStateManager).toBeDefined();
-      // TreeStateManager.moveNode内で循環参照チェックが行われる
-      // 実装コード: if (newParentId && this.isDescendant(newParentId, nodeId))
-      // この機能は存在するが、現在の実装では完全に機能していない可能性がある
     });
   });
 
@@ -431,7 +401,7 @@ describe('エラーハンドリングとエッジケース', () => {
     });
 
     it('カスタムCSSエラー後、修正すればエラー通知が消える', async () => {
-      const invalidCSS = '.test { color: red'; // 閉じ括弧なし
+      const invalidCSS = '.test { color: red';
 
       const initialSettings: UserSettings = {
         fontSize: 14,
@@ -466,20 +436,17 @@ describe('エラーハンドリングとエッジケース', () => {
         );
       });
 
-      // エラー通知が表示される
       await waitFor(() => {
         const errorNotification = document.getElementById('vivaldi-tt-css-error');
         expect(errorNotification).not.toBeNull();
       });
 
-      // 修正されたCSSに更新
       const validCSS = '.test { color: red; }';
       const fixedSettings: UserSettings = {
         ...initialSettings,
         customCSS: validCSS,
       };
 
-      // ストレージ変更イベントをトリガー
       await act(async () => {
         listeners.forEach((listener) => {
           listener(
@@ -494,7 +461,6 @@ describe('エラーハンドリングとエッジケース', () => {
         });
       });
 
-      // エラー通知が消えることを確認
       await waitFor(() => {
         const errorNotification = document.getElementById('vivaldi-tt-css-error');
         expect(errorNotification).toBeNull();

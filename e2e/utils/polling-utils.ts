@@ -11,7 +11,6 @@
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 import { expect } from '@playwright/test';
-// Window型拡張を適用するためのインポート
 import '../types';
 
 /**
@@ -88,7 +87,6 @@ export async function pollInServiceWorker<T, R>(
             return { success: true };
           }
         } catch {
-          // 条件関数内のエラーは無視して続行
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -282,7 +280,6 @@ export async function waitForWindowRegistered(
             return;
           }
         } catch {
-          // エラーは無視して続行
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -320,7 +317,6 @@ export async function waitForWindowClosed(
             return;
           }
         } catch {
-          // エラーは無視して続行
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -360,7 +356,6 @@ export async function waitForTabInWindow(
             return;
           }
         } catch {
-          // エラーは無視して続行
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -406,7 +401,6 @@ export async function waitForWindowTreeSync(
             }
           }
         } catch {
-          // エラーは無視して続行
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -557,7 +551,6 @@ export async function pollInPage<T>(
             return;
           }
         } catch {
-          // 条件関数内のエラーは無視して続行
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -586,17 +579,13 @@ export async function waitForSidePanelReady(
     interval = 100,
   } = options;
 
-  // Side Panelのルート要素が表示されるまで待機
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout });
 
-  // ローディングが消えるまで待機
   try {
     await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 5000 });
   } catch {
-    // ローディングが存在しなかった場合は無視
   }
 
-  // Service Workerが準備完了するまでポーリングで待機
   const iterations = Math.ceil(timeout / interval);
   await serviceWorker.evaluate(
     async ({ iterations, interval }) => {
@@ -670,7 +659,6 @@ export async function waitForCounterIncreased(
   await page.evaluate(
     async ({ counterName, initialValue, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        // TestGlobals型で定義されたカウンタープロパティにアクセス
         const count = counterName === 'stateUpdateCount' ? window.stateUpdateCount :
                       counterName === 'receivedCount' ? window.receivedCount :
                       undefined;
@@ -699,17 +687,13 @@ export async function waitForViewSwitcher(
 ): Promise<void> {
   const { timeout = 10000 } = options;
 
-  // Side Panelのルート要素が表示されるまで待機
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout });
 
-  // ローディングが消えるまで待機
   try {
     await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 5000 });
   } catch {
-    // ローディングが存在しなかった場合は無視
   }
 
-  // ビュースイッチャーが表示されるまで待機
   await page.waitForSelector('[data-testid="view-switcher-container"]', { timeout });
 }
 
@@ -776,7 +760,6 @@ export async function waitForTabStatusComplete(
             return { success: true };
           }
         } catch {
-          // タブが見つからない場合はエラーを無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -828,7 +811,6 @@ export async function waitForCondition(
         return;
       }
     } catch {
-      // 条件関数内のエラーは無視して続行
     }
     await new Promise(resolve => setTimeout(resolve, interval));
   }

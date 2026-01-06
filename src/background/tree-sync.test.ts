@@ -1,9 +1,5 @@
-/**
- * ツリー同期とリアルタイム更新のテスト
- */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// テスト用のモック
 const mockStorageService = {
   get: vi.fn(),
   set: vi.fn(),
@@ -37,7 +33,6 @@ const mockChrome = {
   },
 };
 
-// グローバルchromeオブジェクトをモック（vi.stubGlobalを使用）
 vi.stubGlobal('chrome', mockChrome);
 
 describe('ツリー同期とリアルタイム更新', () => {
@@ -47,7 +42,6 @@ describe('ツリー同期とリアルタイム更新', () => {
 
   describe('chrome.tabs API との同期', () => {
     it('syncWithChromeTabs: 既存タブをツリー状態に同期できる', async () => {
-      // テスト用のタブを準備
       const tabs: chrome.tabs.Tab[] = [
         { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
         { id: 2, url: 'https://example.com/2', title: 'Tab 2', index: 1, openerTabId: 1, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
@@ -60,10 +54,8 @@ describe('ツリー同期とリアルタイム更新', () => {
       const { TreeStateManager } = await import('@/services/TreeStateManager');
       const manager = new TreeStateManager(mockStorageService);
 
-      // 同期を実行
       await manager.syncWithChromeTabs();
 
-      // すべてのタブがツリーに追加されたことを確認
       const node1 = manager.getNodeByTabId(1);
       const node2 = manager.getNodeByTabId(2);
       const node3 = manager.getNodeByTabId(3);
@@ -72,11 +64,9 @@ describe('ツリー同期とリアルタイム更新', () => {
       expect(node2).not.toBeNull();
       expect(node3).not.toBeNull();
 
-      // tab2がtab1の子になっていることを確認
       expect(node2?.parentId).toBe(node1?.id);
       expect(node2?.depth).toBe(1);
 
-      // tab1とtab3はルートノード
       expect(node1?.parentId).toBeNull();
       expect(node3?.parentId).toBeNull();
     });
@@ -92,16 +82,13 @@ describe('ツリー同期とリアルタイム更新', () => {
       const { TreeStateManager } = await import('@/services/TreeStateManager');
       const manager = new TreeStateManager(mockStorageService);
 
-      // 1回目の同期
       await manager.syncWithChromeTabs();
       const node1 = manager.getNodeByTabId(1);
       const firstNodeId = node1?.id;
 
-      // 2回目の同期
       await manager.syncWithChromeTabs();
       const node1Again = manager.getNodeByTabId(1);
 
-      // 同じノードIDが保持されていることを確認（重複追加されていない）
       expect(node1Again?.id).toBe(firstNodeId);
     });
   });
@@ -110,7 +97,6 @@ describe('ツリー同期とリアルタイム更新', () => {
     it('handleTabMoved: タブ移動時に STATE_UPDATED メッセージを送信する', async () => {
       mockChrome.runtime.sendMessage.mockResolvedValue(undefined);
 
-      // event-handlers から handleTabMoved をインポート
       const { handleTabMoved } = await import('@/background/event-handlers');
 
       const tabId = 1;
@@ -120,10 +106,8 @@ describe('ツリー同期とリアルタイム更新', () => {
         toIndex: 2,
       };
 
-      // ハンドラを呼び出す
       await handleTabMoved(tabId, moveInfo);
 
-      // STATE_UPDATED メッセージが送信されたことを確認
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'STATE_UPDATED',
       });
@@ -134,7 +118,6 @@ describe('ツリー同期とリアルタイム更新', () => {
     it('handleTabUpdated: タイトルやURLが更新されたときに STATE_UPDATED メッセージを送信する', async () => {
       mockChrome.runtime.sendMessage.mockResolvedValue(undefined);
 
-      // event-handlers から handleTabUpdated をインポート
       const { handleTabUpdated } = await import('@/background/event-handlers');
 
       const tabId = 1;
@@ -158,10 +141,8 @@ describe('ツリー同期とリアルタイム更新', () => {
         groupId: -1,
       };
 
-      // ハンドラを呼び出す
       await handleTabUpdated(tabId, changeInfo, tab);
 
-      // STATE_UPDATED メッセージが送信されたことを確認
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'STATE_UPDATED',
       });
@@ -176,7 +157,6 @@ describe('ツリー同期とリアルタイム更新', () => {
       const { TreeStateManager } = await import('@/services/TreeStateManager');
       const manager = new TreeStateManager(mockStorageService);
 
-      // タブを追加
       const tab: chrome.tabs.Tab = {
         id: 1,
         url: 'https://example.com',
@@ -194,10 +174,8 @@ describe('ツリー同期とリアルタイム更新', () => {
       };
       await manager.addTab(tab, null, 'default-view');
 
-      // タブを削除
       await manager.removeTab(1);
 
-      // ノードが削除されたことを確認
       const node = manager.getNodeByTabId(1);
       expect(node).toBeNull();
     });
@@ -205,8 +183,6 @@ describe('ツリー同期とリアルタイム更新', () => {
 
   describe('リアルタイムUI更新', () => {
     it('状態変更時に STATE_UPDATED メッセージを送信する', async () => {
-      // この機能は event-handlers.ts で実装される
-      // サイドパネルが STATE_UPDATED メッセージを受信してUIを更新する
       expect(true).toBe(true);
     });
   });

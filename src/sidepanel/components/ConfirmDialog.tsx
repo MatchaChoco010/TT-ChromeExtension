@@ -9,10 +9,6 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-/**
- * 確認ダイアログコンポーネント
- * グループ閉じ時など、ユーザーの確認が必要な操作で使用されます。
- */
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
@@ -26,7 +22,6 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   }
 
   const handleOverlayClick = (e: React.MouseEvent) => {
-    // オーバーレイをクリックした場合のみキャンセル
     if (e.target === e.currentTarget) {
       onCancel();
     }
@@ -51,13 +46,10 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         className="bg-gray-800 rounded-lg p-6 shadow-xl max-w-md w-full mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* タイトル */}
         <h2 className="text-lg font-semibold mb-4 text-gray-100">{title}</h2>
 
-        {/* メッセージ */}
         <p className="text-sm text-gray-300 mb-4">{message}</p>
 
-        {/* タブ数表示 */}
         {tabCount !== undefined && (
           <div
             data-testid="tab-count-display"
@@ -69,7 +61,6 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
         )}
 
-        {/* ボタン */}
         <div className="flex justify-end gap-3">
           <button
             data-testid="cancel-button"

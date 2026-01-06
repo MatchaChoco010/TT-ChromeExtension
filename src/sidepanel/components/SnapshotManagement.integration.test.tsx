@@ -26,7 +26,6 @@ describe('SnapshotManagement Integration', () => {
   }));
 
   beforeEach(() => {
-    // URL APIのモック
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = vi.fn();
 
@@ -56,7 +55,6 @@ describe('SnapshotManagement Integration', () => {
       expect(mockSnapshotManager.getSnapshots).toHaveBeenCalled();
     });
 
-    // すべてのスナップショットが表示される
     expect(screen.getByText('Snapshot 0')).toBeInTheDocument();
     expect(screen.getByText('Snapshot 14')).toBeInTheDocument();
   });
@@ -87,7 +85,6 @@ describe('SnapshotManagement Integration', () => {
 
   it('should delete snapshot when delete button is clicked', async () => {
     mockSnapshotManager.deleteSnapshot.mockResolvedValue(undefined);
-    // 削除後の再読み込みで空のリストを返す
     mockSnapshotManager.getSnapshots.mockResolvedValueOnce(mockSnapshots);
     mockSnapshotManager.getSnapshots.mockResolvedValueOnce([]);
 
@@ -120,7 +117,6 @@ describe('SnapshotManagement Integration', () => {
         { timeout: 3000 },
       );
 
-      // リストを再読み込み
       await waitFor(
         () => {
           expect(mockSnapshotManager.getSnapshots).toHaveBeenCalledTimes(2);
@@ -232,7 +228,6 @@ describe('SnapshotManagement Integration', () => {
       { timeout: 3000 },
     );
 
-    // リストを再読み込み
     await waitFor(
       () => {
         expect(mockSnapshotManager.getSnapshots).toHaveBeenCalledTimes(2);
@@ -256,7 +251,6 @@ describe('SnapshotManagement Integration', () => {
       expect(screen.getByText('Snapshot 0')).toBeInTheDocument();
     });
 
-    // クリーンアップボタンをクリック
     const cleanupButton = screen.getByRole('button', {
       name: /古いスナップショットを削除/i,
     });
@@ -266,7 +260,6 @@ describe('SnapshotManagement Integration', () => {
       expect(mockIndexedDBService.deleteOldSnapshots).toHaveBeenCalledWith(10);
     });
 
-    // リストを再読み込み
     await waitFor(() => {
       expect(mockSnapshotManager.getSnapshots).toHaveBeenCalledTimes(2);
     });
@@ -285,7 +278,6 @@ describe('SnapshotManagement Integration', () => {
       expect(screen.getByText('Snapshot 0')).toBeInTheDocument();
     });
 
-    // 警告メッセージが表示される
     expect(
       screen.getByText(/スナップショット数が上限を超えています/i),
     ).toBeInTheDocument();
@@ -307,7 +299,6 @@ describe('SnapshotManagement Integration', () => {
       expect(screen.getByText('Snapshot 0')).toBeInTheDocument();
     });
 
-    // 警告メッセージが表示されない
     expect(
       screen.queryByText(/スナップショット数が上限を超えています/i),
     ).not.toBeInTheDocument();

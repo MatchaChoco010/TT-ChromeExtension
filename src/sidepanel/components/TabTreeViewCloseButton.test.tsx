@@ -3,9 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import TabTreeView from './TabTreeView';
 import type { TabNode, ExtendedTabInfo } from '@/types';
 
-/**
- * タブにホバー時の閉じるボタンを実装するテスト
- */
 describe('タブにホバー時の閉じるボタンを実装する', () => {
   let originalChrome: typeof chrome;
   let mockTabsRemove: Mock;
@@ -49,8 +46,8 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
     status: 'complete',
     isPinned: false,
     windowId: 1,
-    discarded: false, // 休止タブ状態
-    index: id, // ピン留めタブの順序同期
+    discarded: false,
+    index: id,
   });
 
   const mockGetTabInfo = (nodes: TabNode[]): ((tabId: number) => ExtendedTabInfo | undefined) => {
@@ -78,14 +75,11 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
       const treeNode = screen.getByTestId('tree-node-1');
 
-      // 最初は閉じるボタンが非表示（invisible）
       const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
       expect(closeButtonWrapper).toHaveClass('invisible');
 
-      // マウスをホバー
       fireEvent.mouseEnter(treeNode);
 
-      // 閉じるボタンが表示される
       expect(closeButtonWrapper).toHaveClass('visible');
     });
 
@@ -106,12 +100,9 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
       const childTreeNode = screen.getByTestId('tree-node-2');
 
-      // マウスをホバー
       fireEvent.mouseEnter(childTreeNode);
 
-      // 閉じるボタンが表示される（visible）
       const closeButtonWrappers = screen.getAllByTestId('close-button-wrapper');
-      // 子ノードは2番目のwrapper
       const childCloseButtonWrapper = closeButtonWrappers[1];
       expect(childCloseButtonWrapper).toHaveClass('visible');
     });
@@ -134,15 +125,12 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
       const treeNode = screen.getByTestId('tree-node-123');
 
-      // マウスをホバー
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
-      // 閉じるボタンをクリック
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // chrome.tabs.removeが呼ばれる
       await waitFor(() => {
         expect(mockTabsRemove).toHaveBeenCalledWith(123);
       });
@@ -165,15 +153,12 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
       const treeNode = screen.getByTestId('tree-node-1');
 
-      // マウスをホバー
       fireEvent.mouseEnter(treeNode);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
-      // 閉じるボタンをクリック
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // onNodeClickは呼ばれない（イベント伝播が停止されている）
       expect(onNodeClick).not.toHaveBeenCalled();
     });
   });
@@ -196,14 +181,11 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
       const treeNode = screen.getByTestId('tree-node-1');
       const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
 
-      // マウスをホバー
       fireEvent.mouseEnter(treeNode);
       expect(closeButtonWrapper).toHaveClass('visible');
 
-      // マウスを離す
       fireEvent.mouseLeave(treeNode);
 
-      // 閉じるボタンが非表示になる
       expect(closeButtonWrapper).toHaveClass('invisible');
     });
 
@@ -228,18 +210,14 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
       const wrapper1 = closeButtonWrappers[0];
       const wrapper2 = closeButtonWrappers[1];
 
-      // ノード1にホバー
       fireEvent.mouseEnter(treeNode1);
       expect(wrapper1).toHaveClass('visible');
       expect(wrapper2).toHaveClass('invisible');
 
-      // ノード1から離れる
       fireEvent.mouseLeave(treeNode1);
 
-      // ノード2にホバー
       fireEvent.mouseEnter(treeNode2);
 
-      // ノード1は非表示、ノード2は表示
       expect(wrapper1).toHaveClass('invisible');
       expect(wrapper2).toHaveClass('visible');
     });
@@ -264,18 +242,14 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
       const treeNode = screen.getByTestId('tree-node-1');
       const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
 
-      // 最初は閉じるボタンが非表示（invisible）
       expect(closeButtonWrapper).toHaveClass('invisible');
 
-      // マウスをホバー
       fireEvent.mouseEnter(treeNode);
 
-      // 閉じるボタンが表示される（visible）
       expect(closeButtonWrapper).toHaveClass('visible');
     });
   });
 
-  // 閉じるボタンの右端固定とホバー時サイズ安定化のテスト
   describe('閉じるボタンの右端固定とホバー時サイズ安定化', () => {
     describe('閉じるボタンはタブの右端に固定される', () => {
       it('閉じるボタンのラッパーはflex-shrink-0クラスを持つ', () => {
@@ -293,7 +267,6 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
         );
 
         const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
-        // 閉じるボタンのラッパーがflex-shrink-0を持つことで、タイトルの長さに関わらず位置が固定される
         expect(closeButtonWrapper).toHaveClass('flex-shrink-0');
       });
 
@@ -312,7 +285,6 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
         );
 
         const tabContent = screen.getByTestId('tab-content');
-        // justify-betweenで左右に配置
         expect(tabContent).toHaveClass('justify-between');
       });
     });
@@ -332,21 +304,17 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
           />,
         );
 
-        // 閉じるボタンラッパーは常にDOMに存在
         const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
         expect(closeButtonWrapper).toBeInTheDocument();
 
-        // 初期状態はinvisible
         expect(closeButtonWrapper).toHaveClass('invisible');
 
         const treeNode = screen.getByTestId('tree-node-1');
 
-        // ホバー後もDOMに存在し、visibleになる
         fireEvent.mouseEnter(treeNode);
         expect(closeButtonWrapper).toBeInTheDocument();
         expect(closeButtonWrapper).toHaveClass('visible');
 
-        // ホバー解除後もDOMに存在し、invisibleになる
         fireEvent.mouseLeave(treeNode);
         expect(closeButtonWrapper).toBeInTheDocument();
         expect(closeButtonWrapper).toHaveClass('invisible');
@@ -367,11 +335,9 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
           />,
         );
 
-        // 閉じるボタンラッパーは常にDOMに存在
         const closeButtonWrapper = screen.getByTestId('close-button-wrapper');
         expect(closeButtonWrapper).toBeInTheDocument();
 
-        // 初期状態はinvisible
         expect(closeButtonWrapper).toHaveClass('invisible');
       });
     });

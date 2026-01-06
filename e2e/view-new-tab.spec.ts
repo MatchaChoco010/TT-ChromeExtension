@@ -1,14 +1,3 @@
-/**
- * ビューへの新規タブ追加のE2Eテスト
- *
- * テスト対象:
- * 1. ビューを開いている状態で新しいタブをそのビューに追加
- * 2. 新規タブ追加後もViewSwitcherが現在のビューを維持（ビューが閉じずに維持される）
- * 3. デフォルトビュー以外のビューでも新規タブが現在ビューに属する
- * 4. E2Eテストで検証可能であり、--repeat-each=10で10回連続成功
- * 5. ポーリングベースの状態確定待機を使用してフレーキーでないこと
- */
-
 import { test, expect } from './fixtures/extension';
 import { waitForViewSwitcher, waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import { assertTabStructure, assertViewStructure } from './utils/assertion-utils';

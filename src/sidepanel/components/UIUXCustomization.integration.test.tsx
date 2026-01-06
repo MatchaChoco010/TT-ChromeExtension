@@ -1,11 +1,3 @@
-/**
- * UI/UXカスタマイズのテスト
- *
- * このテストは、以下を検証します:
- * - フォントサイズ変更がすべてのタブアイテムに適用される
- * - カスタムCSSが適用されてスタイルがオーバーライドされる
- */
-
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ThemeProvider, useTheme } from '@/sidepanel/providers/ThemeProvider';
@@ -25,7 +17,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
     mockGet = vi.fn();
     mockSet = vi.fn();
 
-    // グローバルなchromeオブジェクトをモック
     vi.stubGlobal('chrome', {
       storage: {
         local: {
@@ -43,7 +34,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
       },
     });
 
-    // chrome.storage.local.setが呼ばれたときにonChangedリスナーをトリガー
     mockSet.mockImplementation(async (items: Record<string, unknown>) => {
       const changes: StorageChanges = {};
       for (const key in items) {
@@ -53,7 +43,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
       return Promise.resolve();
     });
 
-    // 既存のスタイル要素をクリア
     const existingStyle = document.getElementById('vivaldi-tt-theme');
     if (existingStyle) {
       existingStyle.remove();
@@ -89,11 +78,9 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         user_settings: initialSettings,
       });
 
-      // 複数のタブアイテムを含むテストコンポーネント
       const TestSidePanelWithTabs = () => {
         const { settings, updateSettings } = useTheme();
 
-        // サンプルのタブデータ
         const mockTabs: Array<{ node: TabNode; tab: TabInfo }> = [
           {
             node: {
@@ -185,23 +172,19 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         </ThemeProvider>
       );
 
-      // ThemeProviderが初期化されるまで待つ
       await waitFor(() => {
         expect(screen.getByLabelText(/フォントサイズ/i)).toBeInTheDocument();
       });
 
-      // 初期状態のスタイルを確認
       await waitFor(() => {
         const styleElement = document.getElementById('vivaldi-tt-theme');
         expect(styleElement).toBeTruthy();
         expect(styleElement?.textContent).toContain('--font-size: 14px');
       });
 
-      // フォントサイズを18pxに変更
       const fontSizeInput = screen.getByLabelText(/フォントサイズ/i);
       fireEvent.change(fontSizeInput, { target: { value: '18' } });
 
-      // CSS変数が更新されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
@@ -210,12 +193,10 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         { timeout: 2000 }
       );
 
-      // すべてのタブアイテムが表示されていることを確認
       expect(screen.getByText('タブアイテム1')).toBeInTheDocument();
       expect(screen.getByText('タブアイテム2')).toBeInTheDocument();
       expect(screen.getByText('タブアイテム3')).toBeInTheDocument();
 
-      // bodyタグにフォントサイズが適用されることを確認
       await waitFor(() => {
         const styleElement = document.getElementById('vivaldi-tt-theme');
         expect(styleElement?.textContent).toContain('font-size: var(--font-size)');
@@ -270,11 +251,9 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         expect(screen.getByText('小')).toBeInTheDocument();
       });
 
-      // 「大」ボタンをクリック
       const largeButton = screen.getByText('大');
       fireEvent.click(largeButton);
 
-      // CSS変数が16pxに更新されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
@@ -283,7 +262,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         { timeout: 2000 }
       );
 
-      // すべてのタブアイテムが表示されていることを確認
       expect(screen.getByText('タブ1')).toBeInTheDocument();
       expect(screen.getByText('タブ2')).toBeInTheDocument();
       expect(screen.getByText('タブ3')).toBeInTheDocument();
@@ -339,7 +317,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         </ThemeProvider>
       );
 
-      // カスタムCSSが適用されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
@@ -353,7 +330,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         { timeout: 2000 }
       );
 
-      // 要素が表示されていることを確認
       expect(screen.getByText('Settings')).toBeInTheDocument();
       expect(screen.getByText('Custom Styled Tab')).toBeInTheDocument();
     });
@@ -367,9 +343,9 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
       `;
 
       const settingsWithCustomCSS: UserSettings = {
-        fontSize: 14, // デフォルトは14px
-        fontFamily: 'system-ui', // デフォルトはsystem-ui
-        customCSS: customCSS, // カスタムCSSで20pxとCourier Newに上書き
+        fontSize: 14,
+        fontFamily: 'system-ui',
+        customCSS: customCSS,
         newTabPosition: 'child',
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
@@ -401,15 +377,12 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         </ThemeProvider>
       );
 
-      // カスタムCSSが適用されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
           expect(styleElement).toBeTruthy();
-          // デフォルトのフォント設定
           expect(styleElement?.textContent).toContain('--font-size: 14px');
           expect(styleElement?.textContent).toContain('--font-family: system-ui');
-          // カスタムCSSによる上書き
           expect(styleElement?.textContent).toContain('font-size: 20px !important');
           expect(styleElement?.textContent).toContain(
             "font-family: 'Courier New', monospace !important"
@@ -471,7 +444,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         </ThemeProvider>
       );
 
-      // 複雑なカスタムCSSが正しく適用されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
@@ -527,19 +499,16 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         </ThemeProvider>
       );
 
-      // 初期CSSが適用されることを確認
       await waitFor(() => {
         const styleElement = document.getElementById('vivaldi-tt-theme');
         expect(styleElement?.textContent).toContain('.old { color: red; }');
       });
 
-      // カスタムCSSを変更
       const customCSSTextarea = screen.getByLabelText(/カスタムCSS/i);
       fireEvent.change(customCSSTextarea, {
         target: { value: '.new { color: blue; font-size: 18px; }' },
       });
 
-      // 新しいCSSが適用されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
@@ -589,15 +558,12 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         </ThemeProvider>
       );
 
-      // フォント設定とカスタムCSSの両方が適用されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
           expect(styleElement).toBeTruthy();
-          // フォント設定
           expect(styleElement?.textContent).toContain('--font-size: 18px');
           expect(styleElement?.textContent).toContain('--font-family: Georgia, serif');
-          // カスタムCSS
           expect(styleElement?.textContent).toContain('.custom { background: yellow; }');
         },
         { timeout: 2000 }

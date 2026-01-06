@@ -14,7 +14,6 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 
-// ES Moduleで__dirnameを取得
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -66,13 +65,11 @@ const validateExtensionBuild = (extensionPath: string): { valid: boolean; errors
     'sidepanel.html',
   ];
 
-  // ディレクトリの存在確認
   if (!fs.existsSync(extensionPath)) {
     errors.push(`Extension directory does not exist: ${extensionPath}`);
     return { valid: false, errors };
   }
 
-  // 必須ファイルの存在確認
   for (const file of requiredFiles) {
     const filePath = path.join(extensionPath, file);
     if (!fs.existsSync(filePath)) {
@@ -80,7 +77,6 @@ const validateExtensionBuild = (extensionPath: string): { valid: boolean; errors
     }
   }
 
-  // manifest.jsonの内容検証
   const manifestPath = path.join(extensionPath, 'manifest.json');
   if (fs.existsSync(manifestPath)) {
     try {
@@ -115,30 +111,25 @@ const waitForServiceWorker = async (
 ): Promise<Worker> => {
   const startTime = Date.now();
 
-  // 1. まず既存のService Workerをチェック
   const existingWorkers = context.serviceWorkers();
   if (existingWorkers.length > 0) {
     return existingWorkers[0];
   }
 
-  // 2. シンプルなポーリングで待機
   const pollInterval = 100;
   let pollCount = 0;
 
   while (Date.now() - startTime < timeout) {
     pollCount++;
 
-    // 短い待機
     await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-    // Service Workerをチェック
     const workers = context.serviceWorkers();
     if (workers.length > 0) {
       return workers[0];
     }
   }
 
-  // タイムアウト: 最終チェック
   const finalWorkers = context.serviceWorkers();
   if (finalWorkers.length > 0) {
     return finalWorkers[0];
@@ -166,13 +157,11 @@ const waitForServiceWorker = async (
  * サンドボックス環境でも安全に動作する。
  */
 const createUniqueUserDataDir = (): string => {
-  // リポジトリ内に一時ディレクトリを作成（サンドボックス環境対応）
   const projectRoot = path.join(__dirname, '../..');
   const tmpDir = path.join(projectRoot, '.playwright-tmp');
   const uniqueId = randomUUID();
   const userDataDir = path.join(tmpDir, uniqueId);
 
-  // ディレクトリを作成
   fs.mkdirSync(userDataDir, { recursive: true });
 
   return userDataDir;
@@ -206,13 +195,11 @@ const createExtensionContext = async (
   extensionPath: string,
   headless: boolean
 ): Promise<{ context: BrowserContext; userDataDir: string }> => {
-  // 拡張機能のビルド成果物を検証
   const validation = validateExtensionBuild(extensionPath);
   if (!validation.valid) {
     throw new Error(`Extension build validation failed:\n${validation.errors.join('\n')}`);
   }
 
-  // 一意なユーザーデータディレクトリを作成（並列実行時の競合を防止）
   const userDataDir = createUniqueUserDataDir();
 
   // Persistent Contextを作成して拡張機能をロード
@@ -245,7 +232,6 @@ const createExtensionContext = async (
     ],
   });
 
-  // Service Workerの起動を待機（30秒タイムアウト）
   const timeout = 30000;
   await waitForServiceWorker(context, timeout);
 
@@ -268,20 +254,14 @@ export const test = base.extend<ExtensionFixtures>({
   extensionContext: async ({}, use) => {
     const pathToExtension = getExtensionPath();
 
-    // headlessモードの設定
-    // デフォルトでheadlessモード、HEADED=trueでheadedモードに切り替え
     const headless = process.env.HEADED !== 'true';
 
-    // ブラウザコンテキストを作成（一意なユーザーデータディレクトリ付き）
-    const { context, userDataDir } = await createExtensionContext(pathToExtension, headless);
+      const { context, userDataDir } = await createExtensionContext(pathToExtension, headless);
 
-    // テストで使用
     await use(context);
 
-    // クリーンアップ: コンテキストをクローズ
     await context.close();
 
-    // クリーンアップ: ユーザーデータディレクトリを削除
     removeUserDataDir(userDataDir);
   },
 
@@ -292,7 +272,6 @@ export const test = base.extend<ExtensionFixtures>({
    * ここでは即座に取得できます
    */
   extensionId: async ({ extensionContext }, use) => {
-    // extensionContextフィクスチャでService Workerは既に起動済み
     const workers = extensionContext.serviceWorkers();
 
     if (workers.length === 0) {
@@ -303,8 +282,6 @@ export const test = base.extend<ExtensionFixtures>({
 
     const serviceWorker = workers[0];
 
-    // Service Worker URLからExtension IDを抽出
-    // URL形式: chrome-extension://<extensionId>/service-worker.js
     const extensionId = serviceWorker.url().split('/')[2];
 
     if (!extensionId || extensionId.length !== 32) {
@@ -313,7 +290,6 @@ export const test = base.extend<ExtensionFixtures>({
       );
     }
 
-    // テストで使用
     await use(extensionId);
   },
 
@@ -324,7 +300,6 @@ export const test = base.extend<ExtensionFixtures>({
    * ここでは即座に取得できます
    */
   serviceWorker: async ({ extensionContext }, use) => {
-    // extensionContextフィクスチャでService Workerは既に起動済み
     const workers = extensionContext.serviceWorkers();
 
     if (workers.length === 0) {
@@ -333,7 +308,6 @@ export const test = base.extend<ExtensionFixtures>({
       );
     }
 
-    // テストで使用
     await use(workers[0]);
   },
 
@@ -345,26 +319,20 @@ export const test = base.extend<ExtensionFixtures>({
    * これにより、サイドパネルは現在のウィンドウのタブのみを表示する
    */
   sidePanelPage: async ({ extensionContext, extensionId, serviceWorker }, use) => {
-    // 現在のウィンドウIDを取得してURLパラメータとして渡す
     const currentWindow = await serviceWorker.evaluate(() => {
       return chrome.windows.getCurrent();
     });
     const windowId = currentWindow.id;
 
-    // 新しいページを作成
     const page = await extensionContext.newPage();
 
-    // Side PanelのURLに移動（windowIdパラメータ付き）
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
 
-    // DOMContentLoadedイベントを待機
     await page.waitForLoadState('domcontentloaded');
 
-    // Reactのルート要素が表示されるまで待機
     try {
       await page.waitForSelector('#root', { timeout: 5000 });
     } catch (error) {
-      // エラー時にスクリーンショットを保存してデバッグを支援
       await page.screenshot({
         path: 'test-results/sidepanel-load-error.png',
       });
@@ -373,26 +341,21 @@ export const test = base.extend<ExtensionFixtures>({
       );
     }
 
-    // ツリー状態がストレージに保存されるまで待機（状態同期の完了を確認）
     await serviceWorker.evaluate(async () => {
       for (let i = 0; i < 50; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
         if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
-          return; // Tree state is ready
+          return;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      // タイムアウトしてもエラーにはしない（タブがまだない場合もある）
     });
 
-    // Side Panelのルート要素が安定するまで少し待機
     await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
 
-    // テストで使用
     await use(page);
 
-    // クリーンアップ: ページをクローズ
     await page.close();
   },
 });

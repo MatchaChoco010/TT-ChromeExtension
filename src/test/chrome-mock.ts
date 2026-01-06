@@ -1,4 +1,3 @@
-// Chrome API mock for testing
 import { vi } from 'vitest';
 
 /**
@@ -44,7 +43,6 @@ class MockEvent<T extends GenericCallback> {
 }
 
 export class ChromeMock {
-  // Internal storage map for chrome.storage.local
   private storageData: Record<string, unknown> = {};
 
   tabs = {
@@ -64,6 +62,12 @@ export class ChromeMock {
     >(),
     onActivated: new MockEvent<
       (activeInfo: chrome.tabs.TabActiveInfo) => void
+    >(),
+    onDetached: new MockEvent<
+      (tabId: number, detachInfo: chrome.tabs.TabDetachInfo) => void
+    >(),
+    onAttached: new MockEvent<
+      (tabId: number, attachInfo: chrome.tabs.TabAttachInfo) => void
     >(),
     get: vi.fn<(tabId: number) => Promise<chrome.tabs.Tab | null>>(() => Promise.resolve(null)),
     move: vi.fn<(tabIds: number | number[], moveProperties: chrome.tabs.MoveProperties) => Promise<chrome.tabs.Tab | chrome.tabs.Tab[]>>(() => Promise.resolve([] as chrome.tabs.Tab[])),
@@ -154,6 +158,8 @@ export class ChromeMock {
     this.tabs.onMoved.clear();
     this.tabs.onUpdated.clear();
     this.tabs.onActivated.clear();
+    this.tabs.onDetached.clear();
+    this.tabs.onAttached.clear();
     this.windows.onCreated.clear();
     this.windows.onRemoved.clear();
     this.windows.onFocusChanged.clear();
@@ -161,10 +167,8 @@ export class ChromeMock {
     this.storage.onChanged.addListener.mockClear();
     this.storage.onChanged.removeListener.mockClear();
 
-    // Clear storage data
     this.storageData = {};
 
-    // Reset mock implementations
     this.runtime.sendMessage.mockImplementation(() => Promise.resolve());
     this.runtime.lastError = undefined;
 
@@ -209,9 +213,6 @@ export class ChromeMock {
   }
 }
 
-// Create a singleton mock instance
 export const chromeMock = new ChromeMock();
 
-// Setup global chrome object using vitest's stubGlobal
-// This properly handles type conflicts with @types/chrome
 vi.stubGlobal('chrome', chromeMock);

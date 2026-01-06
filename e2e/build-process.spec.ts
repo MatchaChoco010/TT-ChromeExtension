@@ -11,22 +11,16 @@ import * as path from 'path';
  */
 test.describe('ビルドプロセス統合', () => {
   test('dist/ディレクトリが存在し、ビルド成果物が含まれていること', () => {
-    // このテストはglobalSetupがビルドを実行した後にパスすることを検証
-    // globalSetupはPlaywrightがテスト実行前に自動的に呼び出し、拡張機能をビルドする
     const distPath = path.join(process.cwd(), 'dist');
 
-    // dist/ディレクトリが存在することを検証
     expect(fs.existsSync(distPath)).toBe(true);
 
-    // manifest.jsonが存在することを検証
     const manifestPath = path.join(distPath, 'manifest.json');
     expect(fs.existsSync(manifestPath)).toBe(true);
 
-    // manifest.jsonが有効なJSONであることを検証
     const manifestContent = fs.readFileSync(manifestPath, 'utf-8');
     expect(() => JSON.parse(manifestContent)).not.toThrow();
 
-    // Service Workerファイルが存在することを検証
     const manifest = JSON.parse(manifestContent);
     expect(manifest.background).toBeDefined();
     expect(manifest.background.service_worker).toBeDefined();
@@ -39,25 +33,20 @@ test.describe('ビルドプロセス統合', () => {
   });
 
   test('globalSetup がビルドプロセスを実行すること', async () => {
-    // playwright.config.ts にglobalSetupが設定されていることを確認
     const configPath = path.join(process.cwd(), 'playwright.config.ts');
     const configContent = fs.readFileSync(configPath, 'utf-8');
 
-    // globalSetupフィールドが定義されていることを検証
     expect(configContent).toContain('globalSetup');
   });
 
   test('ビルドスクリプトが実行可能であること', () => {
     const scriptPath = path.join(process.cwd(), 'e2e/scripts/global-setup.ts');
 
-    // スクリプトファイルが存在することを検証
     expect(fs.existsSync(scriptPath)).toBe(true);
 
-    // スクリプトファイルが読み取り可能であることを検証
     const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
     expect(scriptContent.length).toBeGreaterThan(0);
 
-    // スクリプトにビルドロジックが含まれていることを検証
     expect(scriptContent).toContain('build');
   });
 
@@ -65,10 +54,8 @@ test.describe('ビルドプロセス統合', () => {
     const scriptPath = path.join(process.cwd(), 'e2e/scripts/global-setup.ts');
     const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
 
-    // エラーハンドリングロジックが含まれていることを検証
     expect(scriptContent).toMatch(/catch|error|throw/i);
 
-    // エラーメッセージ出力のロジックが含まれていることを検証
     expect(scriptContent).toMatch(/console\.(error|log)|throw.*Error/);
   });
 });

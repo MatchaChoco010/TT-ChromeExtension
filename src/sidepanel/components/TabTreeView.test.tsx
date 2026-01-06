@@ -54,7 +54,6 @@ describe('TabTreeView', () => {
     );
 
     expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
-    // 実装では data-testid="tree-node-${node.tabId}" を使用しているため、tabIdで検索
     expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
   });
 
@@ -74,7 +73,6 @@ describe('TabTreeView', () => {
       />
     );
 
-    // defaultビューのノードのみ表示（tabIdで検索）
     expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
     expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
     expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
@@ -95,7 +93,6 @@ describe('TabTreeView', () => {
       />
     );
 
-    // tabIdで検索（parent-1はtabId=1, child-1はtabId=2）
     expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
     expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
   });
@@ -116,9 +113,7 @@ describe('TabTreeView', () => {
       />
     );
 
-    // tabIdで検索（parent-1はtabId=1）
     expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
-    // 折りたたまれているので子は表示されない（child-1はtabId=2）
     expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
   });
 
@@ -135,7 +130,6 @@ describe('TabTreeView', () => {
       />
     );
 
-    // tabIdで検索
     const nodeElement = screen.getByTestId('tree-node-1');
     await user.click(nodeElement);
 
@@ -158,7 +152,6 @@ describe('TabTreeView', () => {
       />
     );
 
-    // 実装では data-testid="expand-button" を使用（複数ある場合は最初のものを取得）
     const toggleButton = screen.getByTestId('expand-button');
     await user.click(toggleButton);
 
@@ -179,7 +172,6 @@ describe('TabTreeView', () => {
       />
     );
 
-    // tabIdで検索（parent-1はtabId=1, child-1はtabId=2, grandchild-1はtabId=3）
     expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
     expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
@@ -199,7 +191,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムには data-draggable-item 属性がある
       const draggableItem = screen.getByTestId('tree-node-1');
       expect(draggableItem).toHaveAttribute(
         'data-draggable-item',
@@ -220,11 +211,8 @@ describe('TabTreeView', () => {
         />
       );
 
-      // tabIdで検索
       const nodeElement = screen.getByTestId('tree-node-1');
-      // ドラッグ可能なアイテムが存在すること
       expect(nodeElement).toBeInTheDocument();
-      // 自前D&D実装に変更
       expect(nodeElement).toHaveAttribute(
         'data-draggable-item',
         'draggable-item-node-1'
@@ -245,7 +233,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムが2つ存在することを確認
       const draggableItem1 = screen.getByTestId('tree-node-1');
       const draggableItem2 = screen.getByTestId('tree-node-2');
 
@@ -299,7 +286,6 @@ describe('TabTreeView', () => {
       );
 
       expect(screen.getByText('Example Page Title')).toBeInTheDocument();
-      // 内部IDではなくページタイトルが表示されていること
       expect(screen.queryByText('Tab 1')).not.toBeInTheDocument();
     });
 
@@ -338,14 +324,12 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ファビコン画像がなく、デフォルトアイコンが表示されること
       expect(screen.queryByRole('img', { name: /favicon/i })).not.toBeInTheDocument();
       expect(screen.getByTestId('default-icon')).toBeInTheDocument();
     });
 
     it('タブ情報がロード中の場合、Loading...プレースホルダーを表示すること', () => {
       const node = createMockNode('node-1', 1, 'default');
-      // getTabInfoがundefinedを返す（ロード中）
       mockGetTabInfo.mockReturnValue(undefined);
 
       render(
@@ -370,11 +354,9 @@ describe('TabTreeView', () => {
           currentViewId="default"
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
-          // getTabInfoを提供しない
         />
       );
 
-      // フォールバック表示
       expect(screen.getByText('Tab 1')).toBeInTheDocument();
     });
 
@@ -449,9 +431,7 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      // 選択されたノードには控えめな背景色が適用される（青い枠線ではない）
       expect(nodeElement).toHaveClass('bg-gray-500');
-      // 青い枠線が使用されていないこと
       expect(nodeElement).not.toHaveClass('ring-2');
       expect(nodeElement).not.toHaveClass('ring-blue-400');
     });
@@ -472,7 +452,6 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      // 選択されていない場合は選択用の背景色が適用されない
       expect(nodeElement).not.toHaveClass('bg-gray-500');
     });
 
@@ -572,10 +551,8 @@ describe('TabTreeView', () => {
       const nodeElement2 = screen.getByTestId('tree-node-2');
       const nodeElement3 = screen.getByTestId('tree-node-3');
 
-      // node-1とnode-3は選択されているので bg-gray-500 がある
       expect(nodeElement1).toHaveClass('bg-gray-500');
       expect(nodeElement3).toHaveClass('bg-gray-500');
-      // node-2は選択されていないので bg-gray-500 がない
       expect(nodeElement2).not.toHaveClass('bg-gray-500');
     });
 
@@ -607,14 +584,12 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
-          // onSelectを提供しない
         />
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
       await user.click(nodeElement);
 
-      // onNodeClickは呼ばれる
       expect(mockOnNodeClick).toHaveBeenCalledWith(1);
     });
 
@@ -635,7 +610,6 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      // 選択状態は背景色で表示される
       expect(nodeElement).toHaveClass('bg-gray-500');
     });
   });
@@ -657,10 +631,8 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なビューにはdrag-containerクラスがあること
       const container = screen.getByTestId('tab-tree-view').querySelector('.relative');
       expect(container).toBeInTheDocument();
-      // 初期状態ではoverflow-x: hiddenではない（通常のスクロール可能状態）
       expect(container).not.toHaveClass('overflow-x-hidden');
     });
 
@@ -677,14 +649,11 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ中の横スクロール防止のため、コンテナにdata属性が存在
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).toBeInTheDocument();
     });
 
     it('globalIsDraggingがtrueの時、コンテナにis-draggingクラスが適用されること', () => {
-      // この動作は実際のドラッグ操作が必要なため、単体テストでは検証が難しい
-      // E2Eテストで検証する
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -697,7 +666,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 初期状態では is-dragging クラスがないこと
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).not.toHaveClass('is-dragging');
     });
@@ -720,14 +688,11 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグコンテナが存在することを確認（ドラッグ可能なビューがレンダリングされる）
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).toBeInTheDocument();
     });
 
     it('autoScrollが適切なスクロール閾値で設定されていること', () => {
-      // この動作は実際のドラッグ操作が必要なため、実装コードでの確認が必要
-      // 実装時にautoScroll.thresholdが設定されていることを確認
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -740,7 +705,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なツリービューがレンダリングされることを確認
       expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
     });
 
@@ -761,7 +725,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // すべてのノードが正しくレンダリングされることを確認
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
@@ -785,7 +748,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ中でもスクロールコンテナがコンテンツ範囲内に制限されること
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).toBeInTheDocument();
     });
@@ -806,16 +768,12 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ中は横スクロールが禁止されること（overflow-x-hidden）
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).toBeInTheDocument();
-      // 初期状態ではoverflow-x-hiddenがないこと
       expect(container).not.toHaveClass('overflow-x-hidden');
     });
 
     it('autoScroll設定が横スクロールを無効化する設定を持つこと', () => {
-      // autoScroll設定のx閾値が0または無効化されていることを確認
-      // 実装ではAUTO_SCROLL_CONFIGのthreshold.xを0に設定
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -828,13 +786,10 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なツリービューがレンダリングされること
       expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
     });
 
     it('autoScroll設定がコンテンツ範囲外へのスクロールを制限する設定を持つこと', () => {
-      // autoScroll.layoutShiftCompensationがfalseに設定されていることで
-      // 過度なスクロールが抑制されることを期待
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -851,7 +806,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 全ノードがレンダリングされていること
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
@@ -876,7 +830,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムが3つ存在することを確認
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
@@ -895,7 +848,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 自前D&D実装に変更
       const nodeElement = screen.getByTestId('tree-node-1');
       expect(nodeElement).toHaveAttribute('data-draggable-item', 'draggable-item-node-1');
     });
@@ -913,7 +865,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // TabTreeViewはrelativeクラスを持つコンテナをレンダリングする
       const container = screen.getByTestId('tab-tree-view').querySelector('.relative');
       expect(container).toBeInTheDocument();
     });
@@ -921,8 +872,6 @@ describe('TabTreeView', () => {
 
   describe('ドラッグ中のタブサイズ安定化', () => {
     it('ドラッグ中に他のタブのtransformが無効化されていること', () => {
-      // 自前D&D実装では、ドラッグ中の他タブの移動は行わない設計
-      // ドロップ位置のみインジケーターで表示される
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -939,12 +888,10 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 全てのノードがレンダリングされていること
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
 
-      // ドラッグ開始前、コンテナにis-draggingクラスがないこと
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).not.toHaveClass('is-dragging');
     });
@@ -965,12 +912,10 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 各ノードが固定サイズを保持する（padding/layoutが安定している）
       const node1 = screen.getByTestId('tree-node-1');
       const node2 = screen.getByTestId('tree-node-2');
 
-      // ホバー前後でノードの構造が変わらないこと（サイズ安定化）
-      expect(node1).toHaveClass('p-2'); // padding-2（固定サイズ）
+      expect(node1).toHaveClass('p-2');
       expect(node2).toHaveClass('p-2');
     });
 
@@ -991,21 +936,16 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 各ノードにdata-node-id属性が設定されていること（レイアウト識別用）
       expect(screen.getByTestId('tree-node-1')).toHaveAttribute('data-node-id', 'node-1');
       expect(screen.getByTestId('tree-node-2')).toHaveAttribute('data-node-id', 'node-2');
       expect(screen.getByTestId('tree-node-3')).toHaveAttribute('data-node-id', 'node-3');
 
-      // strategyがundefinedの場合、リアルタイム並べ替えが無効でレイアウトが維持される
-      // ドラッグ開始時点でのコンテナ構造が安定している
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).toBeInTheDocument();
       expect(container?.children.length).toBeGreaterThanOrEqual(3);
     });
 
     it('自前D&D実装によりリアルタイム並べ替えが無効化されていること', () => {
-      // dnd-kitからuseDragDropに移行
-      // 自前実装では他タブの位置変更が発生しないため、サイズが安定する
       const node = createMockNode('node-1', 1, 'default');
 
       render(
@@ -1018,7 +958,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ドラッグ可能なアイテムが正しくレンダリングされていること
       const draggableItem = screen.getByTestId('tree-node-1');
       expect(draggableItem).toHaveAttribute('data-draggable-item');
     });
@@ -1042,25 +981,20 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 全てのノードがレンダリングされていること
       const node1 = screen.getByTestId('tree-node-1');
       const node2 = screen.getByTestId('tree-node-2');
       const node3 = screen.getByTestId('tree-node-3');
 
-      // 各ノードが固定paddingを保持していること（サイズ安定化）
       expect(node1).toHaveClass('p-2');
       expect(node2).toHaveClass('p-2');
       expect(node3).toHaveClass('p-2');
 
-      // flexレイアウトが適用されていること（サイズ安定化）
       expect(node1).toHaveClass('flex', 'items-center');
       expect(node2).toHaveClass('flex', 'items-center');
       expect(node3).toHaveClass('flex', 'items-center');
     });
 
     it('親子関係ドロップ時にドラッグハイライトされたタブのサイズが維持されること', () => {
-      // ドラッグハイライト時にborder-2が追加されても、
-      // 元のpadding構造が維持されてサイズが変わらないことを確認
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -1079,13 +1013,9 @@ describe('TabTreeView', () => {
       const node1 = screen.getByTestId('tree-node-1');
       const node2 = screen.getByTestId('tree-node-2');
 
-      // ドラッグハイライト状態の有無に関わらず、基本レイアウトが安定していること
-      // 実装ではisDragHighlightedがtrueの場合にborder-2が追加されるが、
-      // p-2クラスは常に維持される
       expect(node1).toHaveClass('p-2');
       expect(node2).toHaveClass('p-2');
 
-      // min-w-0でflexアイテムの縮小が正しく制御されていること
       const tabContent1 = node1.querySelector('[data-testid="tab-content"]');
       const tabContent2 = node2.querySelector('[data-testid="tab-content"]');
 
@@ -1094,7 +1024,6 @@ describe('TabTreeView', () => {
     });
 
     it('ドラッグ中のアイテム以外はtransformが適用されないこと（shouldApplyTransformフラグ）', () => {
-      // この動作は実際のドラッグ操作が必要なため、構造的な検証のみ
       const nodes = [
         createMockNode('node-1', 1, 'default'),
         createMockNode('node-2', 2, 'default'),
@@ -1110,8 +1039,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 初期状態では全てのノードにtransformスタイルがないこと
-      // ドラッグ前は globalIsDragging=false なのでtransformは適用されない
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).not.toHaveClass('is-dragging');
     });
@@ -1126,7 +1053,6 @@ describe('TabTreeView', () => {
       ];
       const mockOnMoveToView = vi.fn();
 
-      // viewsとonMoveToViewを渡してレンダリングできること
       render(
         <TabTreeView
           nodes={[node]}
@@ -1171,7 +1097,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // ツリービュー全体にselect-noneクラスが適用されていること
       const treeView = screen.getByTestId('tab-tree-view');
       expect(treeView).toHaveClass('select-none');
     });
@@ -1189,7 +1114,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 各タブノード要素にselect-noneクラスが適用されていること
       const nodeElement = screen.getByTestId('tree-node-1');
       expect(nodeElement).toHaveClass('select-none');
     });
@@ -1203,11 +1127,9 @@ describe('TabTreeView', () => {
           currentViewId="default"
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
-          // onDragEndを指定しない（非ドラッグ可能モード）
         />
       );
 
-      // 非ドラッグ可能なノードにもselect-noneクラスが適用されていること
       const nodeElement = screen.getByTestId('tree-node-1');
       expect(nodeElement).toHaveClass('select-none');
     });
@@ -1226,11 +1148,9 @@ describe('TabTreeView', () => {
         />
       );
 
-      // 親ノードにselect-noneクラスが適用されていること
       const parentElement = screen.getByTestId('tree-node-1');
       expect(parentElement).toHaveClass('select-none');
 
-      // 子ノードにもselect-noneクラスが適用されていること
       const childElement = screen.getByTestId('tree-node-2');
       expect(childElement).toHaveClass('select-none');
     });

@@ -1,4 +1,3 @@
-// Test file to verify path alias works
 import type { TabNode, View } from '@/types';
 
 export const testPathAlias = (): void => {
@@ -18,7 +17,6 @@ export const testPathAlias = (): void => {
     color: '#000000',
   };
 
-  // パスエイリアスの動作確認用（testNodeとtestViewを使用）
   void testNode;
   void testView;
 };

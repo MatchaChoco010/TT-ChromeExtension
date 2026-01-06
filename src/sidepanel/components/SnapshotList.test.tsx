@@ -3,17 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SnapshotList from './SnapshotList';
 import type { Snapshot } from '@/types';
 
-// テスト用のモックFile型（必要なプロパティのみ）
 interface MockFile {
   text: () => Promise<string>;
   name: string;
   type: string;
 }
 
-/**
- * スナップショット履歴管理 - SnapshotList コンポーネントのテスト
- * スナップショット一覧表示、削除、エクスポート/インポート機能
- */
 describe('SnapshotList Component', () => {
   const mockSnapshots: Snapshot[] = [
     {
@@ -71,7 +66,6 @@ describe('SnapshotList Component', () => {
       />,
     );
 
-    // すべてのスナップショット名が表示される
     expect(screen.getByText('Manual Snapshot 1')).toBeInTheDocument();
     expect(
       screen.getByText('Auto Snapshot - 2025-12-26 09:00:00'),
@@ -93,7 +87,6 @@ describe('SnapshotList Component', () => {
     const snapshotItems = screen.getAllByRole('listitem');
     expect(snapshotItems).toHaveLength(3);
 
-    // 最新のものが最初に表示される
     expect(snapshotItems[0]).toHaveTextContent('Manual Snapshot 1');
     expect(snapshotItems[1]).toHaveTextContent('Auto Snapshot - 2025-12-26');
     expect(snapshotItems[2]).toHaveTextContent('Manual Snapshot 2');
@@ -110,7 +103,6 @@ describe('SnapshotList Component', () => {
       />,
     );
 
-    // 自動保存バッジが表示される
     const autoSaveBadges = screen.getAllByText('自動保存');
     expect(autoSaveBadges).toHaveLength(1);
   });
@@ -188,12 +180,10 @@ describe('SnapshotList Component', () => {
     const importButton = screen.getByRole('button', { name: /インポート/i });
     expect(importButton).toBeInTheDocument();
 
-    // ファイル入力要素を取得
     const fileInput = screen.getByTestId(
       'snapshot-import-input',
     ) as HTMLInputElement;
 
-    // モックファイルを作成（.text() メソッドを持つオブジェクト）
     const jsonData = JSON.stringify({ id: 'test', name: 'Test Snapshot' });
     const mockFile: MockFile = {
       text: vi.fn<() => Promise<string>>().mockResolvedValue(jsonData),
@@ -201,13 +191,11 @@ describe('SnapshotList Component', () => {
       type: 'application/json',
     };
 
-    // FileList をモック
     Object.defineProperty(fileInput, 'files', {
       value: [mockFile],
       writable: false,
     });
 
-    // ファイルを選択
     fireEvent.change(fileInput);
 
     await waitFor(() => {
@@ -226,7 +214,6 @@ describe('SnapshotList Component', () => {
       />,
     );
 
-    // 日付が表示される (複数あるので getAllByText を使用)
     const dates2026 = screen.getAllByText(/2025-12-26/);
     expect(dates2026.length).toBeGreaterThan(0);
 
@@ -265,7 +252,6 @@ describe('SnapshotList Component', () => {
     const restoreButtons = screen.getAllByRole('button', { name: /復元/i });
     expect(restoreButtons[0]).not.toBeDisabled();
 
-    // processingSnapshotId を設定
     rerender(
       <SnapshotList
         snapshots={mockSnapshots}
@@ -277,7 +263,6 @@ describe('SnapshotList Component', () => {
       />,
     );
 
-    // 処理中のスナップショットのボタンが無効化される
     const updatedRestoreButtons = screen.getAllByRole('button', {
       name: /復元/i,
     });

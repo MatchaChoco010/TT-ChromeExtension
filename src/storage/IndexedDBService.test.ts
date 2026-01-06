@@ -10,7 +10,6 @@ describe('IndexedDBService', () => {
   });
 
   afterEach(async () => {
-    // Clean up: delete all snapshots
     const allSnapshots = await service.getAllSnapshots();
     for (const snapshot of allSnapshots) {
       await service.deleteSnapshot(snapshot.id);

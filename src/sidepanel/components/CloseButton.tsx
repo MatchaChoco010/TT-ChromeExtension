@@ -4,10 +4,6 @@ interface CloseButtonProps {
   onClose: () => void;
 }
 
-/**
- * タブを閉じるボタンコンポーネント
- * TreeNodeのホバー時に表示される
- */
 const CloseButton: React.FC<CloseButtonProps> = ({ onClose }) => {
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

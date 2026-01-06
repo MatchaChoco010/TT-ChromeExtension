@@ -6,10 +6,6 @@ interface SettingsPanelProps {
   onSettingsChange: (settings: UserSettings) => void;
 }
 
-/**
- * 設定パネルコンポーネント
- * ユーザー設定のカスタマイズUIを提供します。
- */
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   settings,
   onSettingsChange,
@@ -19,7 +15,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   ) => {
     const value = parseInt(e.target.value, 10);
 
-    // 1以上の値のみ受け付ける
     if (value >= 1) {
       onSettingsChange({
         ...settings,
@@ -28,11 +23,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
-  // 「デフォルトの新しいタブの位置」設定を削除
-  // 設定画面から「デフォルトの新しいタブの位置」設定を削除
-  // 代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定
-
-  // タブ開き方別の位置ルール
   const handleNewTabPositionFromLinkChange = (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
@@ -53,7 +43,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // フォントサイズ調整
   const handleFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
     if (value >= 8 && value <= 72) {
@@ -71,7 +60,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // フォントファミリー選択
   const handleFontFamilyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onSettingsChange({
       ...settings,
@@ -79,7 +67,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // カスタムCSS
   const handleCustomCSSChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onSettingsChange({
       ...settings,
@@ -87,18 +74,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     });
   };
 
-  // スナップショット自動保存設定
   const isAutoSnapshotEnabled = settings.autoSnapshotInterval > 0;
 
   const handleAutoSnapshotToggle = () => {
     if (isAutoSnapshotEnabled) {
-      // 無効にする
       onSettingsChange({
         ...settings,
         autoSnapshotInterval: 0,
       });
     } else {
-      // 有効にする（デフォルト10分）
       onSettingsChange({
         ...settings,
         autoSnapshotInterval: 10,
@@ -110,7 +94,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const value = parseInt(e.target.value, 10);
-    // 1分以上の値のみ受け付ける
     if (value >= 1) {
       onSettingsChange({
         ...settings,
@@ -121,7 +104,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleMaxSnapshotsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
-    // 1以上の値のみ受け付ける
     if (value >= 1) {
       onSettingsChange({
         ...settings,
@@ -134,11 +116,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     <div className="settings-panel p-4 bg-gray-900 text-gray-100">
       <h1 className="text-xl font-bold mb-6 text-gray-100">設定</h1>
 
-      {/* 外観のカスタマイズセクション */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-4 text-gray-100">外観のカスタマイズ</h2>
 
-        {/* フォントサイズ設定 */}
         <div className="mb-4">
           <label
             htmlFor="fontSize"
@@ -180,7 +160,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* フォントファミリー設定 */}
         <div className="mb-4">
           <label
             htmlFor="fontFamily"
@@ -201,7 +180,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* カスタムCSS設定 */}
         <div className="mb-4">
           <label
             htmlFor="customCSS"
@@ -223,15 +201,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </section>
 
-      {/* タブの動作セクション */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-4 text-gray-100">タブの動作</h2>
 
-        {/* 「デフォルトの新しいタブの位置」設定を削除
-            設定画面から「デフォルトの新しいタブの位置」設定を削除
-            代わりに「リンククリックのタブの位置」と「手動で開かれたタブの位置」を個別に設定 */}
-
-        {/* タブ開き方別の位置ルール */}
         <div className="mb-4">
           <label
             htmlFor="newTabPositionFromLink"
@@ -276,7 +248,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* 警告閾値設定 */}
         <div className="mb-4">
           <label
             htmlFor="closeWarningThreshold"
@@ -301,11 +272,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </section>
 
-      {/* スナップショットの自動保存セクション */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-4 text-gray-100">スナップショットの自動保存</h2>
 
-        {/* 自動保存有効/無効トグル */}
         <div className="mb-4">
           <div className="flex items-center justify-between">
             <label
@@ -335,7 +304,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* 自動保存間隔設定 */}
         <div className="mb-4">
           <label
             htmlFor="autoSnapshotInterval"
@@ -357,7 +325,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </p>
         </div>
 
-        {/* 最大スナップショット数設定 */}
         <div className="mb-4">
           <label
             htmlFor="maxSnapshots"

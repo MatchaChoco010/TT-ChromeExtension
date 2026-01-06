@@ -1,6 +1,3 @@
-/**
- * TreeStateProvider のリアルタイム更新テスト
- */
 import React from 'react';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
@@ -8,7 +5,6 @@ import { TreeStateProvider, useTreeState } from './TreeStateProvider';
 import type { TreeState, StorageChanges, SiblingDropInfo } from '@/types';
 import type { MockChrome, MessageListener } from '@/test/test-types';
 
-// テストコンポーネント
 function TestComponent() {
   const { treeState, isLoading, error } = useTreeState();
 
@@ -33,7 +29,6 @@ describe('TreeStateProvider リアルタイム更新', () => {
     mockMessageListeners = [];
     mockStorageListeners = [];
 
-    // chrome.storage.local のモック
     mockChrome = {
       storage: {
         local: {
@@ -88,6 +83,8 @@ describe('TreeStateProvider リアルタイム更新', () => {
         onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -95,6 +92,7 @@ describe('TreeStateProvider リアルタイム更新', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -256,7 +254,6 @@ describe('TreeStateProvider TabInfoMap管理', () => {
   let mockTabsUpdatedListeners: Array<(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => void> = [];
   let mockChrome: MockChrome;
 
-  // タブ情報を表示するテストコンポーネント
   function TabInfoTestComponent() {
     const { treeState, isLoading, tabInfoMap, getTabInfo } = useTreeState();
 
@@ -355,6 +352,8 @@ describe('TreeStateProvider TabInfoMap管理', () => {
           }),
         },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -362,6 +361,7 @@ describe('TreeStateProvider TabInfoMap管理', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -645,6 +645,8 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
           }),
         },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -652,6 +654,7 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -966,6 +969,8 @@ describe('TreeStateProvider 複数選択状態管理', () => {
         onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -973,6 +978,7 @@ describe('TreeStateProvider 複数選択状態管理', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -1352,6 +1358,8 @@ describe('TreeStateProvider handleSiblingDrop', () => {
         onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -1359,6 +1367,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -2219,6 +2228,8 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
         onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -2226,6 +2237,7 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -2449,6 +2461,8 @@ describe('TreeStateProvider ファビコン永続化', () => {
           }),
         },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -2456,6 +2470,7 @@ describe('TreeStateProvider ファビコン永続化', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -2766,6 +2781,8 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
           }),
         },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -2773,6 +2790,7 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -3017,6 +3035,8 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
           }),
         },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -3024,6 +3044,7 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),
@@ -3426,6 +3447,8 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
         onMoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onUpdated: { addListener: vi.fn(), removeListener: vi.fn() },
         onActivated: { addListener: vi.fn(), removeListener: vi.fn() },
+        onDetached: { addListener: vi.fn(), removeListener: vi.fn() },
+        onAttached: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       windows: {
         get: vi.fn(),
@@ -3433,6 +3456,7 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
         create: vi.fn(),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+        onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
       sidePanel: {
         open: vi.fn(),

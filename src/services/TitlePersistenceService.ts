@@ -11,13 +11,8 @@ import { STORAGE_KEYS } from '@/storage/StorageService';
  * - タブが閉じられた際に該当タブのタイトルデータを削除
  */
 export class TitlePersistenceService {
-  /** タイトルマップ（メモリキャッシュ） */
   private titles: TabTitlesMap = {};
-
-  /** デバウンス用タイマーID */
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  /** デバウンス間隔（ミリ秒） */
   private readonly DEBOUNCE_MS = 300;
 
   constructor(private storageService: IStorageService) {}
@@ -32,10 +27,7 @@ export class TitlePersistenceService {
    * @param title - タイトル
    */
   saveTitle(tabId: number, title: string): void {
-    // メモリキャッシュを更新
     this.titles[tabId] = title;
-
-    // デバウンスで書き込み頻度を制限
     this.debouncedSave();
   }
 
@@ -69,8 +61,6 @@ export class TitlePersistenceService {
    */
   removeTitle(tabId: number): void {
     delete this.titles[tabId];
-
-    // デバウンスで書き込み頻度を制限
     this.debouncedSave();
   }
 
@@ -83,19 +73,16 @@ export class TitlePersistenceService {
     const existingTabIdSet = new Set(existingTabIds);
     const staleTabIds: number[] = [];
 
-    // 存在しないタブIDを特定
     for (const tabId of Object.keys(this.titles).map(Number)) {
       if (!existingTabIdSet.has(tabId)) {
         staleTabIds.push(tabId);
       }
     }
 
-    // 存在しないタブのタイトルを削除
     for (const tabId of staleTabIds) {
       delete this.titles[tabId];
     }
 
-    // 変更があった場合のみ保存
     if (staleTabIds.length > 0) {
       this.debouncedSave();
     }
@@ -113,11 +100,6 @@ export class TitlePersistenceService {
     }
   }
 
-  /**
-   * デバウンスされたストレージ書き込み
-   *
-   * 300msの間隔で書き込み頻度を制限し、パフォーマンスを最適化
-   */
   private debouncedSave(): void {
     if (this.saveTimeoutId !== null) {
       clearTimeout(this.saveTimeoutId);

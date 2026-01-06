@@ -1,9 +1,3 @@
-/**
- * SnapshotSection コンポーネント
- *
- * Side Panel内でスナップショット機能を提供するセクション
- * スナップショット機能の実装とテスト
- */
 import React, { useState, useRef, useEffect } from 'react';
 import type { Snapshot, IIndexedDBService, IStorageService } from '@/types';
 import { SnapshotManager } from '@/services/SnapshotManager';
@@ -13,10 +7,6 @@ interface SnapshotSectionProps {
   storageService: IStorageService;
 }
 
-/**
- * スナップショットセクションコンポーネント
- * スナップショットの作成、復元、削除、エクスポート/インポート機能を提供
- */
 const SnapshotSection: React.FC<SnapshotSectionProps> = ({
   indexedDBService,
   storageService,
@@ -32,12 +22,8 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // SnapshotManagerのインスタンス
   const snapshotManager = new SnapshotManager(indexedDBService, storageService);
 
-  /**
-   * スナップショット一覧を読み込み
-   */
   const loadSnapshots = async () => {
     try {
       setIsLoading(true);
@@ -54,9 +40,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
     loadSnapshots();
   }, []);
 
-  /**
-   * スナップショットを作成
-   */
   const handleCreate = async () => {
     if (!newSnapshotName.trim()) return;
 
@@ -73,9 +56,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
     }
   };
 
-  /**
-   * キー押下時の処理
-   */
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleCreate();
@@ -85,22 +65,17 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
     }
   };
 
-  /**
-   * スナップショットを復元
-   */
   const handleRestore = async (snapshotId: string, closeCurrentTabs: boolean) => {
     try {
       setProcessingId(snapshotId);
       setShowRestoreOptions(null);
 
       if (closeCurrentTabs) {
-        // 現在のタブを閉じる
         const tabs = await chrome.tabs.query({});
         const tabIds = tabs
           .filter((t) => t.id !== undefined)
           .map((t) => t.id as number);
         if (tabIds.length > 0) {
-          // 最低1つのタブを残す
           const tabsToClose = tabIds.slice(1);
           if (tabsToClose.length > 0) {
             await chrome.tabs.remove(tabsToClose);
@@ -116,9 +91,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
     }
   };
 
-  /**
-   * スナップショットを削除
-   */
   const handleDelete = async (snapshotId: string) => {
     try {
       setProcessingId(snapshotId);
@@ -131,9 +103,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
     }
   };
 
-  /**
-   * スナップショットをエクスポート
-   */
   const handleExport = async (snapshotId: string) => {
     try {
       setProcessingId(snapshotId);
@@ -156,16 +125,10 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
     }
   };
 
-  /**
-   * インポートボタンクリック
-   */
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
 
-  /**
-   * ファイル選択時の処理
-   */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -175,7 +138,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
       await snapshotManager.importSnapshot(text);
       await loadSnapshots();
 
-      // ファイル入力をリセット
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -184,9 +146,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
     }
   };
 
-  /**
-   * 日付をフォーマット
-   */
   const formatDate = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -199,7 +158,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
 
   return (
     <div data-testid="snapshot-section" className="border-b border-gray-200">
-      {/* ヘッダー */}
       <button
         className="w-full px-3 py-2 flex items-center justify-between bg-gray-50 hover:bg-gray-100"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -212,7 +170,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
 
       {isExpanded && (
         <div className="p-2">
-          {/* 作成・インポートボタン */}
           <div className="flex gap-2 mb-2">
             <button
               data-testid="create-snapshot-button"
@@ -231,7 +188,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
             </button>
           </div>
 
-          {/* スナップショット名入力 */}
           {isCreating && (
             <div className="mb-2">
               <input
@@ -247,14 +203,12 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
             </div>
           )}
 
-          {/* ローディング表示 */}
           {isLoading && (
             <p className="text-xs text-gray-500 text-center py-2">
               Loading...
             </p>
           )}
 
-          {/* スナップショットリスト */}
           {!isLoading && (
             <div data-testid="snapshot-list" className="space-y-1">
               {snapshots.length === 0 ? (
@@ -287,7 +241,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
                       {formatDate(snapshot.createdAt)}
                     </div>
 
-                    {/* 復元オプションダイアログ */}
                     {showRestoreOptions === snapshot.id && (
                       <div className="mb-2 p-2 bg-gray-50 rounded border border-gray-200">
                         <p className="text-xs text-gray-600 mb-2">
@@ -314,7 +267,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
                       </div>
                     )}
 
-                    {/* アクションボタン */}
                     <div className="flex gap-1">
                       <button
                         data-testid="snapshot-restore-button"
@@ -347,7 +299,6 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
             </div>
           )}
 
-          {/* 非表示のファイル入力 */}
           <input
             ref={fileInputRef}
             type="file"

@@ -1,8 +1,3 @@
-/**
- * SubMenu コンポーネントのテスト
- * 汎用サブメニューコンポーネントを作成
- */
-
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -42,7 +37,6 @@ describe('SubMenu', () => {
         />
       );
 
-      // サブメニューが表示されることを確認
       const submenu = screen.getByRole('menu');
       expect(submenu).toBeInTheDocument();
     });
@@ -61,7 +55,6 @@ describe('SubMenu', () => {
         />
       );
 
-      // 全ての項目が表示されることを確認
       expect(screen.getByText('Item 1')).toBeInTheDocument();
       expect(screen.getByText('Item 2')).toBeInTheDocument();
       expect(screen.getByText('Item 3')).toBeInTheDocument();
@@ -81,7 +74,6 @@ describe('SubMenu', () => {
         />
       );
 
-      // 無効化された項目のボタンを取得
       const disabledItem = screen.getByText('Item 3').closest('button');
       expect(disabledItem).toBeDisabled();
     });
@@ -136,7 +128,6 @@ describe('SubMenu', () => {
       const onSelect = vi.fn();
       const onClose = vi.fn();
 
-      // ウィンドウサイズを設定
       Object.defineProperty(window, 'innerWidth', {
         writable: true,
         configurable: true,
@@ -159,7 +150,6 @@ describe('SubMenu', () => {
       );
 
       const submenu = screen.getByRole('menu');
-      // 親メニューの右側に表示される（left = parentRect.right = 300）
       expect(submenu.style.left).toBeDefined();
     });
 
@@ -167,7 +157,6 @@ describe('SubMenu', () => {
       const onSelect = vi.fn();
       const onClose = vi.fn();
 
-      // ウィンドウサイズを狭く設定
       Object.defineProperty(window, 'innerWidth', {
         writable: true,
         configurable: true,
@@ -203,14 +192,12 @@ describe('SubMenu', () => {
 
       const submenu = screen.getByRole('menu');
       expect(submenu).toBeInTheDocument();
-      // 位置調整のロジックが正しく動作していることを確認
     });
 
     it('下端に近い場合は上方向に調整される', () => {
       const onSelect = vi.fn();
       const onClose = vi.fn();
 
-      // ウィンドウサイズを設定
       Object.defineProperty(window, 'innerWidth', {
         writable: true,
         configurable: true,
@@ -285,10 +272,8 @@ describe('SubMenu', () => {
         />
       );
 
-      // 下矢印キーで次の項目にフォーカス
       await user.keyboard('{ArrowDown}');
 
-      // 最初の有効な項目がフォーカスされることを確認
       const items = screen.getAllByRole('menuitem');
       await waitFor(() => {
         expect(items[0]).toHaveFocus();
@@ -310,10 +295,7 @@ describe('SubMenu', () => {
         />
       );
 
-      // 下矢印キーで最初の項目にフォーカス
       await user.keyboard('{ArrowDown}');
-
-      // Enterキーで選択
       await user.keyboard('{Enter}');
 
       expect(onSelect).toHaveBeenCalledWith('item1');
@@ -358,9 +340,6 @@ describe('SubMenu', () => {
       const submenu = screen.getByRole('menu');
       fireEvent.mouseLeave(submenu);
 
-      // マウスが離れた場合、閉じるまでに遅延がある場合があるので、
-      // 実装に応じてテストを調整
-      // ここでは即座に閉じる実装を想定
       await waitFor(() => {
         expect(onClose).toHaveBeenCalled();
       }, { timeout: 500 });

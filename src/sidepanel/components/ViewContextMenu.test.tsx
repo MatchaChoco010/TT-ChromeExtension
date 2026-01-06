@@ -1,8 +1,3 @@
-/**
- * ViewContextMenu コンポーネントのテスト
- * ビューボタンの右クリックコンテキストメニューの実装
- */
-
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { View } from '@/types';
@@ -210,8 +205,6 @@ describe('ViewContextMenu', () => {
         </div>
       );
 
-      // メニュー外クリックイベントを発火
-      // 非同期でイベントリスナーが登録されるのを待つ
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       const outsideElement = container.querySelector('[data-testid="outside"]');
@@ -239,7 +232,6 @@ describe('ViewContextMenu', () => {
 
   describe('画面端での位置調整', () => {
     it('右端を超える場合は左に調整される', () => {
-      // ウィンドウ幅を設定
       Object.defineProperty(window, 'innerWidth', { value: 300, writable: true });
 
       render(
@@ -255,12 +247,10 @@ describe('ViewContextMenu', () => {
       const menu = screen.getByRole('menu');
       const style = menu.style;
       const leftValue = parseInt(style.left, 10);
-      // メニュー幅（160px）+ マージン（10px）を考慮して調整される
       expect(leftValue).toBeLessThanOrEqual(250);
     });
 
     it('下端を超える場合は上に調整される', () => {
-      // ウィンドウ高さを設定
       Object.defineProperty(window, 'innerHeight', { value: 200, writable: true });
 
       render(
@@ -276,7 +266,6 @@ describe('ViewContextMenu', () => {
       const menu = screen.getByRole('menu');
       const style = menu.style;
       const topValue = parseInt(style.top, 10);
-      // メニュー高さ（80px）+ マージン（10px）を考慮して調整される
       expect(topValue).toBeLessThanOrEqual(180);
     });
   });

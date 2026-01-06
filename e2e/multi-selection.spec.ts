@@ -1,13 +1,3 @@
-/**
- * Multi-Selection E2E Tests
- *
- * 複数選択機能の E2E テスト
- *
- * - Shift+クリックで範囲選択ができること
- * - Ctrl+クリックで追加選択/選択解除ができること
- * - 複数選択時のコンテキストメニューオプションをテスト
- */
-
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';

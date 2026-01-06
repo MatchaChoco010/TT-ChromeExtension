@@ -1,18 +1,8 @@
-/**
- * ビューアイコン選択即時反映のE2Eテスト
- *
- * テスト対象:
- * - プリセットからアイコン選択時に「Select」ボタン不要で即座に反映
- * - ツリービューパネル上のアイコンも即座に更新
- */
 import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
 import { waitForViewSwitcher } from './utils/polling-utils';
 
 extensionTest.describe('ビューアイコン選択即時反映', () => {
-  /**
-   * プリセットからアイコン選択時に即座に反映
-   */
   extensionTest(
     'プリセットからアイコンを選択すると即座に反映される（Selectボタン不要）',
     async ({ sidePanelPage }) => {
@@ -85,9 +75,6 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
     }
   );
 
-  /**
-   * ツリービューパネル上のアイコンも即座に更新
-   */
   extensionTest(
     'アイコン選択後にツリービューパネル上のビューアイコンが即座に更新される',
     async ({ sidePanelPage }) => {
@@ -167,10 +154,6 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
     }
   );
 
-  /**
-   * 「Select」ボタンの押下を必要としない
-   * このテストはアイコン選択時に即座にモーダルが閉じることを検証
-   */
   extensionTest(
     'アイコン選択時にIconPickerが即座に閉じる（Selectボタン不要）',
     async ({ sidePanelPage }) => {
@@ -233,9 +216,6 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
     }
   );
 
-  /**
-   * 複数回のアイコン変更が正しく反映されることを検証
-   */
   extensionTest(
     '複数回アイコンを変更しても正しく反映される',
     async ({ sidePanelPage }) => {

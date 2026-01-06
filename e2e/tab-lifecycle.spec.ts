@@ -1,17 +1,3 @@
-/**
- * タブライフサイクルとツリー構造の基本操作テスト
- *
- * このテストスイートでは、以下を検証します:
- * 1. 新しいタブ作成時のツリーノード追加
- * 2. 親タブからの子タブ作成時の親子関係確立
- * 3. タブを閉じた際のツリーノード削除
- * 4. 子タブを持つ親タブ削除時の子タブ処理
- * 5. タブのタイトル・URL変更時のリアルタイム更新
- * 6. タブアクティブ化時のハイライト表示
- *
- * 注: これらのテストは、chrome.tabs APIの動作を検証します。
- * Side Panelが表示され、基本的なタブ操作が可能であることを確認します。
- */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -91,7 +77,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     );
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
   });
@@ -172,7 +158,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     );
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId1, depth: 1 },
     ], 0);
 
@@ -183,7 +169,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     );
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId1, depth: 1 },
       { tabId: childTabId2, depth: 1 },
     ], 0);

@@ -1,11 +1,5 @@
 /**
  * Vivaldi互換性テスト
- *
- * 以下の互換性をテストする:
- * - Vivaldiブラウザ最新版での動作
- * - VivaldiのタブAPIとChrome拡張機能APIの両方との互換性
- * - Vivaldiのテーマ設定と調和するデフォルトスタイル
- * - VivaldiのAPIが利用できない場合の標準Chrome拡張機能APIへのフォールバック
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -14,13 +8,11 @@ import { ThemeProvider } from '@/sidepanel/providers/ThemeProvider';
 import type { UserSettings } from '@/types';
 import type { MockChrome, MockStorageData } from '@/test/test-types';
 
-// Vivaldiブラウザ固有のAPIをモック
 interface VivaldiTabAPI {
   getAll?: (callback: (tabs: chrome.tabs.Tab[]) => void) => void;
   stackCreate?: (tabIds: number[], callback?: () => void) => void;
 }
 
-// Chromeオブジェクトを拡張してVivaldi固有プロパティを追加
 declare global {
   interface Window {
     vivaldi?: {
@@ -30,16 +22,13 @@ declare global {
 }
 
 describe('Vivaldi互換性テスト', () => {
-  // Mock storage - shared across tests but reset in beforeEach
   let mockStorage: MockStorageData = {};
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Reset mock storage
     mockStorage = {};
 
-    // Chrome storage のモック
     const mockChrome = global.chrome as unknown as MockChrome;
     vi.mocked(mockChrome.storage.local.get).mockImplementation((keys?: string | string[] | null) => {
       const result: Record<string, unknown> = {};
@@ -68,7 +57,6 @@ describe('Vivaldi互換性テスト', () => {
     global.chrome.storage.onChanged.addListener = vi.fn();
     global.chrome.storage.onChanged.removeListener = vi.fn();
 
-    // Chrome tabs API のモック
     vi.mocked(mockChrome.tabs.query).mockResolvedValue([
       {
         id: 1,
@@ -86,17 +74,14 @@ describe('Vivaldi互換性テスト', () => {
       } as chrome.tabs.Tab)
     );
 
-    // Chrome runtime API のモック
     global.chrome.runtime.sendMessage = vi.fn(() => Promise.resolve());
     global.chrome.runtime.onMessage.addListener = vi.fn();
     global.chrome.runtime.onMessage.removeListener = vi.fn();
 
-    // Chrome sidePanel API のモック (Manifest V3)
     vi.mocked(mockChrome.sidePanel.open).mockResolvedValue(undefined);
     vi.mocked(mockChrome.sidePanel.getOptions).mockResolvedValue({ enabled: true });
     vi.mocked(mockChrome.sidePanel.setOptions).mockResolvedValue(undefined);
 
-    // matchMedia のモック
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -114,19 +99,15 @@ describe('Vivaldi互換性テスト', () => {
 
   describe('Vivaldiブラウザでの基本動作', () => {
     it('サイドパネルAPIが正常に動作すること', async () => {
-      // Arrange
       const mockOpenSidePanel = vi.fn(() => Promise.resolve());
       global.chrome.sidePanel.open = mockOpenSidePanel;
 
-      // Act
       await chrome.sidePanel.open({ windowId: 1 });
 
-      // Assert
       expect(mockOpenSidePanel).toHaveBeenCalledWith({ windowId: 1 });
     });
 
     it('Chrome tabs APIが正常に動作すること', async () => {
-      // Arrange
       const mockTabs = [
         {
           id: 1,
@@ -140,16 +121,13 @@ describe('Vivaldi互換性テスト', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.tabs.query).mockResolvedValue(mockTabs);
 
-      // Act
       const tabs = await chrome.tabs.query({ currentWindow: true });
 
-      // Assert
       expect(tabs).toEqual(mockTabs);
       expect(chrome.tabs.query).toHaveBeenCalledWith({ currentWindow: true });
     });
 
     it('ストレージAPIが正常に動作すること', async () => {
-      // Arrange
       const testSettings: UserSettings = {
         fontSize: 14,
         fontFamily: 'system-ui',
@@ -161,20 +139,16 @@ describe('Vivaldi互換性テスト', () => {
         childTabBehavior: 'promote',
       };
 
-      // Act
       await chrome.storage.local.set({ user_settings: testSettings });
 
-      // Get settings from storage
       const result = await chrome.storage.local.get('user_settings');
 
-      // Assert
       expect(result.user_settings).toEqual(testSettings);
     });
   });
 
   describe('VivaldiのタブAPIとChrome拡張機能APIの互換性', () => {
     it('Vivaldi固有のタブプロパティが利用可能な場合、それを活用できること', async () => {
-      // Arrange - Vivaldi固有のAPIを模擬
       const vivaldiTabs: VivaldiTabAPI = {
         getAll: vi.fn((callback) => {
           callback([
@@ -193,7 +167,6 @@ describe('Vivaldi互換性テスト', () => {
         tabs: vivaldiTabs,
       };
 
-      // Act
       const tabs: chrome.tabs.Tab[] = await new Promise((resolve) => {
         if (window.vivaldi?.tabs?.getAll) {
           window.vivaldi.tabs.getAll((tabs) => resolve(tabs));
@@ -202,14 +175,12 @@ describe('Vivaldi互換性テスト', () => {
         }
       });
 
-      // Assert
       expect(tabs).toHaveLength(1);
       expect(tabs[0].title).toBe('Vivaldi Tab');
       expect(vivaldiTabs.getAll).toHaveBeenCalled();
     });
 
     it('標準のChrome tabs APIも正常に動作すること', async () => {
-      // Arrange
       const chromeTabs = [
         {
           id: 1,
@@ -223,17 +194,14 @@ describe('Vivaldi互換性テスト', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.tabs.query).mockResolvedValue(chromeTabs);
 
-      // Act
       const tabs = await chrome.tabs.query({ currentWindow: true });
 
-      // Assert
       expect(tabs).toEqual(chromeTabs);
     });
   });
 
   describe('Vivaldiのテーマ設定との視覚的調和', () => {
     it('ダークモード時にVivaldi用のダークテーマが適用されること', async () => {
-      // Arrange
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation((query: string) => ({
@@ -248,14 +216,12 @@ describe('Vivaldi互換性テスト', () => {
         })),
       });
 
-      // Act
       render(
         <ThemeProvider>
           <div data-testid="test-content">Test</div>
         </ThemeProvider>
       );
 
-      // Assert
       await waitFor(() => {
         const style = document.getElementById('vivaldi-tt-theme');
         expect(style).toBeTruthy();
@@ -266,7 +232,6 @@ describe('Vivaldi互換性テスト', () => {
     });
 
     it('ライトモード時にVivaldi用のライトテーマが適用されること', async () => {
-      // Arrange
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation((query: string) => ({
@@ -281,14 +246,12 @@ describe('Vivaldi互換性テスト', () => {
         })),
       });
 
-      // Act
       render(
         <ThemeProvider>
           <div data-testid="test-content">Test</div>
         </ThemeProvider>
       );
 
-      // Assert
       await waitFor(() => {
         const style = document.getElementById('vivaldi-tt-theme');
         expect(style).toBeTruthy();
@@ -299,14 +262,12 @@ describe('Vivaldi互換性テスト', () => {
     });
 
     it('CSS変数がVivaldiテーマと一貫性のある値を持つこと', async () => {
-      // Act
       render(
         <ThemeProvider>
           <div data-testid="test-content">Test</div>
         </ThemeProvider>
       );
 
-      // Assert
       await waitFor(() => {
         const style = document.getElementById('vivaldi-tt-theme');
         expect(style?.textContent).toContain('--vivaldi-bg-primary');
@@ -319,7 +280,6 @@ describe('Vivaldi互換性テスト', () => {
     });
 
     it('カスタムCSSがVivaldiテーマの上に適用されること', async () => {
-      // Arrange
       const customSettings: UserSettings = {
         fontSize: 16,
         fontFamily: 'Arial, sans-serif',
@@ -331,17 +291,14 @@ describe('Vivaldi互換性テスト', () => {
         childTabBehavior: 'promote',
       };
 
-      // Set settings in storage before rendering
       await chrome.storage.local.set({ user_settings: customSettings });
 
-      // Act
       render(
         <ThemeProvider>
           <div data-testid="test-content">Test</div>
         </ThemeProvider>
       );
 
-      // Assert
       await waitFor(
         () => {
           const style = document.getElementById('vivaldi-tt-theme');
@@ -357,7 +314,6 @@ describe('Vivaldi互換性テスト', () => {
 
   describe('VivaldiのAPIが利用できない場合のフォールバック', () => {
     it('Vivaldi固有APIが存在しない場合、標準Chrome APIにフォールバックすること', async () => {
-      // Arrange
       window.vivaldi = undefined;
 
       const chromeTabs = [
@@ -373,7 +329,6 @@ describe('Vivaldi互換性テスト', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.tabs.query).mockResolvedValue(chromeTabs);
 
-      // Act
       const tabs: chrome.tabs.Tab[] = await new Promise((resolve) => {
         if (window.vivaldi?.tabs?.getAll) {
           window.vivaldi.tabs.getAll((tabs) => resolve(tabs));
@@ -382,18 +337,15 @@ describe('Vivaldi互換性テスト', () => {
         }
       });
 
-      // Assert
       expect(tabs).toEqual(chromeTabs);
       expect(chrome.tabs.query).toHaveBeenCalledWith({ currentWindow: true });
     });
 
     it('Vivaldi固有プロパティがundefinedの場合でもエラーが発生しないこと', async () => {
-      // Arrange
       window.vivaldi = {
         tabs: undefined,
       };
 
-      // Act & Assert
       expect(() => {
         if (window.vivaldi?.tabs?.getAll) {
           window.vivaldi.tabs.getAll(() => {});
@@ -404,14 +356,11 @@ describe('Vivaldi互換性テスト', () => {
     });
 
     it('Chrome APIのみで全機能が動作すること', async () => {
-      // Arrange
       window.vivaldi = undefined;
 
-      // Act - タブ操作
       await chrome.tabs.query({ currentWindow: true });
       await chrome.tabs.update(1, { active: true });
 
-      // Assert
       expect(chrome.tabs.query).toHaveBeenCalled();
       expect(chrome.tabs.update).toHaveBeenCalledWith(1, { active: true });
     });
@@ -419,7 +368,6 @@ describe('Vivaldi互換性テスト', () => {
 
   describe('統合テスト: Vivaldi環境での全機能動作確認', () => {
     it('サイドパネルがVivaldi環境で正常に表示されること', async () => {
-      // Arrange - Vivaldi環境をシミュレート
       window.vivaldi = {
         tabs: {
           getAll: vi.fn((callback) => {
@@ -436,14 +384,12 @@ describe('Vivaldi互換性テスト', () => {
         },
       };
 
-      // Act
       render(
         <ThemeProvider>
           <div data-testid="side-panel-root">Side Panel Content</div>
         </ThemeProvider>
       );
 
-      // Assert
       await waitFor(() => {
         expect(screen.getByTestId('side-panel-root')).toBeInTheDocument();
         const style = document.getElementById('vivaldi-tt-theme');
@@ -452,7 +398,6 @@ describe('Vivaldi互換性テスト', () => {
     });
 
     it('Vivaldiテーマとカスタム設定が同時に適用されること', async () => {
-      // Arrange
       const settings: UserSettings = {
         fontSize: 18,
         fontFamily: 'Courier New, monospace',
@@ -464,17 +409,14 @@ describe('Vivaldi互換性テスト', () => {
         childTabBehavior: 'promote',
       };
 
-      // Set settings before rendering
       await chrome.storage.local.set({ user_settings: settings });
 
-      // Act
       render(
         <ThemeProvider>
           <div data-testid="test-content">Test</div>
         </ThemeProvider>
       );
 
-      // Assert
       await waitFor(
         () => {
           const style = document.getElementById('vivaldi-tt-theme');
@@ -490,11 +432,10 @@ describe('Vivaldi互換性テスト', () => {
     });
 
     it('ダークモードとライトモードの切り替えが動的に反映されること', async () => {
-      // Arrange - ライトモードでスタート
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation((query: string) => ({
-          matches: false, // Light mode
+          matches: false,
           media: query,
           onchange: null,
           addListener: vi.fn(),
@@ -505,7 +446,6 @@ describe('Vivaldi互換性テスト', () => {
         })),
       });
 
-      // Act - ライトモードでレンダリング
       const { unmount } = render(
         <ThemeProvider>
           <div data-testid="test-content">Test Light</div>
@@ -517,14 +457,12 @@ describe('Vivaldi互換性テスト', () => {
         expect(style?.textContent).toContain('Vivaldi Light Theme');
       });
 
-      // Clean up
       unmount();
 
-      // ダークモードに切り替え
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation((query: string) => ({
-          matches: query === '(prefers-color-scheme: dark)', // Dark mode
+          matches: query === '(prefers-color-scheme: dark)',
           media: query,
           onchange: null,
           addListener: vi.fn(),
@@ -535,14 +473,12 @@ describe('Vivaldi互換性テスト', () => {
         })),
       });
 
-      // 新しくレンダリング
       render(
         <ThemeProvider>
           <div data-testid="test-content">Test Dark</div>
         </ThemeProvider>
       );
 
-      // Assert
       await waitFor(() => {
         const style = document.getElementById('vivaldi-tt-theme');
         expect(style?.textContent).toContain('Vivaldi Dark Theme');

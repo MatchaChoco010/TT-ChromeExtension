@@ -1,4 +1,5 @@
 import React from 'react';
+import { TREE_INDENT_WIDTH_PX } from '../utils';
 
 interface UnreadBadgeProps {
   /** 未読状態かどうか */
@@ -27,16 +28,12 @@ const UnreadBadge: React.FC<UnreadBadgeProps> = ({
   depth = 0,
   className,
 }) => {
-  // showIndicatorがfalseの場合、または未読でない場合は何も表示しない
   if (!showIndicator || !isUnread) {
     return null;
   }
 
-  // depthに応じたインデント計算（TreeNodeと同じ20px/depth）
-  const indentPx = depth * 20;
+  const indentPx = depth * TREE_INDENT_WIDTH_PX;
 
-  // 三角形切り欠きスタイル（CSS border-based triangle technique）
-  // 左下角に配置される三角形（depthに応じてインデント）
   const triangleStyle: React.CSSProperties = {
     position: 'absolute',
     left: `${indentPx}px`,
@@ -44,8 +41,6 @@ const UnreadBadge: React.FC<UnreadBadgeProps> = ({
     width: 0,
     height: 0,
     borderStyle: 'solid',
-    // 右上を向いた三角形（左下角に配置）
-    // borderWidth: top right bottom left
     borderWidth: '0 8px 8px 0',
     borderColor: 'transparent transparent #3b82f6 transparent',
   };

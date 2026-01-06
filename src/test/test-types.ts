@@ -1,13 +1,6 @@
-/**
- * テスト用の型定義
- * Chrome API のモック型と、テストで使用する共通の型を定義
- */
 import type { Mock } from 'vitest';
 import type { StorageChanges, UserSettings, TreeState } from '@/types';
 
-/**
- * Chrome Storage のモック型
- */
 export interface MockStorageLocal {
   get: Mock<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>;
   set: Mock<(items: Record<string, unknown>) => Promise<void>>;
@@ -25,9 +18,6 @@ export interface MockStorage {
   onChanged: MockStorageOnChanged;
 }
 
-/**
- * Chrome Tabs のモック型
- */
 export interface MockTabsEvents {
   addListener: Mock;
   removeListener: Mock;
@@ -49,9 +39,6 @@ export interface MockTabs {
   onActivated: MockTabsEvents;
 }
 
-/**
- * Chrome Windows のモック型
- */
 export interface MockWindows {
   get: Mock<(windowId: number, getInfo?: { populate?: boolean; windowTypes?: string[] }) => Promise<chrome.windows.Window>>;
   getCurrent: Mock<() => Promise<chrome.windows.Window>>;
@@ -60,9 +47,6 @@ export interface MockWindows {
   onRemoved: MockTabsEvents;
 }
 
-/**
- * Chrome Runtime のモック型
- */
 export interface MockRuntimeOnMessage {
   addListener: Mock<(callback: (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => boolean | void) => void>;
   removeListener: Mock;
@@ -75,18 +59,12 @@ export interface MockRuntime {
   lastError?: chrome.runtime.LastError;
 }
 
-/**
- * Chrome SidePanel のモック型
- */
 export interface MockSidePanel {
   open: Mock<(options?: { windowId?: number }) => Promise<void>>;
   getOptions: Mock<() => Promise<{ enabled: boolean }>>;
   setOptions: Mock<(options: { enabled?: boolean }) => Promise<void>>;
 }
 
-/**
- * Chrome Alarms のモック型
- */
 export interface MockAlarms {
   create: Mock<(name: string, alarmInfo: chrome.alarms.AlarmCreateInfo) => void>;
   clear: Mock<(name: string) => Promise<boolean>>;
@@ -94,9 +72,6 @@ export interface MockAlarms {
   onAlarm: MockTabsEvents;
 }
 
-/**
- * Chrome API 全体のモック型
- */
 export interface MockChrome {
   storage: MockStorage;
   tabs: MockTabs;
@@ -106,9 +81,6 @@ export interface MockChrome {
   alarms?: MockAlarms;
 }
 
-/**
- * テスト用のストレージデータ型
- */
 export interface MockStorageData {
   user_settings?: UserSettings;
   tree_state?: TreeState;
@@ -116,38 +88,22 @@ export interface MockStorageData {
   groups?: Record<string, { id: string; name: string; color: string; isExpanded: boolean }>;
 }
 
-/**
- * Storage 変更リスナーの型
- */
 export type StorageChangeListener = (changes: StorageChanges, areaName: string) => void;
 
-/**
- * Message リスナーの型
- */
 export type MessageListener = (
   message: unknown,
   sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void
 ) => boolean | void;
 
-/**
- * Chrome API を MockChrome 型としてキャストするヘルパー
- */
 export function getMockChrome(): MockChrome {
   return globalThis.chrome as unknown as MockChrome;
 }
 
-/**
- * モック関数を型安全に取得するヘルパー
- */
 export function getMockedFn<T extends (...args: unknown[]) => unknown>(fn: T): Mock<T> {
   return fn as unknown as Mock<T>;
 }
 
-/**
- * SnapshotManager のモック型
- * テスト用にモック関数を持つインターフェース
- */
 export interface MockSnapshotManager {
   getSnapshots: Mock<() => Promise<import('@/types').Snapshot[]>>;
   createSnapshot: Mock<(name: string, isAutoSave?: boolean) => Promise<import('@/types').Snapshot>>;
@@ -157,10 +113,6 @@ export interface MockSnapshotManager {
   importSnapshot: Mock<(jsonData: string) => Promise<import('@/types').Snapshot>>;
 }
 
-/**
- * IIndexedDBService のモック型
- * テスト用に必要なメソッドのみを持つインターフェース
- */
 export interface MockIndexedDBService {
   deleteOldSnapshots: Mock<(keepCount: number) => Promise<void>>;
   saveSnapshot?: Mock<(snapshot: import('@/types').Snapshot) => Promise<void>>;

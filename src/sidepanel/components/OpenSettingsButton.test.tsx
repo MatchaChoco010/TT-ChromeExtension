@@ -1,11 +1,6 @@
-/**
- * 設定画面を新規タブで開くボタンのテスト
- * 設定画面を新規タブで開く機能を実装する
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
-// chrome.tabs.create のモック
 const mockChromeTabs = {
   create: vi.fn(),
 };
@@ -14,7 +9,6 @@ const mockChromeRuntime = {
   getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
 };
 
-// グローバル chrome オブジェクトのモック
 beforeEach(() => {
   vi.stubGlobal('chrome', {
     tabs: mockChromeTabs,
@@ -28,7 +22,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// OpenSettingsButton コンポーネントをインポート
 import { OpenSettingsButton } from './OpenSettingsButton';
 
 describe('OpenSettingsButton', () => {
@@ -80,7 +73,6 @@ describe('openSettingsInNewTab utility', () => {
   it('chrome.runtime.getURL で settings.html の URL を取得する', async () => {
     mockChromeTabs.create.mockResolvedValue({ id: 1 });
 
-    // openSettingsInNewTab をインポートしてテスト
     const { openSettingsInNewTab } = await import('./OpenSettingsButton');
     await openSettingsInNewTab();
 

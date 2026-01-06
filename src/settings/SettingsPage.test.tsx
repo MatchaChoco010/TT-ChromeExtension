@@ -4,7 +4,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// Mock StorageService - ホイスティング問題を避けるために vi.hoisted を使用
 const { mockStorageService } = vi.hoisted(() => ({
   mockStorageService: {
     get: vi.fn(),
@@ -19,7 +18,6 @@ vi.mock('@/storage/StorageService', () => ({
 
 import { SettingsPage } from './SettingsPage';
 
-// SettingsPageのテスト
 describe('SettingsPage', () => {
   const defaultSettings = {
     fontSize: 14,

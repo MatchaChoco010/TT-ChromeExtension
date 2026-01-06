@@ -1,7 +1,3 @@
-/**
- * ThemeProvider テスト
- */
-
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import React from 'react';
@@ -10,7 +6,6 @@ import type { UserSettings } from '@/types';
 import type { StorageChangeListener } from '@/test/test-types';
 import { chromeMock } from '@/test/chrome-mock';
 
-// テスト用のコンポーネント
 const TestComponent: React.FC<{ onThemeLoad?: (settings: UserSettings | null) => void }> = ({ onThemeLoad }) => {
   const { settings } = useTheme();
 
@@ -25,11 +20,9 @@ const TestComponent: React.FC<{ onThemeLoad?: (settings: UserSettings | null) =>
 
 describe('ThemeProvider', () => {
   beforeEach(() => {
-    // chromeMock をクリア
     vi.clearAllMocks();
     chromeMock.clearAllListeners();
 
-    // スタイル要素をクリア
     const existingStyle = document.getElementById('vivaldi-tt-theme');
     if (existingStyle) {
       existingStyle.remove();
@@ -202,13 +195,11 @@ describe('ThemeProvider', () => {
         expect(document.getElementById('vivaldi-tt-css-error')).toBeTruthy();
       });
 
-      // 有効なCSSに変更
       const validSettings: UserSettings = {
         ...invalidSettings,
         customCSS: '.valid { color: green; }',
       };
 
-      // ストレージ変更をシミュレート
       const listeners = chromeMock.storage.onChanged.addListener.mock.calls;
       expect(listeners.length).toBeGreaterThan(0);
 
@@ -230,7 +221,6 @@ describe('ThemeProvider', () => {
 
   describe('Vivaldiテーマとの調和', () => {
     it('Vivaldiのダークテーマと調和するデフォルトスタイルを適用すること', async () => {
-      // Vivaldiのダークテーマをシミュレート
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation((query: string) => ({
@@ -271,13 +261,11 @@ describe('ThemeProvider', () => {
       await waitFor(() => {
         const styleElement = document.getElementById('vivaldi-tt-theme');
         expect(styleElement).toBeTruthy();
-        // ダークモード用のスタイルが含まれていることを確認
         expect(styleElement?.textContent).toMatch(/background|color/);
       });
     });
 
     it('Vivaldiのライトテーマと調和するデフォルトスタイルを適用すること', async () => {
-      // Vivaldiのライトテーマをシミュレート
       Object.defineProperty(window, 'matchMedia', {
         writable: true,
         value: vi.fn().mockImplementation((query: string) => ({
@@ -324,19 +312,8 @@ describe('ThemeProvider', () => {
 
   describe('useTheme フック', () => {
     it('ThemeProviderの外で使用すると例外をスローすること', () => {
-      // useTheme は React コンテキストを使用しているため、
-      // コンテキスト外で呼び出すと例外をスローすることを確認
-      // ThemeProvider.tsx のコード:
-      // if (!context) { throw new Error('useTheme must be used within ThemeProvider'); }
-
-      // Note: 実際のレンダリングテストは React のエラー境界により
-      // コンソールにエラーが出力されるため、ここでは実装の検証に留める
       expect(useTheme).toBeDefined();
       expect(typeof useTheme).toBe('function');
-
-      // エラーメッセージの検証は ThemeProvider.tsx のソースコードで確認済み
-      // 以下のコードはエラーをコンソールに出力するため、コメントアウト
-      // expect(() => { render(<TestComponent />); }).toThrow('useTheme must be used within ThemeProvider');
     });
 
     it('設定を更新できること', async () => {

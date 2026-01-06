@@ -1,19 +1,15 @@
-// Service Worker for Vivaldi-TT
 import {
   registerTabEventListeners,
   registerWindowEventListeners,
   registerMessageListener,
 } from './event-handlers';
 
-// Get TreeStateManager instance for initialization
 import { testTreeStateManager, testTitlePersistence, testUnreadTracker } from './event-handlers';
 
-// Import services and storage for auto-snapshot
 import { SnapshotManager } from '@/services';
 import { storageService, indexedDBService, STORAGE_KEYS } from '@/storage';
 import type { UserSettings } from '@/types';
 
-// SnapshotManagerインスタンスを作成
 const snapshotManager = new SnapshotManager(indexedDBService, storageService);
 
 /**
@@ -22,19 +18,16 @@ const snapshotManager = new SnapshotManager(indexedDBService, storageService);
  */
 async function cleanupStaleTabData(): Promise<void> {
   try {
-    // 現在開いているタブ一覧を取得
     const tabs = await chrome.tabs.query({});
     const existingTabIds = tabs
       .filter((tab) => tab.id !== undefined)
       .map((tab) => tab.id!);
 
-    // 存在しないタブをクリーンアップ
     await testTreeStateManager.cleanupStaleNodes(existingTabIds);
 
-    // 存在しないタブのタイトルデータもクリーンアップ
     testTitlePersistence.cleanup(existingTabIds);
   } catch (_error) {
-    // Failed to cleanup stale tab data silently
+    // エラーを無視（クリーンアップ失敗は致命的ではない）
   }
 }
 
@@ -54,7 +47,7 @@ async function initializeAutoSnapshot(): Promise<void> {
       }
     }
   } catch (_error) {
-    // Failed to initialize auto-snapshot silently
+    // エラーを無視
   }
 }
 
@@ -75,9 +68,7 @@ function registerSettingsChangeListener(): void {
   });
 }
 
-// Initialize extension
 chrome.runtime.onInstalled.addListener(async () => {
-  // Load state from storage
   await testTreeStateManager.loadState();
 
   // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
@@ -86,10 +77,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   // 古いタブデータをクリーンアップ（ストレージロード後、同期前）
   await cleanupStaleTabData();
 
-  // Sync with existing Chrome tabs
   await testTreeStateManager.syncWithChromeTabs();
 
-  // 自動スナップショットを初期化
   await initializeAutoSnapshot();
 
   // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
@@ -97,10 +86,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   testUnreadTracker.setInitialLoadComplete();
 });
 
-// Initialize on service worker startup
 (async () => {
   try {
-    // Load existing state
     await testTreeStateManager.loadState();
 
     // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
@@ -109,42 +96,33 @@ chrome.runtime.onInstalled.addListener(async () => {
     // 古いタブデータをクリーンアップ（ストレージロード後、同期前）
     await cleanupStaleTabData();
 
-    // Sync with current Chrome tabs
     await testTreeStateManager.syncWithChromeTabs();
 
-    // 自動スナップショットを初期化
     await initializeAutoSnapshot();
 
     // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
     // 以降に作成されるタブにのみ未読バッジを表示する
     testUnreadTracker.setInitialLoadComplete();
   } catch (_error) {
-    // Failed to initialize TreeStateManager silently
+    // エラーを無視
   }
 })();
 
-// Register all event listeners
 registerTabEventListeners();
 registerWindowEventListeners();
 registerMessageListener();
 
-// 設定変更監視を登録
 registerSettingsChangeListener();
 
-// 拡張機能アイコンクリック時に設定画面を開く
 chrome.action.onClicked.addListener(async () => {
   try {
     const settingsUrl = chrome.runtime.getURL('settings.html');
     await chrome.tabs.create({ url: settingsUrl });
   } catch (_error) {
-    // Failed to open settings page silently
+    // エラーを無視
   }
 });
 
-/**
- * ポップアップからスナップショット取得
- * ポップアップメニューからスナップショットを取得
- */
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'CREATE_SNAPSHOT') {
     (async () => {
@@ -160,6 +138,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
       }
     })();
-    return true; // 非同期応答を示す
+    return true;
   }
 });

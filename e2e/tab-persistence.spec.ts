@@ -1,14 +1,3 @@
-/**
- * Tab Persistence E2E Tests
- *
- * タブ永続化のE2Eテスト
- * タブ状態の永続化と復元
- *
- * このテストスイートでは、以下を検証します:
- * 1. タブ数・タイトル・ファビコンが正確に保存・復元されること
- * 2. 余分なLoadingタブが生成されないこと
- * 3. 永続化データと実際のブラウザタブの整合性が保たれること
- */
 import { test, expect } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';

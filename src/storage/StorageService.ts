@@ -5,17 +5,12 @@ import type {
   StorageChanges,
 } from '@/types';
 
-/**
- * ストレージキーの定数定義
- */
 export const STORAGE_KEYS = {
   TREE_STATE: 'tree_state' as const,
   USER_SETTINGS: 'user_settings' as const,
   UNREAD_TABS: 'unread_tabs' as const,
   GROUPS: 'groups' as const,
-  /** タブタイトル永続化 */
   TAB_TITLES: 'tab_titles' as const,
-  /** ファビコン永続化 */
   TAB_FAVICONS: 'tab_favicons' as const,
 } satisfies Record<string, StorageKey>;
 
@@ -70,7 +65,6 @@ export class StorageService implements IStorageService {
       changes: { [key: string]: chrome.storage.StorageChange },
       areaName: string,
     ) => {
-      // local ストレージの変更のみを処理
       if (areaName !== 'local') return;
 
       const storageChanges: StorageChanges = {};
@@ -86,7 +80,6 @@ export class StorageService implements IStorageService {
 
     chrome.storage.onChanged.addListener(listener);
 
-    // リスナーを解除する関数を返す
     return () => {
       chrome.storage.onChanged.removeListener(listener);
     };

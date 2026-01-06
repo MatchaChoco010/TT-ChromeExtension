@@ -17,18 +17,15 @@ describe('SnapshotManager', () => {
   let mockIndexedDBService: IIndexedDBService;
   let mockStorageService: IStorageService;
 
-  // テスト用のビューデータ
   const testViews: View[] = [
     { id: 'view-1', name: 'Work', color: '#ff0000' },
     { id: 'view-2', name: 'Personal', color: '#00ff00' },
   ];
 
-  // テスト用のグループデータ
   const testGroups: Group[] = [
     { id: 'group-1', name: 'Research', color: '#0000ff', isExpanded: true },
   ];
 
-  // テスト用のタブノードデータ
   const testNodes: Record<string, TabNode> = {
     'node-1': {
       id: 'node-1',
@@ -51,7 +48,6 @@ describe('SnapshotManager', () => {
   };
 
   beforeEach(() => {
-    // IndexedDBServiceのモック
     mockIndexedDBService = {
       saveSnapshot: vi.fn().mockResolvedValue(undefined),
       getSnapshot: vi.fn().mockResolvedValue(null),
@@ -60,7 +56,6 @@ describe('SnapshotManager', () => {
       deleteOldSnapshots: vi.fn().mockResolvedValue(undefined),
     };
 
-    // StorageServiceのモック
     mockStorageService = {
       get: vi.fn().mockImplementation((key) => {
         if (key === 'tree_state') {
@@ -83,7 +78,6 @@ describe('SnapshotManager', () => {
       onChange: vi.fn().mockReturnValue(() => {}),
     };
 
-    // Mock chrome.tabs API（vi.stubGlobalを使用）
     vi.stubGlobal('chrome', {
       tabs: {
         query: vi.fn().mockResolvedValue([
@@ -110,29 +104,23 @@ describe('SnapshotManager', () => {
 
   describe('createSnapshot', () => {
     it('should create a snapshot with current state', async () => {
-      // スナップショットコマンドを実行する
       const snapshot = await snapshotManager.createSnapshot('Test Snapshot');
 
-      // スナップショットが作成されることを確認
       expect(snapshot).toBeDefined();
       expect(snapshot.id).toMatch(/^snapshot-/);
       expect(snapshot.name).toBe('Test Snapshot');
       expect(snapshot.isAutoSave).toBe(false);
       expect(snapshot.createdAt).toBeInstanceOf(Date);
 
-      // スナップショットデータが正しく含まれることを確認
       expect(snapshot.data.views).toEqual(testViews);
       expect(snapshot.data.groups).toEqual(testGroups);
       expect(snapshot.data.tabs).toHaveLength(2);
 
-      // タブのURL、タイトル、親子関係、グループ情報を含む
-      // chrome.tabsモックが必要だが、今はタブの構造だけ確認
       expect(snapshot.data.tabs[0]).toHaveProperty('url');
       expect(snapshot.data.tabs[0]).toHaveProperty('title');
       expect(snapshot.data.tabs[0]).toHaveProperty('parentId');
       expect(snapshot.data.tabs[0]).toHaveProperty('viewId');
 
-      // IndexedDBに保存されることを確認
       expect(mockIndexedDBService.saveSnapshot).toHaveBeenCalledWith(snapshot);
     });
 
@@ -145,7 +133,6 @@ describe('SnapshotManager', () => {
 
   describe('restoreSnapshot', () => {
     it('should restore snapshot from IndexedDB', async () => {
-      // スナップショットをインポートする
       const mockSnapshot: Snapshot = {
         id: 'snapshot-123',
         createdAt: new Date('2024-01-01'),
@@ -171,12 +158,10 @@ describe('SnapshotManager', () => {
 
       await snapshotManager.restoreSnapshot('snapshot-123');
 
-      // スナップショットが取得されることを確認
       expect(mockIndexedDBService.getSnapshot).toHaveBeenCalledWith(
         'snapshot-123',
       );
 
-      // タブが作成されることを確認
       expect(global.chrome.tabs.create).toHaveBeenCalledWith({
         url: 'https://example.com',
         active: false,
@@ -259,10 +244,8 @@ describe('SnapshotManager', () => {
 
       const jsonString = await snapshotManager.exportSnapshot('snapshot-123');
 
-      // JSON文字列として返されることを確認
       expect(typeof jsonString).toBe('string');
 
-      // パース可能であることを確認
       const parsed = JSON.parse(jsonString);
       expect(parsed.id).toBe('snapshot-123');
       expect(parsed.name).toBe('Export Test');
@@ -295,13 +278,11 @@ describe('SnapshotManager', () => {
 
       const snapshot = await snapshotManager.importSnapshot(jsonString);
 
-      // スナップショットが正しくインポートされることを確認
       expect(snapshot.id).toBe('snapshot-456');
       expect(snapshot.name).toBe('Imported');
       expect(snapshot.createdAt).toBeInstanceOf(Date);
       expect(snapshot.data.views).toEqual(testViews);
 
-      // IndexedDBに保存されることを確認
       expect(mockIndexedDBService.saveSnapshot).toHaveBeenCalled();
     });
 

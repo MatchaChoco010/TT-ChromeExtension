@@ -1,11 +1,7 @@
-/**
- * PopupMenuコンポーネントのテスト
- */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PopupMenu } from './PopupMenu';
 
-// Chrome APIのモック
 const mockOpenOptionsPage = vi.fn();
 const mockSendMessage = vi.fn();
 const mockChrome = {
@@ -53,7 +49,6 @@ describe('PopupMenu', () => {
       render(<PopupMenu />);
 
       const settingsButton = screen.getByRole('button', { name: '設定を開く' });
-      // ボタン内にアイコンが含まれていることを確認
       expect(settingsButton.querySelector('svg')).toBeInTheDocument();
     });
   });
@@ -99,8 +94,7 @@ describe('PopupMenu', () => {
     });
 
     it('スナップショット取得中は「取得中...」と表示される', async () => {
-      // sendMessageがresolveする前にボタンテキストを確認
-      mockSendMessage.mockImplementation(() => new Promise(() => {})); // 永久にpending
+      mockSendMessage.mockImplementation(() => new Promise(() => {}));
 
       render(<PopupMenu />);
 
@@ -139,7 +133,7 @@ describe('PopupMenu', () => {
     });
 
     it('スナップショット取得中はボタンが無効化される', async () => {
-      mockSendMessage.mockImplementation(() => new Promise(() => {})); // 永久にpending
+      mockSendMessage.mockImplementation(() => new Promise(() => {}));
 
       render(<PopupMenu />);
 
@@ -147,7 +141,6 @@ describe('PopupMenu', () => {
       fireEvent.click(snapshotButton);
 
       await waitFor(() => {
-        // 取得中ボタンを探す
         const loadingButton = screen.getByText('取得中...').closest('button');
         expect(loadingButton).toBeDisabled();
       });

@@ -29,27 +29,11 @@ export interface ViewSwitcherProps {
   onViewUpdate: (viewId: string, updates: Partial<View>) => void;
 }
 
-/**
- * コンテキストメニューの状態
- */
 interface ContextMenuState {
   view: View;
   position: { x: number; y: number };
 }
 
-/**
- * ViewSwitcher コンポーネント
- *
- * サイドパネル上部にファビコンサイズのアイコンボタンを横並びで表示し、
- * ユーザーがビューを切り替えたり、新しいビューを作成したりできるようにします。
- *
- * - 各ビューはファビコンサイズ(32x32px)のアイコンボタンで表示
- * - アイコンが設定されていない場合はカラーサークルを表示
- * - 鉛筆ボタンによるインライン編集UIは削除
- * - ビューボタンを右クリックするとコンテキストメニューを表示
- * - メニューから「ビューの編集」を選択するとViewEditModalを開く
- * - メニューから「ビューの削除」を選択するとビューを削除する
- */
 export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   views,
   currentViewId,
@@ -59,13 +43,9 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   onViewDelete,
   onViewUpdate,
 }) => {
-  // コンテキストメニューの状態
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-
-  // モーダルで編集中のビュー
   const [editingView, setEditingView] = useState<View | null>(null);
 
-  // 右クリックハンドラー
   const handleContextMenu = useCallback(
     (event: React.MouseEvent, view: View) => {
       event.preventDefault();
@@ -77,17 +57,14 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
     []
   );
 
-  // コンテキストメニューを閉じる
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null);
   }, []);
 
-  // 編集アクション
   const handleEdit = useCallback((view: View) => {
     setEditingView(view);
   }, []);
 
-  // 削除アクション
   const handleDelete = useCallback(
     (viewId: string) => {
       onViewDelete(viewId);
@@ -95,12 +72,10 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
     [onViewDelete]
   );
 
-  // モーダルを閉じる
   const handleCloseModal = useCallback(() => {
     setEditingView(null);
   }, []);
 
-  // モーダルで保存
   const handleSaveView = useCallback(
     (view: View) => {
       onViewUpdate(view.id, view);
@@ -109,36 +84,29 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
     [onViewUpdate]
   );
 
-  // 即時更新（モーダルを閉じずにビューを更新）
   const handleImmediateUpdate = useCallback(
     (view: View) => {
       onViewUpdate(view.id, view);
-      // モーダルは閉じないので setEditingView は呼ばない
     },
     [onViewUpdate]
   );
 
-  // マウスホイールでビュー切り替え
   const handleWheel = useCallback(
     (event: React.WheelEvent) => {
-      // deltaYが0の場合は何もしない
       if (event.deltaY === 0) {
         return;
       }
 
-      // 現在のビューのインデックスを取得
       const currentIndex = views.findIndex((v) => v.id === currentViewId);
       if (currentIndex === -1) {
         return;
       }
 
       if (event.deltaY < 0) {
-        // 上スクロール: 前のビューに切り替え
         if (currentIndex > 0) {
           onViewSwitch(views[currentIndex - 1].id);
         }
       } else {
-        // 下スクロール: 次のビューに切り替え
         if (currentIndex < views.length - 1) {
           onViewSwitch(views[currentIndex + 1].id);
         }
@@ -154,7 +122,6 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
       data-testid="view-switcher-container"
       onWheel={handleWheel}
     >
-      {/* ビューリスト（横スクロール可能） */}
       <div className="flex items-center gap-1 overflow-x-auto flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {views.map((view) => {
           const isActive = view.id === currentViewId;
@@ -180,10 +147,8 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
               data-color={view.color}
               title={view.name}
             >
-              {/* アイコンが設定されている場合 */}
               {view.icon ? (
                 isCustomIcon(view.icon) ? (
-                  // カスタムアイコン（SVGプリセット）を表示
                   <span
                     className="w-5 h-5 text-gray-200"
                     data-testid="view-custom-icon"
@@ -191,14 +156,12 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                     {getIconByName(view.icon)?.svg}
                   </span>
                 ) : (
-                  // URL画像アイコンを表示
                   <img
                     src={view.icon}
                     alt={view.name}
                     className="w-5 h-5 rounded object-cover"
                     data-testid="view-url-icon"
                     onError={(e) => {
-                      // アイコン読み込み失敗時はカラーサークルにフォールバック
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
                       const fallback = target.nextElementSibling as HTMLElement;
@@ -209,15 +172,12 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                   />
                 )
               ) : null}
-              {/* アイコンがない場合、またはフォールバック用のカラーサークル */}
               <span
                 className={`w-5 h-5 rounded-full flex-shrink-0 ${view.icon && !isCustomIcon(view.icon) ? 'hidden' : view.icon ? 'hidden' : ''}`}
                 style={{ backgroundColor: view.color }}
                 aria-hidden="true"
                 data-testid="view-color-circle"
               />
-              {/* タブ数バッジ */}
-              {/* 視認性向上 - min-widthを20pxに拡大、位置を内側に調整 */}
               {tabCount > 0 && (
                 <span
                   className="absolute -top-0.5 -right-0.5 min-w-[20px] h-4 px-1 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center"
@@ -231,14 +191,12 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
         })}
       </div>
 
-      {/* 新しいビュー追加ボタン */}
       <button
         onClick={onViewCreate}
         className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors duration-150 flex-shrink-0"
         aria-label="Add new view"
         title="Add new view"
       >
-        {/* Plus アイコン */}
         <svg
           className="w-4 h-4"
           fill="none"
@@ -256,7 +214,6 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
       </button>
     </div>
 
-      {/* コンテキストメニュー */}
       {contextMenu && (
         <ViewContextMenu
           view={contextMenu.view}
@@ -268,8 +225,6 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
         />
       )}
 
-      {/* 編集モーダル */}
-      {/* key を使用してviewが変わるたびにコンポーネントを再マウント */}
       <ViewEditModal
         key={editingView?.id ?? 'closed'}
         view={editingView}

@@ -1,13 +1,5 @@
 /**
- * Selection Auto-Clear E2E Tests
- *
  * 選択状態の自動解除機能の E2E テスト
- *
- * - 新しいタブが開かれたときにタブ選択状態が解除されること
- * - タブクローズ等の操作時にも選択状態が解除されること
- *
- * Note: アクティブタブ変更時の選択状態解除は、ツリー内でのタブクリック時にも
- * onActivatedイベントが発火するため、複数選択機能と競合するため実装していない
  */
 
 import { test, expect } from './fixtures/extension';
@@ -234,9 +226,6 @@ test.describe('選択状態の自動解除', () => {
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
       await newTabButton.click();
 
-      // 新しいタブが作成されたことを確認（新規タブボタンクリック後）
-      // Note: 新規タブボタンのクリックはUI操作なのでcreateTabとは異なるが、
-      // タブ作成後の状態確認としてassertTabStructureを使用
       // 新規タブIDを取得
       const newTabId = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });

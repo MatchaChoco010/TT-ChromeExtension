@@ -6,38 +6,28 @@ test.describe('Playwright Configuration', () => {
   test('playwright.config.ts should exist and be valid', async () => {
     const configPath = join(process.cwd(), 'playwright.config.ts');
 
-    // Verify config file exists
     const configContent = await readFile(configPath, 'utf-8');
     expect(configContent).toBeTruthy();
 
-    // Verify it imports from @playwright/test
     expect(configContent).toContain('@playwright/test');
 
-    // Verify testDir points to ./e2e
     expect(configContent).toContain("testDir: './e2e'");
 
-    // Verify testMatch pattern
     expect(configContent).toContain('**/*.spec.ts');
 
-    // Verify timeout configuration is present (60 seconds)
     expect(configContent).toMatch(/timeout:\s*60000/);
 
-    // Verify retry strategy is present (0 retries - no retry dependency)
     expect(configContent).toMatch(/retries:\s*0/);
 
-    // Verify reporter configuration (HTML, JUnit, list)
     expect(configContent).toContain("'html'");
     expect(configContent).toContain("'junit'");
     expect(configContent).toContain("'list'");
 
-    // Verify trace and screenshot settings
     expect(configContent).toContain("trace: 'on-first-retry'");
     expect(configContent).toContain("screenshot: 'only-on-failure'");
 
-    // Verify Chromium project
     expect(configContent).toContain('chromium');
 
-    // Verify CI-aware worker configuration
     expect(configContent).toContain('getWorkerCount');
   });
 

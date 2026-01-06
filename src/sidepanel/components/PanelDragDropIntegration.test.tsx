@@ -1,16 +1,3 @@
-/**
- * パネル内D&Dの統合テスト
- *
- * このテストは以下の実際のユーザーシナリオをカバーします:
- * - タブをドラッグして別のタブの子として配置できる
- * - タブを同階層で順序変更できる
- * - ホバー時にブランチが自動展開される
- *
- * 統合テストのシナリオ:
- * 1. ユーザーがタブをドラッグして別のタブの上でドロップし、親子関係を作成
- * 2. ユーザーがタブを同階層内で移動して順序を変更
- * 3. 折りたたまれたブランチとドラッグ&ドロップの統合動作を確認
- */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import TabTreeView from './TabTreeView';
@@ -19,7 +6,6 @@ import { act } from 'react';
 import type { TreeState, DragEndEvent } from '@/types';
 import { getMockChrome } from '@/test/test-types';
 
-// テストコンポーネント: 完全な統合テスト用
 function IntegrationTestComponent() {
   const { treeState, handleDragEnd } = useTreeState();
 
@@ -50,11 +36,9 @@ describe('パネル内D&Dの統合テスト', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Note: フェイクタイマーは必要なテストでのみ個別に設定
 
     sendMessageMock = vi.fn().mockResolvedValue(undefined);
 
-    // chrome.storage.local のモック
     global.chrome = {
       storage: {
         local: {
@@ -96,7 +80,7 @@ describe('パネル内D&Dの統合テスト', () => {
                       viewId: 'default',
                     },
                   ],
-                  isExpanded: false, // 折りたたまれている
+                  isExpanded: false,
                   depth: 0,
                   viewId: 'default',
                 },
@@ -142,7 +126,6 @@ describe('パネル内D&Dの統合テスト', () => {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
-        // Add onCreated and onRemoved mocks
         onCreated: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
@@ -151,22 +134,31 @@ describe('パネル内D&Dの統合テスト', () => {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
-        // Add onMoved mock for pinned tab reorder sync
         onMoved: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
         },
+        onDetached: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        onAttached: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
       },
-      // Add windows.getCurrent mock
       windows: {
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
+        onFocusChanged: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
       },
     } as unknown as typeof chrome;
   });
 
   describe('完全なドラッグ&ドロップワークフロー', () => {
     it('シナリオ1: タブを子として配置、同階層で移動を連続して実行', async () => {
-      // useTreeStateから関数を取得するためのコンポーネント
       let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
       function TestHookComponent() {
         const { handleDragEnd } = useTreeState();
@@ -181,7 +173,6 @@ describe('パネル内D&Dの統合テスト', () => {
         </TreeStateProvider>
       );
 
-      // 初期状態の確認 - ツリーノードがレンダリングされるまで待つ
       // Note: data-testid is tree-node-{tabId} (not tree-node-{nodeId})
       await waitFor(() => {
         expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
@@ -193,7 +184,7 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
-      // ステップ1: タブを別のタブの子として配置
+      // Step 1: Place tab as child of another tab
       const dragEndEvent1 = {
         active: {
           id: 'node-2',
@@ -215,12 +206,9 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent1);
       });
 
-      // node-2がnode-1の子として配置されたことを確認
-      // Note: TreeStateProvider now directly updates storage instead of sending UPDATE_TREE message
       const mockChrome = getMockChrome();
       await waitFor(() => {
         expect(chrome.storage.local.set).toHaveBeenCalled();
-        // Verify the tree structure was updated correctly
         const lastCall = mockChrome.storage.local.set.mock.calls.slice(-1)[0];
         if (lastCall && lastCall[0]?.tree_state) {
           const updatedNodes = (lastCall[0].tree_state as TreeState).nodes;
@@ -228,11 +216,9 @@ describe('パネル内D&Dの統合テスト', () => {
         }
       });
 
-      // モックをリセット
       vi.mocked(chrome.storage.local.set).mockClear();
 
-      // ステップ2: タブを同階層で順序変更
-      // node-3をnode-1の子として配置
+      // Step 2: Reorder tabs within same level
       const dragEndEvent2 = {
         active: {
           id: 'node-3',
@@ -254,8 +240,6 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent2);
       });
 
-      // ツリー構造が更新されたことを確認
-      // Note: TreeStateProvider now directly updates storage instead of sending UPDATE_TREE message
       await waitFor(() => {
         expect(chrome.storage.local.set).toHaveBeenCalled();
       });
@@ -281,7 +265,6 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
-      // node-2をnode-1の上にドロップして子として配置
       const dragEndEvent = {
         active: {
           id: 'node-2',
@@ -303,12 +286,9 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
-      // 親子関係が作成されストレージに保存されたことを確認
-      // Note: TreeStateProvider now directly updates storage instead of sending UPDATE_TREE message
       const mockChrome = getMockChrome();
       await waitFor(() => {
         expect(chrome.storage.local.set).toHaveBeenCalled();
-        // Verify the tree structure was updated correctly
         const lastCall = mockChrome.storage.local.set.mock.calls.slice(-1)[0];
         if (lastCall && lastCall[0]?.tree_state) {
           const updatedNodes = (lastCall[0].tree_state as TreeState).nodes;
@@ -337,7 +317,6 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
-      // 同階層でnode-2とnode-1の順序を入れ替え
       const dragEndEvent = {
         active: {
           id: 'node-2',
@@ -359,45 +338,37 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
-      // ツリー状態が更新されストレージに保存されたことを確認
-      // Note: TreeStateProvider now directly updates storage instead of sending UPDATE_TREE message
       await waitFor(() => {
         expect(chrome.storage.local.set).toHaveBeenCalled();
       });
     });
 
     it('ホバー時にブランチが自動展開される (既存テストで確認)', async () => {
-      // このテストは DragHoverAutoExpand.test.tsx で実装されています
-      // TabTreeView コンポーネントがドラッグホバー機能をサポートしていることを確認
+      // DragHoverAutoExpand.test.tsx で実装されています
       render(
         <TreeStateProvider>
           <IntegrationTestComponent />
         </TreeStateProvider>
       );
 
-      // ツリーが正常にレンダリングされることを確認
       // Note: data-testid is tree-node-{tabId} (not tree-node-{nodeId})
       await waitFor(() => {
         expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
         expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
       });
 
-      // 折りたたまれたnode-3 (tabId: 3)が存在することを確認
       const node3 = screen.getByTestId('tree-node-3');
       expect(node3).toBeInTheDocument();
 
-      // 折りたたまれているため、子ノードnode-4 (tabId: 4)は表示されていない
       expect(screen.queryByTestId('tree-node-4')).not.toBeInTheDocument();
 
-      // ホバー時の自動展開機能の詳細なテストは
-      // DragHoverAutoExpand.test.tsx で実施されています
+      // DragHoverAutoExpand.test.tsx で詳細なテストを実施
       expect(true).toBe(true);
     });
   });
 
   describe('エラーケースとエッジケース', () => {
     it('循環参照を防ぐ', async () => {
-      // 親子関係を持つツリーを設定
       const mockChrome = getMockChrome();
       mockChrome.storage.local.get.mockResolvedValue({
         tree_state: {
@@ -458,7 +429,6 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
-      // 循環参照を試みる: node-1をnode-2の子として配置
       const dragEndEvent = {
         active: {
           id: 'node-1',
@@ -480,7 +450,6 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
-      // 循環参照が検出され、メッセージが送信されないことを確認
       await waitFor(() => {
         expect(sendMessageMock).not.toHaveBeenCalled();
       });
@@ -505,7 +474,6 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
-      // 同じノードにドロップ
       const dragEndEvent = {
         active: {
           id: 'node-1',
@@ -527,7 +495,6 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
-      // 何も実行されないことを確認
       expect(sendMessageMock).not.toHaveBeenCalled();
     });
   });

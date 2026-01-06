@@ -1,12 +1,3 @@
-/**
- * 新規タブ追加ボタンのE2Eテスト
- *
- * テスト対象:
- * 1. 新規タブ追加ボタンの存在を検証
- * 2. ボタンクリックで新規タブが追加されることを検証
- * 3. 新規タブがツリー末尾に配置されることを検証
- */
-
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -19,24 +10,19 @@ test.describe('新規タブ追加ボタン', () => {
       extensionContext,
       serviceWorker,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 新規タブ追加ボタンが存在することを確認
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
     });
@@ -46,37 +32,29 @@ test.describe('新規タブ追加ボタン', () => {
       extensionContext,
       serviceWorker,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 新規タブ追加ボタンが存在することを確認
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
 
-      // ボタンの幅がフルワイドであることを確認
-      // w-full クラスが適用されているため、親要素と同じ幅になるはず
       const tabTreeRoot = sidePanelPage.locator('[data-testid="tab-tree-root"]');
       await expect(tabTreeRoot).toBeVisible({ timeout: 5000 });
 
       const buttonBox = await newTabButton.boundingBox();
       const parentBox = await tabTreeRoot.boundingBox();
 
-      // ボタンの幅が親コンテナとほぼ同じであることを確認
-      // 許容誤差: 20px（スクロールバーやパディングの影響を考慮）
+      // 許容誤差20pxはスクロールバーやパディングの影響を考慮した値
       expect(buttonBox).not.toBeNull();
       expect(parentBox).not.toBeNull();
       if (buttonBox && parentBox) {
@@ -91,24 +69,19 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 新規タブ追加ボタンをクリック
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
 
-      // 新しいタブIDを取得
       let newTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -130,10 +103,8 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      // 新しいタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, newTabId!);
 
-      // タブ作成後の構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
@@ -145,24 +116,19 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 新規タブ追加ボタンをクリック
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
 
-      // 新しいタブIDを取得
       let newTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -184,10 +150,8 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      // 新しいタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, newTabId!);
 
-      // タブ作成後の構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
@@ -201,33 +165,26 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 既存のタブを作成してツリーにタブがある状態にする
       const existingTabId = await createTab(extensionContext, 'https://example.com');
 
-      // タブ作成後の構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: existingTabId, depth: 0 },
       ], 0);
 
-      // 新規タブ追加ボタンをクリック
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
 
-      // 新しいタブIDを取得（アクティブタブを取得）
       let newTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -253,10 +210,8 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      // 新しいタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, newTabId!);
 
-      // タブ作成後の構造を検証（新規タブが末尾にあることでY座標検証を代替）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: existingTabId, depth: 0 },
@@ -269,24 +224,19 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 新規タブ追加ボタンをクリック（1つ目）
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
 
-      // 1つ目のタブIDを取得
       let firstNewTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -308,19 +258,15 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'First new tab was not created' }
       );
 
-      // 1つ目のタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, firstNewTabId!);
 
-      // 1つ目のタブ作成後の構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstNewTabId!, depth: 0 },
       ], 0);
 
-      // 2つ目の新規タブを作成
       await newTabButton.click();
 
-      // 2つ目のタブIDを取得
       let secondNewTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -346,10 +292,8 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'Second new tab was not created' }
       );
 
-      // 2つ目のタブがツリーに追加されるまで待機
       await waitForTabInTreeState(extensionContext, secondNewTabId!);
 
-      // 2つ目のタブ作成後の構造を検証（順序でY座標検証を代替）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstNewTabId!, depth: 0 },

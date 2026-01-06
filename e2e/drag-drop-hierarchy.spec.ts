@@ -1,17 +1,3 @@
-/**
- * ドラッグ&ドロップによる階層変更（親子関係の作成）テスト
- *
- * 自前D&D実装用に書き直し
- *
- * このテストスイートでは、ドラッグ&ドロップによる親子関係の作成を検証します。
- * - タブを別のタブに重ねてドロップした際の親子関係作成
- * - 初めて子タブを追加した際の展開/折りたたみアイコン表示
- * - 折りたたまれた親タブへの子タブドロップ時の自動展開
- * - 既存の子を持つ親への新しい子の追加
- * - 深い階層のタブ移動時のdepth再計算
- *
- * Note: ヘッドレスモードで実行すること（npm run test:e2e）
- */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getPseudoSidePanelTabId, getCurrentWindowId, getInitialBrowserTabId } from './utils/tab-utils';
 import { moveTabToParent } from './utils/drag-drop-utils';
@@ -26,22 +12,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 2つのルートレベルのタブを作成
     const parentTab = await createTab(extensionContext, 'https://example.com');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -55,30 +37,17 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 0 },
     ], 0);
 
-    // 実行: childTabをparentTabにドロップして親子関係を作成
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
-    // 検証: 親子関係が作成されたことを確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // 親タブノードに展開ボタンが表示されることを確認
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
     await expect(expandButton.first()).toBeVisible({ timeout: 3000 });
-
-    // 子タブが表示されることを確認（親を展開後）
-    const isExpanded = await parentNode.getAttribute('data-expanded');
-    if (isExpanded !== 'true') {
-      await expandButton.first().click();
-      await expect(parentNode).toHaveAttribute('data-expanded', 'true', { timeout: 3000 });
-    }
-
-    const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTab}"]`);
-    await expect(childNode.first()).toBeVisible({ timeout: 3000 });
   });
 
   test('子タブを持たないタブに初めて子タブを追加した場合、親タブに展開/折りたたみアイコンが表示されること', async ({
@@ -86,22 +55,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 2つのルートレベルのタブを作成
     const parentTab = await createTab(extensionContext, 'https://example.com');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -115,29 +80,23 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 0 },
     ], 0);
 
-    // 初期状態: 親タブに展開ボタンがないことを確認（子がいないため）
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButtonBefore = parentNode.locator('[data-testid="expand-button"]');
     const hasExpandButtonBefore = (await expandButtonBefore.count()) > 0;
 
-    // 実行: childTabをparentTabにドロップして親子関係を作成
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
-    // 検証: 親子関係が作成されたことを確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // 検証: 親タブに展開/折りたたみボタンが表示されること
     const expandButtonAfter = parentNode.locator('[data-testid="expand-button"]');
 
     if (!hasExpandButtonBefore) {
-      // 展開ボタンが新しく表示されることを確認
       await expect(expandButtonAfter.first()).toBeVisible({ timeout: 5000 });
     } else {
-      // 既に展開ボタンがある場合は、引き続き存在することを確認
       await expect(async () => {
         const hasExpandButtonAfter = (await expandButtonAfter.count()) > 0;
         expect(hasExpandButtonAfter).toBe(true);
@@ -150,22 +109,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 親タブと既存の子タブを作成
     const parentTab = await createTab(extensionContext, 'https://example.com');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -179,54 +134,37 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: existingChild, depth: 0 },
     ], 0);
 
-    // 既存の子タブを親タブの子にする
     await moveTabToParent(sidePanelPage, existingChild, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: existingChild, depth: 1 },
     ], 0);
 
-    // 親タブノードを取得して展開ボタンが表示されるまで待機
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButton = parentNode.locator('[data-testid="expand-button"]').first();
     await expect(expandButton).toBeVisible({ timeout: 5000 });
 
-    // 親タブが展開されている場合は折りたたむ
-    const isExpandedBefore = await parentNode.getAttribute('data-expanded');
-    if (isExpandedBefore === 'true') {
-      await expandButton.click();
-      await expect(parentNode).toHaveAttribute('data-expanded', 'false', { timeout: 3000 });
-    }
+    await expandButton.click();
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: false },
+    ], 0);
 
-    // 新しいタブを作成
-    // 注意: 親タブが折りたたまれている場合、existingChildは表示されていないため、
-    // assertTabStructureの期待構造には含めない
     const newChild = await createTab(extensionContext, 'https://www.w3.org');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: false },
       { tabId: newChild, depth: 0 },
     ], 0);
 
-    // 実行: 新しいタブを折りたたまれた親タブにドロップ
     await moveTabToParent(sidePanelPage, newChild, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: existingChild, depth: 1 },
       { tabId: newChild, depth: 1 },
     ], 0);
-
-    // 検証: 新しい子タブが表示されること（親が自動展開されるか、表示されること）
-    const newChildNode = sidePanelPage.locator(`[data-testid="tree-node-${newChild}"]`);
-    await expect(newChildNode.first()).toBeVisible({ timeout: 5000 });
-
-    // 親タブが展開状態であることを確認（可能であれば）
-    const isExpandedAfter = await parentNode.getAttribute('data-expanded');
-    if (isExpandedAfter !== null) {
-      expect(isExpandedAfter).toBe('true');
-    }
   });
 
   test('既に子を持つ親タブに新しい子をドロップした場合、子タブリストに追加されること', async ({
@@ -234,22 +172,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: まずすべてのタブを作成（他のテストと同様のパターン）
     const parentTab = await createTab(extensionContext, 'https://example.com');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -271,34 +205,19 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: newChild, depth: 0 },
     ], 0);
 
-    // D&Dで親子関係を構築
-    // 最初に child1 を parentTab の子にする
     await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: newChild, depth: 0 },
     ], 0);
 
-    // 親タブを展開して子タブを表示
-    const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    const expandButton = parentNode.locator('[data-testid="expand-button"]');
-    await expect(expandButton.first()).toBeVisible({ timeout: 5000 });
-
-    const isExpanded = await parentNode.getAttribute('data-expanded');
-    if (isExpanded !== 'true') {
-      await expandButton.first().click();
-      await expect(parentNode).toHaveAttribute('data-expanded', 'true', { timeout: 3000 });
-    }
-
-    // 次に newChild を parentTab の子にする
     await moveTabToParent(sidePanelPage, newChild, parentTab, serviceWorker);
 
-    // 検証: 両方の子タブが存在し、親子関係が正しいことを確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: newChild, depth: 1 },
     ], 0);
@@ -309,26 +228,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 深い階層のタブ構造を作成
-    // Level 0: rootTab
-    // Level 1: parentTab1 (rootTabの子)
-    // Level 2: childTab (parentTab1の子)
-    // Level 3: grandChildTab (childTabの子)
     const rootTab = await createTab(extensionContext, 'https://example.com');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -359,7 +270,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: grandChildTab, depth: 0 },
     ], 0);
 
-    // 別のルートレベルのタブを作成（移動先）
     const parentTab2 = await createTab(extensionContext, 'https://github.com');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -370,11 +280,10 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: parentTab2, depth: 0 },
     ], 0);
 
-    // D&Dで階層構造を構築（各操作後に親子関係の反映を待機）
     await moveTabToParent(sidePanelPage, parentTab1, rootTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTab, depth: 0 },
+      { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab1, depth: 1 },
       { tabId: childTab, depth: 0 },
       { tabId: grandChildTab, depth: 0 },
@@ -384,8 +293,8 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab1, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTab, depth: 0 },
-      { tabId: parentTab1, depth: 1 },
+      { tabId: rootTab, depth: 0, expanded: true },
+      { tabId: parentTab1, depth: 1, expanded: true },
       { tabId: childTab, depth: 2 },
       { tabId: grandChildTab, depth: 0 },
       { tabId: parentTab2, depth: 0 },
@@ -394,49 +303,21 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, grandChildTab, childTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTab, depth: 0 },
-      { tabId: parentTab1, depth: 1 },
-      { tabId: childTab, depth: 2 },
+      { tabId: rootTab, depth: 0, expanded: true },
+      { tabId: parentTab1, depth: 1, expanded: true },
+      { tabId: childTab, depth: 2, expanded: true },
       { tabId: grandChildTab, depth: 3 },
       { tabId: parentTab2, depth: 0 },
     ], 0);
 
-    // ツリーを展開してすべてのタブを表示
-    const expandNode = async (tabId: number) => {
-      const node = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`).first();
-      const button = node.locator('[data-testid="expand-button"]');
-      if ((await button.count()) > 0) {
-        const isExpanded = await node.getAttribute('data-expanded');
-        if (isExpanded !== 'true') {
-          await button.first().click();
-          await expect(node).toHaveAttribute('data-expanded', 'true', { timeout: 3000 });
-        }
-      }
-    };
-
-    await expandNode(rootTab);
-    await expandNode(parentTab1);
-    await expandNode(childTab);
-
-    // 実行: childTab（およびそのサブツリー）をparentTab2にドロップ
     await moveTabToParent(sidePanelPage, childTab, parentTab2, serviceWorker);
 
-    // parentTab2を展開
-    await expandNode(parentTab2);
-
-    // childTabを再度展開（移動後）
-    await expandNode(childTab);
-
-    // 検証: childTabとgrandChildTabが新しい親の配下に移動したことを確認
-    // depthが正しく再計算されたことを確認
-    // childTabはparentTab2 -> childTabなのでdepth 1
-    // grandChildTabはparentTab2 -> childTab -> grandChildTabなのでdepth 2
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTab, depth: 0 },
+      { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab1, depth: 1 },
-      { tabId: parentTab2, depth: 0 },
-      { tabId: childTab, depth: 1 },
+      { tabId: parentTab2, depth: 0, expanded: true },
+      { tabId: childTab, depth: 1, expanded: true },
       { tabId: grandChildTab, depth: 2 },
     ], 0);
   });
@@ -446,22 +327,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 2つのルートレベルのタブを作成
     const parentTab = await createTab(extensionContext, 'https://example.com/parent-dnd');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -475,24 +352,16 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 0 },
     ], 0);
 
-    // D&Dで親子関係を作成
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
-    // D&D後の構造を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // *** 重要: 実際のブラウザと同様に、D&D後に十分待機してから新規タブを作成 ***
-    // ユーザーはD&D後に数秒待ってから新規タブを作成しても親子関係が失われると報告している
-    // これはレースコンディションではなく、何か根本的な問題があることを示唆している
-
-    // D&D後、数秒待機（実際のブラウザ操作をシミュレート）
     await sidePanelPage.waitForTimeout(3000);
 
-    // 待機後のストレージ状態を確認
     const storageBeforeNewTab = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
@@ -525,19 +394,15 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { parentTabId: parentTab, childTabId: childTab }
     );
 
-    // 新規タブを作成（ブラウザの「新しいタブ」ボタンをシミュレート）
-    // URLなしでcreateTabを使用
     const newTab = await createTab(extensionContext, '');
 
-    // 新規タブ作成後の構造を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: newTab, depth: 0 },
     ], 0);
 
-    // 新規タブ作成直後のストレージ状態を確認
     const storageAfterNewTab = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
@@ -570,13 +435,11 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { parentTabId: parentTab, childTabId: childTab }
     );
 
-    // 親タブノードの展開ボタンがまだ存在するか確認（子がいることの証拠）
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
     const expandButtonAfterNewTab = parentNode.locator('[data-testid="expand-button"]');
     const hasExpandButton = await expandButtonAfterNewTab.count() > 0;
     expect(hasExpandButton).toBe(true);
 
-    // ストレージの状態も確認
     const relationsStillValid = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
@@ -613,7 +476,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           return { valid: false, reason: 'Missing nodes' };
         }
 
-        // 親子関係の検証
         if (childNode.parentId !== parentNodeId) {
           return {
             valid: false,
@@ -623,7 +485,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           };
         }
 
-        // 深さの検証
         if (parentNode.depth !== 0 || childNode.depth !== 1) {
           return {
             valid: false,
@@ -646,22 +507,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 4つのルートレベルのタブを作成
     const parent1 = await createTab(extensionContext, 'https://example.com/parent1-multi');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -692,38 +549,34 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: child2, depth: 0 },
     ], 0);
 
-    // D&Dで親子関係を作成（親子関係1）
     await moveTabToParent(sidePanelPage, child1, parent1, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1, depth: 0 },
+      { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: parent2, depth: 0 },
       { tabId: child2, depth: 0 },
     ], 0);
 
-    // D&Dで親子関係を作成（親子関係2）
     await moveTabToParent(sidePanelPage, child2, parent2, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1, depth: 0 },
+      { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
-      { tabId: parent2, depth: 0 },
+      { tabId: parent2, depth: 0, expanded: true },
       { tabId: child2, depth: 1 },
     ], 0);
 
-    // *** 重要: 新規タブを作成 ***
     const newTab = await createTab(extensionContext, 'https://github.com/new-tab-multi');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1, depth: 0 },
+      { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
-      { tabId: parent2, depth: 0 },
+      { tabId: parent2, depth: 0, expanded: true },
       { tabId: child2, depth: 1 },
       { tabId: newTab, depth: 0 },
     ], 0);
 
-    // ストレージの状態も確認
     const allRelationsStillValid = await serviceWorker.evaluate(
       async ({ parent1Id, child1Id, parent2Id, child2Id }) => {
         interface TreeNode {
@@ -741,7 +594,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           return { valid: false, reason: 'No tree state' };
         }
 
-        // 親子関係1の検証
         const parent1NodeId = treeState.tabToNode[parent1Id];
         const child1NodeId = treeState.tabToNode[child1Id];
         if (!parent1NodeId || !child1NodeId) {
@@ -757,7 +609,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           };
         }
 
-        // 親子関係2の検証
         const parent2NodeId = treeState.tabToNode[parent2Id];
         const child2NodeId = treeState.tabToNode[child2Id];
         if (!parent2NodeId || !child2NodeId) {
@@ -786,22 +637,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 3つのタブを作成
     const parentTab = await createTab(extensionContext, 'https://example.com/parent-close');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -823,29 +670,23 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: unrelatedTab, depth: 0 },
     ], 0);
 
-    // D&Dで親子関係を作成
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
-    // D&D後の構造を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: unrelatedTab, depth: 0 },
     ], 0);
 
-    // *** 重要: 無関係なタブを閉じる ***
-    // これが既存の親子関係を壊さないことを検証
     await closeTab(extensionContext, unrelatedTab);
 
-    // タブ削除後の構造を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // ストレージの状態も確認
     const relationsStillValid = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
@@ -882,7 +723,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           return { valid: false, reason: 'Missing nodes' };
         }
 
-        // 親子関係の検証
         if (childNode.parentId !== parentNodeId) {
           return {
             valid: false,
@@ -892,7 +732,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           };
         }
 
-        // 深さの検証
         if (parentNode.depth !== 0 || childNode.depth !== 1) {
           return {
             valid: false,
@@ -915,22 +754,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     sidePanelPage,
     serviceWorker,
   }) => {
-    // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 準備: 2つのルートレベルのタブを作成
     const parentTab = await createTab(extensionContext, 'https://example.com/parent-window');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -944,20 +779,16 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 0 },
     ], 0);
 
-    // D&Dで親子関係を作成
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
-    // D&D後の構造を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // D&D後、数秒待機
     await sidePanelPage.waitForTimeout(2000);
 
-    // ストレージの状態を確認（ウィンドウ作成前）
     const storageBeforeWindow = await serviceWorker.evaluate(
       async ({ childTabId }) => {
         interface TreeNode {
@@ -988,18 +819,13 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { childTabId: childTab }
     );
 
-    // 新しいウィンドウを作成
-    // handleWindowCreated が syncWithChromeTabs() を呼び出し、
-    // treeStructureが古いか空の場合は親子関係がリセットされる可能性がある
     const newWindowId = await serviceWorker.evaluate(async () => {
       const newWindow = await chrome.windows.create({ type: 'normal' });
       return newWindow.id as number;
     });
 
-    // 新ウィンドウ作成後、処理完了を待機
     await sidePanelPage.waitForTimeout(2000);
 
-    // ストレージの状態を確認（ウィンドウ作成後）
     const storageAfterWindow = await serviceWorker.evaluate(
       async ({ childTabId }) => {
         interface TreeNode {
@@ -1030,18 +856,15 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { childTabId: childTab }
     );
 
-    // 検証: 親子関係が維持されていること
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // 親子関係がストレージでも維持されていることを確認
     expect(storageAfterWindow.childParentId).toBe(storageBeforeWindow.childParentId);
     expect(storageAfterWindow.childDepth).toBe(1);
 
-    // 新しいウィンドウをクリーンアップ
     await serviceWorker.evaluate(async (windowId) => {
       await chrome.windows.remove(windowId);
     }, newWindowId);
@@ -1055,11 +878,9 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
@@ -1081,10 +902,9 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
-    // D&D後の構造を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
@@ -1134,14 +954,12 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { childTabId: childTab }
     );
 
-    // 検証: 親子関係が維持されていること
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // ストレージの状態も確認
     expect(storageAfterSync.childParentId).toBe(storageBeforeSync.childParentId);
     expect(storageAfterSync.childDepth).toBe(1);
   });
@@ -1154,11 +972,9 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // 事前準備: windowIdとpseudoSidePanelTabIdを取得
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
@@ -1180,17 +996,15 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
-    // D&D後の構造を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
 
     await sidePanelPage.waitForTimeout(2000);
 
-    // ストレージのtreeStructureのみを空にする（nodesのparentIdはそのまま）
-    // これはREFRESH_TREE_STRUCTUREが失敗した場合をシミュレート
+    // REFRESH_TREE_STRUCTUREが失敗した場合をシミュレート
     await serviceWorker.evaluate(async () => {
       interface LocalTreeState {
         treeStructure?: unknown[];
@@ -1213,10 +1027,9 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await sidePanelPage.waitForTimeout(2000);
 
-    // treeStructureが空でもnodesのparentIdが正しければ復元される
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTab, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
     ], 0);
   });

@@ -1,24 +1,9 @@
-/**
- * タブ並び替え同期テスト
- *
- * タブ並び替えE2Eテストの追加
- *
- * このテストスイートでは、タブ並び替え後にブラウザタブとツリービューが
- * 正しく同期されることを検証します：
- * - chrome.tabs.move APIでタブを移動した場合のツリービュー同期
- * - ドラッグ&ドロップでタブを移動した場合のツリービュー同期
- * - 並び替え後の順序がストレージに永続化されること
- *
- * Note: フレーキーテスト対策として固定時間待機は使用せず、
- * ポーリングベースの状態確定待機を使用しています。
- */
 import { test } from './fixtures/extension';
 import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab } from './utils/tab-utils';
 import { reorderTabs } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('タブ並び替え同期テスト', () => {
-  // Playwrightのmouse.moveは各ステップで約1秒かかるため、タイムアウトを延長
   test.setTimeout(120000);
 
   test.describe('chrome.tabs.move APIによるタブ移動', () => {
@@ -116,9 +101,7 @@ test.describe('タブ並び替え同期テスト', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      // chrome.tabs.move APIでtab1を末尾に移動
       await serviceWorker.evaluate(async (tabId) => {
-        // index: -1 は末尾に移動
         await chrome.tabs.move(tabId, { index: -1 });
       }, tab1);
 

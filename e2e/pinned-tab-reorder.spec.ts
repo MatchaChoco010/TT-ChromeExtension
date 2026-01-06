@@ -1,10 +1,3 @@
-/**
- * ピン留めタブ並び替えのE2Eテスト
- *
- * - ピン留めタブをドラッグ＆ドロップで並び替えできることを検証
- * - 並び替え後のピン留めタブ順序がブラウザと同期していることを検証
- * - ピン留めタブを通常タブセクションにドロップできないことを検証
- */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, pinTab } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';

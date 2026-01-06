@@ -4,21 +4,22 @@ import UnreadBadge from './UnreadBadge';
 import CloseButton from './CloseButton';
 import ConfirmDialog from './ConfirmDialog';
 import { ContextMenu } from './ContextMenu';
+import { TREE_INDENT_WIDTH_PX } from '../utils';
 
 interface TreeNodeProps {
   node: TabNode;
   tab: TabInfo;
   isUnread: boolean;
   isActive: boolean;
-  isPinned?: boolean; // ピン留め状態
-  isGrouped?: boolean; // グループ化状態
-  isDiscarded?: boolean; // 休止タブ状態（グレーアウト表示）
+  isPinned?: boolean;
+  isGrouped?: boolean;
+  isDiscarded?: boolean;
   showUnreadIndicator?: boolean;
-  closeWarningThreshold?: number; // 警告閾値
+  closeWarningThreshold?: number;
   onActivate: (tabId: number) => void;
   onToggle: (nodeId: string) => void;
   onClose: (tabId: number, hasChildren: boolean) => void;
-  onContextMenu?: (action: MenuAction, tabIds: number[]) => void; // コンテキストメニューアクション
+  onContextMenu?: (action: MenuAction, tabIds: number[]) => void;
 }
 
 /**
@@ -58,7 +59,6 @@ const isNewTabUrl = (url: string): boolean => {
  * PDFなど、file://でも正しいタイトルが設定されている場合がある
  */
 const isTitleUrlFormat = (title: string): boolean => {
-  // スキーム://で始まる場合はURL形式とみなす
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(title);
 };
 
@@ -103,54 +103,39 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
   const title = tab.title || '';
   const url = tab.url || '';
 
-  // Loading状態の場合
   if (tab.status === 'loading') {
     return 'Loading...';
   }
 
-  // タイトルがURL形式でない場合はそのまま表示
-  // これにより、settings.html（タイトル: "Settings"）やgroup.html（タイトル: "Group"）など、
-  // HTMLの<title>タグで適切なタイトルが設定されているページは正しく表示される
   if (!isTitleUrlFormat(title)) {
     return title;
   }
 
-  // スタートページURLの場合
-  // URLをチェック、またはタイトルがURL形式でスタートページパターンの場合もチェック
   if (isStartPageUrl(url) || isStartPageUrl(title)) {
     return 'スタートページ';
   }
 
-  // 新しいタブURLの場合
-  // URLをチェック、またはタイトルがURL形式で新しいタブパターンの場合もチェック
   if (isNewTabUrl(url) || isNewTabUrl(title)) {
     return '新しいタブ';
   }
 
-  // タイトルがURL形式の場合、フレンドリー名があれば使用
   for (const [urlPattern, friendlyName] of Object.entries(SYSTEM_URL_FRIENDLY_NAMES)) {
     if (url.startsWith(urlPattern)) {
       return friendlyName;
     }
   }
 
-  // file://の場合はファイル名を抽出
   if (url.startsWith('file://') && isTitleUrlFormat(title)) {
     const filename = url.split('/').pop() || title;
     return decodeURIComponent(filename);
   }
 
-  // 通常のタイトル
   return title;
 };
 
 /**
  * 個別タブノードのUIコンポーネント
  * ファビコン、タイトル、インデント、展開/折りたたみトグルを表示
- *
- * タブ閉じ時の確認ダイアログ、警告閾値のカスタマイズ、コンテキストメニュー
- * タブタイトル表示改善
- * 休止タブのグレーアウト表示
  */
 const TreeNode: React.FC<TreeNodeProps> = ({
   node,
@@ -159,9 +144,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   isActive,
   isPinned = false,
   isGrouped = false,
-  isDiscarded = false, // 休止タブのグレーアウト表示
+  isDiscarded = false,
   showUnreadIndicator = true,
-  closeWarningThreshold = 3, // デフォルト閾値は3
+  closeWarningThreshold = 3,
   onActivate,
   onToggle,
   onClose,
@@ -169,14 +154,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [contextMenuOpen, setContextMenuOpen] = useState(false); // コンテキストメニューの表示状態
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 }); // メニュー表示位置
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const hasChildren = node.children && node.children.length > 0;
-  const indentSize = node.depth * 20 + 8;
+  const indentSize = node.depth * TREE_INDENT_WIDTH_PX + 8;
 
-  // サブツリーのタブ数を再帰的に計算（親タブ自身を含む）
   const countTabsInSubtree = (currentNode: TabNode): number => {
-    let count = 1; // 親タブ自身
+    let count = 1;
     if (currentNode.children && currentNode.children.length > 0) {
       currentNode.children.forEach((child) => {
         count += countTabsInSubtree(child);
@@ -194,24 +178,19 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     onToggle(node.id);
   };
 
-  // 折りたたまれたブランチを持つ親タブ閉じ時の確認（閾値チェック）
   const handleCloseClick = () => {
-    // 折りたたまれた子ノードがある場合、かつサブツリーのタブ数が閾値以上の場合のみ確認ダイアログを表示
     if (hasChildren && !node.isExpanded) {
       const tabCount = countTabsInSubtree(node);
       if (tabCount >= closeWarningThreshold) {
         setShowConfirmDialog(true);
       } else {
-        // タブ数が閾値未満の場合は確認不要、直接閉じる
         onClose(tab.id, hasChildren);
       }
     } else {
-      // 確認不要の場合は直接閉じる
       onClose(tab.id, hasChildren);
     }
   };
 
-  // 確認後にタブを閉じる
   const handleConfirmClose = () => {
     setShowConfirmDialog(false);
     onClose(tab.id, hasChildren);
@@ -229,7 +208,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     setIsHovered(false);
   };
 
-  // 右クリック時のコンテキストメニュー表示
   const handleRightClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -237,7 +215,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     setContextMenuOpen(true);
   };
 
-  // コンテキストメニューのアクション実行
   const handleContextMenuAction = (action: MenuAction) => {
     if (onContextMenu) {
       onContextMenu(action, [tab.id]);
@@ -261,11 +238,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onMouseLeave={handleMouseLeave}
         onContextMenu={handleRightClick}
       >
-        {/* 未読インジケーター - 左下角の三角形切り欠き、depthに応じた位置 */}
         <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} depth={node.depth} />
 
-        {/* 展開/折りたたみトグルボタン - サイズ縮小版 */}
-        {/* 子がある場合はボタン、ない場合は同じ幅のプレースホルダー */}
         {hasChildren ? (
           <button
             data-testid="expand-button"
@@ -279,7 +253,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           <div className="mr-1 w-3 h-3 flex-shrink-0" />
         )}
 
-        {/* ファビコン */}
         <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
           {tab.favIconUrl ? (
             <img
@@ -295,13 +268,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           )}
         </div>
 
-        {/* タブコンテンツ - タイトルエリアと右端固定アクションを左右に分離 */}
         <div
           data-testid="tab-content"
           className="flex-1 flex items-center justify-between min-w-0"
         >
-          {/* タブタイトルエリア - タイトル表示改善 */}
-          {/* 休止タブにグレーアウトスタイルを適用 */}
           <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
             <span
               className={`truncate ${isDiscarded ? 'text-gray-400' : ''}`}
@@ -310,7 +280,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               {getDisplayTitle(tab)}
             </span>
 
-            {/* ローディングインジケータ - Loading...テキスト表示時も回転アイコンを表示 */}
             {tab.status === 'loading' && (
               <span
                 data-testid="loading-indicator"
@@ -321,18 +290,15 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             )}
           </div>
 
-          {/* 右端固定コンテナ - 閉じるボタン */}
           <div
             data-testid="right-actions-container"
             className="flex items-center flex-shrink-0 ml-2"
           >
-            {/* 閉じるボタン (ホバー時のみ表示) - 常に右端に固定 */}
             {isHovered && <CloseButton onClose={handleCloseClick} />}
           </div>
         </div>
       </div>
 
-      {/* 確認ダイアログ */}
       <ConfirmDialog
         isOpen={showConfirmDialog}
         title="タブを閉じる"
@@ -342,7 +308,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         onCancel={handleCancelClose}
       />
 
-      {/* コンテキストメニュー */}
       {contextMenuOpen && (
         <ContextMenu
           targetTabIds={[tab.id]}

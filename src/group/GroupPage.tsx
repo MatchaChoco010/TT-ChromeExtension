@@ -1,37 +1,23 @@
-/**
- * グループタブ専用ページコンポーネント
- * グループタブ専用ページの作成
- *
- * グループタブのURL（chrome-extension://...）で表示されるページ。
- * グループ名と子タブのリストを表示し、ポーリングで更新を監視します。
- */
 import React, { useEffect, useState, useCallback } from 'react';
 
-/** 子タブ情報 */
 interface ChildTabInfo {
   tabId: number;
   title: string;
   url: string;
 }
 
-/** グループ情報 */
 interface GroupInfo {
   name: string;
   children: ChildTabInfo[];
 }
 
-/** ページの状態 */
 type PageState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'loaded'; groupInfo: GroupInfo };
 
-/** ポーリング間隔（ミリ秒） */
-const POLLING_INTERVAL = 2000;
+const POLLING_INTERVAL_MS = 2000;
 
-/**
- * URLクエリパラメータからtabIdを取得
- */
 function getTabIdFromQuery(): number | null {
   const params = new URLSearchParams(window.location.search);
   const tabIdStr = params.get('tabId');
@@ -40,9 +26,6 @@ function getTabIdFromQuery(): number | null {
   return isNaN(tabId) ? null : tabId;
 }
 
-/**
- * グループ情報を取得
- */
 async function fetchGroupInfo(tabId: number): Promise<GroupInfo> {
   const response = await chrome.runtime.sendMessage({
     type: 'GET_GROUP_INFO',
@@ -77,23 +60,20 @@ export const GroupPage: React.FC = () => {
     }
   }, [tabId]);
 
-  // 初回読み込み
   useEffect(() => {
     loadGroupInfo();
   }, [loadGroupInfo]);
 
-  // ポーリングによる更新監視
   useEffect(() => {
     if (state.status !== 'loaded') return;
 
     const intervalId = setInterval(() => {
       loadGroupInfo();
-    }, POLLING_INTERVAL);
+    }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
   }, [state.status, loadGroupInfo]);
 
-  // ローディング表示
   if (state.status === 'loading') {
     return (
       <div className="group-page min-h-screen bg-gray-900 flex items-center justify-center">
@@ -102,7 +82,6 @@ export const GroupPage: React.FC = () => {
     );
   }
 
-  // エラー表示
   if (state.status === 'error') {
     return (
       <div className="group-page min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-4">
@@ -117,7 +96,6 @@ export const GroupPage: React.FC = () => {
     );
   }
 
-  // グループ情報表示
   const { groupInfo } = state;
 
   return (

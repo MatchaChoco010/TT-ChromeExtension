@@ -1,16 +1,3 @@
-/**
- * chrome.tabs API統合テスト
- *
- * このテストスイートでは、以下を検証します:
- * 1. chrome.tabs.create()を呼び出した場合、新しいタブが作成され、ツリーに反映されること
- * 2. chrome.tabs.remove()を呼び出した場合、タブが削除され、ツリーから削除されること
- * 3. chrome.tabs.update()でタブのプロパティを変更した場合、変更がツリーに反映されること
- * 4. chrome.tabs.query()で複数タブを検索した場合、正しいタブリストが取得されること
- * 5. chrome.tabs.onCreated イベントが発火した場合、ツリーがリアルタイムで更新されること
- * 6. chrome.tabs.onRemoved イベントが発火した場合、ツリーから対応ノードが削除されること
- * 7. chrome.tabs.onUpdated イベントが発火した場合、タブ情報が更新されること
- * 8. chrome.tabs.onActivated イベントが発火した場合、アクティブタブのハイライトが更新されること
- */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, activateTab, pinTab, unpinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
@@ -23,24 +10,19 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // chrome.tabs.create()でタブを作成
       const createdTabId = await createTab(extensionContext, 'https://example.com');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -53,24 +35,19 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 親タブを作成（createTab utilityを使用）
       const parentTabId = await createTab(extensionContext, 'https://example.com/parent');
       expect(parentTabId).toBeDefined();
       await assertTabStructure(sidePanelPage, windowId, [
@@ -78,12 +55,11 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      // 親タブから子タブを作成（createTab utilityを使用してopenerTabIdを設定）
       const childTabId = await createTab(extensionContext, 'https://example.com/child', parentTabId);
       expect(childTabId).toBeDefined();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: parentTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
     });
@@ -95,36 +71,29 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'https://example.com');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // chrome.tabs.remove()でタブを削除
       await serviceWorker.evaluate(async (id) => {
         await chrome.tabs.remove(id);
       }, tabId);
 
-      // タブ削除後の構造を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -135,24 +104,19 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 複数タブを作成
       const tab1Id = await createTab(extensionContext, 'https://example.com/1');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -174,7 +138,6 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: tab3Id, depth: 0 },
       ], 0);
 
-      // 複数タブを一括削除
       const tabIdsToRemove = [tab1Id, tab2Id, tab3Id];
       await serviceWorker.evaluate(
         async (tabIds) => {
@@ -183,7 +146,6 @@ test.describe('chrome.tabs API統合', () => {
         tabIdsToRemove
       );
 
-      // タブ削除後の構造を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -196,31 +158,25 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'https://example.com');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // URLを変更
       await serviceWorker.evaluate(
         async (id) => {
           return await chrome.tabs.update(id, { url: 'https://example.org' });
@@ -228,10 +184,8 @@ test.describe('chrome.tabs API統合', () => {
         tabId
       );
 
-      // URLが更新されるまで待機
       const currentTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'example.org', 5000);
 
-      // URLが更新されている
       expect(currentTab).toBeDefined();
       expect(currentTab.url).toContain('example.org');
     });
@@ -241,24 +195,19 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 2つのタブを作成（非アクティブ）
       const tab1Id = await createTab(extensionContext, 'https://example.com/1', undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -272,20 +221,16 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
-      // tab1をアクティブにする
       await serviceWorker.evaluate(async (tabId) => {
         return await chrome.tabs.update(tabId, { active: true });
       }, tab1Id);
 
-      // tab1がアクティブになるまで待機
       await waitForTabActive(extensionContext, tab1Id);
 
-      // tab2をアクティブにする
       await serviceWorker.evaluate(async (tabId) => {
         return await chrome.tabs.update(tabId, { active: true });
       }, tab2Id);
 
-      // tab2がアクティブになるまで待機
       await waitForTabActive(extensionContext, tab2Id);
     });
 
@@ -294,40 +239,32 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（ピン留めタブなし、擬似サイドパネルタブのみ）
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'https://example.com');
 
-      // タブ作成後の構造を検証
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // ピン留め状態を変更
       await serviceWorker.evaluate(async (id) => {
         return await chrome.tabs.update(id, { pinned: true });
       }, tabId);
 
-      // ピン留め後の構造を検証（タブがピン留めセクションに移動）
       await assertPinnedTabStructure(sidePanelPage, windowId, [
         { tabId: tabId },
       ], 0);
@@ -335,14 +272,12 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // ピン留めを解除
-      // 注意: Chromeはピン留め解除時にタブを最初の非ピン留め位置（index 0）に配置する
-      // そのためtabIdがpseudoSidePanelTabIdより前に表示される
+      // Chromeはピン留め解除時にタブを最初の非ピン留め位置（index 0）に配置するため、
+      // tabIdがpseudoSidePanelTabIdより前に表示される
       await serviceWorker.evaluate(async (id) => {
         return await chrome.tabs.update(id, { pinned: false });
       }, tabId);
 
-      // ピン留め解除後の構造を検証（タブが通常セクションに戻る）
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: tabId, depth: 0 },
@@ -357,24 +292,19 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tab1Id = await createTab(extensionContext, 'https://example.com/1');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -394,36 +324,29 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成してアクティブにする
       const tabId = await createTab(extensionContext, 'https://example.com', undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // アクティブタブを取得（chrome.tabs.query APIのテスト）
       const activeTabs = await serviceWorker.evaluate(async () => {
         return await chrome.tabs.query({ active: true, currentWindow: true });
       });
 
-      // アクティブタブが取得できることを確認（作成したタブがアクティブであること）
       expect(activeTabs[0].id).toBe(tabId);
     });
 
@@ -432,24 +355,19 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 異なるURLのタブを作成
       const tab1Id = await createTab(extensionContext, 'https://example.com/test');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -463,16 +381,13 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
-      // 各タブが期待するURLを持つまで待機
       await waitForTabUrlLoaded(serviceWorker, tab1Id, 'example.com', 5000);
       await waitForTabUrlLoaded(serviceWorker, tab2Id, 'example.org', 5000);
 
-      // URLでフィルタリング（example.comのみ）
       const filteredTabs = await serviceWorker.evaluate(async () => {
         return await chrome.tabs.query({ url: '*://example.com/*' });
       });
 
-      // example.comのタブのみが取得されることを確認（tab1のみ）
       const filteredTabIds = filteredTabs.map((t: chrome.tabs.Tab) => t.id);
       expect(filteredTabIds).toContain(tab1Id);
       expect(filteredTabIds).not.toContain(tab2Id);
@@ -486,25 +401,20 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（ピン留めタブなし、擬似サイドパネルタブのみ）
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'https://example.com');
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
@@ -512,7 +422,6 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // タブをピン留め
       await pinTab(extensionContext, tabId);
       await assertPinnedTabStructure(sidePanelPage, windowId, [
         { tabId: tabId },
@@ -529,29 +438,23 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成（createTab関数はonCreatedイベントの処理を待機する）
       const tabId = await createTab(extensionContext, 'https://example.com');
       expect(tabId).toBeGreaterThan(0);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
-      // ツリー状態がストレージに保存されていることを確認
       const treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
@@ -569,40 +472,32 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'https://example.com');
       expect(tabId).toBeGreaterThan(0);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
-      // タブがツリーに追加されていることを確認
       let treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
       });
       expect(treeState?.tabToNode?.[tabId]).toBeDefined();
 
-      // タブを削除
       await closeTab(extensionContext, tabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
-      // ツリーからタブが削除されるまで待機
       await waitForTabRemovedFromTreeState(extensionContext, tabId);
 
       treeState = await serviceWorker.evaluate(async () => {
@@ -620,39 +515,31 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // URLを更新
       await serviceWorker.evaluate(async (id) => {
         await chrome.tabs.update(id, { url: 'https://example.com' });
       }, tabId);
 
-      // URLが更新されるまで待機
       const updatedTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'example.com', 5000);
 
-      // タブが更新されたことを確認
       expect(updatedTab).toBeDefined();
       expect(updatedTab.id).toBe(tabId);
     });
@@ -664,24 +551,19 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 2つのタブを作成
       const tab1 = await createTab(extensionContext, 'https://example.com/1');
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tab1, depth: 0 }], 0);
 
@@ -692,20 +574,16 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      // tab1をアクティブにする
       await activateTab(extensionContext, tab1);
 
-      // アクティブ状態を確認
       const activeInfo1 = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         return tabs[0];
       });
       expect(activeInfo1.id).toBe(tab1);
 
-      // tab2をアクティブにする
       await activateTab(extensionContext, tab2);
 
-      // アクティブ状態が切り替わったことを確認
       const activeInfo2 = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         return tabs[0];
@@ -718,30 +596,24 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 非アクティブでタブを作成（未読状態になる）
       const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
         active: false,
       });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
-      // 未読状態がストレージに保存されるまで待機
       await waitForCondition(async () => {
         const result = await serviceWorker.evaluate(async () => {
           return await chrome.storage.local.get('unread_tabs');
@@ -749,18 +621,14 @@ test.describe('chrome.tabs API統合', () => {
         return Array.isArray(result.unread_tabs) && result.unread_tabs.includes(tabId);
       }, { timeout: 3000 });
 
-      // 未読状態を確認（配列として保存されている）
       let unreadState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('unread_tabs');
         return result.unread_tabs;
       });
-      // 未読状態は配列として保存されているので、タブIDが含まれているか確認
       expect(Array.isArray(unreadState) && unreadState.includes(tabId)).toBe(true);
 
-      // タブをアクティブ化
       await activateTab(extensionContext, tabId);
 
-      // 未読状態がクリアされるまで待機
       await waitForCondition(async () => {
         const result = await serviceWorker.evaluate(async () => {
           return await chrome.storage.local.get('unread_tabs');
@@ -768,12 +636,10 @@ test.describe('chrome.tabs API統合', () => {
         return !result.unread_tabs || !result.unread_tabs.includes(tabId);
       }, { timeout: 3000 });
 
-      // 未読状態がクリアされたことを確認
       unreadState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('unread_tabs');
         return result.unread_tabs;
       });
-      // 配列にタブIDが含まれていないことを確認
       expect(!unreadState || !unreadState.includes(tabId)).toBe(true);
     });
   });
@@ -784,40 +650,32 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'https://example.com');
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
-      // ツリー状態を確認
       const treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
       });
 
-      // ノードが追加されていることを確認
       expect(treeState).toBeDefined();
       expect(treeState.tabToNode).toBeDefined();
       const nodeId = treeState.tabToNode[tabId];
       expect(nodeId).toBeDefined();
 
-      // ノード情報を確認
       const node = treeState.nodes[nodeId];
       expect(node).toBeDefined();
       expect(node.tabId).toBe(tabId);
@@ -828,28 +686,22 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 親タブを作成
       const parentTabId = await createTab(extensionContext, 'https://example.com/parent');
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: parentTabId, depth: 0 }], 0);
 
-      // 子タブを作成
       const childTabId = await createTab(
         extensionContext,
         'https://example.com/child',
@@ -857,24 +709,21 @@ test.describe('chrome.tabs API統合', () => {
       );
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: parentTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
 
-      // ツリー状態を確認
       const treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
       });
 
-      // 親ノードのIDを取得
       const parentNodeId = treeState.tabToNode[parentTabId];
       const childNodeId = treeState.tabToNode[childTabId];
 
       expect(parentNodeId).toBeDefined();
       expect(childNodeId).toBeDefined();
 
-      // 子ノードの親IDが正しいことを確認
       const childNode = treeState.nodes[childNodeId];
       expect(childNode.parentId).toBe(parentNodeId);
     });
@@ -884,28 +733,22 @@ test.describe('chrome.tabs API統合', () => {
       serviceWorker,
       sidePanelPage,
     }) => {
-      // ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      // 初期状態を検証（擬似サイドパネルタブのみ）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブを作成
       const tabId = await createTab(extensionContext, 'https://example.com');
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
-      // ツリーにノードが追加されていることを確認
       let treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
@@ -913,14 +756,11 @@ test.describe('chrome.tabs API統合', () => {
       const nodeId = treeState.tabToNode[tabId];
       expect(nodeId).toBeDefined();
 
-      // タブを削除
       await closeTab(extensionContext, tabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
-      // ツリーからノードが削除されるまで待機
       await waitForTabRemovedFromTreeState(extensionContext, tabId);
 
-      // ツリーからノードが削除されていることを確認
       treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;

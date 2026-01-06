@@ -1,13 +1,3 @@
-/**
- * 自前ドラッグ&ドロップフック
- *
- * mousedown/mousemove/mouseupイベントでドラッグ操作を処理
- * 8px移動検知によるドラッグ開始（誤操作防止）
- * ドラッグ中の要素をマウスカーソルに追従
- * GapDropDetection.tsのロジックを流用してドロップ位置を計算
- * クロスウィンドウでのドラッグ状態継続を可能に
- */
-
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   calculateDropTarget,
@@ -19,14 +9,9 @@ import {
   DropTargetType,
 } from '../components/GapDropDetection';
 
-// Re-export DropTarget for external use
 export { type DropTarget, DropTargetType };
 
-/**
- * ドラッグ状態
- */
 export interface DragState {
-  /** ドラッグ中かどうか */
   isDragging: boolean;
   /** ドラッグ準備中（mousedownからドラッグ開始までの間） */
   isPotentialDrag: boolean;
@@ -38,33 +23,22 @@ export interface DragState {
   startPosition: { x: number; y: number };
   /** 現在のマウス位置（スクリーン座標） */
   currentPosition: { x: number; y: number };
-  /** ドラッグ開始からの移動量 */
   delta: { x: number; y: number };
-  /** 現在のドロップターゲット */
   dropTarget: DropTarget | null;
   /** ドラッグ中の要素のオフセット（要素内でのクリック位置） */
   offset: { x: number; y: number };
 }
 
-/**
- * useDragDropフックのオプション
- */
 export interface UseDragDropOptions {
   /** ドラッグ開始までの移動距離（デフォルト: 8px） */
   activationDistance?: number;
   /** ドラッグ方向（vertical: 縦方向、horizontal: 横方向） */
   direction?: 'vertical' | 'horizontal';
-  /** コンテナ要素のref */
   containerRef: React.RefObject<HTMLElement | null>;
-  /** アイテムリスト（ドロップ位置計算用） */
   items: Array<{ id: string; tabId: number }>;
-  /** ドラッグ開始コールバック */
   onDragStart?: (itemId: string, tabId: number) => void;
-  /** ドラッグ移動コールバック */
   onDragMove?: (position: { x: number; y: number }, dropTarget: DropTarget | null) => void;
-  /** ドラッグ終了コールバック */
   onDragEnd?: (itemId: string, dropTarget: DropTarget | null) => void;
-  /** ドラッグキャンセルコールバック */
   onDragCancel?: () => void;
   /** 外部ドロップ（ツリー外へのドラッグ）コールバック */
   onExternalDrop?: (tabId: number) => void;
@@ -82,11 +56,7 @@ export interface UseDragDropOptions {
   getSubtreeNodeIds?: (nodeId: string) => string[];
 }
 
-/**
- * useDragDropフックの戻り値
- */
 export interface UseDragDropReturn {
-  /** 現在のドラッグ状態 */
   dragState: DragState;
   /** アイテムに適用するprops（マウス操作のみ、タッチはスコープ外） */
   getItemProps: (itemId: string, tabId: number) => {
@@ -94,15 +64,12 @@ export interface UseDragDropReturn {
     style: React.CSSProperties;
     'data-dragging': boolean;
   };
-  /** ドラッグ中の要素のスタイル（transform含む） */
   getDragOverlayStyle: () => React.CSSProperties | null;
   /** プログラマティックにドラッグを開始（クロスウィンドウ用） */
   startDragProgrammatically: (itemId: string, tabId: number, position: { x: number; y: number }) => void;
-  /** ドラッグをキャンセル */
   cancelDrag: () => void;
 }
 
-// 初期ドラッグ状態
 const initialDragState: DragState = {
   isDragging: false,
   isPotentialDrag: false,
@@ -115,12 +82,6 @@ const initialDragState: DragState = {
   offset: { x: 0, y: 0 },
 };
 
-/**
- * 自前ドラッグ&ドロップフック
- *
- * dnd-kitを置き換え、mousedown/mousemove/mouseupイベントで
- * ドラッグ操作を処理する。8px移動検知で誤操作を防止。
- */
 export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   const {
     activationDistance = 8,
@@ -131,18 +92,14 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     onDragEnd,
     onDragCancel,
     onExternalDrop,
-    // 外部ドロップ判定用の境界参照
     dragOutBoundaryRef,
-    // サブツリーノードID取得コールバック
     getSubtreeNodeIds,
   } = options;
 
   const [dragState, setDragState] = useState<DragState>(initialDragState);
 
-  // refでドラッグ状態を追跡（イベントハンドラ内で最新値を参照するため）
   const dragStateRef = useRef<DragState>(initialDragState);
 
-  // コールバックをrefで保持（イベントハンドラ内で最新値を参照するため）
   const callbacksRef = useRef({
     onDragStart,
     onDragMove,
@@ -151,13 +108,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     onExternalDrop,
   });
 
-  // オプションをrefで保持
   const optionsRef = useRef({
     activationDistance,
     direction,
   });
 
-  // コールバックの更新を同期
   useEffect(() => {
     callbacksRef.current = {
       onDragStart,
@@ -168,7 +123,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     };
   }, [onDragStart, onDragMove, onDragEnd, onDragCancel, onExternalDrop]);
 
-  // オプションの更新を同期
   useEffect(() => {
     optionsRef.current = {
       activationDistance,
@@ -176,19 +130,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     };
   }, [activationDistance, direction]);
 
-  // dragStateの更新をrefにも同期
   useEffect(() => {
     dragStateRef.current = dragState;
   }, [dragState]);
 
-  /**
-   * マウス位置が外部ドロップ境界外かどうかを判定
-   * ドラッグアウト判定はサイドパネル全体の境界を基準にする
-   * dragOutBoundaryRefが指定されている場合はそちらを使用、
-   * 指定されていない場合はcontainerRefを使用（後方互換性維持）
-   */
   const isOutsideDragOutBoundary = useCallback((clientX: number, clientY: number): boolean => {
-    // dragOutBoundaryRefが指定されている場合はそちらを使用
     const boundary = dragOutBoundaryRef?.current ?? containerRef.current;
     if (!boundary) return false;
 
@@ -201,17 +147,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     );
   }, [containerRef, dragOutBoundaryRef]);
 
-  // getSubtreeNodeIdsをrefで保持（useCallbackの依存配列を安定化）
   const getSubtreeNodeIdsRef = useRef(getSubtreeNodeIds);
   useEffect(() => {
     getSubtreeNodeIdsRef.current = getSubtreeNodeIds;
   }, [getSubtreeNodeIds]);
 
-  /**
-   * 垂直方向のドロップターゲットを計算
-   * サブツリーサイズを考慮したドロップ位置計算
-   * 下方向へのドラッグ時、サブツリーを除外してインデックス調整
-   */
   const calculateVerticalDropTarget = useCallback((_clientX: number, clientY: number): DropTarget | null => {
     const container = containerRef.current;
     if (!container) return null;
@@ -219,10 +159,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     const rect = container.getBoundingClientRect();
     const scrollTop = container.scrollTop || 0;
 
-    // コンテナ相対のY座標
     const mouseY = clientY - rect.top + scrollTop;
 
-    // 各タブノードの位置情報を構築
     const tabPositions: TabPosition[] = [];
     const nodeElements = container.querySelectorAll('[data-node-id]');
 
@@ -241,7 +179,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       }
     });
 
-    // ドラッグ中のノードIDを取得してオプションを構築
     const currentDragState = dragStateRef.current;
     const options: DropTargetOptions = {};
 
@@ -253,9 +190,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     return calculateDropTarget(mouseY, tabPositions, options);
   }, [containerRef]);
 
-  /**
-   * 水平方向のドロップターゲットを計算（ピン留めタブ用）
-   */
   const calculateHorizontalDropTargetFromDOM = useCallback((clientX: number, _clientY: number): DropTarget | null => {
     const container = containerRef.current;
     if (!container) return null;
@@ -263,10 +197,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     const rect = container.getBoundingClientRect();
     const scrollLeft = container.scrollLeft || 0;
 
-    // コンテナ相対のX座標
     const mouseX = clientX - rect.left + scrollLeft;
 
-    // 各タブノードの水平位置情報を構築
     const tabPositions: HorizontalTabPosition[] = [];
     const nodeElements = container.querySelectorAll('[data-node-id]');
 
@@ -288,9 +220,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     return calculateHorizontalDropTarget(mouseX, tabPositions);
   }, [containerRef]);
 
-  /**
-   * 方向に応じたドロップターゲットを計算
-   */
   const calculateCurrentDropTarget = useCallback((clientX: number, clientY: number): DropTarget | null => {
     const { direction: dir } = optionsRef.current;
     if (dir === 'horizontal') {
@@ -299,22 +228,15 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     return calculateVerticalDropTarget(clientX, clientY);
   }, [calculateVerticalDropTarget, calculateHorizontalDropTargetFromDOM]);
 
-  /**
-   * ドラッグ状態をリセット
-   */
   const resetDragState = useCallback(() => {
     setDragState(initialDragState);
   }, []);
 
-  // dragstartイベントハンドラをrefで保持
-  // ブラウザのデフォルトドラッグ動作をキャンセルして、
-  // カスタムドラッグ動作が正しく機能するようにする
   const handleDragStartRef = useRef<(e: DragEvent) => void>((e: DragEvent) => {
     e.preventDefault();
     console.log('[useDragDrop] dragstart prevented');
   });
 
-  // イベントハンドラをrefで保持（循環依存を回避）
   const handlersRef = useRef<{
     handleMouseMove: (e: MouseEvent) => void;
     handleMouseUp: (e: MouseEvent) => void;
@@ -323,7 +245,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     handleMouseUp: () => {},
   });
 
-  // イベントハンドラを初期化
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const currentState = dragStateRef.current;
@@ -339,12 +260,10 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
         y: currentPosition.y - currentState.startPosition.y,
       };
 
-      // 方向に応じた移動距離計算
       const distance = dir === 'horizontal'
         ? Math.abs(delta.x)
         : Math.sqrt(delta.x ** 2 + delta.y ** 2);
 
-      // 潜在的ドラッグ中で、アクティベーション距離を超えたらドラッグ開始
       if (currentState.isPotentialDrag && distance >= actDist) {
         const dropTarget = calculateCurrentDropTarget(e.clientX, e.clientY);
 
@@ -363,7 +282,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
         return;
       }
 
-      // ドラッグ中の移動更新
       if (currentState.isDragging) {
         const dropTarget = calculateCurrentDropTarget(e.clientX, e.clientY);
 
@@ -381,24 +299,19 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     const handleMouseUp = (e: MouseEvent) => {
       const currentState = dragStateRef.current;
 
-      // イベントリスナーを削除
       document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
       document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
       document.removeEventListener('dragstart', handleDragStartRef.current);
 
-      // 潜在的ドラッグ中（まだドラッグ開始していない）の場合はリセット
       if (currentState.isPotentialDrag) {
         resetDragState();
         return;
       }
 
-      // ドラッグ中でない場合は何もしない
       if (!currentState.isDragging) {
         return;
       }
 
-      // 外部ドロップ判定
-      // ドラッグアウト判定はサイドパネル全体の境界を基準にする
       if (isOutsideDragOutBoundary(e.clientX, e.clientY)) {
         if (currentState.draggedTabId !== null && callbacksRef.current.onExternalDrop) {
           callbacksRef.current.onExternalDrop(currentState.draggedTabId);
@@ -407,7 +320,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
         return;
       }
 
-      // 通常のドロップ終了
       if (currentState.draggedItemId && callbacksRef.current.onDragEnd) {
         callbacksRef.current.onDragEnd(currentState.draggedItemId, currentState.dropTarget);
       }
@@ -418,18 +330,13 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     handlersRef.current = { handleMouseMove, handleMouseUp };
   }, [calculateCurrentDropTarget, isOutsideDragOutBoundary, resetDragState]);
 
-  /**
-   * mousedownイベントハンドラ
-   */
   const handleMouseDown = useCallback((itemId: string, tabId: number, e: React.MouseEvent) => {
-    // 左クリック以外は無視
     if (e.button !== 0) return;
 
     e.preventDefault();
 
     const startPosition = { x: e.clientX, y: e.clientY };
 
-    // 要素内でのクリック位置オフセットを計算
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
     const offset = {
@@ -449,16 +356,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       offset,
     });
 
-    // グローバルイベントリスナーを設定
     document.addEventListener('mousemove', handlersRef.current.handleMouseMove);
     document.addEventListener('mouseup', handlersRef.current.handleMouseUp);
-    // ブラウザのデフォルトドラッグをキャンセル
     document.addEventListener('dragstart', handleDragStartRef.current);
   }, []);
 
-  /**
-   * ドラッグをキャンセル
-   */
   const cancelDrag = useCallback(() => {
     document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
     document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
@@ -467,10 +369,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     callbacksRef.current.onDragCancel?.();
   }, [resetDragState]);
 
-  /**
-   * プログラマティックにドラッグを開始（クロスウィンドウ用）
-   * 8px移動待機をスキップして即座にドラッグ状態を開始
-   */
+  /** プログラマティックにドラッグを開始（クロスウィンドウ用） */
   const startDragProgrammatically = useCallback((
     itemId: string,
     tabId: number,
@@ -485,19 +384,15 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       currentPosition: position,
       delta: { x: 0, y: 0 },
       dropTarget: null,
-      offset: { x: 0, y: 0 }, // クロスウィンドウ移動時はオフセットなし
+      offset: { x: 0, y: 0 },
     });
 
-    // グローバルイベントリスナーを設定
     document.addEventListener('mousemove', handlersRef.current.handleMouseMove);
     document.addEventListener('mouseup', handlersRef.current.handleMouseUp);
 
     callbacksRef.current.onDragStart?.(itemId, tabId);
   }, []);
 
-  /**
-   * アイテムに適用するpropsを取得
-   */
   const getItemProps = useCallback((itemId: string, tabId: number) => {
     const isDragging = dragState.draggedItemId === itemId && dragState.isDragging;
 
@@ -511,9 +406,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     };
   }, [dragState.draggedItemId, dragState.isDragging, handleMouseDown]);
 
-  /**
-   * ドラッグオーバーレイのスタイルを取得
-   */
   const getDragOverlayStyle = useCallback((): React.CSSProperties | null => {
     if (!dragState.isDragging) {
       return null;
@@ -532,7 +424,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     };
   }, [dragState]);
 
-  // クリーンアップ
   useEffect(() => {
     return () => {
       document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
@@ -553,7 +444,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
           draggedTabId: dragStateRef.current.draggedTabId,
         });
         const currentState = dragStateRef.current;
-        // ドラッグ中の場合のみキャンセル
         if (currentState.isDragging || currentState.isPotentialDrag) {
           console.log('[useDragDrop] Resetting drag state due to DRAG_SESSION_ENDED');
           document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);

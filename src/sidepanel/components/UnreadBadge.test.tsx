@@ -32,7 +32,6 @@ describe('UnreadBadge', () => {
       render(<UnreadBadge isUnread={true} showIndicator={true} />);
 
       const badge = screen.getByTestId('unread-badge');
-      // 三角形切り欠きスタイル（border-based triangle）
       expect(badge).toHaveStyle({
         width: '0',
         height: '0',

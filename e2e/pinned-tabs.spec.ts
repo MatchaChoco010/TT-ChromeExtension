@@ -1,10 +1,3 @@
-/**
- * ピン留めタブセクションのE2Eテスト
- *
- * - ピン留めタブが上部セクションに横並びで表示されることをテストする
- * - ピン留めタブクリックでタブがアクティブ化することをテストする
- * - ピン留めタブと通常タブの間に区切り線が表示されることをテストする
- */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, pinTab, unpinTab } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';

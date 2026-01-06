@@ -22,7 +22,6 @@ describe('ContextMenu', () => {
       const menu = screen.getByRole('menu');
       expect(menu).toBeInTheDocument();
 
-      // メニューの位置が設定されていることを確認
       const style = menu.style;
       expect(style.left).toBe('100px');
       expect(style.top).toBe('200px');
@@ -85,11 +84,9 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 基本的なメニュー項目が表示されることを確認
       expect(screen.getByRole('menuitem', { name: /閉じる/i })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: /複製/i })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: /再読み込み/i })).toBeInTheDocument();
-      // 別のウィンドウに移動サブメニューが表示されることを確認
       expect(screen.getByTestId('context-menu-move-to-window')).toBeInTheDocument();
     });
 
@@ -143,7 +140,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 単一タブ選択時は「グループに追加」がdivで表示される（サブメニュー付き）
       expect(screen.getByText('グループに追加')).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: /グループを解除/i })).not.toBeInTheDocument();
     });
@@ -246,11 +242,9 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 別のウィンドウに移動のサブメニュートリガーにホバー
       const moveToWindowItem = screen.getByTestId('context-menu-move-to-window');
       await user.hover(moveToWindowItem);
 
-      // サブメニューが表示されるのを待つ
       const newWindowSubItem = await screen.findByText('新しいウィンドウ');
       await user.click(newWindowSubItem);
 
@@ -293,7 +287,6 @@ describe('ContextMenu', () => {
       const closeItem = screen.getByRole('menuitem', { name: /選択されたタブを閉じる/i });
       await user.click(closeItem);
 
-      // 複数タブの場合はcloseアクションが実行される（実装で複数タブを閉じる処理が行われる）
       expect(onAction).toHaveBeenCalledWith('close');
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -329,7 +322,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 選択されたタブ数が表示されることを確認
       expect(screen.getByText(/3件/)).toBeInTheDocument();
     });
 
@@ -346,7 +338,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 選択されたタブを閉じるオプションが表示されることを確認
       expect(screen.getByRole('menuitem', { name: /選択されたタブを閉じる \(2件\)/i })).toBeInTheDocument();
     });
 
@@ -363,7 +354,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // グループ化オプションが表示されることを確認
       expect(screen.getByRole('menuitem', { name: /選択されたタブをグループ化/i })).toBeInTheDocument();
     });
 
@@ -401,7 +391,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 単一タブの場合は「グループに追加」がdivで表示される（サブメニュー付き）
       expect(screen.getByText('グループに追加')).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: /選択されたタブをグループ化/i })).not.toBeInTheDocument();
     });
@@ -421,7 +410,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // スナップショット取得オプションが表示されることを確認
       expect(screen.getByRole('menuitem', { name: /スナップショットを取得/i })).toBeInTheDocument();
     });
 
@@ -459,14 +447,12 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 複数選択時でもスナップショット取得オプションが表示されることを確認
       expect(screen.getByRole('menuitem', { name: /スナップショットを取得/i })).toBeInTheDocument();
     });
   });
 
   describe('画面端での位置調整', () => {
     it('メニューが画面右端を超える場合は左側に表示する', () => {
-      // ウィンドウサイズをモック
       Object.defineProperty(window, 'innerWidth', {
         writable: true,
         configurable: true,
@@ -488,13 +474,10 @@ describe('ContextMenu', () => {
 
       const menu = screen.getByRole('menu');
 
-      // メニュー幅を200pxと仮定した場合、750 + 200 > 800 なので調整される
-      // 実際の調整ロジックは実装で確認
       expect(menu).toBeInTheDocument();
     });
 
     it('メニューが画面下端を超える場合は上側に表示する', () => {
-      // ウィンドウサイズをモック
       Object.defineProperty(window, 'innerHeight', {
         writable: true,
         configurable: true,
@@ -516,7 +499,6 @@ describe('ContextMenu', () => {
 
       const menu = screen.getByRole('menu');
 
-      // メニュー高さを200pxと仮定した場合、550 + 200 > 600 なので調整される
       expect(menu).toBeInTheDocument();
     });
   });
@@ -553,7 +535,6 @@ describe('ContextMenu', () => {
       );
 
       const menu = screen.getByRole('menu');
-      // select-noneクラスが適用されていることを確認
       expect(menu).toHaveClass('select-none');
     });
   });
@@ -582,7 +563,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「別のビューへ移動」メニュー項目が表示されることを確認
       expect(screen.getByText('別のビューへ移動')).toBeInTheDocument();
     });
 
@@ -603,7 +583,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // ビューが1つしかないので「別のビューへ移動」は表示されない
       expect(screen.queryByText('別のビューへ移動')).not.toBeInTheDocument();
     });
 
@@ -625,15 +604,12 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「別のビューへ移動」にホバー
       const moveToViewItem = screen.getByText('別のビューへ移動');
       await user.hover(moveToViewItem);
 
-      // サブメニューが表示されることを確認（現在のビューは除外）
       expect(screen.getByTestId('submenu')).toBeInTheDocument();
       expect(screen.getByText('Work')).toBeInTheDocument();
       expect(screen.getByText('Personal')).toBeInTheDocument();
-      // 現在のビュー(Default)は表示されない
       expect(screen.queryByRole('menuitem', { name: 'Default' })).not.toBeInTheDocument();
     });
 
@@ -655,15 +631,12 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「別のビューへ移動」にホバー
       const moveToViewItem = screen.getByText('別のビューへ移動');
       await user.hover(moveToViewItem);
 
-      // サブメニューからビューを選択
       const workView = screen.getByText('Work');
       await user.click(workView);
 
-      // onMoveToViewが選択したビューIDとタブIDで呼ばれることを確認
       expect(onMoveToView).toHaveBeenCalledWith('work', [1, 2]);
       expect(onClose).toHaveBeenCalled();
     });
@@ -686,16 +659,13 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「別のビューへ移動」にホバー
       const moveToViewItem = screen.getByText('別のビューへ移動');
       await user.hover(moveToViewItem);
 
-      // サブメニューが表示（現在のビューworkは除外）
       expect(screen.getByText('Default')).toBeInTheDocument();
       expect(screen.getByText('Personal')).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: 'Work' })).not.toBeInTheDocument();
 
-      // ビューを選択
       await user.click(screen.getByText('Personal'));
 
       expect(onMoveToView).toHaveBeenCalledWith('personal', [1, 2, 3]);
@@ -811,11 +781,9 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「グループに追加」にホバー
       const addToGroupItem = screen.getByText('グループに追加');
       await user.hover(addToGroupItem);
 
-      // サブメニューが表示されることを確認
       expect(screen.getByTestId('submenu')).toBeInTheDocument();
       expect(screen.getByText('Work')).toBeInTheDocument();
       expect(screen.getByText('Personal')).toBeInTheDocument();
@@ -838,15 +806,12 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「グループに追加」にホバー
       const addToGroupItem = screen.getByText('グループに追加');
       await user.hover(addToGroupItem);
 
-      // サブメニューからグループを選択
       const workGroup = screen.getByText('Work');
       await user.click(workGroup);
 
-      // onAddToGroupが選択したグループIDとタブIDで呼ばれることを確認
       expect(onAddToGroup).toHaveBeenCalledWith('group_1', [1]);
       expect(onClose).toHaveBeenCalled();
     });
@@ -865,7 +830,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「グループに追加」ボタンが無効化されていることを確認
       const addToGroupItem = screen.getByText('グループに追加');
       expect(addToGroupItem.closest('button') || addToGroupItem.closest('div')).toHaveClass('text-gray-500');
     });
@@ -883,7 +847,6 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「グループに追加」が表示されていることを確認
       expect(screen.getByText('グループに追加')).toBeInTheDocument();
     });
 
@@ -904,10 +867,8 @@ describe('ContextMenu', () => {
         />
       );
 
-      // 「選択されたタブをグループ化」が表示される
       expect(screen.getByRole('menuitem', { name: /選択されたタブをグループ化/i })).toBeInTheDocument();
 
-      // ホバーしてもサブメニューは表示されない（直接アクションになる）
       const groupItem = screen.getByRole('menuitem', { name: /選択されたタブをグループ化/i });
       await user.click(groupItem);
 

@@ -3,12 +3,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NewTabButton from './NewTabButton';
 
-// chrome API のモック
 const mockChromeTabs = {
   create: vi.fn(),
 };
 
-// グローバルに chrome API をモック
 vi.stubGlobal('chrome', {
   tabs: mockChromeTabs,
 });
@@ -16,7 +14,6 @@ vi.stubGlobal('chrome', {
 describe('NewTabButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // chrome.tabs.create のモックをリセット
     mockChromeTabs.create.mockResolvedValue({ id: 999, windowId: 1 });
   });
 
@@ -36,24 +33,19 @@ describe('NewTabButton', () => {
     it('ボタンがツリービューの横幅いっぱいの幅を持つこと', () => {
       render(<NewTabButton />);
       const button = screen.getByTestId('new-tab-button');
-      // w-full クラスが適用されていることを確認
       expect(button).toHaveClass('w-full');
     });
 
     it('プラスアイコンが表示されていること', () => {
       render(<NewTabButton />);
       const button = screen.getByTestId('new-tab-button');
-      // プラスアイコン（+）がボタン内に含まれていることを確認
       expect(button.textContent).toContain('+');
     });
 
     it('ボタンは「+」アイコンのみを表示し、テキストラベルを表示しないこと', () => {
       render(<NewTabButton />);
       const button = screen.getByTestId('new-tab-button');
-      // 「+」アイコンのみ表示、テキストラベルは表示しない
-      // ボタンのテキストコンテンツは「+」のみであること
       expect(button.textContent?.trim()).toBe('+');
-      // 「新規タブ」というテキストが含まれないこと
       expect(button.textContent).not.toContain('新規タブ');
     });
   });
@@ -83,8 +75,6 @@ describe('NewTabButton', () => {
       );
     });
 
-    // 新規タブのタイトルを「スタートページ」に修正
-    // NewTabButtonがchrome://vivaldi-webui/startpageを開くことで、getDisplayTitleが「スタートページ」を表示
     it('クリック時にVivaldiスタートページが開かれること', async () => {
       const user = userEvent.setup();
       render(<NewTabButton />);
@@ -107,7 +97,6 @@ describe('NewTabButton', () => {
       const button = screen.getByTestId('new-tab-button');
       await user.click(button);
 
-      // Promise が解決されるまで待機
       await vi.waitFor(() => {
         expect(onNewTab).toHaveBeenCalledTimes(1);
       });
@@ -134,7 +123,6 @@ describe('NewTabButton', () => {
     it('ホバー時にスタイルが変化するクラスが適用されていること', () => {
       render(<NewTabButton />);
       const button = screen.getByTestId('new-tab-button');
-      // hover スタイルが適用されていることを確認
       expect(button.className).toMatch(/hover:/);
     });
 
@@ -154,7 +142,6 @@ describe('NewTabButton', () => {
       render(<NewTabButton />);
       const button = screen.getByTestId('new-tab-button');
 
-      // エラーがスローされずにクリックが完了することを確認
       await expect(user.click(button)).resolves.not.toThrow();
 
       consoleErrorSpy.mockRestore();

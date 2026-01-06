@@ -1,38 +1,18 @@
-/**
- * IconPicker コンポーネント
- * カスタムアイコン選択UI
- *
- * カテゴリ別にアイコンを表示し、選択できるUIを提供します。
- * lucide-reactが使用できない場合はSVGアイコンを直接定義して使用します。
- */
-
 import React, { useState, useCallback, useRef } from 'react';
 
-/**
- * アイコンカテゴリの型定義
- */
 export type IconCategory = 'work' | 'hobby' | 'social' | 'dev' | 'general';
 
-/**
- * カテゴリ情報の型定義
- */
 interface CategoryInfo {
   id: IconCategory;
   label: string;
   icons: IconDefinition[];
 }
 
-/**
- * アイコン定義の型
- */
 interface IconDefinition {
   name: string;
   svg: React.ReactNode;
 }
 
-/**
- * IconPickerのProps
- */
 export interface IconPickerProps {
   /** 現在選択中のアイコン（アイコン名またはURL） */
   currentIcon: string | undefined;
@@ -42,8 +22,6 @@ export interface IconPickerProps {
   onCancel: () => void;
 }
 
-// SVGアイコン定義（lucide-react相当のアイコンをSVGで定義）
-// 仕事カテゴリ
 const workIcons: IconDefinition[] = [
   {
     name: 'briefcase',
@@ -136,7 +114,6 @@ const workIcons: IconDefinition[] = [
   },
 ];
 
-// 趣味カテゴリ
 const hobbyIcons: IconDefinition[] = [
   {
     name: 'music',
@@ -226,7 +203,6 @@ const hobbyIcons: IconDefinition[] = [
   },
 ];
 
-// ソーシャルカテゴリ
 const socialIcons: IconDefinition[] = [
   {
     name: 'message-circle',
@@ -305,7 +281,6 @@ const socialIcons: IconDefinition[] = [
   },
 ];
 
-// 開発カテゴリ
 const devIcons: IconDefinition[] = [
   {
     name: 'code',
@@ -405,7 +380,6 @@ const devIcons: IconDefinition[] = [
   },
 ];
 
-// 一般カテゴリ
 const generalIcons: IconDefinition[] = [
   {
     name: 'home',
@@ -479,7 +453,6 @@ const generalIcons: IconDefinition[] = [
   },
 ];
 
-// カテゴリ一覧
 const CATEGORIES: CategoryInfo[] = [
   { id: 'work', label: 'Work', icons: workIcons },
   { id: 'hobby', label: 'Hobby', icons: hobbyIcons },
@@ -488,7 +461,6 @@ const CATEGORIES: CategoryInfo[] = [
   { id: 'general', label: 'General', icons: generalIcons },
 ];
 
-// 全アイコン名からアイコン定義を取得するマップを作成
 const ALL_ICONS_MAP = new Map<string, IconDefinition>();
 CATEGORIES.forEach((category) => {
   category.icons.forEach((icon) => {
@@ -516,9 +488,6 @@ export const isCustomIcon = (iconName: string | undefined): boolean => {
   return ALL_ICONS_MAP.has(iconName);
 };
 
-/**
- * 初期カテゴリを決定するヘルパー関数
- */
 const getInitialCategory = (iconName: string | undefined): IconCategory => {
   if (!iconName || iconName.startsWith('http://') || iconName.startsWith('https://')) {
     return 'work';
@@ -531,9 +500,6 @@ const getInitialCategory = (iconName: string | undefined): IconCategory => {
   return 'work';
 };
 
-/**
- * 初期URL値を決定するヘルパー関数
- */
 const getInitialUrlInput = (iconName: string | undefined): string => {
   if (iconName && (iconName.startsWith('http://') || iconName.startsWith('https://'))) {
     return iconName;
@@ -541,43 +507,33 @@ const getInitialUrlInput = (iconName: string | undefined): string => {
   return '';
 };
 
-/**
- * IconPicker コンポーネント
- */
 export const IconPicker: React.FC<IconPickerProps> = ({
   currentIcon,
   onSelect,
   onCancel,
 }) => {
-  // 現在選択中のカテゴリ（初期値を計算）
   const [selectedCategory, setSelectedCategory] = useState<IconCategory>(() =>
     getInitialCategory(currentIcon)
   );
 
-  // 現在選択中のアイコン名またはURL
   const [selectedIcon, setSelectedIcon] = useState<string | undefined>(currentIcon);
 
-  // URL入力フィールドの値
   const [urlInput, setUrlInput] = useState<string>(() =>
     getInitialUrlInput(currentIcon)
   );
 
-  // タブリストへの参照
   const tabListRef = useRef<HTMLDivElement | null>(null);
 
-  // カテゴリ切り替え
   const handleCategoryChange = useCallback((categoryId: IconCategory) => {
     setSelectedCategory(categoryId);
   }, []);
 
-  // アイコン選択 - 即座にonSelectを呼び出す (Select button不要)
   const handleIconSelect = useCallback((iconName: string) => {
     setSelectedIcon(iconName);
-    setUrlInput(''); // アイコン選択時はURL入力をクリア
-    onSelect(iconName); // 即座に選択を確定
+    setUrlInput('');
+    onSelect(iconName);
   }, [onSelect]);
 
-  // URL入力変更
   const handleUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
     setUrlInput(url);
@@ -586,14 +542,12 @@ export const IconPicker: React.FC<IconPickerProps> = ({
     }
   }, []);
 
-  // 選択確定
   const handleSelect = useCallback(() => {
     if (selectedIcon) {
       onSelect(selectedIcon);
     }
   }, [selectedIcon, onSelect]);
 
-  // キーボードナビゲーション
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, index: number) => {
       const tabs = CATEGORIES;
@@ -621,7 +575,6 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       }
 
       setSelectedCategory(tabs[newIndex].id);
-      // 新しいタブにフォーカスを移動
       const tabButtons = tabListRef.current?.querySelectorAll('[role="tab"]');
       if (tabButtons && tabButtons[newIndex]) {
         (tabButtons[newIndex] as HTMLElement).focus();
@@ -630,14 +583,12 @@ export const IconPicker: React.FC<IconPickerProps> = ({
     []
   );
 
-  // 現在のカテゴリのアイコン一覧
   const currentCategoryIcons =
     CATEGORIES.find((c) => c.id === selectedCategory)?.icons ?? [];
 
-  // プレビュー用のアイコン
   const previewIcon = selectedIcon
     ? urlInput.trim()
-      ? null // URLの場合は画像として表示
+      ? null
       : ALL_ICONS_MAP.get(selectedIcon)
     : null;
 
@@ -646,7 +597,6 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       data-testid="icon-picker"
       className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden"
     >
-      {/* カテゴリタブ */}
       <div
         ref={tabListRef}
         role="tablist"
@@ -673,7 +623,6 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         ))}
       </div>
 
-      {/* アイコングリッド */}
       <div
         id={`panel-${selectedCategory}`}
         role="tabpanel"
@@ -705,7 +654,6 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         </div>
       </div>
 
-      {/* URL入力 */}
       <div className="px-3 pb-3">
         <label className="block text-sm text-gray-400 mb-1">
           Or enter icon URL:
@@ -719,7 +667,6 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         />
       </div>
 
-      {/* プレビュー */}
       <div className="px-3 pb-3">
         <div
           data-testid="icon-preview"
@@ -750,7 +697,6 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         </div>
       </div>
 
-      {/* ボタン */}
       <div className="flex justify-end gap-2 px-3 pb-3">
         <button
           type="button"

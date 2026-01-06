@@ -1,8 +1,5 @@
 /**
  * headlessモードのデフォルト設定の検証テスト
- *
- * このテストは、Playwrightがデフォルトでheadlessモードで実行され、
- * 環境変数HEADED=trueによりheadedモードに切り替えられることを検証します。
  */
 import { test, chromium } from '@playwright/test';
 import { expect } from '@playwright/test';
@@ -29,13 +26,12 @@ async function waitForServiceWorkerReady(
     if (serviceWorkers.length > 0) {
       const serviceWorker = serviceWorkers[0];
       try {
-        // Service Workerが評価可能な状態であることを確認
         await serviceWorker.evaluate(() => {
           return typeof chrome !== 'undefined' && chrome.runtime !== undefined;
         });
-        return; // 成功
+        return;
       } catch {
-        // まだ準備ができていない場合は待機
+        // Service Workerがまだ準備できていない場合は待機を継続
       }
     }
     await new Promise(resolve => setTimeout(resolve, pollInterval));
@@ -45,27 +41,20 @@ async function waitForServiceWorkerReady(
 }
 
 test.describe('headlessモードの設定検証', () => {
-  // タイムアウトを60秒に延長
   test.setTimeout(60000);
 
   test('HEADED=true環境変数でheadedモードに切り替わること', async () => {
-    // このテストはHEADED=trueでのみ実行可能（headedモード専用テスト）
     test.skip(
       process.env.HEADED !== 'true',
       'このテストはHEADED=trueでのみ実行可能です'
     );
 
-    // 拡張機能のパス
     const pathToExtension = path.join(__dirname, '../dist');
-
-    // HEADED=trueが設定されている場合、headlessはfalseになる
     const headless = process.env.HEADED !== 'true';
 
-    // HEADED=trueの場合の動作確認
     if (process.env.HEADED === 'true') {
       expect(headless).toBe(false);
 
-      // ブラウザコンテキストを作成してheadedモードを確認
       const context = await chromium.launchPersistentContext('', {
         headless,
         args: [
@@ -75,28 +64,19 @@ test.describe('headlessモードの設定検証', () => {
       });
 
       expect(context).toBeDefined();
-
-      // Service Workerの起動を待機（拡張機能が正常にロードされたことを確認）
       await waitForServiceWorkerReady(context);
-
       await context.close();
     } else {
-      // HEADED=trueが設定されていない場合はheadlessモード
       expect(headless).toBe(true);
     }
   });
 
   test('CI環境変数が設定されている場合、適切な設定が適用されること', async () => {
-    // CI環境変数が設定されているかチェック
     const isCI = process.env.CI === 'true';
 
-    // playwright.config.tsの設定を確認
-    // CI環境ではretries=2, workers=2が設定される
     if (isCI) {
-      // CI環境での設定確認（playwright.config.tsから読み込まれる）
       expect(isCI).toBe(true);
     } else {
-      // ローカル環境での設定確認
       expect(isCI).toBe(false);
     }
   });

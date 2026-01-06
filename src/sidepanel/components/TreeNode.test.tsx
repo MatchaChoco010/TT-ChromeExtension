@@ -103,7 +103,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // デフォルトアイコンが表示されていることを確認
       const defaultIcon = screen.getByTestId('default-icon');
       expect(defaultIcon).toBeInTheDocument();
     });
@@ -124,9 +123,7 @@ describe('TreeNode', () => {
         />
       );
 
-      // TreeNodeコンポーネントはdata-testid={`tree-node-${tab.id}`}を使用している
       const treeNodeElement = screen.getByTestId('tree-node-1');
-      // depth * 20 + 8 = 2 * 20 + 8 = 48px
       expect(treeNodeElement).toHaveStyle({ paddingLeft: '48px' });
     });
   });
@@ -193,7 +190,6 @@ describe('TreeNode', () => {
       await user.click(toggleButton);
 
       expect(mockOnToggle).toHaveBeenCalledWith('node-1');
-      // ノード自体はクリックされない
       expect(mockOnActivate).not.toHaveBeenCalled();
     });
 
@@ -291,9 +287,7 @@ describe('TreeNode', () => {
         />
       );
 
-      // アクティブタブは青い枠線ではなく背景色で控えめに識別
       expect(treeNodeElement).toHaveClass('bg-gray-200');
-      // 青い枠線が表示されないこと
       expect(treeNodeElement).not.toHaveClass('ring-2');
       expect(treeNodeElement).not.toHaveClass('ring-blue-400');
     });
@@ -425,14 +419,11 @@ describe('TreeNode', () => {
 
       const treeNodeElement = screen.getByTestId('tree-node-1');
 
-      // 初期状態では閉じるボタンは表示されていない
       expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
 
-      // ホバーすると閉じるボタンが表示される
       await user.hover(treeNodeElement);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
-      // ホバーを外すと閉じるボタンが非表示になる
       await user.unhover(treeNodeElement);
       expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
     });
@@ -455,16 +446,12 @@ describe('TreeNode', () => {
 
       const treeNodeElement = screen.getByTestId('tree-node-1');
 
-      // ホバーして閉じるボタンを表示
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
 
-      // 閉じるボタンをクリック
       fireEvent.click(closeButton);
 
-      // 子ノードがないので hasChildren は false
       expect(mockOnClose).toHaveBeenCalledWith(1, false);
-      // ノード自体はアクティブ化されない
       expect(mockOnActivate).not.toHaveBeenCalled();
     });
 
@@ -487,14 +474,11 @@ describe('TreeNode', () => {
 
       const treeNodeElement = screen.getByTestId('tree-node-1');
 
-      // ホバーして閉じるボタンを表示
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
 
-      // 閉じるボタンをクリック
       fireEvent.click(closeButton);
 
-      // 子ノードがあるので hasChildren は true
       expect(mockOnClose).toHaveBeenCalledWith(1, true);
     });
   });
@@ -521,14 +505,11 @@ describe('TreeNode', () => {
 
       const treeNodeElement = screen.getByTestId('tree-node-1');
 
-      // ホバーして閉じるボタンを表示
       fireEvent.mouseEnter(treeNodeElement);
       const closeButton = screen.getByTestId('close-button');
 
-      // 閉じるボタンをクリック
       fireEvent.click(closeButton);
 
-      // 確認ダイアログが表示されることを確認
       expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
       expect(screen.getByText(/閉じる/i)).toBeInTheDocument();
     });
@@ -557,7 +538,6 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // タブ数が表示されることを確認（親タブ + 子タブ2つ = 3）
       expect(screen.getByTestId('tab-count-display')).toHaveTextContent('3');
     });
 
@@ -586,11 +566,9 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // OKボタンをクリック
       const confirmButton = screen.getByTestId('confirm-button');
       await user.click(confirmButton);
 
-      // onCloseが呼ばれることを確認
       expect(mockOnClose).toHaveBeenCalledWith(1, true);
     });
 
@@ -619,13 +597,10 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // Cancelボタンをクリック
       const cancelButton = screen.getByTestId('cancel-button');
       await user.click(cancelButton);
 
-      // onCloseが呼ばれないことを確認
       expect(mockOnClose).not.toHaveBeenCalled();
-      // ダイアログが閉じられることを確認
       expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
     });
 
@@ -652,9 +627,7 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // 確認ダイアログは表示されない
       expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
-      // onCloseは直接呼ばれる
       expect(mockOnClose).toHaveBeenCalledWith(1, true);
     });
 
@@ -679,9 +652,7 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // 確認ダイアログは表示されない
       expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
-      // onCloseは直接呼ばれる
       expect(mockOnClose).toHaveBeenCalledWith(1, false);
     });
   });
@@ -707,8 +678,6 @@ describe('TreeNode', () => {
       const treeNodeElement = screen.getByTestId('tree-node-1');
       await user.hover(treeNodeElement);
 
-      // 閉じるボタンを含むコンテナの親要素がjustify-betweenを持つことを確認
-      // タイトルエリアとCloseButtonが左右に分かれる
       const closeButton = screen.getByTestId('close-button');
       const contentContainer = closeButton.closest('[data-testid="tab-content"]');
       expect(contentContainer).toBeInTheDocument();
@@ -783,7 +752,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // ホバーしていない状態では閉じるボタンは表示されない
       expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
     });
 
@@ -806,14 +774,11 @@ describe('TreeNode', () => {
 
       const treeNodeElement = screen.getByTestId('tree-node-1');
 
-      // ホバー前は閉じるボタンがない
       expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
 
-      // ホバーすると閉じるボタンが表示される
       await user.hover(treeNodeElement);
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
 
-      // ホバーを外すと閉じるボタンが非表示になる
       await user.unhover(treeNodeElement);
       expect(screen.queryByTestId('close-button')).not.toBeInTheDocument();
     });
@@ -845,9 +810,7 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // 確認ダイアログは表示されない（タブ数2 < 閾値5）
       expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
-      // onCloseは直接呼ばれる
       expect(mockOnClose).toHaveBeenCalledWith(1, true);
     });
 
@@ -877,7 +840,6 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // 確認ダイアログが表示される（タブ数3 >= 閾値3）
       expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
       expect(mockOnClose).not.toHaveBeenCalled();
     });
@@ -907,7 +869,6 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // 確認ダイアログが表示される（タブ数2 >= 閾値2）
       expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
       expect(mockOnClose).not.toHaveBeenCalled();
     });
@@ -925,7 +886,6 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          // closeWarningThresholdを指定しない
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
@@ -937,7 +897,6 @@ describe('TreeNode', () => {
       const closeButton = screen.getByTestId('close-button');
       fireEvent.click(closeButton);
 
-      // デフォルト閾値3で、タブ数2 < 3なので確認ダイアログは表示されない
       expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
       expect(mockOnClose).toHaveBeenCalledWith(1, true);
     });
@@ -966,9 +925,7 @@ describe('TreeNode', () => {
         />
       );
 
-      // Loading状態では「Loading...」と表示される
       expect(screen.getByText('Loading...')).toBeInTheDocument();
-      // 元のタイトルは表示されない
       expect(screen.queryByText('Some Title')).not.toBeInTheDocument();
     });
 
@@ -997,8 +954,6 @@ describe('TreeNode', () => {
       expect(screen.getByText('Loaded Page Title')).toBeInTheDocument();
     });
 
-    // タイトルがURL形式でない場合はそのまま表示
-    // chrome.tabs.Tab.titleを優先するため、ブラウザが設定したタイトルがそのまま表示される
     it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) でタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1021,14 +976,10 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
       expect(screen.getByText('Start Page')).toBeInTheDocument();
     });
 
-    // タイトルがURL形式の場合も対応
     it('タイトルがchrome://vivaldi-webui/startpage形式でURLが空の場合も「スタートページ」と表示されること', () => {
-      // Chromiumでは拡張機能にvivaldi-webui URLが公開されない場合がある
-      // その場合、タイトルがURL形式になることがあるので、タイトルもチェックする
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
@@ -1053,7 +1004,6 @@ describe('TreeNode', () => {
       expect(screen.getByText('スタートページ')).toBeInTheDocument();
     });
 
-    // タイトルがURL形式でない場合はそのまま表示
     it('vivaldi://startpage URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1076,11 +1026,9 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
       expect(screen.getByText('Speed Dial')).toBeInTheDocument();
     });
 
-    // タイトルがURL形式でない場合はそのまま表示
     it('chrome-extension://内部URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1103,11 +1051,9 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
       expect(screen.getByText('New Tab')).toBeInTheDocument();
     });
 
-    // タイトルがURL形式でない場合はそのまま表示
     it('chrome://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1130,11 +1076,9 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
       expect(screen.getByText('New Tab')).toBeInTheDocument();
     });
 
-    // タイトルがURL形式でない場合はそのまま表示
     it('vivaldi://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
@@ -1157,7 +1101,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
       expect(screen.getByText('Speed Dial')).toBeInTheDocument();
     });
 
@@ -1210,7 +1153,6 @@ describe('TreeNode', () => {
 
       expect(screen.getByText('Initial Title')).toBeInTheDocument();
 
-      // タイトルが変更された場合
       const updatedTab: TabInfo = {
         ...initialTab,
         title: 'Updated Title',
@@ -1254,10 +1196,8 @@ describe('TreeNode', () => {
         />
       );
 
-      // Loading中は「Loading...」と表示される
       expect(screen.getByText('Loading...')).toBeInTheDocument();
 
-      // ロード完了後
       const completeTab: TabInfo = {
         ...loadingTab,
         status: 'complete',
@@ -1275,18 +1215,15 @@ describe('TreeNode', () => {
         />
       );
 
-      // 完了後は実際のタイトルが表示される
       expect(screen.getByText('Page Title')).toBeInTheDocument();
       expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
     });
 
-    // タイトルがURL形式でない場合はそのまま表示
-    // about:blankはURL形式（スキーム://で始まる）ではないため、そのまま表示される
     it('about:blank URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
       const node = createMockNode('node-1', 1);
       const tab: TabInfo = {
         id: 1,
-        title: 'about:blank', // about:スキームはスキーム://形式ではないため、URL形式とは判定されない
+        title: 'about:blank',
         url: 'about:blank',
         favIconUrl: undefined,
         status: 'complete',
@@ -1304,7 +1241,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
       expect(screen.getByText('about:blank')).toBeInTheDocument();
     });
   });
@@ -1347,7 +1283,6 @@ describe('TreeNode', () => {
       );
 
       const treeNodeElement = screen.getByTestId('tree-node-1');
-      // select-noneクラスが適用されていることを確認
       expect(treeNodeElement).toHaveClass('select-none');
     });
   });
@@ -1369,11 +1304,9 @@ describe('TreeNode', () => {
         />
       );
 
-      // 未読バッジが表示される
       const unreadBadge = screen.getByTestId('unread-badge');
       expect(unreadBadge).toBeInTheDocument();
 
-      // 未読バッジがタブノード要素の直接の子であること
       const treeNode = screen.getByTestId('tree-node-1');
       expect(treeNode).toContainElement(unreadBadge);
     });
@@ -1395,7 +1328,6 @@ describe('TreeNode', () => {
       );
 
       const unreadBadge = screen.getByTestId('unread-badge');
-      // 絶対位置指定で左下に配置（depth=0なのでleft=0px）
       expect(unreadBadge).toHaveStyle({
         position: 'absolute',
         left: '0px',
@@ -1420,7 +1352,6 @@ describe('TreeNode', () => {
       );
 
       const unreadBadge = screen.getByTestId('unread-badge');
-      // depth=2なのでleft=40px (2 * 20px)
       expect(unreadBadge).toHaveStyle({
         position: 'absolute',
         left: '40px',
@@ -1445,7 +1376,6 @@ describe('TreeNode', () => {
       );
 
       const unreadBadge = screen.getByTestId('unread-badge');
-      // 三角形切り欠きスタイル（border-based triangle）
       expect(unreadBadge).toHaveStyle({
         width: '0px',
         height: '0px',
@@ -1470,7 +1400,6 @@ describe('TreeNode', () => {
       );
 
       const unreadBadge = screen.getByTestId('unread-badge');
-      // タイトルエリア（title-area）の外にあることを確認
       const titleArea = screen.getByTestId('title-area');
       expect(titleArea).not.toContainElement(unreadBadge);
     });
@@ -1495,7 +1424,6 @@ describe('TreeNode', () => {
       const treeNodeElement = screen.getByTestId('tree-node-1');
       await user.hover(treeNodeElement);
 
-      // 両方が表示される
       expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
       expect(screen.getByTestId('close-button')).toBeInTheDocument();
     });

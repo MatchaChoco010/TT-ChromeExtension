@@ -7,26 +7,11 @@ import { StorageService } from '@/storage/StorageService';
 import type { TabNode, TabInfo } from '@/types';
 import type { MockChrome, MockStorageLocal, MockStorage, MockRuntimeOnMessage } from '@/test/test-types';
 
-/**
- * E2Eテスト: 未読インジケータの統合
- *
- * - 新規タブに未読インジケータが表示される
- * - タブアクティブ化で未読インジケータが削除される
- *
- * このテストは、実際のユーザーフローをシミュレートします:
- * 1. 新しいタブが作成される
- * 2. UnreadTrackerが未読としてマーク
- * 3. TreeNodeに未読バッジが表示される
- * 4. ユーザーがタブをクリックしてアクティブ化
- * 5. UnreadTrackerが既読としてマーク
- * 6. TreeNodeから未読バッジが削除される
- */
 describe('未読インジケータ E2Eテスト', () => {
   let storageService: StorageService;
   let unreadTracker: UnreadTracker;
 
   beforeEach(async () => {
-    // モックChrome APIのセットアップ
     const mockStorageLocal: MockStorageLocal = {
       get: vi.fn().mockResolvedValue({}),
       set: vi.fn().mockResolvedValue(undefined),
@@ -61,7 +46,6 @@ describe('未読インジケータ E2Eテスト', () => {
     storageService = new StorageService();
     unreadTracker = new UnreadTracker(storageService);
     await unreadTracker.loadFromStorage();
-    // 起動完了フラグを設定（テストでは起動後の挙動をシミュレート）
     unreadTracker.setInitialLoadComplete();
   });
 
@@ -93,10 +77,8 @@ describe('未読インジケータ E2Eテスト', () => {
       const node = createMockNode('node-101', tabId);
       const tab = createMockTab(tabId, '新しいタブ');
 
-      // 1. タブを未読としてマーク（chrome.tabs.onCreated で実行される想定）
       await unreadTracker.markAsUnread(tabId);
 
-      // 2. TreeNodeをレンダリング
       const { rerender } = render(
         <TreeNode
           node={node}
@@ -110,21 +92,18 @@ describe('未読インジケータ E2Eテスト', () => {
         />,
       );
 
-      // 3. 未読バッジが表示されることを確認
       expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
       expect(screen.getByTestId('unread-badge')).toHaveAttribute(
         'aria-label',
         'Unread',
       );
 
-      // 4. ストレージに保存されることを確認
       await waitFor(() => {
         expect(global.chrome.storage.local.set).toHaveBeenCalledWith({
           unread_tabs: expect.arrayContaining([tabId]),
         });
       });
 
-      // クリーンアップ
       rerender(<></>);
     });
 
@@ -135,12 +114,10 @@ describe('未読インジケータ E2Eテスト', () => {
         { id: 203, title: 'タブ3' },
       ];
 
-      // すべてのタブを未読としてマーク
       for (const tab of tabs) {
         await unreadTracker.markAsUnread(tab.id);
       }
 
-      // 各タブをレンダリング
       const { container } = render(
         <>
           {tabs.map((tab) => (
@@ -159,11 +136,9 @@ describe('未読インジケータ E2Eテスト', () => {
         </>,
       );
 
-      // すべてのタブに未読バッジが表示される
       const badges = container.querySelectorAll('[data-testid="unread-badge"]');
       expect(badges).toHaveLength(3);
 
-      // 未読数が正しい
       expect(unreadTracker.getUnreadCount()).toBe(3);
     });
   });
@@ -175,17 +150,13 @@ describe('未読インジケータ E2Eテスト', () => {
       const node = createMockNode('node-301', tabId);
       const tab = createMockTab(tabId, 'アクティブ化するタブ');
 
-      // 1. タブを未読としてマーク
       await unreadTracker.markAsUnread(tabId);
       expect(unreadTracker.isUnread(tabId)).toBe(true);
 
-      // 2. onActivateコールバックのモック（chrome.tabs.onActivated で実行される想定）
       const handleActivate = vi.fn(async (activatedTabId: number) => {
-        // タブアクティブ化時に既読としてマーク
         await unreadTracker.markAsRead(activatedTabId);
       });
 
-      // 3. 初期レンダリング（未読状態）
       const { rerender } = render(
         <TreeNode
           node={node}
@@ -199,20 +170,16 @@ describe('未読インジケータ E2Eテスト', () => {
         />,
       );
 
-      // 未読バッジが表示される
       expect(screen.getByTestId('unread-badge')).toBeInTheDocument();
 
-      // 4. タブをクリックしてアクティブ化
       const treeNode = screen.getByTestId(`tree-node-${tabId}`);
       await user.click(treeNode);
 
-      // onActivateが呼ばれたことを確認
       expect(handleActivate).toHaveBeenCalledWith(tabId);
       await waitFor(() => {
         expect(unreadTracker.isUnread(tabId)).toBe(false);
       });
 
-      // 5. 再レンダリング（既読状態）
       rerender(
         <TreeNode
           node={node}
@@ -226,10 +193,8 @@ describe('未読インジケータ E2Eテスト', () => {
         />,
       );
 
-      // 6. 未読バッジが削除されることを確認
       expect(screen.queryByTestId('unread-badge')).not.toBeInTheDocument();
 
-      // ストレージが更新されることを確認
       await waitFor(() => {
         expect(global.chrome.storage.local.set).toHaveBeenCalledWith({
           unread_tabs: expect.not.arrayContaining([tabId]),
@@ -245,18 +210,15 @@ describe('未読インジケータ E2Eテスト', () => {
         { id: 403, title: '未読タブ3' },
       ];
 
-      // すべてのタブを未読としてマーク
       for (const tab of tabs) {
         await unreadTracker.markAsUnread(tab.id);
       }
       expect(unreadTracker.getUnreadCount()).toBe(3);
 
-      // onActivateコールバック
       const handleActivate = vi.fn(async (activatedTabId: number) => {
         await unreadTracker.markAsRead(activatedTabId);
       });
 
-      // 初期レンダリング
       const { rerender } = render(
         <>
           {tabs.map((tab) => (
@@ -275,11 +237,9 @@ describe('未読インジケータ E2Eテスト', () => {
         </>,
       );
 
-      // すべてのタブに未読バッジがある
       let badges = screen.getAllByTestId('unread-badge');
       expect(badges).toHaveLength(3);
 
-      // 2番目のタブをアクティブ化
       const secondTab = screen.getByTestId('tree-node-402');
       await user.click(secondTab);
 
@@ -287,7 +247,6 @@ describe('未読インジケータ E2Eテスト', () => {
         expect(unreadTracker.isUnread(402)).toBe(false);
       });
 
-      // 再レンダリング
       rerender(
         <>
           {tabs.map((tab) => (
@@ -306,11 +265,9 @@ describe('未読インジケータ E2Eテスト', () => {
         </>,
       );
 
-      // 未読バッジが2つだけ残っている
       badges = screen.getAllByTestId('unread-badge');
       expect(badges).toHaveLength(2);
 
-      // 未読数が2に減っている
       expect(unreadTracker.getUnreadCount()).toBe(2);
       expect(unreadTracker.isUnread(401)).toBe(true);
       expect(unreadTracker.isUnread(402)).toBe(false);
@@ -320,7 +277,6 @@ describe('未読インジケータ E2Eテスト', () => {
 
   describe('ストレージ永続化の統合', () => {
     it('ブラウザ再起動後もUnreadTrackerが未読状態をロードできる', async () => {
-      // 1. 未読タブを設定
       await unreadTracker.markAsUnread(501);
       await unreadTracker.markAsUnread(502);
 
@@ -330,7 +286,6 @@ describe('未読インジケータ E2Eテスト', () => {
         });
       });
 
-      // 2. 新しいUnreadTrackerインスタンスを作成（再起動をシミュレート）
       const savedUnreadTabs = [501, 502];
       global.chrome.storage.local.get = vi
         .fn()
@@ -339,12 +294,10 @@ describe('未読インジケータ E2Eテスト', () => {
       const newUnreadTracker = new UnreadTracker(storageService);
       await newUnreadTracker.loadFromStorage();
 
-      // 3. 未読状態が復元されることを確認
       expect(newUnreadTracker.isUnread(501)).toBe(true);
       expect(newUnreadTracker.isUnread(502)).toBe(true);
       expect(newUnreadTracker.getUnreadCount()).toBe(2);
 
-      // 4. UIに反映
       const { container } = render(
         <>
           <TreeNode

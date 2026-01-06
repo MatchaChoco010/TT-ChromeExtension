@@ -23,7 +23,6 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // ダイアログが表示されていないことを確認
     expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
   });
 
@@ -38,7 +37,6 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // ダイアログが表示されていることを確認
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
     expect(screen.getByText('Confirm Action')).toBeInTheDocument();
     expect(screen.getByText('Are you sure you want to proceed?')).toBeInTheDocument();
@@ -56,7 +54,6 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // タブ数が表示されていることを確認
     expect(screen.getByText('This group contains 5 tabs.')).toBeInTheDocument();
   });
 
@@ -76,7 +73,6 @@ describe('ConfirmDialog', () => {
     const confirmButton = screen.getByTestId('confirm-button');
     await user.click(confirmButton);
 
-    // onConfirmが呼ばれることを確認
     expect(mockOnConfirm).toHaveBeenCalledTimes(1);
     expect(mockOnCancel).not.toHaveBeenCalled();
   });
@@ -97,7 +93,6 @@ describe('ConfirmDialog', () => {
     const cancelButton = screen.getByTestId('cancel-button');
     await user.click(cancelButton);
 
-    // onCancelが呼ばれることを確認
     expect(mockOnCancel).toHaveBeenCalledTimes(1);
     expect(mockOnConfirm).not.toHaveBeenCalled();
   });
@@ -115,11 +110,9 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // 背景（オーバーレイ）をクリック
     const overlay = screen.getByTestId('dialog-overlay');
     await user.click(overlay);
 
-    // onCancelが呼ばれることを確認
     expect(mockOnCancel).toHaveBeenCalledTimes(1);
   });
 
@@ -134,12 +127,10 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // OKボタンとCancelボタンが存在することを確認
     expect(screen.getByTestId('confirm-button')).toBeInTheDocument();
     expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
   });
 
-  // 配下のタブ数を表示
   it('should display tab count when tabCount is provided', () => {
     render(
       <ConfirmDialog
@@ -152,13 +143,10 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // タブ数が表示されることを確認
     expect(screen.getByText(/5/)).toBeInTheDocument();
-    // または特定のフォーマットで表示されることを確認
     expect(screen.getByTestId('tab-count-display')).toHaveTextContent('5');
   });
 
-  // タブ数が1の場合
   it('should display correct singular form when tabCount is 1', () => {
     render(
       <ConfirmDialog
@@ -171,11 +159,9 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // タブ数が1の場合の表示を確認
     expect(screen.getByTestId('tab-count-display')).toHaveTextContent('1');
   });
 
-  // tabCountが提供されない場合は表示しない
   it('should not display tab count when tabCount is not provided', () => {
     render(
       <ConfirmDialog
@@ -187,7 +173,6 @@ describe('ConfirmDialog', () => {
       />
     );
 
-    // タブ数表示要素が存在しないことを確認
     expect(screen.queryByTestId('tab-count-display')).not.toBeInTheDocument();
   });
 });

@@ -1,35 +1,13 @@
-/**
- * DragOverlayコンポーネント
- *
- * ドラッグ中の要素をマウスカーソルに追従させること
- *
- * ReactDOM.createPortalでbody直下に描画し、
- * コンテナのoverflow:hiddenに影響されないようにする。
- * pointer-events: noneでマウスイベントを透過し、
- * transformでマウス位置に追従する。
- */
-
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-/**
- * DragOverlayコンポーネントのprops
- */
 export interface DragOverlayProps {
-  /** ドラッグ中かどうか */
   isDragging: boolean;
-  /** ドラッグ中の要素の内容 */
   children: React.ReactNode;
-  /** 現在のマウス位置 */
   position: { x: number; y: number };
-  /** 要素内でのクリック位置オフセット */
   offset: { x: number; y: number };
 }
 
-/**
- * ドラッグ中の要素をReactPortalでbody直下に描画
- * これによりコンテナのoverflow:hiddenに影響されない
- */
 export const DragOverlay: React.FC<DragOverlayProps> = ({
   isDragging,
   children,
@@ -40,7 +18,6 @@ export const DragOverlay: React.FC<DragOverlayProps> = ({
     return null;
   }
 
-  // 位置計算: position - offset
   const x = position.x - offset.x;
   const y = position.y - offset.y;
 

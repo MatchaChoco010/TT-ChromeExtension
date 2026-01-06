@@ -1,16 +1,9 @@
 import type { Snapshot, IIndexedDBService } from '@/types';
 
-/**
- * IndexedDB のデータベース名とバージョン
- */
 const DB_NAME = 'vivaldi-tt-snapshots';
 const DB_VERSION = 1;
 const STORE_NAME = 'snapshots';
 
-/**
- * IndexedDB に保存する Snapshot のレコード形式
- * createdAt は Date オブジェクトではなく timestamp (number) として保存
- */
 interface SnapshotRecord {
   id: string;
   createdAt: number;
@@ -26,10 +19,6 @@ interface SnapshotRecord {
 export class IndexedDBService implements IIndexedDBService {
   private dbPromise: Promise<IDBDatabase> | null = null;
 
-  /**
-   * IndexedDB データベースへの接続を取得
-   * データベースが存在しない場合は作成し、必要なオブジェクトストアとインデックスを初期化
-   */
   private getDB(): Promise<IDBDatabase> {
     if (this.dbPromise) {
       return this.dbPromise;
@@ -50,14 +39,11 @@ export class IndexedDBService implements IIndexedDBService {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
 
-        // snapshots オブジェクトストアを作成 (key path: id)
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
 
-          // createdAt インデックスを作成 (降順ソート用)
           store.createIndex('createdAt', 'createdAt', { unique: false });
 
-          // isAutoSave インデックスを作成
           store.createIndex('isAutoSave', 'isAutoSave', { unique: false });
         }
       };
@@ -66,9 +52,6 @@ export class IndexedDBService implements IIndexedDBService {
     return this.dbPromise;
   }
 
-  /**
-   * Snapshot を SnapshotRecord に変換
-   */
   private snapshotToRecord(snapshot: Snapshot): SnapshotRecord {
     return {
       id: snapshot.id,
@@ -79,9 +62,6 @@ export class IndexedDBService implements IIndexedDBService {
     };
   }
 
-  /**
-   * SnapshotRecord を Snapshot に変換
-   */
   private recordToSnapshot(record: SnapshotRecord): Snapshot {
     return {
       id: record.id,
@@ -159,7 +139,7 @@ export class IndexedDBService implements IIndexedDBService {
       const index = store.index('createdAt');
 
       return new Promise((resolve, reject) => {
-        const request = index.openCursor(null, 'prev'); // 降順 (newest first)
+        const request = index.openCursor(null, 'prev');
         const snapshots: Snapshot[] = [];
 
         request.onsuccess = () => {
@@ -218,10 +198,8 @@ export class IndexedDBService implements IIndexedDBService {
     try {
       const allSnapshots = await this.getAllSnapshots();
 
-      // 削除対象のスナップショットを特定（keepCount より古いもの）
       const snapshotsToDelete = allSnapshots.slice(keepCount);
 
-      // 削除実行
       for (const snapshot of snapshotsToDelete) {
         await this.deleteSnapshot(snapshot.id);
       }
@@ -232,7 +210,4 @@ export class IndexedDBService implements IIndexedDBService {
   }
 }
 
-/**
- * IndexedDBService のシングルトンインスタンス
- */
 export const indexedDBService = new IndexedDBService();

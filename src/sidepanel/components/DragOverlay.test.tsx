@@ -21,7 +21,6 @@ describe('DragOverlay', () => {
         </DragOverlay>
       );
 
-      // body直下にもドラッグオーバーレイが存在しないことを確認
       expect(document.querySelector('[data-testid="drag-overlay"]')).toBeNull();
       expect(screen.queryByTestId('drag-content')).toBeNull();
     });
@@ -58,7 +57,6 @@ describe('DragOverlay', () => {
       const overlay = document.querySelector('[data-testid="drag-overlay"]') as HTMLElement;
       expect(overlay).not.toBeNull();
 
-      // transform: translate3d(130px, 220px, 0) を期待
       const style = overlay.style;
       expect(style.transform).toBe('translate3d(130px, 220px, 0px)');
     });
@@ -90,7 +88,6 @@ describe('DragOverlay', () => {
       );
 
       const overlay = document.querySelector('[data-testid="drag-overlay"]') as HTMLElement;
-      // 50 - (-10) = 60, 50 - (-20) = 70
       expect(overlay.style.transform).toBe('translate3d(60px, 70px, 0px)');
     });
   });
@@ -175,10 +172,8 @@ describe('DragOverlay', () => {
       const overlay = document.querySelector('[data-testid="drag-overlay"]');
       const parentContainer = screen.getByTestId('parent-container');
 
-      // オーバーレイはparent-containerの子ではない
       expect(parentContainer.contains(overlay)).toBe(false);
 
-      // オーバーレイはdocument.bodyの直接の子
       expect(overlay?.parentElement).toBe(document.body);
     });
   });

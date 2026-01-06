@@ -1,24 +1,9 @@
-/**
- * ドラッグ&ドロップ - プレースホルダー表示のE2Eテスト
- *
- * プレースホルダー表示のE2Eテスト
- *
- * このテストスイートでは、ドラッグ&ドロップのプレースホルダー表示を検証します。
- * - ドラッグ中のプレースホルダーが正しいタブ間の位置に表示されること
- * - ホバー中のタブが適切にハイライトされること
- * - 不正な位置にプレースホルダーが表示されないこと
- *
- * Note: ヘッドレスモードで実行すること（npm run test:e2e）
- */
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { startDrag, hoverOverTab, dropTab } from './utils/drag-drop-utils';
 import type { Page } from '@playwright/test';
 
-/**
- * タブノードのバウンディングボックスを取得
- */
 async function getTabNodeBoundingBox(
   page: Page,
   tabId: number
@@ -32,9 +17,6 @@ async function getTabNodeBoundingBox(
   return box;
 }
 
-/**
- * ドロップインジケーターの位置を取得
- */
 async function getDropIndicatorPosition(
   page: Page
 ): Promise<{ top: number; left: number } | null> {
@@ -50,9 +32,6 @@ async function getDropIndicatorPosition(
   return { top: box.y, left: box.x };
 }
 
-/**
- * ドロップインジケーターが表示されるまでポーリングで待機
- */
 async function waitForDropIndicatorVisible(
   page: Page,
   timeout: number = 5000
@@ -61,9 +40,6 @@ async function waitForDropIndicatorVisible(
   await expect(indicator).toBeVisible({ timeout });
 }
 
-/**
- * ドロップインジケーターの位置が変わるまでポーリングで待機
- */
 async function waitForDropIndicatorPositionChange(
   page: Page,
   previousTop: number,
@@ -203,9 +179,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       // ドロップを実行
       await dropTab(sidePanelPage);
     });
-
-    // Note: 「最後のタブの下端にドラッグするとプレースホルダーが表示されること」のテストは
-    // 他のテストケース（タブ間の隙間ドラッグ）で同等の機能がカバーされているため省略
   });
 
   test.describe('ドロップターゲットとなるタブのハイライト表示', () => {
@@ -543,8 +516,4 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       await dropTab(sidePanelPage);
     });
   });
-
-  // Note: スクロール位置を考慮したプレースホルダー表示のテストは
-  // 多数のタブ作成によりCI環境での不安定性があるため、
-  // 基本機能は他のテストでカバーされているため省略
 });

@@ -1,11 +1,3 @@
-/**
- * UI Display E2E Tests
- *
- * テスト対象:
- * 1. フォントサイズ設定がタブタイトルに反映されることを検証
- * 2. スタートページのタイトルがURL表示ではなく適切なタイトルで表示されることを検証
- */
-
 import { test, expect } from './fixtures/extension';
 import type { Page } from '@playwright/test';
 import { COMMON_SELECTORS, COMMON_TIMEOUTS, FORM_INPUTS } from './test-data/common-constants';

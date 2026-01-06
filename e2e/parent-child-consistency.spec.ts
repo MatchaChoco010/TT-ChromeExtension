@@ -1,11 +1,3 @@
-/**
- * 親子関係不整合解消テスト（タスク8）
- *
- * このテストスイートでは、以下を検証します:
- * 1. タブを閉じた後も、他のタブの親子関係が維持される
- * 2. タブを移動した後も、他のタブの親子関係が維持される
- * 3. 複数のタブ操作を連続で行っても、親子関係が維持される
- */
 import { test } from './fixtures/extension';
 import { createTab, closeTab } from './utils/tab-utils';
 import {
@@ -47,7 +39,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
     ], 0);
 
@@ -56,7 +48,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, parent2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
       { tabId: parent2TabId, depth: 0 },
     ], 0);
@@ -66,9 +58,9 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
     ], 0);
 
@@ -77,9 +69,9 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, tempTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
       { tabId: tempTabId, depth: 0 },
     ], 0);
@@ -89,9 +81,9 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabRemovedFromTreeState(extensionContext, tempTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
     ], 0);
   });
@@ -126,7 +118,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
     ], 0);
 
@@ -135,7 +127,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, parent2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
       { tabId: parent2TabId, depth: 0 },
     ], 0);
@@ -144,9 +136,9 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
     ], 0);
 
@@ -156,7 +148,7 @@ test.describe('親子関係不整合解消', () => {
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: child1TabId, depth: 0 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
     ], 0);
   });
@@ -191,7 +183,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parentTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
 
@@ -201,7 +193,7 @@ test.describe('親子関係不整合解消', () => {
       await waitForTabInTreeState(extensionContext, tempTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: parentTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
         { tabId: tempTabId, depth: 0 },
       ], 0);
@@ -210,7 +202,7 @@ test.describe('親子関係不整合解消', () => {
       await waitForTabRemovedFromTreeState(extensionContext, tempTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: parentTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
     }
@@ -246,7 +238,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, middleTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTabId, depth: 0 },
+      { tabId: rootTabId, depth: 0, expanded: true },
       { tabId: middleTabId, depth: 1 },
     ], 0);
 
@@ -254,8 +246,8 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, leafTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTabId, depth: 0 },
-      { tabId: middleTabId, depth: 1 },
+      { tabId: rootTabId, depth: 0, expanded: true },
+      { tabId: middleTabId, depth: 1, expanded: true },
       { tabId: leafTabId, depth: 2 },
     ], 0);
 
@@ -264,8 +256,8 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, temp1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTabId, depth: 0 },
-      { tabId: middleTabId, depth: 1 },
+      { tabId: rootTabId, depth: 0, expanded: true },
+      { tabId: middleTabId, depth: 1, expanded: true },
       { tabId: leafTabId, depth: 2 },
       { tabId: temp1TabId, depth: 0 },
     ], 0);
@@ -274,8 +266,8 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, temp2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTabId, depth: 0 },
-      { tabId: middleTabId, depth: 1 },
+      { tabId: rootTabId, depth: 0, expanded: true },
+      { tabId: middleTabId, depth: 1, expanded: true },
       { tabId: leafTabId, depth: 2 },
       { tabId: temp1TabId, depth: 0 },
       { tabId: temp2TabId, depth: 0 },
@@ -286,8 +278,8 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabRemovedFromTreeState(extensionContext, temp1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: rootTabId, depth: 0 },
-      { tabId: middleTabId, depth: 1 },
+      { tabId: rootTabId, depth: 0, expanded: true },
+      { tabId: middleTabId, depth: 1, expanded: true },
       { tabId: leafTabId, depth: 2 },
       { tabId: temp2TabId, depth: 0 },
     ], 0);
@@ -324,7 +316,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child1aTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1aTabId, depth: 1 },
     ], 0);
 
@@ -332,7 +324,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child1bTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1aTabId, depth: 1 },
       { tabId: child1bTabId, depth: 1 },
     ], 0);
@@ -342,7 +334,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, parent2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1aTabId, depth: 1 },
       { tabId: child1bTabId, depth: 1 },
       { tabId: parent2TabId, depth: 0 },
@@ -352,10 +344,10 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1aTabId, depth: 1 },
       { tabId: child1bTabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
     ], 0);
 
@@ -364,10 +356,10 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, parent3TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1aTabId, depth: 1 },
       { tabId: child1bTabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
       { tabId: parent3TabId, depth: 0 },
     ], 0);
@@ -376,12 +368,12 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, child3TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1aTabId, depth: 1 },
       { tabId: child1bTabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
-      { tabId: parent3TabId, depth: 0 },
+      { tabId: parent3TabId, depth: 0, expanded: true },
       { tabId: child3TabId, depth: 1 },
     ], 0);
 
@@ -390,11 +382,11 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabRemovedFromTreeState(extensionContext, child1aTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1bTabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
-      { tabId: parent3TabId, depth: 0 },
+      { tabId: parent3TabId, depth: 0, expanded: true },
       { tabId: child3TabId, depth: 1 },
     ], 0);
 
@@ -403,11 +395,11 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, newTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: parent1TabId, depth: 0 },
+      { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1bTabId, depth: 1 },
-      { tabId: parent2TabId, depth: 0 },
+      { tabId: parent2TabId, depth: 0, expanded: true },
       { tabId: child2TabId, depth: 1 },
-      { tabId: parent3TabId, depth: 0 },
+      { tabId: parent3TabId, depth: 0, expanded: true },
       { tabId: child3TabId, depth: 1 },
       { tabId: newTabId, depth: 0 },
     ], 0);
@@ -446,7 +438,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabAId, depth: 0 },
+      { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
     ], 0);
 
@@ -454,8 +446,8 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabInTreeState(extensionContext, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabAId, depth: 0 },
-      { tabId: tabBId, depth: 1 },
+      { tabId: tabAId, depth: 0, expanded: true },
+      { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
     ], 0);
 
@@ -464,7 +456,7 @@ test.describe('親子関係不整合解消', () => {
     await waitForTabRemovedFromTreeState(extensionContext, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabBId, depth: 0 },
+      { tabId: tabBId, depth: 0, expanded: true },
       { tabId: tabCId, depth: 1 },
     ], 0);
   });

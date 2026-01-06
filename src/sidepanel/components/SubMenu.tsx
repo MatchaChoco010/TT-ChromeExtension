@@ -11,7 +11,6 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import type { SubMenuItem, SubMenuProps } from '@/types';
 
-// Re-export types for backward compatibility
 export type { SubMenuItem, SubMenuProps };
 
 /**
@@ -30,34 +29,28 @@ export const SubMenu: React.FC<SubMenuProps> = ({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // サブメニューの推定サイズ
   const SUBMENU_WIDTH = 160;
   const SUBMENU_ITEM_HEIGHT = 36;
   const SUBMENU_PADDING = 8;
 
-  // 画面端での位置調整
   const adjustedPosition = useMemo(() => {
     const submenuHeight = items.length * SUBMENU_ITEM_HEIGHT + SUBMENU_PADDING * 2;
 
     let x = parentRect.right;
     let y = parentRect.top;
 
-    // 右端を超える場合は左側に表示
     if (x + SUBMENU_WIDTH > window.innerWidth) {
       x = parentRect.left - SUBMENU_WIDTH;
     }
 
-    // 左端を超える場合は最小位置を保証
     if (x < 10) {
       x = 10;
     }
 
-    // 下端を超える場合は上に調整
     if (y + submenuHeight > window.innerHeight) {
       y = window.innerHeight - submenuHeight - 10;
     }
 
-    // 上端を超える場合は最小位置を保証
     if (y < 10) {
       y = 10;
     }
@@ -65,7 +58,6 @@ export const SubMenu: React.FC<SubMenuProps> = ({
     return { x, y };
   }, [parentRect, items.length]);
 
-  // 有効な項目のインデックスを取得
   const enabledIndices = useMemo(() => {
     return items
       .map((item, index) => ({ item, index }))
@@ -73,7 +65,6 @@ export const SubMenu: React.FC<SubMenuProps> = ({
       .map(({ index }) => index);
   }, [items]);
 
-  // フォーカスを設定
   const setFocus = useCallback((index: number) => {
     if (index >= 0 && index < items.length && itemRefs.current[index]) {
       itemRefs.current[index]?.focus();
@@ -81,7 +72,6 @@ export const SubMenu: React.FC<SubMenuProps> = ({
     }
   }, [items.length]);
 
-  // キーボードイベントハンドラ
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
@@ -92,7 +82,6 @@ export const SubMenu: React.FC<SubMenuProps> = ({
 
         case 'ArrowDown': {
           event.preventDefault();
-          // 次の有効な項目にフォーカス
           const currentPos = enabledIndices.indexOf(focusedIndex);
           const nextPos = currentPos === -1 ? 0 : Math.min(currentPos + 1, enabledIndices.length - 1);
           setFocus(enabledIndices[nextPos]);
@@ -101,7 +90,6 @@ export const SubMenu: React.FC<SubMenuProps> = ({
 
         case 'ArrowUp': {
           event.preventDefault();
-          // 前の有効な項目にフォーカス
           const currentPos = enabledIndices.indexOf(focusedIndex);
           const prevPos = currentPos === -1 ? enabledIndices.length - 1 : Math.max(currentPos - 1, 0);
           setFocus(enabledIndices[prevPos]);
@@ -117,7 +105,6 @@ export const SubMenu: React.FC<SubMenuProps> = ({
         }
 
         case 'ArrowLeft':
-          // 親メニューに戻る（閉じる）
           event.preventDefault();
           onClose();
           break;
@@ -134,20 +121,16 @@ export const SubMenu: React.FC<SubMenuProps> = ({
     };
   }, [onClose, onSelect, focusedIndex, enabledIndices, setFocus, items]);
 
-  // マウスが離れた時のハンドラ
   const handleMouseLeave = useCallback(() => {
-    // 遅延なしで閉じる
     onClose();
   }, [onClose]);
 
-  // 項目クリックハンドラ
   const handleItemClick = useCallback((itemId: string, disabled?: boolean) => {
     if (!disabled) {
       onSelect(itemId);
     }
   }, [onSelect]);
 
-  // 項目参照を設定
   const setItemRef = useCallback((index: number) => (el: HTMLButtonElement | null) => {
     itemRefs.current[index] = el;
   }, []);

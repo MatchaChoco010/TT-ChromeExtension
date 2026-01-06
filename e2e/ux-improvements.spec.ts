@@ -1,12 +1,3 @@
-/**
- * UX改善機能のE2Eテスト
- *
- * テスト対象:
- * 1. ピン留めタブの閉じるボタン非表示確認
- * 2. ビュースクロール切り替えテスト
- * 3. サブメニュー操作テスト
- */
-
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure, assertViewStructure } from './utils/assertion-utils';

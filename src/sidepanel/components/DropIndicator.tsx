@@ -37,7 +37,6 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
     return null;
   }
 
-  // 左位置の計算: containerPadding + depth * indentWidth
   const leftPosition = containerPadding + targetDepth * indentWidth;
 
   return (
