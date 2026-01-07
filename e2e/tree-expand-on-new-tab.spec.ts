@@ -20,7 +20,7 @@ test.describe('新規タブ作成時のツリー展開', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, 'https://example.com');
+    const parentTabId = await createTab(extensionContext, 'about:blank');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
@@ -28,7 +28,7 @@ test.describe('新規タブ作成時のツリー展開', () => {
 
     const childTabId1 = await createTab(
       extensionContext,
-      'https://example.com/child1',
+      'about:blank',
       parentTabId
     );
     await assertTabStructure(sidePanelPage, windowId, [
@@ -54,7 +54,7 @@ test.describe('新規タブ作成時のツリー展開', () => {
 
     const childTabId2 = await createTab(
       extensionContext,
-      'https://example.com/child2',
+      'about:blank',
       parentTabId
     );
     await assertTabStructure(sidePanelPage, windowId, [
@@ -100,7 +100,7 @@ test.describe('新規タブ作成時のツリー展開', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, 'https://example.com');
+    const parentTabId = await createTab(extensionContext, 'about:blank');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
@@ -108,7 +108,7 @@ test.describe('新規タブ作成時のツリー展開', () => {
 
     const childTabId = await createTab(
       extensionContext,
-      'https://example.com/child',
+      'about:blank',
       parentTabId
     );
     await assertTabStructure(sidePanelPage, windowId, [

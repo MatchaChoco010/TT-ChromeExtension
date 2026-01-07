@@ -112,6 +112,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
+  const handleDuplicateTabPositionChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const value = e.target.value as 'sibling' | 'end';
+    onSettingsChange({
+      ...settings,
+      duplicateTabPosition: value,
+    });
+  };
+
   return (
     <div className="settings-panel p-4 bg-gray-900 text-gray-100">
       <h1 className="text-xl font-bold mb-6 text-gray-100">設定</h1>
@@ -245,6 +255,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </select>
           <p className="text-xs text-gray-400 mt-1">
             手動で開かれたタブ(アドレスバー、新規タブボタン、設定画面など)の挿入位置
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="duplicateTabPosition"
+            className="block text-sm font-medium text-gray-300 mb-2"
+          >
+            複製されたタブの位置
+          </label>
+          <select
+            id="duplicateTabPosition"
+            value={settings.duplicateTabPosition ?? 'sibling'}
+            onChange={handleDuplicateTabPositionChange}
+            className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
+          >
+            <option value="sibling">元のタブの直後</option>
+            <option value="end">リストの最後</option>
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            タブを複製したときの挿入位置
           </p>
         </div>
 

@@ -161,54 +161,6 @@ test.describe('コンテキストメニュー操作', () => {
     ], 0);
   });
 
-  test('コンテキストメニューから"グループに追加"を選択した場合、グループ選択またはグループ作成のインタラクションが開始される', async ({
-    extensionContext,
-    sidePanelPage,
-    serviceWorker,
-  }) => {
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, 'about:blank');
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId, depth: 0 },
-    ], 0);
-
-    const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-
-    await sidePanelPage.waitForFunction(
-      (tabId) => {
-        const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
-        if (!node) return false;
-        const rect = node.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      },
-      tabId,
-      { timeout: 5000 }
-    );
-
-    await tabNode.click({ button: 'right' });
-    await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
-
-    const groupItem = sidePanelPage.locator('[role="menu"]').getByText('グループに追加');
-    await expect(groupItem).toBeVisible();
-
-    await sidePanelPage.keyboard.press('Escape');
-    await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 2000 });
-    await closeTab(extensionContext, tabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-  });
-
   test('コンテキストメニューから「別のウィンドウに移動」→「新しいウィンドウ」を選択した場合、タブが新しいウィンドウに移動する', async ({
     extensionContext,
     sidePanelPage,

@@ -5,6 +5,7 @@
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 import type { TestGlobals } from '../types';
+import { waitForTabStatusComplete, waitForTabInTreeState } from './polling-utils';
 
 declare const globalThis: typeof globalThis & TestGlobals;
 
@@ -117,10 +118,12 @@ export async function createTab(
         interface TreeNode {
           parentId: string | null;
           depth: number;
+          isExpanded?: boolean;
         }
         interface LocalTreeState {
           tabToNode: Record<number, string>;
           nodes: Record<string, TreeNode>;
+          expandedNodes?: string[];
         }
 
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -136,6 +139,16 @@ export async function createTab(
           treeState.nodes[childNodeId].parentId = parentNodeId;
           const parentDepth = treeState.nodes[parentNodeId].depth || 0;
           treeState.nodes[childNodeId].depth = parentDepth + 1;
+
+          // Expand parent node when child is created (mimics handleTabCreated behavior)
+          treeState.nodes[parentNodeId].isExpanded = true;
+          if (!treeState.expandedNodes) {
+            treeState.expandedNodes = [];
+          }
+          if (!treeState.expandedNodes.includes(parentNodeId)) {
+            treeState.expandedNodes.push(parentNodeId);
+          }
+
           await chrome.storage.local.set({ tree_state: treeState });
 
           // IMPORTANT: Reload treeStateManager from storage to sync the in-memory state
@@ -203,19 +216,24 @@ export async function closeTab(context: BrowserContext, tabId: number): Promise<
     return chrome.tabs.remove(tabId);
   }, tabId);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async (tabId) => {
       for (let i = 0; i < 50; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
         if (!treeState?.tabToNode?.[tabId]) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
+      return { success: false };
     },
     tabId
   );
+
+  if (!result.success) {
+    throw new Error(`Timeout waiting for tab ${tabId} to be removed from tree`);
+  }
 }
 
 /**
@@ -234,18 +252,23 @@ export async function activateTab(
     return chrome.tabs.update(tabId, { active: true });
   }, tabId);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async (tabId) => {
       for (let i = 0; i < 50; i++) {
         const tab = await chrome.tabs.get(tabId);
         if (tab.active) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
+      return { success: false };
     },
     tabId
   );
+
+  if (!result.success) {
+    throw new Error(`Timeout waiting for tab ${tabId} to become active`);
+  }
 }
 
 /**
@@ -261,18 +284,23 @@ export async function pinTab(context: BrowserContext, tabId: number): Promise<vo
     await chrome.tabs.update(id, { pinned: true });
   }, tabId);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async (id) => {
       for (let i = 0; i < 50; i++) {
         const tab = await chrome.tabs.get(id);
         if (tab.pinned) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
+      return { success: false };
     },
     tabId
   );
+
+  if (!result.success) {
+    throw new Error(`Timeout waiting for tab ${tabId} to be pinned`);
+  }
 }
 
 /**
@@ -288,18 +316,23 @@ export async function unpinTab(context: BrowserContext, tabId: number): Promise<
     await chrome.tabs.update(id, { pinned: false });
   }, tabId);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async (id) => {
       for (let i = 0; i < 50; i++) {
         const tab = await chrome.tabs.get(id);
         if (!tab.pinned) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
+      return { success: false };
     },
     tabId
   );
+
+  if (!result.success) {
+    throw new Error(`Timeout waiting for tab ${tabId} to be unpinned`);
+  }
 }
 
 /**
@@ -316,18 +349,23 @@ export async function updateTabUrl(context: BrowserContext, tabId: number, url: 
     await chrome.tabs.update(id, { url: newUrl });
   }, { id: tabId, newUrl: url });
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ id, expectedUrl }) => {
       for (let i = 0; i < 100; i++) {
         const tab = await chrome.tabs.get(id);
         if (tab.url?.includes(expectedUrl) || tab.pendingUrl?.includes(expectedUrl)) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
+      return { success: false };
     },
     { id: tabId, expectedUrl: url }
   );
+
+  if (!result.success) {
+    throw new Error(`Timeout waiting for tab ${tabId} URL to contain "${url}"`);
+  }
 }
 
 /**
@@ -441,4 +479,135 @@ export async function getInitialBrowserTabId(serviceWorker: Worker, windowId: nu
   }, windowId);
 }
 
+
+/**
+ * テスト用リンクページのURLを生成
+ *
+ * @param targetUrl - リンク先のURL
+ * @returns テスト用リンクページのURL
+ */
+export function getTestLinkPageUrl(targetUrl: string): string {
+  return `http://test-link-page.local/?target=${encodeURIComponent(targetUrl)}`;
+}
+
+/**
+ * テスト用リンクページのルートを設定
+ *
+ * ブラウザコンテキストにリンクを含むHTMLページを配信するルートを追加する。
+ * このルートは、リンククリックテストで使用される。
+ *
+ * @param context - ブラウザコンテキスト
+ */
+export async function setupTestLinkPageRoute(context: BrowserContext): Promise<void> {
+  await context.route('**/test-link-page.local/**', (route) => {
+    const url = new URL(route.request().url());
+    const targetUrl = url.searchParams.get('target') || 'https://example.org/';
+
+    route.fulfill({
+      contentType: 'text/html',
+      body: `<!DOCTYPE html>
+<html>
+<head><title>Test Link Page</title></head>
+<body>
+  <a id="test-link" href="${targetUrl}" target="_blank">Click to open in new tab</a>
+  <a id="test-link-no-target" href="${targetUrl}">Click (no target)</a>
+</body>
+</html>`,
+    });
+  });
+}
+
+/**
+ * クリックの種類
+ */
+export type ClickType = 'normal' | 'middle' | 'ctrl';
+
+/**
+ * リンククリックで新しいタブを開く
+ *
+ * 実際のユーザー操作をシミュレートして新しいタブを開く。
+ * これにより chrome.webNavigation.onCreatedNavigationTarget が発火し、
+ * リンククリックとして正しく検出される。
+ *
+ * 注意: assertTabStructureで検証するためにはタブIDが必要だが、
+ * リンククリックではタブ作成後にしかIDを知ることができない。
+ * そのため、この関数内で新しいタブのIDをポーリングで取得して返す。
+ * これは「状態の検証」ではなく「必要な情報の取得」である。
+ * タブ構造の検証は呼び出し元でassertTabStructureを使用すること。
+ *
+ * @param context - ブラウザコンテキスト
+ * @param page - リンクを含むページ
+ * @param selector - クリックするリンクのセレクタ（デフォルト: '#test-link'）
+ * @param clickType - クリックの種類（'normal': 通常クリック、'middle': 中クリック、'ctrl': Ctrl+クリック）
+ * @returns 新しく開かれたタブのID
+ */
+export async function clickLinkToOpenTab(
+  context: BrowserContext,
+  page: Page,
+  selector: string = '#test-link',
+  clickType: ClickType = 'middle'
+): Promise<number> {
+  const serviceWorker = await getServiceWorker(context);
+
+  const tabIdsBefore = await serviceWorker.evaluate(async () => {
+    const tabs = await chrome.tabs.query({});
+    return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
+  });
+
+  switch (clickType) {
+    case 'normal':
+      await page.click(selector);
+      break;
+    case 'middle':
+      await page.click(selector, { button: 'middle' });
+      break;
+    case 'ctrl':
+      await page.click(selector, { modifiers: ['Control'] });
+      break;
+  }
+
+  const newTabId = await serviceWorker.evaluate(async (previousIds) => {
+    for (let i = 0; i < 100; i++) {
+      const tabs = await chrome.tabs.query({});
+      const newTab = tabs.find(t => t.id !== undefined && !previousIds.includes(t.id));
+      if (newTab?.id) {
+        return newTab.id;
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    throw new Error('Timeout waiting for new tab to be created');
+  }, tabIdsBefore);
+
+  return newTabId;
+}
+
+/**
+ * リンククリックで現在のタブをナビゲート
+ *
+ * 通常クリック（target属性なしのリンク）で現在のタブのURLを変更する。
+ * この場合、新しいタブは作成されない。
+ *
+ * @param context - ブラウザコンテキスト
+ * @param page - リンクを含むページ
+ * @param selector - クリックするリンクのセレクタ
+ */
+export async function clickLinkToNavigate(
+  context: BrowserContext,
+  page: Page,
+  selector: string
+): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+
+  const tabId = await serviceWorker.evaluate(async (url) => {
+    const tabs = await chrome.tabs.query({});
+    const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
+    return tab?.id;
+  }, page.url());
+
+  await page.click(selector);
+
+  if (tabId) {
+    await waitForTabStatusComplete(serviceWorker, tabId);
+  }
+}
 

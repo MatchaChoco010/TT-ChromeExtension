@@ -43,9 +43,10 @@ async function getCurrentViewId(): Promise<string> {
 const pendingTabParents = new Map<number, number>();
 
 // Track source tabs for pending duplications
-// Set<sourceTabId>
+// Map<sourceTabId, { url: string; windowId: number }>
 // When a tab is duplicated, we want the new tab to be placed as a sibling, not a child
-const pendingDuplicateSources = new Set<number>();
+// We store URL and windowId to identify the duplicated tab since openerTabId might not be set correctly
+const pendingDuplicateSources = new Map<number, { url: string; windowId: number }>();
 
 // Track group tabs being created
 // Set<tabId>
@@ -56,39 +57,35 @@ const pendingGroupTabIds = new Set<number>();
 // Used to handle race condition between chrome.tabs.create and onCreated event
 let isCreatingGroupTab = false;
 
-/**
- * システムページ判定
- *
- * システムページ（chrome://, vivaldi://, chrome-extension://, about:）を検出する。
- * これらのページはopenerTabIdがあっても手動タブとして扱われる。
- *
- * @param url - 検査するURL
- * @returns システムページの場合はtrue、それ以外はfalse
- */
-export function isSystemPage(url: string): boolean {
-  if (!url) return false;
-  return (
-    url.startsWith('chrome://') ||
-    url.startsWith('chrome-extension://') ||
-    url.startsWith('vivaldi://') ||
-    url.startsWith('about:')
-  );
-}
+// Track the last active tab ID for each window
+// Map<windowId, tabId>
+// This is used to determine the parent for manually opened tabs with 'child' setting
+// When a new tab is created without openerTabId, we use the last active tab as the parent
+const lastActiveTabByWindow = new Map<number, number>();
+
+// Track link clicks detected by webNavigation.onCreatedNavigationTarget
+// Map<tabId, sourceTabId>
+// This event fires specifically when a link is clicked or window.open() is called
+// It does NOT fire for chrome.tabs.create(), bookmarks, address bar, or Ctrl+T
+const pendingLinkClicks = new Map<number, number>();
 
 // Export to globalThis for access from service worker evaluation contexts (e.g., E2E tests)
 declare global {
   // eslint-disable-next-line no-var
   var pendingTabParents: Map<number, number>;
   // eslint-disable-next-line no-var
-  var pendingDuplicateSources: Set<number>;
+  var pendingDuplicateSources: Map<number, { url: string; windowId: number }>;
   // eslint-disable-next-line no-var
   var pendingGroupTabIds: Set<number>;
+  // eslint-disable-next-line no-var
+  var pendingLinkClicks: Map<number, number>;
   // eslint-disable-next-line no-var
   var treeStateManager: TreeStateManager;
 }
 globalThis.pendingTabParents = pendingTabParents;
 globalThis.pendingDuplicateSources = pendingDuplicateSources;
 globalThis.pendingGroupTabIds = pendingGroupTabIds;
+globalThis.pendingLinkClicks = pendingLinkClicks;
 globalThis.treeStateManager = treeStateManager;
 
 /**
@@ -113,6 +110,35 @@ export function registerWindowEventListeners(): void {
 }
 
 /**
+ * Register webNavigation event listeners
+ * onCreatedNavigationTarget fires when a link is clicked or window.open() is called
+ * This is the reliable way to detect link clicks as it does NOT fire for:
+ * - chrome.tabs.create()
+ * - Bookmarks
+ * - Address bar navigation
+ * - Ctrl+T (new tab)
+ */
+export function registerWebNavigationListeners(): void {
+  chrome.webNavigation.onCreatedNavigationTarget.addListener(handleCreatedNavigationTarget);
+}
+
+/**
+ * Handle webNavigation.onCreatedNavigationTarget event
+ * This event fires when a new tab is created due to a link click or window.open()
+ * We track this to reliably identify tabs opened from link clicks
+ */
+function handleCreatedNavigationTarget(
+  details: chrome.webNavigation.WebNavigationSourceCallbackDetails
+): void {
+  pendingLinkClicks.set(details.tabId, details.sourceTabId);
+
+  // onCreatedが発火しないケースに備えてクリーンアップ
+  setTimeout(() => {
+    pendingLinkClicks.delete(details.tabId);
+  }, 5000);
+}
+
+/**
  * Register Chrome runtime message listener
  */
 export function registerMessageListener(): void {
@@ -134,6 +160,12 @@ function isGroupTabUrl(url: string | undefined): boolean {
 export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
   if (!tab.id) return;
+
+  // IMPORTANT: Capture lastActiveTabByWindow immediately before any async operations
+  // This prevents race condition where onActivated updates the map before we read it
+  const capturedLastActiveTabId = tab.windowId !== undefined
+    ? lastActiveTabByWindow.get(tab.windowId)
+    : undefined;
 
   if (isCreatingGroupTab) {
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -167,40 +199,70 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
 
+    // Chrome's onCreated event doesn't always include openerTabId,
+    // so we need to refresh the tab object to get it
+    let openerTabIdFromChrome: number | undefined = tab.openerTabId;
+    if (openerTabIdFromChrome === undefined) {
+      try {
+        const freshTab = await chrome.tabs.get(tab.id);
+        openerTabIdFromChrome = freshTab.openerTabId;
+      } catch {
+        // タブが既に閉じられている場合は無視
+      }
+    }
+
     const pendingOpenerTabId = pendingTabParents.get(tab.id);
-    const effectiveOpenerTabId = pendingOpenerTabId || tab.openerTabId;
 
     let newTabPosition: 'child' | 'sibling' | 'end';
 
-    const tabUrl = tab.url || '';
-    const isLinkClick = effectiveOpenerTabId && !isSystemPage(tabUrl);
+    // chrome.webNavigation.onCreatedNavigationTargetで検出されたタブをリンククリックとして扱う
+    // このAPIはリンククリック/window.open()でのみ発火し、
+    // chrome.tabs.create()、ブックマーク、アドレスバー、Ctrl+Tでは発火しない
+    const linkClickSourceTabId = pendingLinkClicks.get(tab.id);
+    const isLinkClick = linkClickSourceTabId !== undefined;
+
+    const effectiveOpenerTabId = isLinkClick
+      ? linkClickSourceTabId
+      : (pendingOpenerTabId || openerTabIdFromChrome);
 
     if (isLinkClick) {
-      newTabPosition =
-        settings?.newTabPositionFromLink !== undefined
-          ? settings.newTabPositionFromLink
-          : settings?.newTabPosition || 'child';
+      pendingLinkClicks.delete(tab.id);
+    }
+
+    if (isLinkClick) {
+      newTabPosition = settings?.newTabPositionFromLink ?? 'child';
     } else {
-      newTabPosition =
-        settings?.newTabPositionManual !== undefined
-          ? settings.newTabPositionManual
-          : settings?.newTabPosition || 'end';
+      newTabPosition = settings?.newTabPositionManual ?? 'end';
     }
 
     let parentId: string | null = null;
 
     let isDuplicatedTab = false;
-    if (effectiveOpenerTabId && pendingDuplicateSources.has(effectiveOpenerTabId)) {
-      isDuplicatedTab = true;
-      pendingDuplicateSources.delete(effectiveOpenerTabId);
+    let duplicateSourceTabId: number | null = null;
+
+    // 複製タブの検出: URLとwindowIdで照合
+    // chrome.tabs.duplicate()から作成されたタブはopenerTabIdが呼び出し元のタブ（サイドパネル）に
+    // 設定される場合があるため、URLで照合する
+    const tabUrl = tab.url || tab.pendingUrl || '';
+    for (const [sourceTabId, sourceInfo] of pendingDuplicateSources.entries()) {
+      if (sourceInfo.url === tabUrl && sourceInfo.windowId === tab.windowId) {
+        isDuplicatedTab = true;
+        duplicateSourceTabId = sourceTabId;
+        pendingDuplicateSources.delete(sourceTabId);
+        break;
+      }
     }
 
+    const duplicateTabPosition = settings?.duplicateTabPosition || 'sibling';
+
     let insertAfterNodeId: string | undefined;
-    if (isDuplicatedTab && effectiveOpenerTabId) {
-      const openerNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
-      if (openerNode) {
-        parentId = openerNode.parentId;
-        insertAfterNodeId = openerNode.id;
+    if (isDuplicatedTab && duplicateSourceTabId !== null) {
+      if (duplicateTabPosition === 'sibling') {
+        const openerNode = treeStateManager.getNodeByTabId(duplicateSourceTabId);
+        if (openerNode) {
+          parentId = openerNode.parentId;
+          insertAfterNodeId = openerNode.id;
+        }
       }
     } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'child') {
       const parentNode = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
@@ -213,6 +275,17 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
         parentId = openerNode.parentId;
         insertAfterNodeId = openerNode.id;
       }
+    } else if (!isLinkClick && newTabPosition === 'child') {
+      // 手動で開かれたタブで'child'設定の場合、最後にアクティブだったタブを親とする
+      // タブが作成されると新しいタブがアクティブになるため、chrome.tabs.queryではなく
+      // capturedLastActiveTabIdを使用して、タブ作成前にアクティブだったタブを取得する
+      // (関数の最初でキャプチャしておく必要がある。onActivatedが先に実行されるため)
+      if (capturedLastActiveTabId !== undefined && capturedLastActiveTabId !== tab.id) {
+        const lastActiveNode = treeStateManager.getNodeByTabId(capturedLastActiveTabId);
+        if (lastActiveNode) {
+          parentId = lastActiveNode.id;
+        }
+      }
     }
 
     if (pendingOpenerTabId) {
@@ -221,7 +294,9 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     const currentViewId = await getCurrentViewId();
 
-    if (newTabPosition === 'end' && tab.windowId !== undefined) {
+    const shouldMoveToEnd = (newTabPosition === 'end' && !isDuplicatedTab) ||
+                            (isDuplicatedTab && duplicateTabPosition === 'end');
+    if (shouldMoveToEnd && tab.windowId !== undefined) {
       try {
         await chrome.tabs.move(tab.id, { index: -1 });
       } catch (_moveError) {
@@ -250,13 +325,24 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
  * 最後のウィンドウは閉じない（ブラウザ終了防止）
  */
 async function tryCloseEmptyWindow(windowId: number): Promise<void> {
+  console.log('[EMPTY WINDOW DEBUG] tryCloseEmptyWindow called for windowId:', windowId);
   try {
     const tabs = await chrome.tabs.query({ windowId });
-    if (tabs.length > 0) return;
+    console.log('[EMPTY WINDOW DEBUG] tabs.length:', tabs.length, 'tabs:', tabs.map(t => ({ id: t.id, url: t.url })));
+    if (tabs.length > 0) {
+      console.log('[EMPTY WINDOW DEBUG] Window has tabs, not closing');
+      return;
+    }
 
     const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-    if (allWindows.length <= 1) return;
+    console.log('[EMPTY WINDOW DEBUG] allWindows.length:', allWindows.length);
+    if (allWindows.length <= 1) {
+      console.log('[EMPTY WINDOW DEBUG] Only one window, not closing');
+      return;
+    }
 
+    console.log('[EMPTY WINDOW DEBUG] CLOSING EMPTY WINDOW:', windowId);
+    console.log('[EMPTY WINDOW DEBUG] Stack trace:', new Error().stack);
     await chrome.windows.remove(windowId);
   } catch {
   }
@@ -266,6 +352,7 @@ export async function handleTabRemoved(
   tabId: number,
   removeInfo: chrome.tabs.TabRemoveInfo,
 ): Promise<void> {
+  console.log('[TAB REMOVED DEBUG] handleTabRemoved called with tabId:', tabId, 'removeInfo:', removeInfo);
   const { windowId, isWindowClosing } = removeInfo;
 
   try {
@@ -321,6 +408,7 @@ export async function handleTabUpdated(
   changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab,
 ): Promise<void> {
+  console.log('[TAB UPDATED DEBUG] handleTabUpdated called with tabId:', tabId, 'changeInfo:', JSON.stringify(changeInfo));
   try {
     if (changeInfo.title !== undefined && tab.title) {
       titlePersistence.saveTitle(tabId, tab.title);
@@ -336,12 +424,13 @@ export async function handleTabUpdated(
       }
     }
 
-    // Only notify UI for meaningful changes (title, url, status, favIconUrl)
+    // Only notify UI for meaningful changes (title, url, status, favIconUrl, discarded)
     if (
       changeInfo.title !== undefined ||
       changeInfo.url !== undefined ||
       changeInfo.status !== undefined ||
-      changeInfo.favIconUrl !== undefined
+      changeInfo.favIconUrl !== undefined ||
+      changeInfo.discarded !== undefined
     ) {
       chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
     }
@@ -351,6 +440,10 @@ export async function handleTabUpdated(
 
 async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promise<void> {
   try {
+    // Track the last active tab for each window
+    // This is used to determine the parent for manually opened tabs with 'child' setting
+    lastActiveTabByWindow.set(activeInfo.windowId, activeInfo.tabId);
+
     if (unreadTracker.isUnread(activeInfo.tabId)) {
       await unreadTracker.markAsRead(activeInfo.tabId);
 
@@ -488,6 +581,10 @@ function handleMessage(
 
       case 'REGISTER_DUPLICATE_SOURCE':
         handleRegisterDuplicateSource(message.payload.sourceTabId, sendResponse);
+        break;
+
+      case 'DUPLICATE_SUBTREE':
+        handleDuplicateSubtree(message.payload.tabId, sendResponse);
         break;
 
       case 'GET_GROUP_INFO':
@@ -701,7 +798,10 @@ async function handleCreateWindowWithSubtree(
       if (sourceWindowId !== undefined) {
         try {
           const remainingTabs = await chrome.tabs.query({ windowId: sourceWindowId });
+          console.log('[CREATE_WINDOW_WITH_SUBTREE DEBUG] remainingTabs in source window:', remainingTabs.length);
           if (remainingTabs.length === 0) {
+            console.log('[CREATE_WINDOW_WITH_SUBTREE DEBUG] CLOSING EMPTY SOURCE WINDOW:', sourceWindowId);
+            console.log('[CREATE_WINDOW_WITH_SUBTREE DEBUG] Stack trace:', new Error().stack);
             await chrome.windows.remove(sourceWindowId);
           }
         } catch (_error) {
@@ -946,14 +1046,96 @@ async function handleDissolveGroup(
  * 複製元タブの登録
  * 複製されたタブを元のタブの兄弟として配置するために、
  * 複製される前に複製元のタブIDを登録する
+ * URLとwindowIdを保存して、openerTabIdが正しく設定されない場合でも
+ * 複製タブを識別できるようにする
  */
-function handleRegisterDuplicateSource(
+async function handleRegisterDuplicateSource(
   sourceTabId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
-): void {
+): Promise<void> {
   try {
-    pendingDuplicateSources.add(sourceTabId);
+    const tab = await chrome.tabs.get(sourceTabId);
+    pendingDuplicateSources.set(sourceTabId, {
+      url: tab.url || tab.pendingUrl || '',
+      windowId: tab.windowId,
+    });
 
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * サブツリーを複製
+ * 親タブが閉じられた状態で複製された場合、サブツリー全体を複製する
+ */
+async function handleDuplicateSubtree(
+  tabId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    await treeStateManager.loadState();
+
+    const subtree = treeStateManager.getSubtree(tabId);
+    if (subtree.length === 0) {
+      sendResponse({
+        success: false,
+        error: 'Tab not found',
+      });
+      return;
+    }
+
+    const tabIdToNewTabId = new Map<number, number>();
+
+    for (const node of subtree) {
+      pendingDuplicateSources.set(node.tabId, {
+        url: '',
+        windowId: -1,
+      });
+      const duplicatedTab = await chrome.tabs.duplicate(node.tabId);
+      if (duplicatedTab?.id) {
+        tabIdToNewTabId.set(node.tabId, duplicatedTab.id);
+      }
+      pendingDuplicateSources.delete(node.tabId);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await treeStateManager.loadState();
+
+    const rootNode = subtree[0];
+    const rootNewTabId = tabIdToNewTabId.get(rootNode.tabId);
+    const rootNewNode = rootNewTabId ? treeStateManager.getNodeByTabId(rootNewTabId) : null;
+
+    if (rootNewNode) {
+      for (let i = 1; i < subtree.length; i++) {
+        const originalNode = subtree[i];
+        const newTabId = tabIdToNewTabId.get(originalNode.tabId);
+        if (!newTabId) continue;
+
+        const newNode = treeStateManager.getNodeByTabId(newTabId);
+        if (!newNode) continue;
+
+        const originalParentTabId = originalNode.parentId
+          ? treeStateManager.getNodeById(originalNode.parentId)?.tabId
+          : null;
+
+        if (originalParentTabId) {
+          const newParentTabId = tabIdToNewTabId.get(originalParentTabId);
+          if (newParentTabId) {
+            const newParentNode = treeStateManager.getNodeByTabId(newParentTabId);
+            if (newParentNode) {
+              await treeStateManager.moveNode(newNode.id, newParentNode.id, -1);
+            }
+          }
+        }
+      }
+    }
+
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
     sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({

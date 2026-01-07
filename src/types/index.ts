@@ -49,11 +49,12 @@ export interface UserSettings {
   newTabPosition: 'child' | 'sibling' | 'end';
   closeWarningThreshold: number;
   showUnreadIndicator: boolean;
-  autoSnapshotInterval: number; // minutes, 0 = disabled
+  autoSnapshotInterval: number;
   childTabBehavior: 'promote' | 'close_all';
   newTabPositionFromLink?: 'child' | 'sibling' | 'end';
   newTabPositionManual?: 'child' | 'sibling' | 'end';
-  maxSnapshots?: number; // デフォルト: 10
+  maxSnapshots?: number;
+  duplicateTabPosition?: 'sibling' | 'end';
 }
 
 export type StorageChanges = {
@@ -186,6 +187,7 @@ export type MessageType =
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
   | { type: 'CREATE_SNAPSHOT' }
   | { type: 'REGISTER_DUPLICATE_SOURCE'; payload: { sourceTabId: number } }
+  | { type: 'DUPLICATE_SUBTREE'; payload: { tabId: number } }
   | {
       type: 'START_DRAG_SESSION';
       payload: { tabId: number; windowId: number; treeData: TabNode[] };
@@ -278,7 +280,6 @@ export interface TabTreeViewProps {
   onSnapshot?: () => Promise<void>;
   groups?: Record<string, Group>;
   onGroupToggle?: (groupId: string) => void;
-  onAddToGroup?: (groupId: string, tabIds: number[]) => void;
   views?: View[];
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
   currentWindowId?: number;
@@ -301,6 +302,7 @@ export type MenuAction =
   | 'group'
   | 'ungroup'
   | 'reload'
+  | 'discard'
   | 'copyUrl'
   | 'snapshot';
 
@@ -322,8 +324,6 @@ export interface ContextMenuProps {
   views?: View[];
   currentViewId?: string;
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
-  groups?: Record<string, Group>;
-  onAddToGroup?: (groupId: string, tabIds: number[]) => void;
   currentWindowId?: number;
   otherWindows?: WindowInfo[];
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;

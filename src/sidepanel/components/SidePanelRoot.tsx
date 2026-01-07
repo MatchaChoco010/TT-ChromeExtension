@@ -29,7 +29,6 @@ const TreeViewContent: React.FC = () => {
     updateView,
     groups,
     toggleGroupExpanded,
-    addTabToGroup,
     isTabUnread,
     getUnreadChildCount,
     activeTabId,
@@ -117,16 +116,6 @@ const TreeViewContent: React.FC = () => {
       console.error('Failed to create snapshot:', error);
     }
   }, []);
-
-  const handleAddToGroup = useCallback((groupId: string, tabIds: number[]) => {
-    if (!treeState) return;
-    for (const tabId of tabIds) {
-      const nodeId = treeState.tabToNode[tabId];
-      if (nodeId) {
-        addTabToGroup(nodeId, groupId);
-      }
-    }
-  }, [treeState, addTabToGroup]);
 
   const handleNodeClick = (tabId: number) => {
     chrome.tabs.update(tabId, { active: true });
@@ -290,7 +279,6 @@ const TreeViewContent: React.FC = () => {
             onSnapshot={handleSnapshot}
             groups={groups}
             onGroupToggle={toggleGroupExpanded}
-            onAddToGroup={handleAddToGroup}
             views={treeState?.views}
             onMoveToView={moveTabsToView}
             currentWindowId={currentWindowId ?? undefined}

@@ -171,7 +171,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, 'https://www.google.com');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -179,15 +179,15 @@ test.describe('chrome.tabs API統合', () => {
 
       await serviceWorker.evaluate(
         async (id) => {
-          return await chrome.tabs.update(id, { url: 'https://example.org' });
+          return await chrome.tabs.update(id, { url: 'https://www.google.com/search?q=test' });
         },
         tabId
       );
 
-      const currentTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'example.org', 5000);
+      const currentTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'google.com/search', 10000);
 
       expect(currentTab).toBeDefined();
-      expect(currentTab.url).toContain('example.org');
+      expect(currentTab.url).toContain('google.com/search');
     });
 
     test('chrome.tabs.update()でactiveを変更した場合、アクティブ状態が更新される', async ({

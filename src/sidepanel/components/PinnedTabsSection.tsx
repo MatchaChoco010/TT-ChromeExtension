@@ -3,6 +3,42 @@ import type { TabInfoMap } from '@/types';
 import { useDragDrop, DropTargetType } from '../hooks/useDragDrop';
 import { DragOverlay } from './DragOverlay';
 
+/**
+ * 内部ページのデフォルトファビコンを取得するヘルパー関数
+ */
+const getInternalPageFavicon = (url: string): string | null => {
+  if (!url) return null;
+
+  if (url.startsWith('chrome://') ||
+      url.startsWith('vivaldi://') ||
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('about:') ||
+      url.startsWith('edge://') ||
+      url.startsWith('brave://')) {
+    return `chrome://favicon/size/16@2x/${url}`;
+  }
+
+  return null;
+};
+
+/**
+ * タブ情報から表示用ファビコンURLを取得するヘルパー関数
+ */
+const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
+  if (tabInfo.favIconUrl) {
+    return tabInfo.favIconUrl;
+  }
+
+  if (tabInfo.url) {
+    const internalFavicon = getInternalPageFavicon(tabInfo.url);
+    if (internalFavicon) {
+      return internalFavicon;
+    }
+  }
+
+  return null;
+};
+
 interface PinnedTabsSectionProps {
   pinnedTabIds: number[];
   tabInfoMap: TabInfoMap;
@@ -17,7 +53,7 @@ interface PinnedTabsSectionProps {
 
 interface PinnedTabItemProps {
   tabId: number;
-  tabInfo: { title: string; favIconUrl?: string };
+  tabInfo: { title: string; favIconUrl?: string; url?: string };
   isActive: boolean;
   isDraggable: boolean;
   isDragging: boolean;
@@ -57,25 +93,29 @@ const PinnedTabItem: React.FC<PinnedTabItemProps> = ({
       onContextMenu={(e) => onContextMenu(tabId, e)}
       onMouseDown={isDraggable ? onMouseDown : undefined}
     >
-      {tabInfo.favIconUrl ? (
-        <img
-          src={tabInfo.favIconUrl}
-          alt={tabInfo.title}
-          className="w-4 h-4"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-            const defaultIcon = e.currentTarget.parentElement?.querySelector('[data-default-icon]');
-            if (defaultIcon) {
-              (defaultIcon as HTMLElement).style.display = 'block';
-            }
-          }}
-        />
-      ) : (
-        <div
-          data-testid={`pinned-tab-${tabId}-default-icon`}
-          className="w-4 h-4 bg-gray-400 rounded"
-        />
-      )}
+      {(() => {
+        const displayFavicon = getDisplayFavicon(tabInfo);
+        return displayFavicon ? (
+          <img
+            src={displayFavicon}
+            alt={tabInfo.title}
+            className="w-4 h-4"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const defaultIcon = e.currentTarget.parentElement?.querySelector('[data-default-icon]');
+              if (defaultIcon) {
+                (defaultIcon as HTMLElement).style.display = 'block';
+              }
+            }}
+          />
+        ) : null;
+      })()}
+      <div
+        data-testid={`pinned-tab-${tabId}-default-icon`}
+        data-default-icon="true"
+        className="w-4 h-4 bg-gray-400 rounded"
+        style={{ display: getDisplayFavicon(tabInfo) ? 'none' : 'block' }}
+      />
     </div>
   );
 };
@@ -149,7 +189,7 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
     (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
   }, [containerRef]);
 
-  const handleDragEnd = useCallback((itemId: string, dropTarget: { type: string; insertIndex?: number } | null) => {
+  const handleDragEnd = useCallback(async (itemId: string, dropTarget: { type: string; insertIndex?: number } | null): Promise<void> => {
     if (!dropTarget || dropTarget.type !== DropTargetType.HorizontalGap || !onPinnedTabReorder) {
       return;
     }
@@ -235,15 +275,25 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
           offset={dragState.offset}
         >
           <div className="flex items-center justify-center w-7 h-7 rounded bg-gray-700 shadow-lg">
-            {draggedTabInfo.favIconUrl ? (
-              <img
-                src={draggedTabInfo.favIconUrl}
-                alt={draggedTabInfo.title}
-                className="w-4 h-4"
-              />
-            ) : (
-              <div className="w-4 h-4 bg-gray-400 rounded" />
-            )}
+            {(() => {
+              const displayFavicon = getDisplayFavicon(draggedTabInfo);
+              return displayFavicon ? (
+                <img
+                  src={displayFavicon}
+                  alt={draggedTabInfo.title}
+                  className="w-4 h-4"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'block';
+                  }}
+                />
+              ) : null;
+            })()}
+            <div
+              className="w-4 h-4 bg-gray-400 rounded"
+              style={{ display: getDisplayFavicon(draggedTabInfo) ? 'none' : 'block' }}
+            />
           </div>
         </DragOverlay>
       )}

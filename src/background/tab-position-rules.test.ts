@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { chromeMock } from '@/test/chrome-mock';
 import {
   registerTabEventListeners,
+  registerWebNavigationListeners,
   testStorageService,
   testTreeStateManager,
-  isSystemPage,
 } from './event-handlers';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import type { UserSettings } from '@/types';
@@ -41,20 +41,37 @@ describe('タブ開き方別の位置ルール', () => {
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
+      registerWebNavigationListeners();
 
       const parentTab = {
         id: 1,
         index: 0,
         windowId: 1,
+        url: 'https://example.com',
       } as chrome.tabs.Tab;
+      chromeMock.tabs.get.mockImplementation((tabId: number) => {
+        if (tabId === 1) return Promise.resolve(parentTab);
+        return Promise.resolve(null);
+      });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
+      chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
+        tabId: 2,
+        sourceTabId: 1,
+        sourceProcessId: 1,
+        sourceFrameId: 0,
+        url: 'https://example.com/page',
+        timeStamp: Date.now(),
+      });
 
       const childTab = {
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
+        url: 'https://example.com/page',
       } as chrome.tabs.Tab;
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -83,20 +100,37 @@ describe('タブ開き方別の位置ルール', () => {
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
+      registerWebNavigationListeners();
 
       const parentTab = {
         id: 1,
         index: 0,
         windowId: 1,
+        url: 'https://example.com',
       } as chrome.tabs.Tab;
+      chromeMock.tabs.get.mockImplementation((tabId: number) => {
+        if (tabId === 1) return Promise.resolve(parentTab);
+        return Promise.resolve(null);
+      });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
+      chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
+        tabId: 2,
+        sourceTabId: 1,
+        sourceProcessId: 1,
+        sourceFrameId: 0,
+        url: 'https://example.com/page',
+        timeStamp: Date.now(),
+      });
 
       const childTab = {
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
+        url: 'https://example.com/page',
       } as chrome.tabs.Tab;
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -154,20 +188,37 @@ describe('タブ開き方別の位置ルール', () => {
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
+      registerWebNavigationListeners();
 
       const parentTab = {
         id: 1,
         index: 0,
         windowId: 1,
+        url: 'https://example.com',
       } as chrome.tabs.Tab;
+      chromeMock.tabs.get.mockImplementation((tabId: number) => {
+        if (tabId === 1) return Promise.resolve(parentTab);
+        return Promise.resolve(null);
+      });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
+      chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
+        tabId: 2,
+        sourceTabId: 1,
+        sourceProcessId: 1,
+        sourceFrameId: 0,
+        url: 'https://example.com/page',
+        timeStamp: Date.now(),
+      });
 
       const childTab = {
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
+        url: 'https://example.com/page',
       } as chrome.tabs.Tab;
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -195,166 +246,8 @@ describe('システムページ判定と新規タブ位置設定', () => {
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
   });
 
-  describe('isSystemPage 関数のテスト', () => {
-    it('chrome:// スキームはシステムページとして判定される', () => {
-      expect(isSystemPage('chrome://settings')).toBe(true);
-      expect(isSystemPage('chrome://extensions')).toBe(true);
-      expect(isSystemPage('chrome://newtab')).toBe(true);
-    });
-
-    it('chrome-extension:// スキームはシステムページとして判定される', () => {
-      expect(isSystemPage('chrome-extension://abc123/options.html')).toBe(true);
-      expect(isSystemPage('chrome-extension://xyz/popup.html')).toBe(true);
-    });
-
-    it('vivaldi:// スキームはシステムページとして判定される', () => {
-      expect(isSystemPage('vivaldi://settings')).toBe(true);
-      expect(isSystemPage('vivaldi://extensions')).toBe(true);
-    });
-
-    it('about: スキームはシステムページとして判定される', () => {
-      expect(isSystemPage('about:blank')).toBe(true);
-      expect(isSystemPage('about:newtab')).toBe(true);
-    });
-
-    it('http/https はシステムページではないと判定される', () => {
-      expect(isSystemPage('https://example.com')).toBe(false);
-      expect(isSystemPage('http://localhost:3000')).toBe(false);
-    });
-
-    it('空文字列やundefinedはシステムページではないと判定される', () => {
-      expect(isSystemPage('')).toBe(false);
-    });
-  });
-
-  describe('openerTabIdがあってもシステムページの場合は手動タブとして扱う', () => {
-    it('設定画面はopenerTabIdがあっても手動タブとして扱われる (リストの最後に配置)', async () => {
-      // Arrange: 設定を保存
-      const settings: UserSettings = {
-        fontSize: 14,
-        fontFamily: 'system-ui',
-        customCSS: '',
-        newTabPosition: 'child',
-        newTabPositionFromLink: 'child', // リンクからは child
-        newTabPositionManual: 'end',
-        closeWarningThreshold: 3,
-        showUnreadIndicator: true,
-        autoSnapshotInterval: 0,
-        childTabBehavior: 'promote',
-      };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
-
-      registerTabEventListeners();
-
-      const parentTab = {
-        id: 1,
-        index: 0,
-        windowId: 1,
-        url: 'https://example.com',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(parentTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const settingsTab = {
-        id: 2,
-        index: 1,
-        windowId: 1,
-        openerTabId: 1,
-        url: 'chrome://settings',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(settingsTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const settingsNode = testTreeStateManager.getNodeByTabId(2);
-      expect(settingsNode).toBeDefined();
-      expect(settingsNode?.parentId).toBeNull();
-    });
-
-    it('vivaldi://settings もopenerTabIdがあっても手動タブとして扱われる', async () => {
-      const settings: UserSettings = {
-        fontSize: 14,
-        fontFamily: 'system-ui',
-        customCSS: '',
-        newTabPosition: 'child',
-        newTabPositionFromLink: 'child',
-        newTabPositionManual: 'end',
-        closeWarningThreshold: 3,
-        showUnreadIndicator: true,
-        autoSnapshotInterval: 0,
-        childTabBehavior: 'promote',
-      };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
-
-      registerTabEventListeners();
-
-      const parentTab = {
-        id: 1,
-        index: 0,
-        windowId: 1,
-        url: 'https://example.com',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(parentTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const vivaldiSettingsTab = {
-        id: 2,
-        index: 1,
-        windowId: 1,
-        openerTabId: 1,
-        url: 'vivaldi://settings',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(vivaldiSettingsTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const settingsNode = testTreeStateManager.getNodeByTabId(2);
-      expect(settingsNode).toBeDefined();
-      expect(settingsNode?.parentId).toBeNull();
-    });
-
-    it('chrome-extension:// ページもopenerTabIdがあっても手動タブとして扱われる', async () => {
-      const settings: UserSettings = {
-        fontSize: 14,
-        fontFamily: 'system-ui',
-        customCSS: '',
-        newTabPosition: 'child',
-        newTabPositionFromLink: 'child',
-        newTabPositionManual: 'end',
-        closeWarningThreshold: 3,
-        showUnreadIndicator: true,
-        autoSnapshotInterval: 0,
-        childTabBehavior: 'promote',
-      };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
-
-      registerTabEventListeners();
-
-      const parentTab = {
-        id: 1,
-        index: 0,
-        windowId: 1,
-        url: 'https://example.com',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(parentTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const extensionTab = {
-        id: 2,
-        index: 1,
-        windowId: 1,
-        openerTabId: 1,
-        url: 'chrome-extension://abc123/options.html',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(extensionTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const extensionNode = testTreeStateManager.getNodeByTabId(2);
-      expect(extensionNode).toBeDefined();
-      expect(extensionNode?.parentId).toBeNull();
-    });
-  });
-
   describe('通常のリンククリックは引き続き子タブとして配置', () => {
-    it('http/https ページはopenerTabIdがあれば子タブとして配置される', async () => {
+    it('http/https ページはwebNavigation経由で検出されれば子タブとして配置される', async () => {
       const settings: UserSettings = {
         fontSize: 14,
         fontFamily: 'system-ui',
@@ -370,6 +263,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
+      registerWebNavigationListeners();
 
       const parentTab = {
         id: 1,
@@ -377,8 +271,22 @@ describe('システムページ判定と新規タブ位置設定', () => {
         windowId: 1,
         url: 'https://example.com',
       } as chrome.tabs.Tab;
+      chromeMock.tabs.get.mockImplementation((tabId: number) => {
+        if (tabId === 1) return Promise.resolve(parentTab);
+        return Promise.resolve(null);
+      });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
+      chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
+        tabId: 2,
+        sourceTabId: 1,
+        sourceProcessId: 1,
+        sourceFrameId: 0,
+        url: 'https://example.com/page',
+        timeStamp: Date.now(),
+      });
 
       const childTab = {
         id: 2,
@@ -397,53 +305,12 @@ describe('システムページ判定と新規タブ位置設定', () => {
     });
   });
 
-  describe('手動タブ位置が「現在のタブの子」設定でも正しく動作', () => {
-    it('手動タブ位置が「child」設定でも、システムページは子として配置されない', async () => {
-      const settings: UserSettings = {
-        fontSize: 14,
-        fontFamily: 'system-ui',
-        customCSS: '',
-        newTabPosition: 'child',
-        newTabPositionFromLink: 'child',
-        newTabPositionManual: 'child',
-        closeWarningThreshold: 3,
-        showUnreadIndicator: true,
-        autoSnapshotInterval: 0,
-        childTabBehavior: 'promote',
-      };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
-
-      registerTabEventListeners();
-
-      const parentTab = {
-        id: 1,
-        index: 0,
-        windowId: 1,
-        url: 'https://example.com',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(parentTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const settingsTab = {
-        id: 2,
-        index: 1,
-        windowId: 1,
-        url: 'chrome://settings',
-      } as chrome.tabs.Tab;
-      chromeMock.tabs.onCreated.trigger(settingsTab);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const settingsNode = testTreeStateManager.getNodeByTabId(2);
-      expect(settingsNode).toBeDefined();
-      expect(settingsNode?.parentId).toBeNull();
-    });
-  });
-
   describe('デフォルト設定の確認', () => {
     it('設定が存在しない場合、リンククリックはデフォルトで子タブとして配置', async () => {
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, null as unknown as UserSettings);
 
       registerTabEventListeners();
+      registerWebNavigationListeners();
 
       const parentTab = {
         id: 1,
@@ -451,8 +318,22 @@ describe('システムページ判定と新規タブ位置設定', () => {
         windowId: 1,
         url: 'https://example.com',
       } as chrome.tabs.Tab;
+      chromeMock.tabs.get.mockImplementation((tabId: number) => {
+        if (tabId === 1) return Promise.resolve(parentTab);
+        return Promise.resolve(null);
+      });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
+      chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
+        tabId: 2,
+        sourceTabId: 1,
+        sourceProcessId: 1,
+        sourceFrameId: 0,
+        url: 'https://example.com/page',
+        timeStamp: Date.now(),
+      });
 
       const childTab = {
         id: 2,

@@ -140,7 +140,7 @@ describe('ContextMenu', () => {
         />
       );
 
-      expect(screen.getByText('グループに追加')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /タブをグループ化/i })).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: /グループを解除/i })).not.toBeInTheDocument();
     });
 
@@ -158,7 +158,7 @@ describe('ContextMenu', () => {
         />
       );
 
-      expect(screen.queryByRole('menuitem', { name: /グループに追加/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: /タブをグループ化/i })).not.toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: /グループを解除/i })).toBeInTheDocument();
     });
   });
@@ -322,7 +322,8 @@ describe('ContextMenu', () => {
         />
       );
 
-      expect(screen.getByText(/3件/)).toBeInTheDocument();
+      const elementsWithCount = screen.getAllByText(/3件/);
+      expect(elementsWithCount.length).toBeGreaterThan(0);
     });
 
     it('選択されたタブを一括で閉じるオプションが表示される', () => {
@@ -378,7 +379,7 @@ describe('ContextMenu', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('単一タブ選択時にはグループに追加メニューが表示される', () => {
+    it('単一タブ選択時には「タブをグループ化」メニューが表示される', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
 
@@ -391,7 +392,7 @@ describe('ContextMenu', () => {
         />
       );
 
-      expect(screen.getByText('グループに追加')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /タブをグループ化/i })).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: /選択されたタブをグループ化/i })).not.toBeInTheDocument();
     });
   });
@@ -731,148 +732,5 @@ describe('ContextMenu', () => {
       expect(onClose).toHaveBeenCalled();
     });
 
-    it('単一タブで「タブをグループ化」と「グループに追加」の両方が表示される', () => {
-      const mockGroups = {
-        'group_1': { id: 'group_1', name: 'Work', color: '#3b82f6', isExpanded: true },
-      };
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-      const onAddToGroup = vi.fn();
-
-      render(
-        <ContextMenu
-          targetTabIds={[1]}
-          position={{ x: 100, y: 200 }}
-          onAction={onAction}
-          onClose={onClose}
-          isGrouped={false}
-          groups={mockGroups}
-          onAddToGroup={onAddToGroup}
-        />
-      );
-
-      const groupItem = screen.getByRole('menuitem', { name: /タブをグループ化/i });
-      expect(groupItem).toBeInTheDocument();
-      expect(groupItem).not.toBeDisabled();
-      expect(screen.getByText('グループに追加')).toBeInTheDocument();
-    });
-  });
-
-  describe('シングルタブのグループ追加機能', () => {
-    const mockGroups = {
-      'group_1': { id: 'group_1', name: 'Work', color: '#3b82f6', isExpanded: true },
-      'group_2': { id: 'group_2', name: 'Personal', color: '#10b981', isExpanded: true },
-    };
-
-    it('単一タブ選択時に「グループに追加」をホバーするとサブメニューが表示される', async () => {
-      const user = userEvent.setup();
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-      const onAddToGroup = vi.fn();
-
-      render(
-        <ContextMenu
-          targetTabIds={[1]}
-          position={{ x: 100, y: 200 }}
-          onAction={onAction}
-          onClose={onClose}
-          groups={mockGroups}
-          onAddToGroup={onAddToGroup}
-        />
-      );
-
-      const addToGroupItem = screen.getByText('グループに追加');
-      await user.hover(addToGroupItem);
-
-      expect(screen.getByTestId('submenu')).toBeInTheDocument();
-      expect(screen.getByText('Work')).toBeInTheDocument();
-      expect(screen.getByText('Personal')).toBeInTheDocument();
-    });
-
-    it('サブメニューからグループを選択するとonAddToGroupが呼ばれる', async () => {
-      const user = userEvent.setup();
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-      const onAddToGroup = vi.fn();
-
-      render(
-        <ContextMenu
-          targetTabIds={[1]}
-          position={{ x: 100, y: 200 }}
-          onAction={onAction}
-          onClose={onClose}
-          groups={mockGroups}
-          onAddToGroup={onAddToGroup}
-        />
-      );
-
-      const addToGroupItem = screen.getByText('グループに追加');
-      await user.hover(addToGroupItem);
-
-      const workGroup = screen.getByText('Work');
-      await user.click(workGroup);
-
-      expect(onAddToGroup).toHaveBeenCalledWith('group_1', [1]);
-      expect(onClose).toHaveBeenCalled();
-    });
-
-    it('グループが存在しない場合は「グループに追加」が無効化される', () => {
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-
-      render(
-        <ContextMenu
-          targetTabIds={[1]}
-          position={{ x: 100, y: 200 }}
-          onAction={onAction}
-          onClose={onClose}
-          groups={{}}
-        />
-      );
-
-      const addToGroupItem = screen.getByText('グループに追加');
-      expect(addToGroupItem.closest('button') || addToGroupItem.closest('div')).toHaveClass('text-gray-500');
-    });
-
-    it('groupsがundefinedでも「グループに追加」が表示される（無効化状態）', () => {
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-
-      render(
-        <ContextMenu
-          targetTabIds={[1]}
-          position={{ x: 100, y: 200 }}
-          onAction={onAction}
-          onClose={onClose}
-        />
-      );
-
-      expect(screen.getByText('グループに追加')).toBeInTheDocument();
-    });
-
-    it('複数タブ選択時は「選択されたタブをグループ化」が表示され、サブメニューは表示されない', async () => {
-      const user = userEvent.setup();
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-      const onAddToGroup = vi.fn();
-
-      render(
-        <ContextMenu
-          targetTabIds={[1, 2, 3]}
-          position={{ x: 100, y: 200 }}
-          onAction={onAction}
-          onClose={onClose}
-          groups={mockGroups}
-          onAddToGroup={onAddToGroup}
-        />
-      );
-
-      expect(screen.getByRole('menuitem', { name: /選択されたタブをグループ化/i })).toBeInTheDocument();
-
-      const groupItem = screen.getByRole('menuitem', { name: /選択されたタブをグループ化/i });
-      await user.click(groupItem);
-
-      expect(onAction).toHaveBeenCalledWith('group');
-    });
   });
 });

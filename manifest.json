@@ -8,7 +8,8 @@
     "tabs",
     "storage",
     "unlimitedStorage",
-    "alarms"
+    "alarms",
+    "webNavigation"
   ],
   "options_page": "settings.html",
   "side_panel": {

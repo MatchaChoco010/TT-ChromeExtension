@@ -4,7 +4,9 @@ import { useDragDrop, type DropTarget, DropTargetType } from '../hooks/useDragDr
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { DragOverlay } from './DragOverlay';
 import { ContextMenu } from './ContextMenu';
+import ConfirmDialog from './ConfirmDialog';
 import { useMenuActions } from '../hooks/useMenuActions';
+import { useTheme } from '../providers/ThemeProvider';
 import UnreadBadge from './UnreadBadge';
 import CloseButton from './CloseButton';
 import DropIndicator from './DropIndicator';
@@ -13,6 +15,17 @@ import {
   type TabPosition,
 } from './GapDropDetection';
 import { TREE_INDENT_WIDTH_PX } from '../utils';
+
+/**
+ * ノードとその子孫の数を再帰的にカウント
+ */
+const countSubtreeNodes = (node: TabNode): number => {
+  let count = 1;
+  for (const child of node.children) {
+    count += countSubtreeNodes(child);
+  }
+  return count;
+};
 
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 
@@ -76,6 +89,52 @@ const getDisplayTitle = (tab: { title: string; url: string; status?: 'loading' |
   return tab.title;
 };
 
+/**
+ * 内部ページのデフォルトファビコンを取得するヘルパー関数
+ * chrome://, vivaldi://, about:等の内部ページにはブラウザがファビコンURLを提供しないため、
+ * chrome://favicon/を使用するか、デフォルトアイコンを返す
+ */
+const getInternalPageFavicon = (url: string): string | null => {
+  if (!url) return null;
+
+  // chrome://favicon/ APIを使用してファビコンを取得
+  // このAPIは多くの内部ページでも動作する
+  if (url.startsWith('chrome://') ||
+      url.startsWith('vivaldi://') ||
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('about:') ||
+      url.startsWith('edge://') ||
+      url.startsWith('brave://')) {
+    return `chrome://favicon/size/16@2x/${url}`;
+  }
+
+  return null;
+};
+
+/**
+ * タブ情報から表示用ファビコンURLを取得するヘルパー関数
+ * 優先順位:
+ * 1. tabInfo.favIconUrl（通常のウェブページのファビコン）
+ * 2. 内部ページの場合はchrome://favicon/ APIを使用
+ * 3. null（デフォルトアイコンを表示）
+ */
+const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
+  // 既存のファビコンがあればそれを使用
+  if (tabInfo.favIconUrl) {
+    return tabInfo.favIconUrl;
+  }
+
+  // 内部ページのファビコンを取得
+  if (tabInfo.url) {
+    const internalFavicon = getInternalPageFavicon(tabInfo.url);
+    if (internalFavicon) {
+      return internalFavicon;
+    }
+  }
+
+  return null;
+};
+
 const INDENT_WIDTH = TREE_INDENT_WIDTH_PX;
 
 interface TreeNodeItemProps {
@@ -98,7 +157,6 @@ interface TreeNodeItemProps {
   currentViewId?: string;
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
   groups?: Record<string, Group>;
-  onAddToGroup?: (groupId: string, tabIds: number[]) => void;
   currentWindowId?: number;
   otherWindows?: WindowInfo[];
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
@@ -135,8 +193,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   views,
   currentViewId,
   onMoveToView,
-  groups,
-  onAddToGroup,
+  groups: _groups,
   currentWindowId,
   otherWindows,
   onMoveToWindow,
@@ -149,7 +206,12 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingSubtreeCount, setPendingSubtreeCount] = useState(0);
   const { executeAction } = useMenuActions();
+  const { settings } = useTheme();
+
+  const closeWarningThreshold = settings?.closeWarningThreshold ?? 10;
 
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
   const isActive = activeTabId === node.tabId;
@@ -166,7 +228,32 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   };
 
   const handleCloseClick = () => {
-    chrome.tabs.remove(node.tabId);
+    if (hasChildren && !node.isExpanded) {
+      const subtreeCount = countSubtreeNodes(node);
+      if (subtreeCount >= closeWarningThreshold) {
+        setPendingSubtreeCount(subtreeCount);
+        setShowConfirmDialog(true);
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: 'CLOSE_SUBTREE',
+        payload: { tabId: node.tabId },
+      });
+    } else {
+      chrome.tabs.remove(node.tabId);
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowConfirmDialog(false);
+    chrome.runtime.sendMessage({
+      type: 'CLOSE_SUBTREE',
+      payload: { tabId: node.tabId },
+    });
+  };
+
+  const handleCancelClose = () => {
+    setShowConfirmDialog(false);
   };
 
   const style: React.CSSProperties = {
@@ -181,9 +268,15 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     setContextMenuOpen(true);
   };
 
+  const isCollapsedParent = hasChildren && !node.isExpanded;
+
   const handleContextMenuAction = (action: MenuAction) => {
     const targetTabIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
-    executeAction(action, targetTabIds, { url: tabInfo?.url || 'about:blank', onSnapshot });
+    executeAction(action, targetTabIds, {
+      url: tabInfo?.url || 'about:blank',
+      onSnapshot,
+      isCollapsedParent: !isSelected && isCollapsedParent,
+    });
   };
 
   const handleNodeClick = (e: React.MouseEvent) => {
@@ -244,18 +337,26 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
         {getTabInfo && tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
-            {tabInfo.favIconUrl ? (
-              <img
-                src={tabInfo.favIconUrl}
-                alt="Favicon"
-                className="w-full h-full object-contain"
-              />
-            ) : (
-              <div
-                data-testid="default-icon"
-                className="w-full h-full bg-gray-300 rounded-sm"
-              />
-            )}
+            {(() => {
+              const displayFavicon = getDisplayFavicon(tabInfo);
+              return displayFavicon ? (
+                <img
+                  src={displayFavicon}
+                  alt="Favicon"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'block';
+                  }}
+                />
+              ) : null;
+            })()}
+            <div
+              data-testid="default-icon"
+              className="w-full h-full bg-gray-300 rounded-sm"
+              style={{ display: getDisplayFavicon(tabInfo) ? 'none' : 'block' }}
+            />
           </div>
         ) : getTabInfo && !tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -303,13 +404,20 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           views={views}
           currentViewId={currentViewId}
           onMoveToView={onMoveToView}
-          groups={groups}
-          onAddToGroup={onAddToGroup}
           currentWindowId={currentWindowId}
           otherWindows={otherWindows}
           onMoveToWindow={onMoveToWindow}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        title="タブを閉じる"
+        message="このタブと配下のすべてのタブを閉じますか？"
+        tabCount={pendingSubtreeCount}
+        onConfirm={handleConfirmClose}
+        onCancel={handleCancelClose}
+      />
 
       {hasChildren && node.isExpanded && (
         <div>
@@ -333,8 +441,6 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               views={views}
               currentViewId={currentViewId}
               onMoveToView={onMoveToView}
-              groups={groups}
-              onAddToGroup={onAddToGroup}
               currentWindowId={currentWindowId}
               otherWindows={otherWindows}
               onMoveToWindow={onMoveToWindow}
@@ -365,8 +471,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   views,
   currentViewId,
   onMoveToView,
-  groups,
-  onAddToGroup,
+  groups: _groups,
   currentWindowId,
   otherWindows,
   onMoveToWindow,
@@ -375,7 +480,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingSubtreeCount, setPendingSubtreeCount] = useState(0);
   const { executeAction } = useMenuActions();
+  const { settings } = useTheme();
+
+  const closeWarningThreshold = settings?.closeWarningThreshold ?? 10;
 
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
   const isActive = activeTabId === node.tabId;
@@ -391,7 +501,32 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   };
 
   const handleCloseClick = () => {
-    chrome.tabs.remove(node.tabId);
+    if (hasChildren && !node.isExpanded) {
+      const subtreeCount = countSubtreeNodes(node);
+      if (subtreeCount >= closeWarningThreshold) {
+        setPendingSubtreeCount(subtreeCount);
+        setShowConfirmDialog(true);
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: 'CLOSE_SUBTREE',
+        payload: { tabId: node.tabId },
+      });
+    } else {
+      chrome.tabs.remove(node.tabId);
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowConfirmDialog(false);
+    chrome.runtime.sendMessage({
+      type: 'CLOSE_SUBTREE',
+      payload: { tabId: node.tabId },
+    });
+  };
+
+  const handleCancelClose = () => {
+    setShowConfirmDialog(false);
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -401,9 +536,15 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
     setContextMenuOpen(true);
   };
 
+  const isCollapsedParent = hasChildren && !node.isExpanded;
+
   const handleContextMenuAction = (action: MenuAction) => {
     const targetTabIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
-    executeAction(action, targetTabIds, { url: tabInfo?.url || 'about:blank', onSnapshot });
+    executeAction(action, targetTabIds, {
+      url: tabInfo?.url || 'about:blank',
+      onSnapshot,
+      isCollapsedParent: !isSelected && isCollapsedParent,
+    });
   };
 
   const handleNodeClick = (e: React.MouseEvent) => {
@@ -451,18 +592,26 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
         {getTabInfo && tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
-            {tabInfo.favIconUrl ? (
-              <img
-                src={tabInfo.favIconUrl}
-                alt="Favicon"
-                className="w-full h-full object-contain"
-              />
-            ) : (
-              <div
-                data-testid="default-icon"
-                className="w-full h-full bg-gray-300 rounded-sm"
-              />
-            )}
+            {(() => {
+              const displayFavicon = getDisplayFavicon(tabInfo);
+              return displayFavicon ? (
+                <img
+                  src={displayFavicon}
+                  alt="Favicon"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'block';
+                  }}
+                />
+              ) : null;
+            })()}
+            <div
+              data-testid="default-icon"
+              className="w-full h-full bg-gray-300 rounded-sm"
+              style={{ display: getDisplayFavicon(tabInfo) ? 'none' : 'block' }}
+            />
           </div>
         ) : getTabInfo && !tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -510,13 +659,20 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           views={views}
           currentViewId={currentViewId}
           onMoveToView={onMoveToView}
-          groups={groups}
-          onAddToGroup={onAddToGroup}
           currentWindowId={currentWindowId}
           otherWindows={otherWindows}
           onMoveToWindow={onMoveToWindow}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        title="タブを閉じる"
+        message="このタブと配下のすべてのタブを閉じますか？"
+        tabCount={pendingSubtreeCount}
+        onConfirm={handleConfirmClose}
+        onCancel={handleCancelClose}
+      />
 
       {hasChildren && node.isExpanded && (
         <div>
@@ -567,7 +723,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   getSelectedTabIds,
   onSnapshot,
   groups,
-  onAddToGroup,
   views,
   onMoveToView,
   currentWindowId,
@@ -726,8 +881,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         lastHoverNodeIdRef.current = null;
       }
     }, [nodes, onToggleExpand, handleDropTargetChange, onOutsideTreeChange, sidePanelRef]),
-    onDragEnd: useCallback((itemId: string, finalDropTarget: DropTarget | null) => {
-      setGlobalIsDragging(false);
+    onDragEnd: useCallback(async (itemId: string, finalDropTarget: DropTarget | null): Promise<void> => {
+      // 非同期処理の完了前に状態をリセットしない（waitForDragEndがis-draggingクラスで待機するため）
       setActiveNodeId(null);
 
       if (hoverTimerRef.current) {
@@ -759,6 +914,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           isOutsideTreeRef.current = false;
           onExternalDrop(tabId);
           handleDropTargetChange(null);
+          setGlobalIsDragging(false);
           return;
         }
       }
@@ -784,24 +940,26 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           belowNodeId = effectiveTabPositions[gapIndex]?.nodeId;
         }
 
-        onSiblingDrop({
+        await onSiblingDrop({
           activeNodeId: itemId,
           insertIndex: gapIndex,
           aboveNodeId,
           belowNodeId,
         });
         handleDropTargetChange(null);
+        setGlobalIsDragging(false);
         return;
       }
 
       if (finalDropTarget?.type === DropTargetType.Tab && onDragEnd) {
-        onDragEnd({
+        await onDragEnd({
           active: { id: itemId },
           over: finalDropTarget.targetNodeId ? { id: finalDropTarget.targetNodeId } : null,
         } as Parameters<typeof onDragEnd>[0]);
       }
 
       handleDropTargetChange(null);
+      setGlobalIsDragging(false);
     }, [nodes, onDragEnd, onSiblingDrop, onExternalDrop, handleDropTargetChange, getSubtreeNodeIds]),
     onDragCancel: useCallback(() => {
       setGlobalIsDragging(false);
@@ -943,8 +1101,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           views={views}
           currentViewId={currentViewId}
           onMoveToView={onMoveToView}
-          groups={groups}
-          onAddToGroup={onAddToGroup}
           currentWindowId={currentWindowId}
           otherWindows={otherWindows}
           onMoveToWindow={onMoveToWindow}
@@ -977,13 +1133,18 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         otherWindows={otherWindows}
         onMoveToWindow={onMoveToWindow}
         groups={groups}
-        onAddToGroup={onAddToGroup}
       />
     );
   };
 
   const content = (
-    <div ref={containerRef} className={containerClassName} data-drag-container>
+    <div
+      ref={containerRef}
+      className={containerClassName}
+      data-drag-container
+      data-drop-target-type={dropTarget?.type ?? 'none'}
+      data-drop-target-node={dropTarget?.type === DropTargetType.Tab ? dropTarget.targetNodeId : undefined}
+    >
       {filteredNodes.map((node) => {
         return renderTabNode(node);
       })}
@@ -1033,15 +1194,25 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
                 className="flex items-center p-2 bg-gray-700 text-gray-100 shadow-lg rounded border border-gray-600"
                 style={{ width: '250px' }}
               >
-                {draggedTabInfo?.favIconUrl ? (
-                  <img
-                    src={draggedTabInfo.favIconUrl}
-                    alt="Favicon"
-                    className="w-4 h-4 mr-2 flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-4 h-4 mr-2 bg-gray-300 rounded-sm flex-shrink-0" />
-                )}
+                {(() => {
+                  const displayFavicon = draggedTabInfo ? getDisplayFavicon(draggedTabInfo) : null;
+                  return displayFavicon ? (
+                    <img
+                      src={displayFavicon}
+                      alt="Favicon"
+                      className="w-4 h-4 mr-2 flex-shrink-0"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'block';
+                      }}
+                    />
+                  ) : null;
+                })()}
+                <div
+                  className="w-4 h-4 mr-2 bg-gray-300 rounded-sm flex-shrink-0"
+                  style={{ display: draggedTabInfo && getDisplayFavicon(draggedTabInfo) ? 'none' : 'block' }}
+                />
                 <span className="truncate">
                   {draggedTabInfo ? getDisplayTitle({ title: draggedTabInfo.title, url: draggedTabInfo.url || '', status: draggedTabInfo.status }) : `Tab ${draggedNode.tabId}`}
                 </span>

@@ -617,8 +617,7 @@ export async function assertDropIndicator(
 ): Promise<void> {
   const indicator = page.locator('[data-testid="drop-indicator"]');
 
-  // インジケータが見つからない場合もエラーにしない（実装に依存）
-  await indicator.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+  await indicator.waitFor({ state: 'visible', timeout: 2000 });
 }
 
 /**

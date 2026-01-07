@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
 import type { TabNode, ExtendedTabInfo } from '@/types';
 

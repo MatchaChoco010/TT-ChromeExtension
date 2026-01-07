@@ -33,10 +33,8 @@ async function waitForScrollChange(
       }
       return currentScrollTop < initialScrollTop;
     },
-    { timeout: maxWait, interval: 16 }
-  ).catch(() => {
-    // タイムアウトしても最終値を返す
-  });
+    { timeout: maxWait, interval: 16, timeoutMessage: `Scroll did not change ${direction} from ${initialScrollTop} within ${maxWait}ms` }
+  );
 
   return currentScrollTop;
 }
@@ -69,10 +67,8 @@ async function waitForScrollStabilize(
       }
       return false;
     },
-    { timeout: maxWait, interval: 16 }
-  ).catch(() => {
-    // タイムアウトしても最終値を返す
-  });
+    { timeout: maxWait, interval: 16, timeoutMessage: `Scroll position did not stabilize within ${maxWait}ms` }
+  );
 
   return lastScrollTop;
 }

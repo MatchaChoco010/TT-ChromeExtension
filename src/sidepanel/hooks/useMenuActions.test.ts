@@ -10,9 +10,12 @@ const chromeMock = {
     update: vi.fn(),
     reload: vi.fn(),
     query: vi.fn(),
+    get: vi.fn(),
+    move: vi.fn(),
   },
   windows: {
     create: vi.fn(),
+    remove: vi.fn(),
   },
   runtime: {
     sendMessage: vi.fn(),
@@ -105,7 +108,10 @@ describe('useMenuActions', () => {
     });
 
     it('newWindowアクション: 新しいウィンドウでタブを開く', async () => {
-      chromeMock.windows.create.mockResolvedValue({ id: 2 });
+      chromeMock.tabs.get.mockResolvedValue({ id: 1, windowId: 100 });
+      chromeMock.windows.create.mockResolvedValue({ id: 200 });
+      chromeMock.tabs.move.mockResolvedValue({});
+      chromeMock.tabs.query.mockResolvedValue([{ id: 3 }]);
 
       const { result } = renderHook(() => useMenuActions());
 
@@ -113,8 +119,29 @@ describe('useMenuActions', () => {
         await result.current.executeAction('newWindow', [1, 2]);
       });
 
+      expect(chromeMock.tabs.get).toHaveBeenCalledWith(1);
       expect(chromeMock.windows.create).toHaveBeenCalledWith({ tabId: 1 });
-      expect(chromeMock.windows.create).toHaveBeenCalledWith({ tabId: 2 });
+      expect(chromeMock.tabs.move).toHaveBeenCalledWith([2], { windowId: 200, index: -1 });
+      expect(chromeMock.tabs.query).toHaveBeenCalledWith({ windowId: 100 });
+      expect(chromeMock.windows.remove).not.toHaveBeenCalled();
+    });
+
+    it('newWindowアクション: 最後のタブを移動した場合、元のウィンドウを閉じる', async () => {
+      chromeMock.tabs.get.mockResolvedValue({ id: 1, windowId: 100 });
+      chromeMock.windows.create.mockResolvedValue({ id: 200 });
+      chromeMock.tabs.query.mockResolvedValue([]);
+      chromeMock.windows.remove.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useMenuActions());
+
+      await act(async () => {
+        await result.current.executeAction('newWindow', [1]);
+      });
+
+      expect(chromeMock.tabs.get).toHaveBeenCalledWith(1);
+      expect(chromeMock.windows.create).toHaveBeenCalledWith({ tabId: 1 });
+      expect(chromeMock.tabs.query).toHaveBeenCalledWith({ windowId: 100 });
+      expect(chromeMock.windows.remove).toHaveBeenCalledWith(100);
     });
   });
 

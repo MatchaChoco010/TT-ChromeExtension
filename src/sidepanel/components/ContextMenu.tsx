@@ -16,22 +16,17 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   views,
   currentViewId,
   onMoveToView,
-  groups,
-  onAddToGroup,
   currentWindowId: _currentWindowId,
   otherWindows,
   onMoveToWindow,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const moveToViewButtonRef = useRef<HTMLDivElement>(null);
-  const addToGroupButtonRef = useRef<HTMLDivElement>(null);
   const moveToWindowButtonRef = useRef<HTMLDivElement>(null);
   const isMultipleSelection = targetTabIds.length > 1;
 
   const [isSubMenuOpen, setIsSubMenuOpen] = useState(false);
   const [subMenuParentRect, setSubMenuParentRect] = useState<DOMRect | null>(null);
-  const [isGroupSubMenuOpen, setIsGroupSubMenuOpen] = useState(false);
-  const [groupSubMenuParentRect, setGroupSubMenuParentRect] = useState<DOMRect | null>(null);
   const [isWindowSubMenuOpen, setIsWindowSubMenuOpen] = useState(false);
   const [windowSubMenuParentRect, setWindowSubMenuParentRect] = useState<DOMRect | null>(null);
 
@@ -124,40 +119,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
   const handleSubMenuClose = useCallback(() => {
     setIsSubMenuOpen(false);
-  }, []);
-
-  const availableGroups = useMemo((): SubMenuItem[] => {
-    if (!groups) return [];
-    return Object.values(groups).map(g => ({
-      id: g.id,
-      label: g.name,
-    }));
-  }, [groups]);
-
-  const hasAvailableGroups = availableGroups.length > 0;
-
-  const handleGroupSelect = useCallback((groupId: string) => {
-    if (onAddToGroup) {
-      onAddToGroup(groupId, targetTabIds);
-      onClose();
-    }
-  }, [onAddToGroup, targetTabIds, onClose]);
-
-  const handleAddToGroupMouseEnter = useCallback(() => {
-    if (!hasAvailableGroups) return;
-    if (addToGroupButtonRef.current) {
-      setGroupSubMenuParentRect(addToGroupButtonRef.current.getBoundingClientRect());
-    } else {
-      setGroupSubMenuParentRect(new DOMRect(adjustedPosition.x, adjustedPosition.y, 200, 36));
-    }
-    setIsGroupSubMenuOpen(true);
-  }, [adjustedPosition, hasAvailableGroups]);
-
-  const handleAddToGroupMouseLeave = useCallback(() => {
-  }, []);
-
-  const handleGroupSubMenuClose = useCallback(() => {
-    setIsGroupSubMenuOpen(false);
   }, []);
 
   const windowSubMenuItems = useMemo((): SubMenuItem[] => {
@@ -263,6 +224,17 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         タブを再読み込み
       </button>
 
+      <button
+        role="menuitem"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
+        onClick={() => handleMenuItemClick('discard')}
+        data-testid="context-menu-discard"
+      >
+        {isMultipleSelection
+          ? `タブを休止 (${targetTabIds.length}件)`
+          : 'タブを休止'}
+      </button>
+
       <div className="border-t border-gray-700 my-1" />
 
       {isPinned ? (
@@ -324,37 +296,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           選択されたタブをグループ化
         </button>
       ) : (
-        <>
-          <button
-            role="menuitem"
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
-            onClick={() => handleMenuItemClick('group')}
-          >
-            タブをグループ化
-          </button>
-          <div
-            ref={addToGroupButtonRef}
-            className={`relative w-full px-4 py-2 text-left text-sm flex items-center justify-between cursor-default ${
-              hasAvailableGroups
-                ? 'hover:bg-gray-700 text-gray-100'
-                : 'text-gray-500 cursor-not-allowed'
-            }`}
-            onMouseEnter={handleAddToGroupMouseEnter}
-            onMouseLeave={handleAddToGroupMouseLeave}
-          >
-            <span>グループに追加</span>
-            {hasAvailableGroups && <span className="ml-2">▶</span>}
-            {isGroupSubMenuOpen && groupSubMenuParentRect && hasAvailableGroups && (
-              <SubMenu
-                label="グループに追加"
-                items={availableGroups}
-                onSelect={handleGroupSelect}
-                onClose={handleGroupSubMenuClose}
-                parentRect={groupSubMenuParentRect}
-              />
-            )}
-          </div>
-        </>
+        <button
+          role="menuitem"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
+          onClick={() => handleMenuItemClick('group')}
+        >
+          タブをグループ化
+        </button>
       )}
 
       {showMoveToViewMenu && (

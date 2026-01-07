@@ -688,7 +688,7 @@ describe('TreeStateManager', () => {
       expect(removedCount).toBe(0);
     });
 
-    it('クリーンアップ後にストレージに永続化される', async () => {
+    it('クリーンアップ後はストレージに永続化しない（syncWithChromeTabsが永続化を担当）', async () => {
       const viewId = 'default';
       const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1' } as chrome.tabs.Tab;
       const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2' } as chrome.tabs.Tab;
@@ -700,13 +700,7 @@ describe('TreeStateManager', () => {
 
       await manager.cleanupStaleNodes([1]);
 
-      expect(mockStorageService.set).toHaveBeenCalledWith(
-        'tree_state',
-        expect.objectContaining({
-          nodes: expect.any(Object),
-          tabToNode: expect.any(Object),
-        }),
-      );
+      expect(mockStorageService.set).not.toHaveBeenCalled();
     });
 
     it('階層構造のあるツリーで、存在しない複数のタブをクリーンアップする', async () => {

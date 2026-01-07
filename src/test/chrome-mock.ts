@@ -99,7 +99,8 @@ export class ChromeMock {
       ) => boolean | void
     >(),
     sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(() => Promise.resolve()),
-    getURL: vi.fn((path: string) => `chrome-extension://test/${path}`),
+    getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
+    id: 'test-extension-id',
     lastError: undefined as chrome.runtime.LastError | undefined,
   };
 
@@ -107,6 +108,12 @@ export class ChromeMock {
     open: vi.fn(() => Promise.resolve()),
     getOptions: vi.fn(() => Promise.resolve({ enabled: true })),
     setOptions: vi.fn(() => Promise.resolve()),
+  };
+
+  webNavigation = {
+    onCreatedNavigationTarget: new MockEvent<
+      (details: chrome.webNavigation.WebNavigationSourceCallbackDetails) => void
+    >(),
   };
 
   storage = {
@@ -163,6 +170,7 @@ export class ChromeMock {
     this.windows.onCreated.clear();
     this.windows.onRemoved.clear();
     this.windows.onFocusChanged.clear();
+    this.webNavigation.onCreatedNavigationTarget.clear();
     this.runtime.onMessage.clear();
     this.storage.onChanged.addListener.mockClear();
     this.storage.onChanged.removeListener.mockClear();

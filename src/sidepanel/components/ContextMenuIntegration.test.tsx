@@ -177,6 +177,8 @@ describe('ContextMenu Integration with MenuActions', () => {
 
     it('「別のウィンドウに移動」サブメニューから「新しいウィンドウ」をクリックすると新しいウィンドウが作成される', async () => {
       const user = userEvent.setup();
+      chromeMock.tabs.get.mockResolvedValue({ id: 1, windowId: 1 } as chrome.tabs.Tab);
+      chromeMock.tabs.query.mockResolvedValue([{ id: 1, windowId: 1 } as chrome.tabs.Tab]);
       chromeMock.windows.create.mockResolvedValue({ id: 2 } as chrome.windows.Window);
 
       const ContextMenuWrapper = () => {

@@ -6,7 +6,6 @@ async function globalSetup() {
   console.log('🔨 E2Eテスト実行前にビルドを開始します...');
 
   try {
-    // vite build を直接実行（TypeScriptエラーがある場合でもビルド可能）
     execSync('npx vite build', {
       stdio: 'inherit',
       cwd: process.cwd(),

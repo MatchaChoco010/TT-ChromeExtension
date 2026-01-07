@@ -40,7 +40,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           fontFamily: 'system-ui, -apple-system, sans-serif',
           customCSS: '',
           newTabPosition: 'child',
-          closeWarningThreshold: 3,
+          closeWarningThreshold: 10,
           showUnreadIndicator: true,
           autoSnapshotInterval: 0,
           childTabBehavior: 'promote',

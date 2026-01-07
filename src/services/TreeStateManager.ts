@@ -40,6 +40,15 @@ export class TreeStateManager {
   }
 
   /**
+   * nodeIdからTabNodeを取得
+   * @param nodeId - ノードID
+   * @returns TabNodeまたはnull
+   */
+  getNodeById(nodeId: string): TabNode | null {
+    return this.nodes.get(nodeId) || null;
+  }
+
+  /**
    * 新しいタブを追加
    * @param tab - Chrome タブオブジェクト
    * @param parentId - 親ノードID（nullの場合はルートノード）
@@ -265,8 +274,6 @@ export class TreeStateManager {
       await this.removeStaleNode(tabId);
     }
 
-    await this.persistState();
-
     return staleTabIds.length;
   }
 
@@ -307,6 +314,11 @@ export class TreeStateManager {
    */
   async syncWithChromeTabs(): Promise<void> {
     try {
+      // IMPORTANT: Load the latest state from storage before syncing
+      // This prevents race conditions where concurrent operations (like handleTabCreated)
+      // might have modified and saved state that we would otherwise overwrite
+      await this.loadState();
+
       const tabs = await chrome.tabs.query({});
 
       // Must match TreeStateProvider's default currentViewId
@@ -605,9 +617,11 @@ export class TreeStateManager {
   private async persistState(): Promise<void> {
     const nodesRecord: Record<string, TabNode> = {};
     this.nodes.forEach((node, id) => {
+      // children配列の順序を保持するため、各子ノードのIDを保存
+      // 循環参照を避けるため、子ノードの完全なオブジェクトではなくIDのみを保存
       nodesRecord[id] = {
         ...node,
-        children: [],
+        children: node.children.map(child => ({ id: child.id })) as unknown as TabNode[],
       };
     });
 
@@ -708,12 +722,36 @@ export class TreeStateManager {
         }
       });
 
-      Object.entries(state.nodes).forEach(([id, node]) => {
+      // ストレージに保存されたchildren配列の順序を維持して再構築
+      // 2段階で処理: 1. 保存された順序で追加、2. parentIdで関連付けられているが未追加の子を追加
+      const addedChildIds = new Set<string>();
+
+      Object.entries(state.nodes).forEach(([parentId, parentNode]) => {
+        const parent = this.nodes.get(parentId);
+        if (!parent) return;
+
+        // 保存されたchildren配列がある場合はその順序を使用
+        if (parentNode.children && Array.isArray(parentNode.children)) {
+          for (const storedChild of parentNode.children) {
+            if (!storedChild || typeof storedChild !== 'object') continue;
+            const childId = (storedChild as { id?: string }).id;
+            if (!childId) continue;
+            const child = this.nodes.get(childId);
+            if (child && child.parentId === parentId) {
+              parent.children.push(child);
+              addedChildIds.add(childId);
+            }
+          }
+        }
+      });
+
+      // フォールバック: parentIdで関連付けられているが、まだ追加されていない子を追加
+      this.nodes.forEach((node, id) => {
+        if (addedChildIds.has(id)) return;
         if (node.parentId) {
           const parent = this.nodes.get(node.parentId);
-          const child = this.nodes.get(id);
-          if (parent && child) {
-            parent.children.push(child);
+          if (parent) {
+            parent.children.push(node);
           }
         }
       });

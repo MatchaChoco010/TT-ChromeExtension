@@ -33,6 +33,18 @@ Chrome Extension Manifest V3アーキテクチャ。Service WorkerとSide Panel�
 
 これにより、すべてのエージェントがプロジェクトの規約・構造・技術スタックを理解した上で作業できる。
 
+### バグ修正時の行動規範（必須）
+
+**バグ修正作業を開始する前に、必ず`docs/steering/bug-fixing-rules.md`を読み込むこと。**
+
+このドキュメントには以下の重要な規範が定められている：
+- 根本原因の特定を最優先する（場当たり的な修正の禁止）
+- フォールバックによる問題の隠蔽を禁止する
+- 仮説の検証を徹底する（「テストが通った = 原因が正しかった」の禁止）
+- デバッグ用コードの管理を徹底する（放置禁止）
+
+**この規範に従わないバグ修正は、たとえテストが通っても完了とは認められない。**
+
 ### Type Safety（必須）
 
 - TypeScript strict mode有効
@@ -217,7 +229,7 @@ await assertTabStructure(sidePanelPage, windowId, [
 ### フレーキーテスト防止
 
 - **固定時間待機（`waitForTimeout`）禁止**: ポーリングで状態確定を待つ
-- **新規テストは10回連続成功必須**: `npx playwright test --repeat-each=10 path/to/new.spec.ts`
+- **テストは10回連続成功必須**: `npm run test:e2e`を10回連続実行して全て成功することを確認
 - **Chrome Background Throttling対策**: ドラッグ操作前に`page.bringToFront()`
 - **リトライ追加禁止**: テストにリトライを安易に追加してはならない。リトライはフレーキーさの根本原因を隠蔽し、問題の発覚を遅らせるだけである。テストがフレーキーな場合は、リトライを追加せずに根本的な原因を特定し修正すること
 
@@ -338,6 +350,7 @@ npm run test:e2e   # Playwright E2Eテスト
 - **Path Alias `@/`**: `./src/`へのエイリアス
 - **複数ウィンドウ対応**: TreeStateProviderでwindowIdを取得し各ウィンドウで自身のタブのみをフィルタリング表示
 - **ウィンドウ間タブ移動**: コンテキストメニューから「別のウィンドウに移動」「新しいウィンドウに移動」で実現
+- **リンククリック検出**: `chrome.webNavigation.onCreatedNavigationTarget` APIを使用。このAPIはリンククリックまたは`window.open()`の場合のみ発火し、`chrome.tabs.create()`・ブックマーク・アドレスバー・Ctrl+Tでは発火しない。これにより「リンクから開いたタブ」と「手動で開いたタブ」を正確に区別し、それぞれの設定（`newTabPositionFromLink` / `newTabPositionManual`）を適用する
 
 ---
 

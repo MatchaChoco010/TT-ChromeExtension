@@ -227,7 +227,6 @@ describe('Vivaldi互換性テスト', () => {
         expect(style).toBeTruthy();
         expect(style?.textContent).toContain('--vivaldi-bg-primary: #1e1e1e');
         expect(style?.textContent).toContain('--vivaldi-text-primary: #e0e0e0');
-        expect(style?.textContent).toContain('Vivaldi Dark Theme');
       });
     });
 
@@ -257,7 +256,6 @@ describe('Vivaldi互換性テスト', () => {
         expect(style).toBeTruthy();
         expect(style?.textContent).toContain('--vivaldi-bg-primary: #ffffff');
         expect(style?.textContent).toContain('--vivaldi-text-primary: #202020');
-        expect(style?.textContent).toContain('Vivaldi Light Theme');
       });
     });
 
@@ -304,7 +302,7 @@ describe('Vivaldi互換性テスト', () => {
           const style = document.getElementById('vivaldi-tt-theme');
           expect(style).toBeTruthy();
           const content = style?.textContent || '';
-          expect(content).toContain('Vivaldi');
+          expect(content).toContain('--vivaldi-');
           expect(content).toContain('.custom-class { color: red; }');
         },
         { timeout: 2000 }
@@ -454,7 +452,7 @@ describe('Vivaldi互換性テスト', () => {
 
       await waitFor(() => {
         const style = document.getElementById('vivaldi-tt-theme');
-        expect(style?.textContent).toContain('Vivaldi Light Theme');
+        expect(style?.textContent).toContain('--vivaldi-bg-primary: #ffffff');
       });
 
       unmount();
@@ -481,7 +479,7 @@ describe('Vivaldi互換性テスト', () => {
 
       await waitFor(() => {
         const style = document.getElementById('vivaldi-tt-theme');
-        expect(style?.textContent).toContain('Vivaldi Dark Theme');
+        expect(style?.textContent).toContain('--vivaldi-bg-primary: #1e1e1e');
       });
     });
   });

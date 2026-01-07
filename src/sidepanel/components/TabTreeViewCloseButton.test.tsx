@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach, Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
 import type { TabNode, ExtendedTabInfo } from '@/types';
 

@@ -90,6 +90,7 @@ describe('TreeStateProvider リアルタイム更新', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -359,6 +360,7 @@ describe('TreeStateProvider TabInfoMap管理', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -652,6 +654,7 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -976,6 +979,7 @@ describe('TreeStateProvider 複数選択状態管理', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -1365,6 +1369,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -2136,10 +2141,9 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
 
     // ブラウザタブの順序が正しく同期されることを確認
-    // node-1(index=0)がnode-3(index=2)より前にあるため、インデックスを調整
-    // aboveIndex = 2 - 1 = 1, targetChromeIndex = 1 + 1 = 2
+    // リスト末尾への移動はindex:-1を使用
     await waitFor(() => {
-      expect(mockChrome.tabs.move).toHaveBeenCalledWith(1, { index: 2 });
+      expect(mockChrome.tabs.move).toHaveBeenCalledWith(1, { index: -1 });
     });
   });
 });
@@ -2234,6 +2238,7 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
       windows: {
         get: vi.fn(),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -2468,6 +2473,7 @@ describe('TreeStateProvider ファビコン永続化', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -2788,6 +2794,7 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -3042,6 +3049,7 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },
@@ -3454,6 +3462,7 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
         get: vi.fn(),
         getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
         create: vi.fn(),
+        getAll: vi.fn().mockResolvedValue([]),
         onCreated: { addListener: vi.fn(), removeListener: vi.fn() },
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
         onFocusChanged: { addListener: vi.fn(), removeListener: vi.fn() },

@@ -342,14 +342,41 @@ export const test = base.extend<ExtensionFixtures>({
     }
 
     await serviceWorker.evaluate(async () => {
+      // Wait for tree_state to be initialized
       for (let i = 0; i < 50; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
         if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
-          return;
+          break;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
+
+      // SYNC_TABSでsyncWithChromeTabsの完了を待機し、handleTabCreatedとのrace conditionを防ぐ
+      await new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage({ type: 'SYNC_TABS' }, () => {
+          resolve();
+        });
+      });
+    });
+
+    // Initialize user settings for tests
+    await serviceWorker.evaluate(async () => {
+      await chrome.storage.local.set({
+        user_settings: {
+          fontSize: 14,
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          customCSS: '',
+          newTabPosition: 'end',
+          newTabPositionManual: 'end',
+          newTabPositionFromLink: 'end',
+          duplicateTabPosition: 'sibling',
+          closeWarningThreshold: 10,
+          showUnreadIndicator: true,
+          autoSnapshotInterval: 0,
+          childTabBehavior: 'promote',
+        },
+      });
     });
 
     await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });

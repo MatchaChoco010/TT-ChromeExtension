@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { act } from 'react';

@@ -8,7 +8,7 @@ const defaultSettings: UserSettings = {
   fontFamily: 'system-ui, sans-serif',
   customCSS: '',
   newTabPosition: 'child',
-  closeWarningThreshold: 3,
+  closeWarningThreshold: 10,
   showUnreadIndicator: true,
   autoSnapshotInterval: 0,
   childTabBehavior: 'promote',

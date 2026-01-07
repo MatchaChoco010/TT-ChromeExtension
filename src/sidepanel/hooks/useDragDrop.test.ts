@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDragDrop } from './useDragDrop';
 
 const createMouseEvent = (
@@ -275,7 +275,10 @@ describe('useDragDrop', () => {
         document.dispatchEvent(createMouseEvent('mouseup', 110, 100));
       });
 
-      expect(result.current.dragState.isDragging).toBe(false);
+      // handleMouseUpはasync関数なので、状態更新を待つ
+      await waitFor(() => {
+        expect(result.current.dragState.isDragging).toBe(false);
+      });
       expect(result.current.dragState.draggedItemId).toBeNull();
       expect(onDragEnd).toHaveBeenCalledWith('node-1', { type: 'none' });
     });

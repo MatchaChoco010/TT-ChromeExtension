@@ -38,7 +38,7 @@ export interface UseDragDropOptions {
   items: Array<{ id: string; tabId: number }>;
   onDragStart?: (itemId: string, tabId: number) => void;
   onDragMove?: (position: { x: number; y: number }, dropTarget: DropTarget | null) => void;
-  onDragEnd?: (itemId: string, dropTarget: DropTarget | null) => void;
+  onDragEnd?: (itemId: string, dropTarget: DropTarget | null) => Promise<void>;
   onDragCancel?: () => void;
   /** 外部ドロップ（ツリー外へのドラッグ）コールバック */
   onExternalDrop?: (tabId: number) => void;
@@ -129,10 +129,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       direction,
     };
   }, [activationDistance, direction]);
-
-  useEffect(() => {
-    dragStateRef.current = dragState;
-  }, [dragState]);
 
   const isOutsideDragOutBoundary = useCallback((clientX: number, clientY: number): boolean => {
     const boundary = dragOutBoundaryRef?.current ?? containerRef.current;
@@ -229,6 +225,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   }, [calculateVerticalDropTarget, calculateHorizontalDropTargetFromDOM]);
 
   const resetDragState = useCallback(() => {
+    dragStateRef.current = initialDragState;
     setDragState(initialDragState);
   }, []);
 
@@ -239,7 +236,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
 
   const handlersRef = useRef<{
     handleMouseMove: (e: MouseEvent) => void;
-    handleMouseUp: (e: MouseEvent) => void;
+    handleMouseUp: (e: MouseEvent) => void | Promise<void>;
   }>({
     handleMouseMove: () => {},
     handleMouseUp: () => {},
@@ -267,14 +264,17 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       if (currentState.isPotentialDrag && distance >= actDist) {
         const dropTarget = calculateCurrentDropTarget(e.clientX, e.clientY);
 
-        setDragState((prev) => ({
-          ...prev,
+        const newState: DragState = {
+          ...currentState,
           isDragging: true,
           isPotentialDrag: false,
           currentPosition,
           delta,
           dropTarget,
-        }));
+        };
+
+        dragStateRef.current = newState;
+        setDragState(newState);
 
         if (currentState.draggedItemId && currentState.draggedTabId !== null) {
           callbacksRef.current.onDragStart?.(currentState.draggedItemId, currentState.draggedTabId);
@@ -285,18 +285,21 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       if (currentState.isDragging) {
         const dropTarget = calculateCurrentDropTarget(e.clientX, e.clientY);
 
-        setDragState((prev) => ({
-          ...prev,
+        const newState: DragState = {
+          ...currentState,
           currentPosition,
           delta,
           dropTarget,
-        }));
+        };
+
+        dragStateRef.current = newState;
+        setDragState(newState);
 
         callbacksRef.current.onDragMove?.(currentPosition, dropTarget);
       }
     };
 
-    const handleMouseUp = (e: MouseEvent) => {
+    const handleMouseUp = async (e: MouseEvent) => {
       const currentState = dragStateRef.current;
 
       document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
@@ -321,7 +324,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       }
 
       if (currentState.draggedItemId && callbacksRef.current.onDragEnd) {
-        callbacksRef.current.onDragEnd(currentState.draggedItemId, currentState.dropTarget);
+        const dropTarget = calculateCurrentDropTarget(e.clientX, e.clientY);
+        await callbacksRef.current.onDragEnd(currentState.draggedItemId, dropTarget);
       }
 
       resetDragState();
@@ -344,7 +348,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       y: e.clientY - rect.top,
     };
 
-    setDragState({
+    const newState: DragState = {
       isDragging: false,
       isPotentialDrag: true,
       draggedItemId: itemId,
@@ -354,7 +358,12 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       delta: { x: 0, y: 0 },
       dropTarget: null,
       offset,
-    });
+    };
+
+    // Synchronously update the ref to avoid race condition with event handlers
+    // Event handlers may fire before useEffect updates the ref
+    dragStateRef.current = newState;
+    setDragState(newState);
 
     document.addEventListener('mousemove', handlersRef.current.handleMouseMove);
     document.addEventListener('mouseup', handlersRef.current.handleMouseUp);
@@ -375,7 +384,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     tabId: number,
     position: { x: number; y: number }
   ) => {
-    setDragState({
+    const newState: DragState = {
       isDragging: true,
       isPotentialDrag: false,
       draggedItemId: itemId,
@@ -385,7 +394,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       delta: { x: 0, y: 0 },
       dropTarget: null,
       offset: { x: 0, y: 0 },
-    });
+    };
+
+    // Synchronously update the ref to avoid race condition with event handlers
+    dragStateRef.current = newState;
+    setDragState(newState);
 
     document.addEventListener('mousemove', handlersRef.current.handleMouseMove);
     document.addEventListener('mouseup', handlersRef.current.handleMouseUp);

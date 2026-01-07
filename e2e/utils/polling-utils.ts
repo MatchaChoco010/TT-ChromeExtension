@@ -120,25 +120,31 @@ export async function waitForTreeStateCondition(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = DEFAULT_INTERVAL,
+    timeoutMessage = 'Timeout waiting for tree state condition to be met',
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ checkFnStr, iterations, interval }) => {
       // eslint-disable-next-line no-eval
       const checkFn = eval(`(${checkFnStr})`) as (treeState: unknown) => boolean;
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
         if (checkFn(result.tree_state)) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { checkFnStr, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -197,24 +203,30 @@ export async function waitForTabRemovedFromTreeState(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 50,
+    timeoutMessage = `Timeout waiting for tab ${tabId} to be removed from tree`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
         if (!treeState?.tabToNode?.[tabId]) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { tabId, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -232,23 +244,29 @@ export async function waitForTabActive(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 50,
+    timeoutMessage = `Timeout waiting for tab ${tabId} to become active`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const tab = await chrome.tabs.get(tabId);
         if (tab.active) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { tabId, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -266,26 +284,32 @@ export async function waitForWindowRegistered(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for window ${windowId} to be registered`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         try {
           const windows = await chrome.windows.getAll();
           if (windows.find(w => w.id === windowId)) {
-            return;
+            return { success: true };
           }
         } catch {
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { windowId, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -303,26 +327,32 @@ export async function waitForWindowClosed(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for window ${windowId} to be closed`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         try {
           const windows = await chrome.windows.getAll();
           if (!windows.find(w => w.id === windowId)) {
-            return;
+            return { success: true };
           }
         } catch {
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { windowId, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -342,26 +372,32 @@ export async function waitForTabInWindow(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for tab ${tabId} to be in window ${windowId}`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ tabId, windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         try {
           const tab = await chrome.tabs.get(tabId);
           if (tab.windowId === windowId) {
-            return;
+            return { success: true };
           }
         } catch {
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { tabId, windowId, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -379,12 +415,13 @@ export async function waitForWindowTreeSync(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for window ${windowId} tabs to sync with tree state`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         try {
@@ -397,16 +434,21 @@ export async function waitForWindowTreeSync(
               (tab: chrome.tabs.Tab) => tab.id && treeState.tabToNode[tab.id]
             );
             if (allTabsSynced) {
-              return;
+              return { success: true };
             }
           }
         } catch {
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { windowId, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -424,12 +466,13 @@ export async function waitForGroupInStorage(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for group "${groupName}" to be saved in storage`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ groupName, iterations, interval }) => {
       interface GroupInfo {
         name: string;
@@ -442,14 +485,19 @@ export async function waitForGroupInStorage(
             (group: GroupInfo) => group.name === groupName
           );
           if (hasGroup) {
-            return;
+            return { success: true };
           }
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { groupName, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -467,24 +515,30 @@ export async function waitForGroupRemovedFromStorage(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for group "${groupId}" to be removed from storage`,
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ groupId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('groups');
         const groups = result.groups as Record<string, unknown> | undefined;
         if (!groups || !groups[groupId]) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { groupId, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -500,24 +554,30 @@ export async function waitForTreeStateInitialized(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = 'Timeout waiting for tree state to be initialized',
   } = options;
 
   const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
         if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -537,26 +597,32 @@ export async function pollInPage<T>(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = DEFAULT_INTERVAL,
+    timeoutMessage = 'Timeout waiting for page condition to be met',
   } = options;
 
   const iterations = Math.ceil(timeout / interval);
 
-  await page.evaluate(
+  const result = await page.evaluate(
     async ({ conditionFnStr, args, iterations, interval }) => {
       // eslint-disable-next-line no-eval
       const fn = eval(`(${conditionFnStr})`);
       for (let i = 0; i < iterations; i++) {
         try {
           if (await fn(args)) {
-            return;
+            return { success: true };
           }
         } catch {
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { conditionFnStr, args, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -577,6 +643,7 @@ export async function waitForSidePanelReady(
   const {
     timeout = 10000,
     interval = 100,
+    timeoutMessage = 'Timeout waiting for side panel to be ready',
   } = options;
 
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout });
@@ -587,19 +654,24 @@ export async function waitForSidePanelReady(
   }
 
   const iterations = Math.ceil(timeout / interval);
-  await serviceWorker.evaluate(
+  const result = await serviceWorker.evaluate(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
         if (treeState?.nodes) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -617,22 +689,28 @@ export async function waitForMessageReceived(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for message "${messageType}" to be received`,
   } = options;
 
   const iterations = Math.ceil(timeout / interval);
 
-  await page.evaluate(
+  const result = await page.evaluate(
     async ({ messageType, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const messages = window.receivedMessages;
         if (messages && messages.some((msg) => msg.type === messageType)) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { messageType, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -652,24 +730,30 @@ export async function waitForCounterIncreased(
   const {
     timeout = DEFAULT_TIMEOUT,
     interval = 100,
+    timeoutMessage = `Timeout waiting for counter "${counterName}" to increase from ${initialValue}`,
   } = options;
 
   const iterations = Math.ceil(timeout / interval);
 
-  await page.evaluate(
+  const result = await page.evaluate(
     async ({ counterName, initialValue, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const count = counterName === 'stateUpdateCount' ? window.stateUpdateCount :
                       counterName === 'receivedCount' ? window.receivedCount :
                       undefined;
         if (count !== undefined && count > initialValue) {
-          return;
+          return { success: true };
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
+      return { success: false };
     },
     { counterName, initialValue, iterations, interval }
   );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
 }
 
 /**
@@ -715,20 +799,26 @@ export async function waitForTabUrlLoaded(
   expectedUrlPart: string,
   timeout: number = 10000
 ): Promise<chrome.tabs.Tab> {
-  return await serviceWorker.evaluate(async ({ id, urlPart, maxWait }) => {
+  const result = await serviceWorker.evaluate(async ({ id, urlPart, maxWait }) => {
     const startTime = Date.now();
     while (Date.now() - startTime < maxWait) {
       const tab = await chrome.tabs.get(id);
       if (tab.url && tab.url.includes(urlPart)) {
-        return tab;
-      }
-      if (tab.pendingUrl && tab.pendingUrl.includes(urlPart)) {
-        return tab;
+        return { success: true, tab };
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    return chrome.tabs.get(id);
+    const finalTab = await chrome.tabs.get(id);
+    return { success: false, tab: finalTab };
   }, { id: tabId, urlPart: expectedUrlPart, maxWait: timeout });
+
+  if (!result.success) {
+    throw new Error(
+      `waitForTabUrlLoaded: Timeout waiting for tab ${tabId} URL to contain "${expectedUrlPart}". ` +
+      `Current URL: "${result.tab.url}", pendingUrl: "${result.tab.pendingUrl}"`
+    );
+  }
+  return result.tab;
 }
 
 /**
@@ -757,6 +847,90 @@ export async function waitForTabStatusComplete(
         try {
           const tab = await chrome.tabs.get(tabId);
           if (tab.status === 'complete') {
+            return { success: true };
+          }
+        } catch {
+        }
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+      return { success: false };
+    },
+    { tabId, iterations, interval }
+  );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
+}
+
+/**
+ * タブが休止（discarded）状態になるまで待機
+ *
+ * @param serviceWorker - Service Worker
+ * @param tabId - 待機するタブのID
+ * @param options - ポーリングオプション
+ */
+export async function waitForTabDiscarded(
+  serviceWorker: Worker,
+  tabId: number,
+  options: PollingOptions = {}
+): Promise<void> {
+  const {
+    timeout = 10000,
+    interval = 100,
+    timeoutMessage = `Tab ${tabId} was not discarded`,
+  } = options;
+
+  const iterations = Math.ceil(timeout / interval);
+
+  const result = await serviceWorker.evaluate(
+    async ({ tabId, iterations, interval }) => {
+      for (let i = 0; i < iterations; i++) {
+        try {
+          const tab = await chrome.tabs.get(tabId);
+          if (tab.discarded === true) {
+            return { success: true };
+          }
+        } catch {
+        }
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+      return { success: false };
+    },
+    { tabId, iterations, interval }
+  );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
+}
+
+/**
+ * タブが休止状態から復帰するまで待機
+ *
+ * @param serviceWorker - Service Worker
+ * @param tabId - 待機するタブのID
+ * @param options - ポーリングオプション
+ */
+export async function waitForTabNotDiscarded(
+  serviceWorker: Worker,
+  tabId: number,
+  options: PollingOptions = {}
+): Promise<void> {
+  const {
+    timeout = 10000,
+    interval = 100,
+    timeoutMessage = `Tab ${tabId} was not un-discarded`,
+  } = options;
+
+  const iterations = Math.ceil(timeout / interval);
+
+  const result = await serviceWorker.evaluate(
+    async ({ tabId, iterations, interval }) => {
+      for (let i = 0; i < iterations; i++) {
+        try {
+          const tab = await chrome.tabs.get(tabId);
+          if (tab.discarded === false) {
             return { success: true };
           }
         } catch {

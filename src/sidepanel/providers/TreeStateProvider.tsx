@@ -215,14 +215,31 @@ async function syncTreeToChromeTabs(
 
   const pinnedCount = pinnedSet.size;
 
+  // 最新のタブ情報を取得（tabInfoMapはReact stateで古い可能性があるため）
+  const currentTabs = await chrome.tabs.query({ currentWindow: true });
+  const currentIndexMap = new Map<number, number>();
+  for (const tab of currentTabs) {
+    if (tab.id !== undefined) {
+      currentIndexMap.set(tab.id, tab.index);
+    }
+  }
+
   for (let i = 0; i < orderedTabIds.length; i++) {
     const tabId = orderedTabIds[i];
     const expectedIndex = pinnedCount + i;
-    const currentInfo = tabInfoMap[tabId];
+    const currentIndex = currentIndexMap.get(tabId);
 
-    if (currentInfo && currentInfo.index !== expectedIndex) {
+    if (currentIndex !== undefined && currentIndex !== expectedIndex) {
       try {
         await chrome.tabs.move(tabId, { index: expectedIndex });
+        // 移動後は他のタブのインデックスも変わるので、再取得
+        const updatedTabs = await chrome.tabs.query({ currentWindow: true });
+        currentIndexMap.clear();
+        for (const tab of updatedTabs) {
+          if (tab.id !== undefined) {
+            currentIndexMap.set(tab.id, tab.index);
+          }
+        }
       } catch {
         // タブが存在しない場合などのエラーは無視
       }
@@ -559,16 +576,33 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     ) => {
       // タブが移動されると、同じウィンドウ内の他のタブのインデックスも変更される
       // 最新のインデックスを取得して全タブを更新
+      // 注意: 新規タブが作成されて即座に移動された場合、handleTabCreatedの
+      // state更新がまだバッチ処理で適用されていない可能性があるため、
+      // 既存タブの更新だけでなく、新規タブの追加も行う
       try {
         const tabs = await chrome.tabs.query({ windowId: moveInfo.windowId });
         setTabInfoMap(prev => {
           const newMap = { ...prev };
           for (const tab of tabs) {
-            if (tab.id !== undefined && newMap[tab.id]) {
-              newMap[tab.id] = {
-                ...newMap[tab.id],
-                index: tab.index,
-              };
+            if (tab.id !== undefined) {
+              if (newMap[tab.id]) {
+                newMap[tab.id] = {
+                  ...newMap[tab.id],
+                  index: tab.index,
+                };
+              } else {
+                newMap[tab.id] = {
+                  id: tab.id,
+                  title: tab.title || '',
+                  url: tab.url || '',
+                  favIconUrl: tab.favIconUrl,
+                  status: tab.status === 'loading' ? 'loading' : 'complete',
+                  isPinned: tab.pinned || false,
+                  windowId: tab.windowId,
+                  discarded: tab.discarded || false,
+                  index: tab.index,
+                };
+              }
             }
           }
           return newMap;
@@ -792,52 +826,67 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         return;
       }
 
-      const isDescendant = (ancestorId: string, descendantId: string): boolean => {
-        const ancestor = treeState.nodes[ancestorId];
+      const isDescendant = (ancestorId: string, descendantId: string, nodes: Record<string, TabNode>): boolean => {
+        const ancestor = nodes[ancestorId];
         if (!ancestor) return false;
 
         for (const child of ancestor.children) {
           if (child.id === descendantId) return true;
-          if (isDescendant(child.id, descendantId)) return true;
+          if (isDescendant(child.id, descendantId, nodes)) return true;
         }
 
         return false;
       };
 
-      if (isDescendant(activeId, overId)) {
-        return;
+      // ドラッグ中のノードが選択に含まれているかチェック
+      const isActiveNodeSelected = selectedNodeIds.has(activeId);
+      // 移動対象のノードID一覧（選択されていれば全選択ノード、そうでなければアクティブノードのみ）
+      const nodesToMove = isActiveNodeSelected ? Array.from(selectedNodeIds) : [activeId];
+      const nodesToMoveSet = new Set(nodesToMove);
+
+      // 移動先が移動対象のノードの子孫でないかチェック
+      for (const nodeId of nodesToMove) {
+        if (isDescendant(nodeId, overId, treeState.nodes)) {
+          return;
+        }
       }
 
       const updatedNodes: Record<string, TabNode> = {};
       Object.entries(treeState.nodes).forEach(([id, node]) => {
         updatedNodes[id] = {
           ...node,
-          children: [], // 子配列は後で再構築
+          children: [],
         };
       });
 
-      const updatedActiveNode = updatedNodes[activeId];
+      // 移動対象ノードの親IDを更新
+      for (const nodeId of nodesToMove) {
+        const node = updatedNodes[nodeId];
+        if (node) {
+          node.parentId = overId;
+        }
+      }
 
-      // 子を親の直上にドロップした場合、最後の子として配置
-      updatedActiveNode.parentId = overId;
-
+      // 子配列を再構築
       Object.entries(treeState.nodes).forEach(([parentId, originalNode]) => {
         const parent = updatedNodes[parentId];
         if (!parent) return;
 
-        // 対象の親（overId）の場合は特別処理
-        // activeNodeを除いた子リストを構築し、最後にactiveNodeを追加
         if (parentId === overId) {
+          // 移動先の親の場合：既存の子から移動対象を除き、最後に移動対象を追加
           for (const originalChild of originalNode.children) {
             const childId = originalChild.id;
             const child = updatedNodes[childId];
-            if (child && child.parentId === parentId && childId !== activeId) {
+            if (child && child.parentId === parentId && !nodesToMoveSet.has(childId)) {
               parent.children.push(child);
             }
           }
-          const activeChild = updatedNodes[activeId];
-          if (activeChild && activeChild.parentId === overId) {
-            parent.children.push(activeChild);
+          // 移動対象ノードを元のツリー順序で追加
+          for (const nodeId of nodesToMove) {
+            const node = updatedNodes[nodeId];
+            if (node && node.parentId === overId) {
+              parent.children.push(node);
+            }
           }
         } else {
           for (const originalChild of originalNode.children) {
@@ -850,7 +899,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         }
       });
 
-      // 深さを再計算（parentIdベースで、children配列に依存しない）
       const calculateDepth = (nodeId: string, visited: Set<string> = new Set()): number => {
         if (visited.has(nodeId)) {
           return 0;
@@ -869,7 +917,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         node.depth = calculateDepth(node.id);
       });
 
-      // 新しい親を自動展開
       const updatedOverNode = updatedNodes[overId];
       updatedOverNode.isExpanded = true;
 
@@ -886,21 +933,14 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       try {
         await syncTreeToChromeTabs(updatedNodes, treeState.currentViewId, tabInfoMap);
       } catch {
-        // 同期に失敗してもツリー状態の更新は維持する
+        // タブ同期エラーは無視（タブが既に閉じられている場合など）
       }
 
-      // Note: We don't send UPDATE_TREE message because:
-      // 1. TreeStateProvider directly updates storage
-      // 2. Service worker's TreeStateManager will reload from storage when needed
-      // 3. Sending UPDATE_TREE would cause duplicate updates and potential race conditions
-      //
-      // しかし、treeStructureを更新する必要があるので、REFRESH_TREE_STRUCTUREを送信
-      // これにより、ブラウザ再起動時に親子関係が正しく復元される
-      chrome.runtime.sendMessage({ type: 'REFRESH_TREE_STRUCTURE' }).catch((_error) => {
+      chrome.runtime.sendMessage({ type: 'REFRESH_TREE_STRUCTURE' }).catch(() => {
         // Ignore errors when no listeners are available
       });
     },
-    [treeState, updateTreeState, tabInfoMap]
+    [treeState, updateTreeState, tabInfoMap, selectedNodeIds]
   );
 
   /**
@@ -909,7 +949,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
    */
   const handleSiblingDrop = useCallback(
     async (info: SiblingDropInfo) => {
-      // insertIndexはツリー内の位置であり、ブラウザタブのインデックスとは異なる
       const { activeNodeId, insertIndex: _insertIndex, aboveNodeId, belowNodeId } = info;
 
       if (!treeState) {
@@ -921,32 +960,35 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         return;
       }
 
-      // 異なる深度のタブ間にドロップした場合は「下のノードの親」を使用する
+      const isActiveNodeSelected = selectedNodeIds.has(activeNodeId);
+      const nodesToMove = isActiveNodeSelected ? Array.from(selectedNodeIds) : [activeNodeId];
+      const nodesToMoveSet = new Set(nodesToMove);
+
       let targetParentId: string | null = null;
 
       if (belowNodeId && treeState.nodes[belowNodeId]) {
-        // 下のノードが存在する場合、下のノードと同じ親を持つ兄弟として挿入
-        // これにより異なる深度間のドロップでも正しい位置に配置される
         targetParentId = treeState.nodes[belowNodeId].parentId;
       } else if (aboveNodeId && treeState.nodes[aboveNodeId]) {
         targetParentId = treeState.nodes[aboveNodeId].parentId;
       }
 
       if (targetParentId) {
-        const isDescendant = (ancestorId: string, descendantId: string): boolean => {
+        const isDescendantFn = (ancestorId: string, descendantId: string): boolean => {
           const ancestor = treeState.nodes[ancestorId];
           if (!ancestor) return false;
 
           for (const child of ancestor.children) {
             if (child.id === descendantId) return true;
-            if (isDescendant(child.id, descendantId)) return true;
+            if (isDescendantFn(child.id, descendantId)) return true;
           }
 
           return false;
         };
 
-        if (isDescendant(activeNodeId, targetParentId)) {
-          return;
+        for (const nodeId of nodesToMove) {
+          if (isDescendantFn(nodeId, targetParentId)) {
+            return;
+          }
         }
       }
 
@@ -954,28 +996,38 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       Object.entries(treeState.nodes).forEach(([id, node]) => {
         updatedNodes[id] = {
           ...node,
-          children: [], // 子配列は後で再構築
+          children: [],
         };
       });
 
-      const updatedActiveNode = updatedNodes[activeNodeId];
-      updatedActiveNode.parentId = targetParentId;
+      for (const nodeId of nodesToMove) {
+        const node = updatedNodes[nodeId];
+        if (node) {
+          node.parentId = targetParentId;
+        }
+      }
 
-      // 親子関係を再構築（元のchildren配列の順序を維持しつつ、activeNodeを正しい位置に挿入）
       Object.entries(treeState.nodes).forEach(([parentId, originalNode]) => {
         const parent = updatedNodes[parentId];
         if (!parent) return;
 
         for (const originalChild of originalNode.children) {
           const childId = originalChild.id;
-          // activeNodeは後で正しい位置に挿入するのでスキップ
-          if (childId === activeNodeId) continue;
+          if (nodesToMoveSet.has(childId)) continue;
           const child = updatedNodes[childId];
           if (child && child.parentId === parentId) {
             parent.children.push(child);
           }
         }
       });
+
+      const sortedNodesToMove = [...nodesToMove].sort((a, b) => {
+        const tabInfoA = tabInfoMap[treeState.nodes[a]?.tabId];
+        const tabInfoB = tabInfoMap[treeState.nodes[b]?.tabId];
+        return (tabInfoA?.index ?? 0) - (tabInfoB?.index ?? 0);
+      });
+
+      const nodesToInsert = sortedNodesToMove.map(id => updatedNodes[id]).filter(Boolean);
 
       if (targetParentId) {
         const targetParent = updatedNodes[targetParentId];
@@ -985,27 +1037,27 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             if (belowNode && belowNode.parentId === targetParentId) {
               const insertIndex = targetParent.children.findIndex(c => c.id === belowNodeId);
               if (insertIndex !== -1) {
-                targetParent.children.splice(insertIndex, 0, updatedActiveNode);
+                targetParent.children.splice(insertIndex, 0, ...nodesToInsert);
               } else {
-                targetParent.children.push(updatedActiveNode);
+                targetParent.children.push(...nodesToInsert);
               }
             } else {
-              targetParent.children.push(updatedActiveNode);
+              targetParent.children.push(...nodesToInsert);
             }
           } else if (aboveNodeId) {
             const aboveNode = updatedNodes[aboveNodeId];
             if (aboveNode && aboveNode.parentId === targetParentId) {
               const insertIndex = targetParent.children.findIndex(c => c.id === aboveNodeId);
               if (insertIndex !== -1) {
-                targetParent.children.splice(insertIndex + 1, 0, updatedActiveNode);
+                targetParent.children.splice(insertIndex + 1, 0, ...nodesToInsert);
               } else {
-                targetParent.children.push(updatedActiveNode);
+                targetParent.children.push(...nodesToInsert);
               }
             } else {
-              targetParent.children.push(updatedActiveNode);
+              targetParent.children.push(...nodesToInsert);
             }
           } else {
-            targetParent.children.push(updatedActiveNode);
+            targetParent.children.push(...nodesToInsert);
           }
         }
       }
@@ -1039,34 +1091,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       await updateTreeState(newTreeState);
 
       try {
-        let targetChromeIndex: number;
-        const activeTabInfo = tabInfoMap[activeNode.tabId];
-        const activeTabIndex = activeTabInfo?.index ?? 0;
-
-        if (belowNodeId && updatedNodes[belowNodeId]) {
-          const belowNode = updatedNodes[belowNodeId];
-          const belowTabInfo = tabInfoMap[belowNode.tabId];
-          let belowIndex = belowTabInfo?.index ?? 0;
-          // アクティブタブがbelowタブより前にある場合、chrome.tabs.moveで
-          // アクティブタブが除外されてからbelowタブのインデックスが1つ減るため、
-          // 目的インデックスを1減らす
-          if (activeTabIndex < belowIndex) {
-            belowIndex -= 1;
-          }
-          targetChromeIndex = belowIndex;
-        } else if (aboveNodeId && updatedNodes[aboveNodeId]) {
-          const aboveNode = updatedNodes[aboveNodeId];
-          const aboveTabInfo = tabInfoMap[aboveNode.tabId];
-          let aboveIndex = aboveTabInfo?.index ?? 0;
-          // アクティブタブがaboveタブより前にある場合、同様にインデックスを調整
-          if (activeTabIndex < aboveIndex) {
-            aboveIndex -= 1;
-          }
-          targetChromeIndex = aboveIndex + 1;
-        } else {
-          targetChromeIndex = activeTabIndex;
-        }
-
         const collectSubtreeTabIds = (node: TabNode): number[] => {
           const result: number[] = [node.tabId];
           for (const child of node.children) {
@@ -1074,16 +1098,57 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           }
           return result;
         };
-        const subtreeTabIds = collectSubtreeTabIds(updatedNodes[activeNodeId]);
 
-        for (let i = 0; i < subtreeTabIds.length; i++) {
-          const tabId = subtreeTabIds[i];
-          const currentInfo = tabInfoMap[tabId];
-          if (!currentInfo?.isPinned) {
-            try {
-              await chrome.tabs.move(tabId, { index: targetChromeIndex + i });
-            } catch {
-              // タブが存在しない場合などのエラーは無視
+        const allSubtreeTabIds: number[] = [];
+        for (const nodeId of sortedNodesToMove) {
+          const node = updatedNodes[nodeId];
+          if (node) {
+            allSubtreeTabIds.push(...collectSubtreeTabIds(node));
+          }
+        }
+
+        const movingTabIndexes = allSubtreeTabIds
+          .map(tabId => tabInfoMap[tabId]?.index ?? 0)
+          .sort((a, b) => a - b);
+
+        let targetChromeIndex: number;
+
+        if (belowNodeId && updatedNodes[belowNodeId]) {
+          const belowNode = updatedNodes[belowNodeId];
+          const belowTabInfo = tabInfoMap[belowNode.tabId];
+          let belowIndex = belowTabInfo?.index ?? 0;
+          const countBefore = movingTabIndexes.filter(idx => idx < belowIndex).length;
+          belowIndex -= countBefore;
+          targetChromeIndex = belowIndex;
+        } else if (aboveNodeId && updatedNodes[aboveNodeId]) {
+          const aboveNode = updatedNodes[aboveNodeId];
+          const aboveTabInfo = tabInfoMap[aboveNode.tabId];
+          let aboveIndex = aboveTabInfo?.index ?? 0;
+          const countBefore = movingTabIndexes.filter(idx => idx <= aboveIndex).length;
+          aboveIndex -= countBefore;
+          targetChromeIndex = aboveIndex + 1;
+        } else {
+          targetChromeIndex = movingTabIndexes.length > 0 ? movingTabIndexes[0] : 0;
+        }
+
+        const tabsToMove = allSubtreeTabIds.filter(tabId => !tabInfoMap[tabId]?.isPinned);
+        if (tabsToMove.length > 0) {
+          if (!belowNodeId) {
+            for (const tabId of tabsToMove) {
+              try {
+                await chrome.tabs.move(tabId, { index: -1 });
+              } catch {
+                // タブが存在しない場合などのエラーは無視
+              }
+            }
+          } else {
+            for (let i = tabsToMove.length - 1; i >= 0; i--) {
+              const tabId = tabsToMove[i];
+              try {
+                await chrome.tabs.move(tabId, { index: targetChromeIndex });
+              } catch {
+                // タブが存在しない場合などのエラーは無視
+              }
             }
           }
         }
@@ -1095,7 +1160,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         // Ignore errors when no listeners are available
       });
     },
-    [treeState, updateTreeState, tabInfoMap]
+    [treeState, updateTreeState, tabInfoMap, selectedNodeIds]
   );
 
   /**
@@ -1285,7 +1350,13 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       });
       setLastSelectedNodeId(nodeId);
     } else if (modifiers.shift && lastSelectedNodeId) {
-      const nodeIds = Object.keys(treeState.nodes);
+      const nodeIds = Object.keys(treeState.nodes)
+        .filter(id => treeState.nodes[id] && tabInfoMap[treeState.nodes[id].tabId])
+        .sort((a, b) => {
+          const indexA = tabInfoMap[treeState.nodes[a].tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+          const indexB = tabInfoMap[treeState.nodes[b].tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+          return indexA - indexB;
+        });
       const lastIndex = nodeIds.indexOf(lastSelectedNodeId);
       const currentIndex = nodeIds.indexOf(nodeId);
 
@@ -1302,7 +1373,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       setSelectedNodeIds(new Set([nodeId]));
       setLastSelectedNodeId(nodeId);
     }
-  }, [treeState, lastSelectedNodeId]);
+  }, [treeState, lastSelectedNodeId, tabInfoMap]);
 
   const clearSelection = useCallback(() => {
     setSelectedNodeIds(new Set());

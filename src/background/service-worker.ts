@@ -2,6 +2,7 @@ import {
   registerTabEventListeners,
   registerWindowEventListeners,
   registerMessageListener,
+  registerWebNavigationListeners,
 } from './event-handlers';
 
 import { testTreeStateManager, testTitlePersistence, testUnreadTracker } from './event-handlers';
@@ -110,6 +111,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 registerTabEventListeners();
 registerWindowEventListeners();
+registerWebNavigationListeners();
 registerMessageListener();
 
 registerSettingsChangeListener();

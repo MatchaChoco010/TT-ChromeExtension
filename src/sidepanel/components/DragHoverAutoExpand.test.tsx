@@ -2,7 +2,7 @@
  * ドラッグホバー時のブランチ自動展開のテスト
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
 
 describe('ドラッグホバー時のブランチ自動展開', () => {

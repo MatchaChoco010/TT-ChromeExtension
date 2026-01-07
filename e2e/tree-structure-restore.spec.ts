@@ -496,4 +496,173 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: childTabId, depth: 1 },
     ], 0, { timeout: 5000 });
   });
+
+  test('treeStructureからviewIdが正しく復元される', async ({
+    sidePanelPage,
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
+    await expect(sidePanelRoot).toBeVisible();
+
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(extensionContext, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+
+    const tabAId = await createTab(extensionContext, 'about:blank');
+    await waitForTabInTreeState(extensionContext, tabAId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabAId, depth: 0 },
+    ], 0);
+
+    interface TreeStructureEntry {
+      url: string;
+      parentIndex: number | null;
+      index: number;
+      viewId: string;
+      isExpanded: boolean;
+    }
+
+    await waitForCondition(async () => {
+      const ts = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { treeStructure?: TreeStructureEntry[] } | undefined;
+        return treeState?.treeStructure;
+      });
+      return ts !== undefined && ts.length >= 2;
+    }, { timeout: 5000, timeoutMessage: 'Tab not in treeStructure' });
+
+    await serviceWorker.evaluate(async ({ tabAId }) => {
+      const result = await chrome.storage.local.get('tree_state');
+      interface StoredTreeState {
+        views?: Array<{ id: string; name: string; color: string }>;
+        currentViewId?: string;
+        nodes?: Record<string, { tabId: number; viewId: string }>;
+        tabToNode?: Record<number, string>;
+        treeStructure?: Array<{
+          url: string;
+          parentIndex: number | null;
+          index: number;
+          viewId: string;
+          isExpanded: boolean;
+        }>;
+      }
+      const treeState = result.tree_state as StoredTreeState | undefined;
+      if (!treeState?.treeStructure || !treeState?.tabToNode) return;
+
+      const newViews = [
+        { id: 'default', name: 'Default', color: '#3b82f6' },
+        { id: 'custom-view', name: 'Custom View', color: '#10b981' },
+      ];
+
+      const nodeId = treeState.tabToNode[tabAId];
+      const tabIndex = nodeId
+        ? Object.entries(treeState.nodes || {}).find(([id]) => id === nodeId)?.[1]
+        : null;
+
+      const updatedTreeStructure = treeState.treeStructure.map((entry, idx) => {
+        if (idx === 1) {
+          return { ...entry, viewId: 'custom-view' };
+        }
+        return entry;
+      });
+
+      const updatedState = {
+        ...treeState,
+        views: newViews,
+        treeStructure: updatedTreeStructure,
+      };
+      await chrome.storage.local.set({ tree_state: updatedState });
+    }, { tabAId });
+
+    await serviceWorker.evaluate(async () => {
+      interface StoredTreeState {
+        views?: unknown[];
+        currentViewId?: string;
+        nodes?: Record<string, unknown>;
+        tabToNode?: Record<number, string>;
+        treeStructure?: unknown[];
+      }
+
+      const result = await chrome.storage.local.get('tree_state');
+      const treeState = result.tree_state as StoredTreeState | undefined;
+
+      if (treeState) {
+        const clearedState = {
+          ...treeState,
+          nodes: {},
+          tabToNode: {},
+        };
+        await chrome.storage.local.set({ tree_state: clearedState });
+
+        // @ts-expect-error accessing global treeStateManager
+        if (globalThis.treeStateManager) {
+          // @ts-expect-error accessing global treeStateManager
+          await globalThis.treeStateManager.loadState();
+          // @ts-expect-error accessing global treeStateManager
+          await globalThis.treeStateManager.syncWithChromeTabs();
+        }
+      }
+    });
+
+    interface ViewIdResult {
+      valid: boolean;
+      reason?: string;
+      viewId?: string;
+      expectedViewId?: string;
+    }
+
+    let viewIdValid: ViewIdResult = { valid: false };
+    await waitForCondition(async () => {
+      viewIdValid = await serviceWorker.evaluate(
+        async ({ tabAId }) => {
+          interface TreeNode {
+            viewId: string;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, string>;
+            nodes: Record<string, TreeNode>;
+          }
+
+          const result = await chrome.storage.local.get('tree_state');
+          const treeState = result.tree_state as LocalTreeState | undefined;
+
+          if (!treeState?.nodes || !treeState?.tabToNode) {
+            return { valid: false, reason: 'No tree state' };
+          }
+
+          const nodeId = treeState.tabToNode[tabAId];
+          if (!nodeId) {
+            return { valid: false, reason: 'Node not found for tabAId' };
+          }
+
+          const node = treeState.nodes[nodeId];
+          if (!node) {
+            return { valid: false, reason: 'Node object not found' };
+          }
+
+          if (node.viewId !== 'custom-view') {
+            return {
+              valid: false,
+              reason: 'ViewId mismatch',
+              viewId: node.viewId,
+              expectedViewId: 'custom-view',
+            };
+          }
+
+          return { valid: true };
+        },
+        { tabAId }
+      );
+      return viewIdValid.valid;
+    }, { timeout: 5000, timeoutMessage: 'ViewId was not restored correctly' });
+
+    expect(viewIdValid).toEqual({ valid: true });
+  });
 });
