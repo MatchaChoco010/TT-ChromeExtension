@@ -5,7 +5,7 @@
  */
 import { test } from '../fixtures/extension';
 import * as dragDropUtils from './drag-drop-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './tab-utils';
 import { assertTabStructure } from './assertion-utils';
 
 test.describe('DragDropUtils', () => {
@@ -26,7 +26,7 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
@@ -54,13 +54,13 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -87,7 +87,7 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
@@ -120,13 +120,13 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -157,13 +157,13 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -196,13 +196,13 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      const childTabId = await createTab(extensionContext, 'https://www.example.org');
+      const childTabId = await createTab(extensionContext, getTestServerUrl('/child'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
@@ -235,13 +235,13 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com');
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://www.example.org');
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -277,20 +277,20 @@ test.describe('DragDropUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      const childTabId = await createTab(extensionContext, 'https://www.example.org', parentTabId);
+      const childTabId = await createTab(extensionContext, getTestServerUrl('/child'), parentTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
 
-      const dragTabId = await createTab(extensionContext, 'https://www.iana.org');
+      const dragTabId = await createTab(extensionContext, getTestServerUrl('/drag'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, pinTab } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, pinTab, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
 
 test.describe('ピン留めタブの並び替え', () => {
@@ -23,14 +23,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/1');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/2');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -38,7 +38,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId3 = await createTab(extensionContext, 'https://example.com/3');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -136,14 +136,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/first');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/first'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/second');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/second'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -209,14 +209,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/tab1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/tab2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -224,7 +224,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId3 = await createTab(extensionContext, 'https://example.com/tab3');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/tab3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -321,14 +321,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const pinnedTabId = await createTab(extensionContext, 'https://example.com/pinned');
+      const pinnedTabId = await createTab(extensionContext, getTestServerUrl('/pinned'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: pinnedTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const normalTabId = await createTab(extensionContext, 'https://example.com/normal');
+      const normalTabId = await createTab(extensionContext, getTestServerUrl('/normal'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: pinnedTabId, depth: 0 },
@@ -411,7 +411,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -463,14 +463,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/pinned1');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/pinned1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/pinned2');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/pinned2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -478,7 +478,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId3 = await createTab(extensionContext, 'https://example.com/pinned3');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/pinned3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -580,14 +580,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/pinned1');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/pinned1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/pinned2');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/pinned2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -595,7 +595,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId3 = await createTab(extensionContext, 'https://example.com/pinned3');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/pinned3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -697,14 +697,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/pinned1');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/pinned1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/pinned2');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/pinned2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -712,7 +712,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId3 = await createTab(extensionContext, 'https://example.com/pinned3');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/pinned3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -814,14 +814,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/pinned1');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/pinned1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/pinned2');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/pinned2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -829,7 +829,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId3 = await createTab(extensionContext, 'https://example.com/pinned3');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/pinned3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -838,7 +838,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId4 = await createTab(extensionContext, 'https://example.com/pinned4');
+      const tabId4 = await createTab(extensionContext, getTestServerUrl('/pinned4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -956,14 +956,14 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId1 = await createTab(extensionContext, 'https://example.com/pinned1');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/pinned1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId2 = await createTab(extensionContext, 'https://example.com/pinned2');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/pinned2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -971,7 +971,7 @@ test.describe('ピン留めタブの並び替え', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      const tabId3 = await createTab(extensionContext, 'https://example.com/pinned3');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/pinned3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },

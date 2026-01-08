@@ -285,6 +285,12 @@ await assertTabStructure(sidePanelPage, windowId, [
 
 `page.pause()`などユーザー操作を待機するデバッグ機能は使用禁止。
 
+### リンククリックには`noWaitAfter: true`必須
+
+リンクをクリックする際は`page.click(selector, { noWaitAfter: true })`を使用する。`noWaitAfter`なしだと`context.close()`が約4〜5秒遅延する。
+
+`e2e/utils/tab-utils.ts`の`clickLinkToOpenTab`・`clickLinkToNavigate`は内部で対応済み。
+
 ### E2Eテスト実行時の結果確認（必須）
 
 テスト結果は**ログファイルに保存**してから確認する。出力を切り捨てると失敗テストの情報が失われ、再実行が必要になる。

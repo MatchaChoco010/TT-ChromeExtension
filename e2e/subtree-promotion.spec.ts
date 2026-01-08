@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabInTreeState } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -21,14 +21,14 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabAId = await createTab(extensionContext, 'https://example.com/A');
+    const tabAId = await createTab(extensionContext, getTestServerUrl('/A'));
     await waitForTabInTreeState(extensionContext, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    const tabBId = await createTab(extensionContext, 'https://example.com/B', tabAId);
+    const tabBId = await createTab(extensionContext, getTestServerUrl('/B'), tabAId);
     await waitForTabInTreeState(extensionContext, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -36,7 +36,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabBId, depth: 1 },
     ], 0);
 
-    const tabCId = await createTab(extensionContext, 'https://example.com/C', tabBId);
+    const tabCId = await createTab(extensionContext, getTestServerUrl('/C'), tabBId);
     await waitForTabInTreeState(extensionContext, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -45,7 +45,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabCId, depth: 2 },
     ], 0);
 
-    const tabDId = await createTab(extensionContext, 'https://example.com/D', tabBId);
+    const tabDId = await createTab(extensionContext, getTestServerUrl('/D'), tabBId);
     await waitForTabInTreeState(extensionContext, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -81,14 +81,14 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabAId = await createTab(extensionContext, 'https://example.com/A');
+    const tabAId = await createTab(extensionContext, getTestServerUrl('/A'));
     await waitForTabInTreeState(extensionContext, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    const tabBId = await createTab(extensionContext, 'https://example.com/B', tabAId);
+    const tabBId = await createTab(extensionContext, getTestServerUrl('/B'), tabAId);
     await waitForTabInTreeState(extensionContext, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -96,7 +96,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabBId, depth: 1 },
     ], 0);
 
-    const tabCId = await createTab(extensionContext, 'https://example.com/C', tabBId);
+    const tabCId = await createTab(extensionContext, getTestServerUrl('/C'), tabBId);
     await waitForTabInTreeState(extensionContext, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -105,7 +105,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabCId, depth: 2 },
     ], 0);
 
-    const tabDId = await createTab(extensionContext, 'https://example.com/D', tabCId);
+    const tabDId = await createTab(extensionContext, getTestServerUrl('/D'), tabCId);
     await waitForTabInTreeState(extensionContext, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -141,14 +141,14 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabAId = await createTab(extensionContext, 'https://example.com/A');
+    const tabAId = await createTab(extensionContext, getTestServerUrl('/A'));
     await waitForTabInTreeState(extensionContext, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    const tabBId = await createTab(extensionContext, 'https://example.com/B', tabAId);
+    const tabBId = await createTab(extensionContext, getTestServerUrl('/B'), tabAId);
     await waitForTabInTreeState(extensionContext, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -156,7 +156,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabBId, depth: 1 },
     ], 0);
 
-    const tabCId = await createTab(extensionContext, 'https://example.com/C', tabBId);
+    const tabCId = await createTab(extensionContext, getTestServerUrl('/C'), tabBId);
     await waitForTabInTreeState(extensionContext, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -165,7 +165,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabCId, depth: 2 },
     ], 0);
 
-    const tabDId = await createTab(extensionContext, 'https://example.com/D', tabBId);
+    const tabDId = await createTab(extensionContext, getTestServerUrl('/D'), tabBId);
     await waitForTabInTreeState(extensionContext, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -175,7 +175,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabDId, depth: 2 },
     ], 0);
 
-    const tabEId = await createTab(extensionContext, 'https://example.com/E', tabAId);
+    const tabEId = await createTab(extensionContext, getTestServerUrl('/E'), tabAId);
     await waitForTabInTreeState(extensionContext, tabEId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -186,7 +186,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabEId, depth: 1 },
     ], 0);
 
-    const tabFId = await createTab(extensionContext, 'https://example.com/F', tabAId);
+    const tabFId = await createTab(extensionContext, getTestServerUrl('/F'), tabAId);
     await waitForTabInTreeState(extensionContext, tabFId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -198,7 +198,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
       { tabId: tabFId, depth: 1 },
     ], 0);
 
-    const tabGId = await createTab(extensionContext, 'https://example.com/G', tabFId);
+    const tabGId = await createTab(extensionContext, getTestServerUrl('/G'), tabFId);
     await waitForTabInTreeState(extensionContext, tabGId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },

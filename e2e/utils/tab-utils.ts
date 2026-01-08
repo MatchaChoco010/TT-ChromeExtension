@@ -481,40 +481,20 @@ export async function getInitialBrowserTabId(serviceWorker: Worker, windowId: nu
 
 
 /**
- * テスト用リンクページのURLを生成
+ * テストサーバーのURLを生成
  *
- * @param targetUrl - リンク先のURL
- * @returns テスト用リンクページのURL
+ * PlaywrightのwebServer設定で起動されたHTTPサーバーのURLを返す。
+ * 動的ポートは環境変数TEST_SERVER_PORTから取得される。
+ *
+ * @param path - ページのパス（例: '/page', '/link-with-target-blank'）
+ * @returns テストサーバーのURL
  */
-export function getTestLinkPageUrl(targetUrl: string): string {
-  return `http://test-link-page.local/?target=${encodeURIComponent(targetUrl)}`;
-}
-
-/**
- * テスト用リンクページのルートを設定
- *
- * ブラウザコンテキストにリンクを含むHTMLページを配信するルートを追加する。
- * このルートは、リンククリックテストで使用される。
- *
- * @param context - ブラウザコンテキスト
- */
-export async function setupTestLinkPageRoute(context: BrowserContext): Promise<void> {
-  await context.route('**/test-link-page.local/**', (route) => {
-    const url = new URL(route.request().url());
-    const targetUrl = url.searchParams.get('target') || 'https://example.org/';
-
-    route.fulfill({
-      contentType: 'text/html',
-      body: `<!DOCTYPE html>
-<html>
-<head><title>Test Link Page</title></head>
-<body>
-  <a id="test-link" href="${targetUrl}" target="_blank">Click to open in new tab</a>
-  <a id="test-link-no-target" href="${targetUrl}">Click (no target)</a>
-</body>
-</html>`,
-    });
-  });
+export function getTestServerUrl(path: string): string {
+  const port = process.env.TEST_SERVER_PORT;
+  if (!port) {
+    throw new Error('TEST_SERVER_PORT is not set. Make sure webServer is configured in playwright.config.ts');
+  }
+  return `http://127.0.0.1:${port}${path}`;
 }
 
 /**
@@ -554,15 +534,20 @@ export async function clickLinkToOpenTab(
     return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
   });
 
+  // noWaitAfter: trueは必須。target="_blank"リンクや中クリック・Ctrl+クリックで
+  // 新しいタブを開く場合、ナビゲーションは新しいタブで発生するため、
+  // Playwrightのデフォルトのナビゲーション待機が正しく完了しない。
+  // この状態がcontext.close()時に遅延を引き起こす可能性がある。
+  // 詳細は docs/steering/tech.md を参照。
   switch (clickType) {
     case 'normal':
-      await page.click(selector);
+      await page.click(selector, { noWaitAfter: true });
       break;
     case 'middle':
-      await page.click(selector, { button: 'middle' });
+      await page.click(selector, { button: 'middle', noWaitAfter: true });
       break;
     case 'ctrl':
-      await page.click(selector, { modifiers: ['Control'] });
+      await page.click(selector, { modifiers: ['Control'], noWaitAfter: true });
       break;
   }
 
@@ -604,7 +589,8 @@ export async function clickLinkToNavigate(
     return tab?.id;
   }, page.url());
 
-  await page.click(selector);
+  // noWaitAfter: trueを追加して遅延が解消されるか検証
+  await page.click(selector, { noWaitAfter: true });
 
   if (tabId) {
     await waitForTabStatusComplete(serviceWorker, tabId);

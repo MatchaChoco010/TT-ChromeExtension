@@ -1,5 +1,5 @@
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { waitForCondition } from './utils/polling-utils';
 import { moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
@@ -34,20 +34,20 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'https://example.com');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      const tabC = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -89,20 +89,20 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'https://example.com');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      const tabC = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -110,7 +110,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: tabC, depth: 0 },
       ], 0);
 
-      const tabD = await createTab(extensionContext, 'https://httpbin.org');
+      const tabD = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -166,20 +166,20 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'https://example.com');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      const tabC = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -223,20 +223,20 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'https://example.com');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      const tabC = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -244,7 +244,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: tabC, depth: 0 },
       ], 0);
 
-      const tabD = await createTab(extensionContext, 'https://httpbin.org');
+      const tabD = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -300,20 +300,20 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'https://example.com');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'https://www.iana.org');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const tabC = await createTab(extensionContext, 'https://www.w3.org');
+      const tabC = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -321,7 +321,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: tabC, depth: 0 },
       ], 0);
 
-      const tabD = await createTab(extensionContext, 'https://httpbin.org');
+      const tabD = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -330,7 +330,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
         { tabId: tabD, depth: 0 },
       ], 0);
 
-      const tabE = await createTab(extensionContext, 'https://jsonplaceholder.typicode.com');
+      const tabE = await createTab(extensionContext, getTestServerUrl('/page5'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },

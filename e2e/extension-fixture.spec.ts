@@ -3,6 +3,7 @@
  */
 import { test, expect } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
+import { getTestServerUrl } from './utils/tab-utils';
 
 test.describe.serial('ExtensionFixture', () => {
   test('拡張機能がロードされ、Extension IDが取得できること', async ({
@@ -81,7 +82,7 @@ test.describe.serial('ExtensionFixture', () => {
     const pages = extensionContext.pages();
 
     const newPage = await extensionContext.newPage();
-    await newPage.goto('about:blank');
+    await newPage.goto(getTestServerUrl('/page'));
 
     await newPage.waitForLoadState('domcontentloaded');
 

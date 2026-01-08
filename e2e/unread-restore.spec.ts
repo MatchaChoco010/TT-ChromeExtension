@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
-import { createTab, activateTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, activateTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 extensionTest.describe('未読インジケーター復元時制御', () => {
@@ -87,7 +87,7 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // 起動完了後にバックグラウンドでタブを作成（active: false）
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -134,7 +134,7 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // バックグラウンドでタブを作成
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -191,7 +191,7 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // 複数のバックグラウンドタブを作成
       const bgTabId1 = await createTab(
         extensionContext,
-        'https://example.com/page1',
+        getTestServerUrl('/page1'),
         undefined,
         { active: false }
       );
@@ -202,7 +202,7 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
 
       const bgTabId2 = await createTab(
         extensionContext,
-        'https://example.com/page2',
+        getTestServerUrl('/page2'),
         undefined,
         { active: false }
       );
@@ -258,7 +258,7 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // アクティブなタブを作成（active: true）
       const activeTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: true }
       );

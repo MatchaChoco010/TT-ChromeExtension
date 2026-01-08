@@ -7,6 +7,7 @@ import {
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
+  getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure, assertUnreadBadge } from './utils/assertion-utils';
 
@@ -26,7 +27,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -61,7 +62,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -107,7 +108,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       const parentTabId = await createTab(
         extensionContext,
-        'https://example.com/parent',
+        getTestServerUrl('/page'),
         undefined,
         { active: true }
       );
@@ -119,7 +120,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       const childTabId = await createTab(
         extensionContext,
-        'https://example.com/child',
+        getTestServerUrl('/page'),
         parentTabId,
         { active: false }
       );
@@ -168,7 +169,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       const bgTabId1 = await createTab(
         extensionContext,
-        'https://example.com/tab1',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -180,7 +181,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       const bgTabId2 = await createTab(
         extensionContext,
-        'https://example.com/tab2',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -193,7 +194,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       const bgTabId3 = await createTab(
         extensionContext,
-        'https://example.com/tab3',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -249,7 +250,7 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -301,7 +302,7 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       const shortTitleTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -313,7 +314,7 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       const longTitleTabId = await createTab(
         extensionContext,
-        'https://example.org/this-is-a-very-long-path-to-create-a-long-title',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -388,7 +389,7 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -438,7 +439,7 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       const shortTitleTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -450,7 +451,7 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       const longTitleTabId = await createTab(
         extensionContext,
-        'https://example.org/this-is-a-very-long-path-to-create-a-long-title-for-testing-purposes',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -527,7 +528,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const rootTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -575,7 +576,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const parentTabId = await createTab(
         extensionContext,
-        'https://example.com/parent',
+        getTestServerUrl('/page'),
         undefined,
         { active: true }
       );
@@ -587,7 +588,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const childTabId = await createTab(
         extensionContext,
-        'https://example.com/child',
+        getTestServerUrl('/page'),
         parentTabId,
         { active: false }
       );
@@ -643,7 +644,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const parentTabId = await createTab(
         extensionContext,
-        'https://example.com/parent',
+        getTestServerUrl('/page'),
         undefined,
         { active: true }
       );
@@ -655,7 +656,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const childTabId = await createTab(
         extensionContext,
-        'https://example.com/child',
+        getTestServerUrl('/page'),
         parentTabId,
         { active: true }
       );
@@ -668,7 +669,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const grandchildTabId = await createTab(
         extensionContext,
-        'https://example.com/grandchild',
+        getTestServerUrl('/page'),
         childTabId,
         { active: false }
       );
@@ -733,7 +734,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const rootTabId = await createTab(
         extensionContext,
-        'https://example.com/root',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -745,7 +746,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const parentTabId = await createTab(
         extensionContext,
-        'https://example.org/parent',
+        getTestServerUrl('/page'),
         undefined,
         { active: true }
       );
@@ -758,7 +759,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       const childTabId = await createTab(
         extensionContext,
-        'https://example.org/child',
+        getTestServerUrl('/page'),
         parentTabId,
         { active: false }
       );
@@ -832,7 +833,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -902,7 +903,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -958,7 +959,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -1004,7 +1005,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       const bgTabId1 = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -1016,7 +1017,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       const bgTabId2 = await createTab(
         extensionContext,
-        'https://example.org/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );

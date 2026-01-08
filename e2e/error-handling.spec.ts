@@ -2,7 +2,7 @@
  * エラーハンドリングとエッジケースのE2Eテスト
  */
 import { test as extensionTest } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 extensionTest.describe('エラーハンドリングとエッジケース', () => {
@@ -108,7 +108,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },

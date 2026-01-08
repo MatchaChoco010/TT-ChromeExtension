@@ -3,7 +3,7 @@
  */
 import { test, expect } from './fixtures/extension';
 import type { Locator } from '@playwright/test';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { startDrag, dropTab } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { waitForCondition } from './utils/polling-utils';
@@ -90,20 +90,20 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tab1 = await createTab(extensionContext, 'https://example.com');
+    const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
     ], 0);
 
-    const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+    const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
     ], 0);
 
-    const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+    const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
@@ -144,20 +144,20 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tab1 = await createTab(extensionContext, 'https://example.com');
+    const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
     ], 0);
 
-    const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+    const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
     ], 0);
 
-    const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+    const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
@@ -211,18 +211,18 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
 
     const tabs: number[] = [];
     const urls = [
-      'https://example.com',
-      'https://www.iana.org',
-      'https://www.w3.org',
-      'https://developer.mozilla.org',
-      'https://httpbin.org',
-      'https://jsonplaceholder.typicode.com',
-      'https://www.google.com',
-      'https://www.github.com',
-      'https://www.stackoverflow.com',
-      'https://www.reddit.com',
-      'https://www.wikipedia.org',
-      'https://www.amazon.com',
+      getTestServerUrl('/page1'),
+      getTestServerUrl('/page2'),
+      getTestServerUrl('/page3'),
+      getTestServerUrl('/page4'),
+      getTestServerUrl('/page5'),
+      getTestServerUrl('/page6'),
+      getTestServerUrl('/page7'),
+      getTestServerUrl('/page8'),
+      getTestServerUrl('/page9'),
+      getTestServerUrl('/page10'),
+      getTestServerUrl('/page11'),
+      getTestServerUrl('/page12'),
     ];
 
     for (const url of urls) {
@@ -285,14 +285,14 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
 
     const tabs: number[] = [];
     const urls = [
-      'https://example.com',
-      'https://www.iana.org',
-      'https://www.w3.org',
-      'https://developer.mozilla.org',
-      'https://httpbin.org',
-      'https://jsonplaceholder.typicode.com',
-      'https://www.google.com',
-      'https://www.github.com',
+      getTestServerUrl('/page1'),
+      getTestServerUrl('/page2'),
+      getTestServerUrl('/page3'),
+      getTestServerUrl('/page4'),
+      getTestServerUrl('/page5'),
+      getTestServerUrl('/page6'),
+      getTestServerUrl('/page7'),
+      getTestServerUrl('/page8'),
     ];
 
     for (const url of urls) {

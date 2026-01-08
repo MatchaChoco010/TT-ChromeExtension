@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure, assertViewStructure } from './utils/assertion-utils';
 import { waitForViewSwitcher, waitForCondition } from './utils/polling-utils';
 
@@ -25,7 +25,7 @@ test.describe('UX改善機能', () => {
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
       // タブを作成
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -76,7 +76,7 @@ test.describe('UX改善機能', () => {
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
       // タブを作成
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -258,7 +258,7 @@ test.describe('UX改善機能', () => {
       ], 0);
 
       // 最初にタブを作成（ビュー追加前）
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -328,7 +328,7 @@ test.describe('UX改善機能', () => {
       ], 0);
 
       // 最初にタブを作成（ビュー追加前）
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -414,7 +414,7 @@ test.describe('UX改善機能', () => {
       ], 0);
 
       // 最初にタブを作成（ビュー追加前）
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },

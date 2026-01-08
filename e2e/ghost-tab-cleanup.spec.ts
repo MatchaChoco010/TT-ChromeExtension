@@ -9,6 +9,7 @@ import {
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
+  getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import './types';
@@ -29,7 +30,7 @@ test.describe('Ghost Tab Cleanup', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab = await createTab(extensionContext, 'about:blank', { active: false });
+      const tab = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab, depth: 0 },
@@ -287,7 +288,7 @@ test.describe('Ghost Tab Cleanup', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const normalTab = await createTab(extensionContext, 'about:blank', { active: false });
+      const normalTab = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTab, depth: 0 },

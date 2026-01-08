@@ -1,25 +1,8 @@
 import { test } from './fixtures/extension';
-import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, clickLinkToOpenTab, clickLinkToNavigate, activateTab } from './utils/tab-utils';
+import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, clickLinkToOpenTab, clickLinkToNavigate, activateTab, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabInTreeState } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setUserSettings } from './utils/settings-utils';
-import type { BrowserContext } from '@playwright/test';
-
-async function setupLinkPageRoute(context: BrowserContext, hasTarget: boolean): Promise<void> {
-  const targetAttr = hasTarget ? ' target="_blank"' : '';
-  await context.route('**/test-link-page.local/**', (route) => {
-    route.fulfill({
-      contentType: 'text/html',
-      body: `<!DOCTYPE html>
-<html>
-<head><title>Test Link Page</title></head>
-<body>
-  <a id="test-link" href="https://example.org/"${targetAttr}>Click me</a>
-</body>
-</html>`,
-    });
-  });
-}
 
 test.describe('リンククリック組み合わせテスト', () => {
   test.describe('target="_blank"リンクのクリックテスト', () => {
@@ -28,7 +11,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      await setupLinkPageRoute(extensionContext, true);
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
       await sidePanelPage.waitForTimeout(100);
 
@@ -38,15 +20,16 @@ test.describe('リンククリック組み合わせテスト', () => {
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
+      const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const openerPage = await extensionContext.newPage();
-      await openerPage.goto('http://test-link-page.local/');
+      await openerPage.goto(linkPageUrl);
       await openerPage.waitForLoadState('domcontentloaded');
 
-      const openerTabId = await serviceWorker.evaluate(async () => {
+      const openerTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, openerTabId!);
       await activateTab(extensionContext, openerTabId!);
 
@@ -64,7 +47,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      await setupLinkPageRoute(extensionContext, true);
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
       await sidePanelPage.waitForTimeout(100);
 
@@ -74,15 +56,16 @@ test.describe('リンククリック組み合わせテスト', () => {
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
+      const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const openerPage = await extensionContext.newPage();
-      await openerPage.goto('http://test-link-page.local/');
+      await openerPage.goto(linkPageUrl);
       await openerPage.waitForLoadState('domcontentloaded');
 
-      const openerTabId = await serviceWorker.evaluate(async () => {
+      const openerTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, openerTabId!);
       await activateTab(extensionContext, openerTabId!);
 
@@ -100,7 +83,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      await setupLinkPageRoute(extensionContext, true);
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
       await sidePanelPage.waitForTimeout(100);
 
@@ -110,15 +92,16 @@ test.describe('リンククリック組み合わせテスト', () => {
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
+      const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const openerPage = await extensionContext.newPage();
-      await openerPage.goto('http://test-link-page.local/');
+      await openerPage.goto(linkPageUrl);
       await openerPage.waitForLoadState('domcontentloaded');
 
-      const openerTabId = await serviceWorker.evaluate(async () => {
+      const openerTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, openerTabId!);
       await activateTab(extensionContext, openerTabId!);
 
@@ -138,23 +121,22 @@ test.describe('リンククリック組み合わせテスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      await setupLinkPageRoute(extensionContext, false);
-
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
+      const linkPageUrl = getTestServerUrl('/link-without-target');
       const openerPage = await extensionContext.newPage();
-      await openerPage.goto('http://test-link-page.local/');
+      await openerPage.goto(linkPageUrl);
       await openerPage.waitForLoadState('domcontentloaded');
 
-      const openerTabId = await serviceWorker.evaluate(async () => {
+      const openerTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, openerTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
@@ -175,7 +157,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      await setupLinkPageRoute(extensionContext, false);
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
       await sidePanelPage.waitForTimeout(100);
 
@@ -185,15 +166,16 @@ test.describe('リンククリック組み合わせテスト', () => {
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
+      const linkPageUrl = getTestServerUrl('/link-without-target');
       const openerPage = await extensionContext.newPage();
-      await openerPage.goto('http://test-link-page.local/');
+      await openerPage.goto(linkPageUrl);
       await openerPage.waitForLoadState('domcontentloaded');
 
-      const openerTabId = await serviceWorker.evaluate(async () => {
+      const openerTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, openerTabId!);
       await activateTab(extensionContext, openerTabId!);
 
@@ -211,7 +193,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      await setupLinkPageRoute(extensionContext, false);
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
       await sidePanelPage.waitForTimeout(100);
 
@@ -221,15 +202,16 @@ test.describe('リンククリック組み合わせテスト', () => {
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
       await closeTab(extensionContext, initialBrowserTabId);
 
+      const linkPageUrl = getTestServerUrl('/link-without-target');
       const openerPage = await extensionContext.newPage();
-      await openerPage.goto('http://test-link-page.local/');
+      await openerPage.goto(linkPageUrl);
       await openerPage.waitForLoadState('domcontentloaded');
 
-      const openerTabId = await serviceWorker.evaluate(async () => {
+      const openerTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, openerTabId!);
       await activateTab(extensionContext, openerTabId!);
 

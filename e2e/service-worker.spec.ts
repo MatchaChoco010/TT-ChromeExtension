@@ -20,6 +20,7 @@ import {
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
+  getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import './types';
@@ -68,7 +69,7 @@ test.describe('Service Workerとの通信', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -109,7 +110,7 @@ test.describe('Service Workerとの通信', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -243,7 +244,7 @@ test.describe('Service Workerとの通信', () => {
         return window.stateUpdateCount;
       });
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -276,7 +277,7 @@ test.describe('Service Workerとの通信', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -324,7 +325,7 @@ test.describe('Service Workerとの通信', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -376,13 +377,13 @@ test.describe('Service Workerとの通信', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'about:blank', { active: true });
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page'), { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'about:blank', { active: false });
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -568,7 +569,7 @@ test.describe('Service Workerとの通信', () => {
         });
       });
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -683,7 +684,7 @@ test.describe('Service Workerとの通信', () => {
         });
       });
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: sidePanelTab2Id, depth: 0 },

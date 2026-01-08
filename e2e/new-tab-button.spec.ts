@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 
@@ -175,7 +175,7 @@ test.describe('新規タブ追加ボタン', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const existingTabId = await createTab(extensionContext, 'https://example.com');
+      const existingTabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },

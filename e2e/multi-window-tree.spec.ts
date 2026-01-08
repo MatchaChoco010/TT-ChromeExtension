@@ -1,6 +1,6 @@
 import { test } from './fixtures/extension';
 import { createWindow, moveTabToWindow, openSidePanelForWindow } from './utils/window-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure, assertWindowExists } from './utils/assertion-utils';
 import { waitForTabInTreeState, waitForSidePanelReady } from './utils/polling-utils';
 
@@ -18,13 +18,13 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/tab1'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/tab2'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -44,7 +44,7 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId3 = await createTab(extensionContext, 'https://example.com/tab3', { windowId: newWindowId });
+    const tabId3 = await createTab(extensionContext, getTestServerUrl('/tab3'), { windowId: newWindowId });
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newInitialBrowserTabId, depth: 0 },
       { tabId: newPseudoSidePanelTabId, depth: 0 },
@@ -68,6 +68,8 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
+
+    await newWindowSidePanel.close();
   });
 
   test('when tab is moved to another window, it should appear in the destination window tree and disappear from source', async ({
@@ -83,7 +85,7 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -119,6 +121,8 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: newPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
+
+    await newWindowSidePanel.close();
   });
 
   test('new window should have empty tab tree except for default new tab', async ({
@@ -134,13 +138,13 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(extensionContext, 'https://example.com/tab1');
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/tab1'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, 'https://example.com/tab2');
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/tab2'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -160,5 +164,7 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: newInitialBrowserTabId, depth: 0 },
       { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
+
+    await newWindowSidePanel.close();
   });
 });

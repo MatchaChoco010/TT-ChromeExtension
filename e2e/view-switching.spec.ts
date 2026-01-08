@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/extension';
 import { waitForViewSwitcher, waitForCondition } from './utils/polling-utils';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab } from './utils/tab-utils';
+import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ビュー切り替え機能', () => {
@@ -237,7 +237,7 @@ test.describe('ビュー切り替え機能', () => {
       const emptyMessage = sidePanelPage.locator('text=No tabs in this view');
       await expect(emptyMessage).toBeVisible({ timeout: 5000 });
 
-      const newTabId = await createTab(extensionContext, 'about:blank');
+      const newTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: newTabId, depth: 0 },
       ], 1);

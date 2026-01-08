@@ -255,7 +255,7 @@ export const test = base.extend<ExtensionFixtures>({
 
     const headless = process.env.HEADED !== 'true';
 
-      const { context, userDataDir } = await createExtensionContext(pathToExtension, headless);
+    const { context, userDataDir } = await createExtensionContext(pathToExtension, headless);
 
     await use(context);
 

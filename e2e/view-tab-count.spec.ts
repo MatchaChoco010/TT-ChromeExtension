@@ -3,7 +3,7 @@ import {
   waitForViewSwitcher,
   waitForCondition,
 } from './utils/polling-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ビューのタブカウント正確性', () => {
@@ -39,7 +39,7 @@ test.describe('ビューのタブカウント正確性', () => {
       const initialCount = await getTabCountBadge();
 
       // 新しいタブを作成
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -83,7 +83,7 @@ test.describe('ビューのタブカウント正確性', () => {
       ], 0);
 
       // タブを作成して初期状態を確立
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -160,14 +160,14 @@ test.describe('ビューのタブカウント正確性', () => {
 
       // 3つのタブを追加
       const tabIds: number[] = [];
-      const tab1 = await createTab(extensionContext, 'about:blank');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page'));
       tabIds.push(tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'about:blank');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page'));
       tabIds.push(tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -175,7 +175,7 @@ test.describe('ビューのタブカウント正確性', () => {
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'about:blank');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page'));
       tabIds.push(tab3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -237,7 +237,7 @@ test.describe('ビューのタブカウント正確性', () => {
       ], 0);
 
       // 1. 正常なタブを作成
-      const normalTabId = await createTab(extensionContext, 'about:blank');
+      const normalTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
@@ -394,7 +394,7 @@ test.describe('ビューのタブカウント正確性', () => {
       ], 0);
 
       // 1. タブを作成
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -476,20 +476,20 @@ test.describe('タブ数表示の視認性', () => {
       const initialCount = await getTabCountBadge();
 
       // 複数のタブを追加（2桁の数字を表示するため）
-      const tab1 = await createTab(extensionContext, 'about:blank');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'about:blank');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'about:blank');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -568,7 +568,7 @@ test.describe('タブ数表示の視認性', () => {
       const tabsToAdd = Math.max(0, targetTotal - initialCount);
 
       for (let i = 0; i < tabsToAdd; i++) {
-        const tabId = await createTab(extensionContext, 'about:blank');
+        const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
         tabIds.push(tabId);
         // 各タブ作成後にassertTabStructure
         await assertTabStructure(sidePanelPage, windowId, [
@@ -628,7 +628,7 @@ test.describe('タブ数表示の視認性', () => {
       ], 0);
 
       // タブを追加してバッジを表示
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },

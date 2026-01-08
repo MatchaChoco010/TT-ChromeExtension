@@ -14,6 +14,7 @@ import {
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
   closeTab,
+  getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -230,7 +231,7 @@ test.describe('内部ページのタイトル表示', () => {
     await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 
-  test('about:blankページがツリーで適切なタイトルで表示される', async ({
+  test('テストページがツリーで適切なタイトルで表示される', async ({
     extensionContext,
     sidePanelPage,
     serviceWorker,
@@ -248,13 +249,13 @@ test.describe('内部ページのタイトル表示', () => {
 
     const tabId = await createTab(
       extensionContext,
-      'about:blank',
+      getTestServerUrl('/page'),
       { active: true, windowId }
     );
 
     await waitForTabInTreeState(extensionContext, tabId, {
       timeout: COMMON_TIMEOUTS.medium,
-      timeoutMessage: `about:blank tab ${tabId} was not added to tree`,
+      timeoutMessage: `test page tab ${tabId} was not added to tree`,
     });
 
     await assertTabStructure(sidePanelPage, windowId, [
@@ -269,12 +270,12 @@ test.describe('内部ページのタイトル表示', () => {
           return false;
         }
         const displayedTitle = await treeNode.locator('[data-testid="tab-title"], [data-testid="discarded-tab-title"]').textContent();
-        return displayedTitle === '新しいタブ';
+        return displayedTitle === 'Test Page';
       },
       {
         timeout: COMMON_TIMEOUTS.medium,
         interval: 100,
-        timeoutMessage: 'about:blank title was not displayed as 新しいタブ',
+        timeoutMessage: 'Test page title was not displayed as Test Page',
       }
     );
 

@@ -5,6 +5,7 @@ import {
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
+  getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -20,7 +21,7 @@ test.describe('タブの休止機能', () => {
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
 
-    const tabId = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -47,8 +48,8 @@ test.describe('タブの休止機能', () => {
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(extensionContext, initialBrowserTabId);
 
-    const tabId1 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
-    const tabId2 = await createTab(extensionContext, 'about:blank', undefined, { active: false });
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },

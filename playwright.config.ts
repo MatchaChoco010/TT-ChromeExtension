@@ -21,6 +21,16 @@ export default defineConfig({
   // グローバルセットアップ（テスト実行前に拡張機能をビルド）
   globalSetup: './e2e/scripts/global-setup.ts',
 
+  // テスト用HTTPサーバー（動的ポートをキャプチャして環境変数に設定）
+  webServer: {
+    command: 'node e2e/test-server.cjs',
+    reuseExistingServer: !process.env.CI,
+    stdout: 'pipe',
+    wait: {
+      stdout: /Listening on port (?<TEST_SERVER_PORT>\d+)/,
+    },
+  },
+
   // テストディレクトリ
   testDir: './e2e',
 

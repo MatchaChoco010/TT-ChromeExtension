@@ -1,5 +1,5 @@
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { reorderTabs, moveTabToParent } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -21,20 +21,20 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -65,20 +65,20 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -86,7 +86,7 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tab4 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -119,20 +119,20 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -165,20 +165,20 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -186,7 +186,7 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tab4 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -219,20 +219,20 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -240,7 +240,7 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tab4 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -282,20 +282,20 @@ test.describe('ドラッグ&ドロップ - タブ挿入', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },

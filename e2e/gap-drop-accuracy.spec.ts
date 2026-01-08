@@ -2,7 +2,7 @@
  * Gapドロップ精度のE2Eテスト
  */
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { startDrag, dropTab, moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
 import { waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -42,20 +42,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -63,7 +63,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tab4 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -96,20 +96,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -140,20 +140,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -161,7 +161,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tab4 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -205,13 +205,13 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'https://example.com');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const child1 = await createTab(extensionContext, 'https://www.iana.org');
+      const child1 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -225,7 +225,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: child1, depth: 1 },
       ], 0);
 
-      const rootTab = await createTab(extensionContext, 'https://www.w3.org');
+      const rootTab = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
@@ -256,20 +256,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -302,20 +302,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -323,7 +323,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tab4 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -332,7 +332,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: tab4, depth: 0 },
       ], 0);
 
-      const tab5 = await createTab(extensionContext, 'https://httpbin.org');
+      const tab5 = await createTab(extensionContext, getTestServerUrl('/page5'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -377,20 +377,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -398,7 +398,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const tab4 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -446,20 +446,20 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://www.iana.org');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'https://www.w3.org');
+      const tab3 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },

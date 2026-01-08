@@ -5,6 +5,7 @@ import {
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
+  getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -26,20 +27,20 @@ test.describe('テキスト選択禁止機能', () => {
     ], 0);
 
     // Arrange: 複数のタブを作成
-    const tabId1 = await createTab(extensionContext, 'https://example.com/page1');
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, 'https://example.com/page2');
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
 
-    const tabId3 = await createTab(extensionContext, 'https://example.com/page3');
+    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page3'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -103,7 +104,7 @@ test.describe('テキスト選択禁止機能', () => {
     ], 0);
 
     // Arrange: タブを作成
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -163,7 +164,7 @@ test.describe('テキスト選択禁止機能', () => {
     ], 0);
 
     // Arrange: タブを作成してツリービューを表示
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -197,7 +198,7 @@ test.describe('テキスト選択禁止機能', () => {
     ], 0);
 
     // Arrange: タブを作成
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -231,7 +232,7 @@ test.describe('テキスト選択禁止機能', () => {
     ], 0);
 
     // Arrange: タブを作成
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },

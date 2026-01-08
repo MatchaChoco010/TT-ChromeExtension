@@ -14,19 +14,19 @@ export interface TreeStateTestData {
 
 export const BASIC_TREE_STATE_FIXTURE: TreeStateTestData = {
   tabs: [
-    { url: 'https://example.com/page1', title: 'Page 1' },
-    { url: 'https://example.com/page2', title: 'Page 2' },
-    { url: 'https://example.com/page3', title: 'Page 3' },
+    { url: 'http://127.0.0.1/page1', title: 'Page 1' },
+    { url: 'http://127.0.0.1/page2', title: 'Page 2' },
+    { url: 'http://127.0.0.1/page3', title: 'Page 3' },
   ],
 };
 
 export const HIERARCHICAL_TREE_STATE_FIXTURE: TreeStateTestData = {
   tabs: [
-    { url: 'https://example.com/parent1', title: 'Parent 1' },
-    { url: 'https://example.com/child1-1', title: 'Child 1-1', parentIndex: 0 },
-    { url: 'https://example.com/child1-2', title: 'Child 1-2', parentIndex: 0 },
-    { url: 'https://example.com/parent2', title: 'Parent 2' },
-    { url: 'https://example.com/child2-1', title: 'Child 2-1', parentIndex: 3 },
+    { url: 'http://127.0.0.1/parent1', title: 'Parent 1' },
+    { url: 'http://127.0.0.1/child1-1', title: 'Child 1-1', parentIndex: 0 },
+    { url: 'http://127.0.0.1/child1-2', title: 'Child 1-2', parentIndex: 0 },
+    { url: 'http://127.0.0.1/parent2', title: 'Parent 2' },
+    { url: 'http://127.0.0.1/child2-1', title: 'Child 2-1', parentIndex: 3 },
   ],
 };
 
@@ -40,7 +40,7 @@ export function generateLargeTabData(count: number): TreeStateTestData {
 
   for (let i = 0; i < count; i++) {
     tabs.push({
-      url: `https://example.com/tab-${i}`,
+      url: `http://127.0.0.1/tab-${i}`,
       title: `Test Tab ${i}`,
     });
   }
@@ -84,13 +84,13 @@ export const TEST_SNAPSHOT_DATA = {
     views: [],
     tabs: [
       {
-        url: 'https://example.com/test1',
+        url: 'http://127.0.0.1/test1',
         title: 'Test Page 1',
         parentId: null,
         viewId: 'default',
       },
       {
-        url: 'https://example.com/test2',
+        url: 'http://127.0.0.1/test2',
         title: 'Test Page 2',
         parentId: null,
         viewId: 'default',
@@ -119,7 +119,7 @@ export function generateLargeSnapshotData(
         views: [],
         tabs: [
           {
-            url: `https://example.com/snapshot-${i}-tab1`,
+            url: `http://127.0.0.1/snapshot-${i}-tab1`,
             title: `Snapshot ${i} Tab 1`,
             parentId: null,
             viewId: 'default',

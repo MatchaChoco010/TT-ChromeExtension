@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/extension';
 import { createWindow, openSidePanelForWindow } from './utils/window-utils';
-import { createTab, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure, assertWindowClosed, assertWindowExists } from './utils/assertion-utils';
 
 test.describe('chrome.windows API統合', () => {
@@ -38,20 +38,22 @@ test.describe('chrome.windows API統合', () => {
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(extensionContext, 'https://example.com', { windowId, active: false });
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), { windowId, active: false });
     await assertTabStructure(newWindowSidePanel, windowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, 'https://example.org', { windowId, active: false });
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'), { windowId, active: false });
     await assertTabStructure(newWindowSidePanel, windowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
+
+    await newWindowSidePanel.close();
 
     await serviceWorker.evaluate((wId) => {
       return chrome.windows.remove(wId);
@@ -154,18 +156,21 @@ test.describe('chrome.windows API統合', () => {
       { tabId: pseudoSidePanelTabId2, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(extensionContext, 'https://example.com', { windowId: windowId1, active: false });
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), { windowId: windowId1, active: false });
     await assertTabStructure(sidePanel1, windowId1, [
       { tabId: initialTabId1, depth: 0 },
       { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, 'https://example.org', { windowId: windowId2, active: false });
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'), { windowId: windowId2, active: false });
     await assertTabStructure(sidePanel2, windowId2, [
       { tabId: initialTabId2, depth: 0 },
       { tabId: pseudoSidePanelTabId2, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
+
+    await sidePanel1.close();
+    await sidePanel2.close();
   });
 });

@@ -175,17 +175,6 @@ export function getViewEditButtonSelector(viewName: string): string {
 }
 
 /**
- * テスト用URL定義
- *
- * テストで頻繁に使用されるURL
- */
-export const TEST_URLS = {
-  blank: 'about:blank',
-  example: 'https://example.com',
-  exampleOrg: 'https://example.org',
-} as const;
-
-/**
  * フォーム入力要素のセレクタ
  *
  * 設定パネル等で使用されるフォーム入力要素

@@ -12,6 +12,7 @@ import {
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
+  getTestServerUrl,
 } from './tab-utils';
 import { assertTabStructure, assertUnreadBadge } from './assertion-utils';
 
@@ -30,7 +31,7 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
     expect(tabId).toBeGreaterThan(0);
 
@@ -54,7 +55,7 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, 'https://example.com');
+    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
@@ -62,7 +63,7 @@ test.describe('TabTestUtils', () => {
 
     const childTabId = await createTab(
       extensionContext,
-      'https://example.com/child',
+      getTestServerUrl('/child'),
       parentTabId
     );
 
@@ -87,7 +88,7 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -115,13 +116,13 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(extensionContext, 'https://example.com');
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, 'https://example.org');
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -148,7 +149,7 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
     await expect(
       assertTabStructure(sidePanelPage, windowId, [
@@ -172,7 +173,7 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -201,7 +202,7 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, {
       active: false,
     });
 
@@ -227,7 +228,7 @@ test.describe('TabTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, {
       active: false,
     });
 

@@ -70,11 +70,11 @@ export async function startDrag(page: Page, sourceTabId: number): Promise<void> 
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  await page.mouse.move(startX, startY, { steps: 3 });
+  await page.mouse.move(startX, startY, { steps: 1 });
 
   await page.mouse.down();
 
-  await page.mouse.move(startX + 10, startY, { steps: 5 });
+  await page.mouse.move(startX + 10, startY, { steps: 2 });
 
   await waitForDragState(page);
 }
@@ -94,7 +94,7 @@ export async function hoverOverTab(page: Page, targetTabId: number): Promise<voi
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
 
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
@@ -108,7 +108,7 @@ export async function hoverOverTab(page: Page, targetTabId: number): Promise<voi
  * @param y - Y座標
  */
 export async function moveTo(page: Page, x: number, y: number): Promise<void> {
-  await page.mouse.move(x, y, { steps: 5 });
+  await page.mouse.move(x, y, { steps: 3 });
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
@@ -149,11 +149,11 @@ export async function reorderTabs(
   const sourceX = sourceBox.x + sourceBox.width / 2;
   const sourceY = sourceBox.y + sourceBox.height / 2;
 
-  await page.mouse.move(sourceX, sourceY, { steps: 3 });
+  await page.mouse.move(sourceX, sourceY, { steps: 1 });
 
   await page.mouse.down();
 
-  await page.mouse.move(sourceX + 10, sourceY, { steps: 5 });
+  await page.mouse.move(sourceX + 10, sourceY, { steps: 2 });
 
   await waitForDragState(page);
 
@@ -165,7 +165,7 @@ export async function reorderTabs(
     ? targetBox.y + targetBox.height * 0.15
     : targetBox.y + targetBox.height * 0.85;
 
-  await page.mouse.move(targetX, targetY, { steps: 15 });
+  await page.mouse.move(targetX, targetY, { steps: 5 });
 
   await waitForDropIndicator(page, 2000);
 
@@ -204,11 +204,11 @@ export async function moveTabToParent(
   const sourceX = sourceBox.x + sourceBox.width / 2;
   const sourceY = sourceBox.y + sourceBox.height / 2;
 
-  await page.mouse.move(sourceX, sourceY, { steps: 3 });
+  await page.mouse.move(sourceX, sourceY, { steps: 1 });
 
   await page.mouse.down();
 
-  await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
+  await page.mouse.move(sourceX + 15, sourceY, { steps: 2 });
 
   await waitForDragState(page);
 
@@ -217,7 +217,7 @@ export async function moveTabToParent(
   const targetX = targetBox.x + targetBox.width / 2;
   const targetY = targetBox.y + targetBox.height / 2;
 
-  await page.mouse.move(targetX, targetY, { steps: 15 });
+  await page.mouse.move(targetX, targetY, { steps: 5 });
 
   await page.mouse.up();
 
@@ -270,15 +270,15 @@ export async function dragOutside(
   await page.bringToFront();
   await page.evaluate(() => window.focus());
 
-  await page.mouse.move(sourceX, sourceY, { steps: 3 });
+  await page.mouse.move(sourceX, sourceY, { steps: 1 });
 
   await page.mouse.down();
 
-  await page.mouse.move(sourceX + 10, sourceY, { steps: 5 });
+  await page.mouse.move(sourceX + 10, sourceY, { steps: 2 });
 
   await waitForDragState(page);
 
-  await page.mouse.move(targetX, targetY, { steps: 10 });
+  await page.mouse.move(targetX, targetY, { steps: 5 });
 
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
@@ -409,11 +409,11 @@ export async function moveTabToRoot(
   const sourceX = sourceBox.x + sourceBox.width / 2;
   const sourceY = sourceBox.y + sourceBox.height / 2;
 
-  await page.mouse.move(sourceX, sourceY, { steps: 3 });
+  await page.mouse.move(sourceX, sourceY, { steps: 1 });
 
   await page.mouse.down();
 
-  await page.mouse.move(sourceX + 15, sourceY, { steps: 5 });
+  await page.mouse.move(sourceX + 15, sourceY, { steps: 2 });
 
   await waitForDragState(page);
 
@@ -423,7 +423,7 @@ export async function moveTabToRoot(
   const targetX = targetBox.x + 30;
   const targetY = targetBox.y + targetBox.height * 0.15;
 
-  await page.mouse.move(targetX, targetY, { steps: 10 });
+  await page.mouse.move(targetX, targetY, { steps: 5 });
 
   await waitForDropIndicator(page, 2000);
 

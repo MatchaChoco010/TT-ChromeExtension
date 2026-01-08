@@ -17,6 +17,7 @@ import {
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
+  getTestServerUrl,
 } from './tab-utils';
 import { assertTabStructure, assertWindowExists } from './assertion-utils';
 
@@ -41,7 +42,7 @@ test.describe('WindowTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'about:blank');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -73,6 +74,8 @@ test.describe('WindowTestUtils', () => {
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
+
+    await newWindowSidePanel.close();
   });
 
   test('クロスウィンドウでタブを別ウィンドウに移動する（moveTabToWindow）', async ({
@@ -89,7 +92,7 @@ test.describe('WindowTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'about:blank');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -120,6 +123,8 @@ test.describe('WindowTestUtils', () => {
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
+
+    await newWindowSidePanel.close();
   });
 
   test('assertWindowTreeSyncは各ウィンドウのツリー状態が正しく同期されることを検証する', async ({
@@ -141,6 +146,8 @@ test.describe('WindowTestUtils', () => {
     await expect(
       assertWindowTreeSync(extensionContext, newWindowId)
     ).resolves.not.toThrow();
+
+    await newWindowSidePanel.close();
   });
 
   test('複数ウィンドウ間でタブを移動した後、各ウィンドウのツリー状態が正しく同期されることを検証する', async ({
@@ -157,13 +164,13 @@ test.describe('WindowTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tab1Id = await createTab(extensionContext, 'about:blank');
+    const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1Id, depth: 0 },
     ], 0);
 
-    const tab2Id = await createTab(extensionContext, 'about:blank');
+    const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1Id, depth: 0 },
@@ -200,6 +207,8 @@ test.describe('WindowTestUtils', () => {
 
     await assertWindowTreeSync(extensionContext, currentWindowId);
     await assertWindowTreeSync(extensionContext, newWindowId);
+
+    await newWindowSidePanel.close();
   });
 
   test('子タブを持つ親タブを別ウィンドウに移動した場合、サブツリー全体が一緒に移動する', async ({
@@ -216,7 +225,7 @@ test.describe('WindowTestUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, 'about:blank');
+    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
@@ -224,7 +233,7 @@ test.describe('WindowTestUtils', () => {
 
     const childTabId = await createTab(
       extensionContext,
-      'about:blank',
+      getTestServerUrl('/child'),
       parentTabId
     );
     await assertTabStructure(sidePanelPage, currentWindowId, [
@@ -262,5 +271,7 @@ test.describe('WindowTestUtils', () => {
     ], 0);
 
     await assertWindowTreeSync(extensionContext, newWindowId);
+
+    await newWindowSidePanel.close();
   });
 });

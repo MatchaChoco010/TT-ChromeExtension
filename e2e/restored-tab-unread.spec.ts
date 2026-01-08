@@ -5,7 +5,7 @@
  */
 import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
-import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 extensionTest.describe('復元タブの未読状態', () => {
@@ -58,7 +58,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       // バックグラウンドで新しいタブを作成
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -105,7 +105,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       // アクティブ状態で新しいタブを作成
       const activeTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: true }
       );
@@ -152,7 +152,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       // バックグラウンドで新しいタブを作成（未読状態になる）
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );
@@ -227,7 +227,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       // バックグラウンドで新しいタブを作成
       const bgTabId = await createTab(
         extensionContext,
-        'https://example.com/',
+        getTestServerUrl('/page'),
         undefined,
         { active: false }
       );

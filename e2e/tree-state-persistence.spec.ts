@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { moveTabToParent } from './utils/drag-drop-utils';
 import { waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -25,13 +25,13 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'https://example.com');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -89,13 +89,13 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'https://example.com');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -143,20 +143,20 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const rootTab = await createTab(extensionContext, 'https://example.com');
+      const rootTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
 
-      const grandchildTab = await createTab(extensionContext, 'https://www.w3.org');
+      const grandchildTab = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0 },
@@ -216,13 +216,13 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'https://example.com');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -312,13 +312,13 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'https://example.com');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -398,13 +398,13 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'https://example.com');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -478,20 +478,20 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parent1 = await createTab(extensionContext, 'https://example.com');
+      const parent1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
       ], 0);
 
-      const child1 = await createTab(extensionContext, 'https://www.iana.org');
+      const child1 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
         { tabId: child1, depth: 0 },
       ], 0);
 
-      const parent2 = await createTab(extensionContext, 'https://www.w3.org');
+      const parent2 = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
@@ -499,7 +499,7 @@ test.describe('ツリー状態永続化', () => {
         { tabId: parent2, depth: 0 },
       ], 0);
 
-      const child2 = await createTab(extensionContext, 'https://developer.mozilla.org');
+      const child2 = await createTab(extensionContext, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
@@ -613,13 +613,13 @@ test.describe('ツリー状態永続化', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'https://example.com');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'https://www.iana.org');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },

@@ -15,6 +15,7 @@ import {
   getInitialBrowserTabId,
   closeTab,
   createTab,
+  getTestServerUrl,
 } from './utils/tab-utils';
 
 /**
@@ -274,10 +275,11 @@ test.describe('スタートページタイトル', () => {
       const initialTitle = await tabTitleElement.textContent();
       expect(['スタートページ', 'Loading...']).toContain(initialTitle);
 
-      // example.comに遷移
-      await serviceWorker.evaluate(async (tabId) => {
-        await chrome.tabs.update(tabId, { url: 'https://example.com' });
-      }, newTabId!);
+      // テストサーバーのページに遷移
+      const targetUrl = getTestServerUrl('/page');
+      await serviceWorker.evaluate(async ({ tabId, url }) => {
+        await chrome.tabs.update(tabId, { url });
+      }, { tabId: newTabId!, url: targetUrl });
 
       // ページの読み込みが完了するまで待機
       await waitForCondition(
@@ -286,7 +288,7 @@ test.describe('スタートページタイトル', () => {
             const t = await chrome.tabs.get(tabId);
             return { status: t.status, url: t.url };
           }, newTabId!);
-          return tabInfo.status === 'complete' && tabInfo.url?.includes('example.com');
+          return tabInfo.status === 'complete' && tabInfo.url?.includes('127.0.0.1');
         },
         { timeout: 10000, interval: 200, timeoutMessage: 'Page navigation did not complete' }
       );

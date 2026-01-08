@@ -1,5 +1,5 @@
 import { test } from './fixtures/extension';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab } from './utils/tab-utils';
+import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab, getTestServerUrl } from './utils/tab-utils';
 import { moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -21,20 +21,20 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'about:blank');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const child1 = await createTab(extensionContext, 'about:blank');
+      const child1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: child1, depth: 0 },
       ], 0);
 
-      const child2 = await createTab(extensionContext, 'about:blank');
+      const child2 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -82,20 +82,20 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'about:blank');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const child1 = await createTab(extensionContext, 'about:blank');
+      const child1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: child1, depth: 0 },
       ], 0);
 
-      const child2 = await createTab(extensionContext, 'about:blank');
+      const child2 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -103,7 +103,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: child2, depth: 0 },
       ], 0);
 
-      const child3 = await createTab(extensionContext, 'about:blank');
+      const child3 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -166,13 +166,13 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'about:blank');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'about:blank');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -209,20 +209,20 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'about:blank');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'about:blank');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'about:blank');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -230,7 +230,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'about:blank');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -273,20 +273,20 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'about:blank');
+      const parentTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'about:blank');
+      const childTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
 
-      const lastTab = await createTab(extensionContext, 'about:blank');
+      const lastTab = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
@@ -328,20 +328,20 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'about:blank');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'about:blank');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const tabC = await createTab(extensionContext, 'about:blank');
+      const tabC = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -349,7 +349,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: tabC, depth: 0 },
       ], 0);
 
-      const tabD = await createTab(extensionContext, 'about:blank');
+      const tabD = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -358,7 +358,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: tabD, depth: 0 },
       ], 0);
 
-      const tabE = await createTab(extensionContext, 'about:blank');
+      const tabE = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -414,20 +414,20 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabA = await createTab(extensionContext, 'about:blank');
+      const tabA = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
-      const tabB = await createTab(extensionContext, 'about:blank');
+      const tabB = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
 
-      const tabC = await createTab(extensionContext, 'about:blank');
+      const tabC = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -435,7 +435,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: tabC, depth: 0 },
       ], 0);
 
-      const tabD = await createTab(extensionContext, 'about:blank');
+      const tabD = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -444,7 +444,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: tabD, depth: 0 },
       ], 0);
 
-      const tabE = await createTab(extensionContext, 'about:blank');
+      const tabE = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -454,7 +454,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: tabE, depth: 0 },
       ], 0);
 
-      const tabF = await createTab(extensionContext, 'about:blank');
+      const tabF = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -465,7 +465,7 @@ test.describe('子タブの並び替え・ドロップ位置テスト', () => {
         { tabId: tabF, depth: 0 },
       ], 0);
 
-      const tabG = await createTab(extensionContext, 'about:blank');
+      const tabG = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, activateTab, clickLinkToOpenTab, setupTestLinkPageRoute, getTestLinkPageUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, activateTab, clickLinkToOpenTab, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { COMMON_TIMEOUTS } from './test-data/common-constants';
@@ -61,8 +61,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       sidePanelPage,
       extensionId,
     }) => {
-      await setupTestLinkPageRoute(extensionContext);
-
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
@@ -77,16 +75,16 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await settingsPage.close();
       await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'child');
 
-      const linkPageUrl = getTestLinkPageUrl('https://example.org/');
+      const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const parentPage = await extensionContext.newPage();
       await parentPage.goto(linkPageUrl);
       await parentPage.waitForLoadState('domcontentloaded');
 
-      const parentTabId = await serviceWorker.evaluate(async () => {
+      const parentTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, parentTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
@@ -120,8 +118,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange:
-      const existingTabId = await createTab(extensionContext, 'https://example.com');
+      const existingTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: existingTabId, depth: 0 },
@@ -132,10 +129,8 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await settingsPage.close();
       await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'end');
 
-      // Act:
       const newTabId = await createTab(extensionContext, 'chrome://settings');
 
-      // Assert:
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: existingTabId, depth: 0 },
@@ -158,8 +153,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange:
-      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
@@ -170,10 +164,8 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await settingsPage.close();
       await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'end');
 
-      // Act:
-      const newTabId = await createTab(extensionContext, 'https://example.org');
+      const newTabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
-      // Assert:
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
@@ -196,8 +188,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange:
-      const parentTabId = await createTab(extensionContext, 'https://example.com');
+      const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
@@ -210,10 +201,8 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'child');
       await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'end');
 
-      // Act:
       const systemTabId = await createTab(extensionContext, 'chrome://extensions');
 
-      // Assert:
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
@@ -227,8 +216,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       sidePanelPage,
       extensionId,
     }) => {
-      await setupTestLinkPageRoute(extensionContext);
-
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
@@ -243,16 +230,16 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await settingsPage.close();
       await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'sibling');
 
-      const linkPageUrl = getTestLinkPageUrl('https://example.org/');
+      const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const parentPage = await extensionContext.newPage();
       await parentPage.goto(linkPageUrl);
       await parentPage.waitForLoadState('domcontentloaded');
 
-      const parentTabId = await serviceWorker.evaluate(async () => {
+      const parentTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, parentTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
@@ -277,8 +264,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       extensionId,
       sidePanelPage,
     }) => {
-      await setupTestLinkPageRoute(extensionContext);
-
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
@@ -293,16 +278,16 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await settingsPage.close();
       await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'child');
 
-      const linkPageUrl = getTestLinkPageUrl('https://example.org/');
+      const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const grandparentPage = await extensionContext.newPage();
       await grandparentPage.goto(linkPageUrl);
       await grandparentPage.waitForLoadState('domcontentloaded');
 
-      const grandparentTabId = await serviceWorker.evaluate(async () => {
+      const grandparentTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, grandparentTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
@@ -336,7 +321,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       }, parentTabId);
 
       const pages = extensionContext.pages();
-      const parentPageForClick = pages.find(p => p.url().includes('test-link-page.local') && p !== grandparentPage);
+      const parentPageForClick = pages.find(p => p.url().includes('link-with-target-blank') && p !== grandparentPage);
 
       if (!parentPageForClick) {
         throw new Error('Could not find parent page');
@@ -360,8 +345,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       sidePanelPage,
       extensionId,
     }) => {
-      await setupTestLinkPageRoute(extensionContext);
-
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
@@ -376,16 +359,16 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await settingsPage.close();
       await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'end');
 
-      const linkPageUrl = getTestLinkPageUrl('https://example.org/');
+      const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const parentPage = await extensionContext.newPage();
       await parentPage.goto(linkPageUrl);
       await parentPage.waitForLoadState('domcontentloaded');
 
-      const parentTabId = await serviceWorker.evaluate(async () => {
+      const parentTabId = await serviceWorker.evaluate(async (url) => {
         const tabs = await chrome.tabs.query({});
-        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes('test-link-page.local'));
+        const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
-      });
+      }, linkPageUrl);
       await waitForTabInTreeState(extensionContext, parentTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
@@ -393,7 +376,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         { tabId: parentTabId!, depth: 0 },
       ], 0);
 
-      const siblingTabId = await createTab(extensionContext, 'about:blank');
+      const siblingTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
@@ -428,14 +411,12 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange:
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
 
-      // Act:
       await newTabButton.click();
 
       let newTabId: number | undefined;
@@ -464,7 +445,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         };
       });
 
-      // Assert:
       expect(tabInfo.pendingUrl !== undefined || tabInfo.url !== undefined).toBe(true);
     });
 
@@ -482,7 +462,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange:
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -508,7 +487,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
         { tabId: newTabId!, depth: 0 },
       ], 0);
 
-      // Assert:
       await waitForCondition(
         async () => {
           const tabTitle = sidePanelPage.locator(`[data-testid="tree-node-${newTabId}"] [data-testid="tab-title"]`);

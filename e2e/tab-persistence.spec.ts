@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import './types';
 
@@ -21,7 +21,7 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. タブを作成
-      const tabId = await createTab(extensionContext, 'https://example.com', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
@@ -34,7 +34,7 @@ test.describe('Tab Persistence', () => {
             const t = await chrome.tabs.get(id);
             return { title: t.title, status: t.status };
           }, tabId);
-          return tabInfo.title !== undefined && tabInfo.title !== '' && tabInfo.title !== 'about:blank';
+          return tabInfo.title !== undefined && tabInfo.title !== '' && tabInfo.title !== getTestServerUrl('/page');
         },
         { timeout: 10000, interval: 100, timeoutMessage: 'Tab title did not update' }
       );
@@ -83,14 +83,14 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. タブを作成
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
       // 2. ファビコンを直接ストレージに設定（chrome.tabs.onUpdatedイベントをシミュレート）
-      const testFaviconUrl = 'https://example.com/favicon.ico';
+      const testFaviconUrl = 'http://127.0.0.1/favicon.ico';
       await serviceWorker.evaluate(
         async ({ id, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -134,13 +134,13 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. 複数のタブを作成
-      const tab1Id = await createTab(extensionContext, 'https://example.com', { active: false });
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://example.org', { active: false });
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -205,7 +205,7 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. 正常なタブを作成
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
@@ -254,16 +254,17 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. about:blankタブを作成（タイトルは空）
-      const tabId = await createTab(extensionContext, 'about:blank', { active: true });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
       // 2. 別のページに遷移
-      await serviceWorker.evaluate(async (id) => {
-        await chrome.tabs.update(id, { url: 'https://example.com' });
-      }, tabId);
+      const navigateUrl = getTestServerUrl('/page2');
+      await serviceWorker.evaluate(async ({ id, url }) => {
+        await chrome.tabs.update(id, { url });
+      }, { id: tabId, url: navigateUrl });
 
       // 3. ページ読み込みとタイトル取得を待機
       await waitForCondition(
@@ -273,17 +274,16 @@ test.describe('Tab Persistence', () => {
             return { title: t.title, url: t.url, status: t.status };
           }, tabId);
           return (
-            tabInfo.url?.includes('example.com') === true &&
+            tabInfo.url?.includes('127.0.0.1') === true &&
             tabInfo.status === 'complete' &&
             tabInfo.title !== undefined &&
-            tabInfo.title !== '' &&
-            tabInfo.title !== 'about:blank'
+            tabInfo.title !== ''
           );
         },
         { timeout: 10000, interval: 200 }
       );
 
-      // 4. 新しいタイトル（Example Domain）が永続化されるまで待機
+      // 4. 新しいタイトルが永続化されるまで待機
       await waitForCondition(
         async () => {
           const storedTitle = await serviceWorker.evaluate(async (id) => {
@@ -291,12 +291,7 @@ test.describe('Tab Persistence', () => {
             const titles = result.tab_titles as Record<number, string> | undefined;
             return titles?.[id];
           }, tabId);
-          // タイトルが永続化されていることを確認（空や about:blank ではない）
-          return (
-            storedTitle !== undefined &&
-            storedTitle !== '' &&
-            storedTitle !== 'about:blank'
-          );
+          return storedTitle !== undefined && storedTitle !== '';
         },
         { timeout: 5000, interval: 100, timeoutMessage: 'Title was not persisted after navigation' }
       );
@@ -325,14 +320,14 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. タブを作成
-      const tabId = await createTab(extensionContext, 'about:blank', { active: true });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
       // 2. 初期ファビコンを設定
-      const initialFaviconUrl = 'https://example.com/initial-favicon.ico';
+      const initialFaviconUrl = 'http://127.0.0.1/initial-favicon.ico';
       await serviceWorker.evaluate(
         async ({ id, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -352,7 +347,7 @@ test.describe('Tab Persistence', () => {
       expect(initialStored).toBe(initialFaviconUrl);
 
       // 4. ファビコンを更新
-      const updatedFaviconUrl = 'https://example.org/updated-favicon.ico';
+      const updatedFaviconUrl = 'http://127.0.0.1/updated-favicon.ico';
       await serviceWorker.evaluate(
         async ({ id, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -397,7 +392,7 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. タブを作成
-      const tabId = await createTab(extensionContext, 'https://example.com', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
@@ -461,14 +456,14 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. タブを作成
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
       // 2. ファビコンを直接設定
-      const testFaviconUrl = 'https://example.com/test-favicon.ico';
+      const testFaviconUrl = 'http://127.0.0.1/test-favicon.ico';
       await serviceWorker.evaluate(
         async ({ id, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -528,7 +523,7 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. 正常なタブを作成
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
@@ -567,7 +562,7 @@ test.describe('Tab Persistence', () => {
           // tab_favicons にゴーストエントリを追加
           const faviconsResult = await chrome.storage.local.get('tab_favicons');
           const favicons = (faviconsResult.tab_favicons as Record<number, string>) || {};
-          favicons[ghostTabId] = 'https://example.com/ghost-favicon.ico';
+          favicons[ghostTabId] = 'http://127.0.0.1/ghost-favicon.ico';
           await chrome.storage.local.set({ tab_favicons: favicons });
         },
         { ghostTabId, ghostNodeId }
@@ -698,13 +693,13 @@ test.describe('Tab Persistence', () => {
       ], 0);
 
       // 1. 複数タブを作成
-      const tab1Id = await createTab(extensionContext, 'https://example.com', { active: false });
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://example.org', { active: false });
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },

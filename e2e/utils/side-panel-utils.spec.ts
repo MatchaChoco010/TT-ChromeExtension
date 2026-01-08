@@ -11,7 +11,7 @@ import {
   assertRealTimeUpdate,
   assertSmoothScrolling,
 } from './side-panel-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './tab-utils';
 import { assertTabStructure } from './assertion-utils';
 
 test.describe('SidePanelUtils', () => {
@@ -47,7 +47,7 @@ test.describe('SidePanelUtils', () => {
 
     let createdTabId: number | null = null;
     const action = async () => {
-      createdTabId = await createTab(extensionContext, 'https://example.com');
+      createdTabId = await createTab(extensionContext, getTestServerUrl('/page'));
     };
 
     await assertRealTimeUpdate(sidePanelPage, action);
@@ -73,7 +73,7 @@ test.describe('SidePanelUtils', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId = await createTab(extensionContext, 'https://example.com');
+    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -109,7 +109,7 @@ test.describe('SidePanelUtils', () => {
     const tabCount = 10;
     const createdTabs: number[] = [];
     for (let i = 0; i < tabCount; i++) {
-      const tabId = await createTab(extensionContext, `https://example.com/page${i}`);
+      const tabId = await createTab(extensionContext, getTestServerUrl(`/page${i}`));
       createdTabs.push(tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [

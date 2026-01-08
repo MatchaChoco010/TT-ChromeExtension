@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, activateTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, activateTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
 import { waitForCondition, waitForTabRemovedFromTreeState, waitForTabUrlLoaded, waitForTabActive } from './utils/polling-utils';
 
@@ -23,7 +23,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const createdTabId = await createTab(extensionContext, 'https://example.com');
+      const createdTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: createdTabId, depth: 0 },
@@ -48,14 +48,14 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTabId = await createTab(extensionContext, 'https://example.com/parent');
+      const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
       expect(parentTabId).toBeDefined();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      const childTabId = await createTab(extensionContext, 'https://example.com/child', parentTabId);
+      const childTabId = await createTab(extensionContext, getTestServerUrl('/child'), parentTabId);
       expect(childTabId).toBeDefined();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -84,7 +84,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -117,20 +117,20 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com/1');
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://example.com/2');
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
-      const tab3Id = await createTab(extensionContext, 'https://example.com/3');
+      const tab3Id = await createTab(extensionContext, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -171,23 +171,24 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://www.google.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/google'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
+      const newUrl = getTestServerUrl('/google-search');
       await serviceWorker.evaluate(
-        async (id) => {
-          return await chrome.tabs.update(id, { url: 'https://www.google.com/search?q=test' });
+        async ({ id, url }) => {
+          return await chrome.tabs.update(id, { url });
         },
-        tabId
+        { id: tabId, url: newUrl }
       );
 
-      const currentTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'google.com/search', 10000);
+      const currentTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'google-search', 10000);
 
       expect(currentTab).toBeDefined();
-      expect(currentTab.url).toContain('google.com/search');
+      expect(currentTab.url).toContain('google-search');
     });
 
     test('chrome.tabs.update()でactiveを変更した場合、アクティブ状態が更新される', async ({
@@ -208,13 +209,13 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com/1', undefined, { active: false });
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://example.com/2', undefined, { active: false });
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -253,7 +254,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
 
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
@@ -305,13 +306,13 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com/1');
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://example.com/2');
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
@@ -337,7 +338,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com', undefined, { active: true });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -368,31 +369,31 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1Id = await createTab(extensionContext, 'https://example.com/test');
+      const tab1Id = await createTab(extensionContext, getTestServerUrl('/test'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(extensionContext, 'https://example.org/other');
+      const tab2Id = await createTab(extensionContext, getTestServerUrl('/other'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
-      await waitForTabUrlLoaded(serviceWorker, tab1Id, 'example.com', 5000);
-      await waitForTabUrlLoaded(serviceWorker, tab2Id, 'example.org', 5000);
+      await waitForTabUrlLoaded(serviceWorker, tab1Id, '/test', 5000);
+      await waitForTabUrlLoaded(serviceWorker, tab2Id, '/other', 5000);
 
       const filteredTabs = await serviceWorker.evaluate(async () => {
-        return await chrome.tabs.query({ url: '*://example.com/*' });
+        return await chrome.tabs.query({ url: '*://127.0.0.1/test' });
       });
 
       const filteredTabIds = filteredTabs.map((t: chrome.tabs.Tab) => t.id);
       expect(filteredTabIds).toContain(tab1Id);
       expect(filteredTabIds).not.toContain(tab2Id);
       for (const tab of filteredTabs) {
-        expect(tab.url).toContain('example.com');
+        expect(tab.url).toContain('127.0.0.1');
       }
     });
 
@@ -415,7 +416,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -451,7 +452,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       expect(tabId).toBeGreaterThan(0);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
@@ -485,7 +486,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       expect(tabId).toBeGreaterThan(0);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
@@ -528,17 +529,18 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/blank'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      await serviceWorker.evaluate(async (id) => {
-        await chrome.tabs.update(id, { url: 'https://example.com' });
-      }, tabId);
+      const newUrl = getTestServerUrl('/page');
+      await serviceWorker.evaluate(async ({ id, url }) => {
+        await chrome.tabs.update(id, { url });
+      }, { id: tabId, url: newUrl });
 
-      const updatedTab = await waitForTabUrlLoaded(serviceWorker, tabId, 'example.com', 5000);
+      const updatedTab = await waitForTabUrlLoaded(serviceWorker, tabId, '/page', 5000);
 
       expect(updatedTab).toBeDefined();
       expect(updatedTab.id).toBe(tabId);
@@ -564,10 +566,10 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'https://example.com/1');
+      const tab1 = await createTab(extensionContext, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tab1, depth: 0 }], 0);
 
-      const tab2 = await createTab(extensionContext, 'https://example.com/2');
+      const tab2 = await createTab(extensionContext, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -609,7 +611,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com', undefined, {
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, {
         active: false,
       });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
@@ -663,7 +665,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
       const treeState = await serviceWorker.evaluate(async () => {
@@ -699,12 +701,12 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTabId = await createTab(extensionContext, 'https://example.com/parent');
+      const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: parentTabId, depth: 0 }], 0);
 
       const childTabId = await createTab(
         extensionContext,
-        'https://example.com/child',
+        getTestServerUrl('/child'),
         parentTabId
       );
       await assertTabStructure(sidePanelPage, windowId, [
@@ -746,7 +748,7 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'https://example.com');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId, depth: 0 }], 0);
 
       let treeState = await serviceWorker.evaluate(async () => {

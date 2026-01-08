@@ -8,7 +8,7 @@ import {
   assertEventListenersRegistered,
   assertServiceWorkerLifecycle,
 } from './utils/service-worker-utils';
-import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, createTab } from './utils/tab-utils';
+import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, createTab, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import './types';
 
@@ -37,7 +37,7 @@ test.describe('ServiceWorkerUtils', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'about:blank', { active: false });
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabInTreeState } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setUserSettings } from './utils/settings-utils';
@@ -20,7 +20,7 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId = await createTab(extensionContext, 'about:blank');
+      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -93,20 +93,20 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, 'about:blank');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      const tabId2 = await createTab(extensionContext, 'about:blank');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      const tabId3 = await createTab(extensionContext, 'about:blank');
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -196,7 +196,7 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, 'about:blank');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -269,13 +269,13 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTabId = await createTab(extensionContext, 'about:blank');
+      const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      const childTabId = await createTab(extensionContext, 'about:blank', parentTabId);
+      const childTabId = await createTab(extensionContext, getTestServerUrl('/page'), parentTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
@@ -360,13 +360,13 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, 'about:blank');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      const tabId2 = await createTab(extensionContext, 'about:blank');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -438,13 +438,13 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, 'about:blank');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      const tabId2 = await createTab(extensionContext, 'about:blank');
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -515,9 +515,9 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, 'about:blank');
-      const tabId2 = await createTab(extensionContext, 'about:blank');
-      const tabId3 = await createTab(extensionContext, 'about:blank');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -587,9 +587,9 @@ test.describe('タブ複製時の配置', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, 'about:blank');
-      const tabId2 = await createTab(extensionContext, 'about:blank');
-      const tabId3 = await createTab(extensionContext, 'about:blank');
+      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },

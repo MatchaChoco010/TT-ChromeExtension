@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { startDrag, dropTab, waitForDragEnd } from './utils/drag-drop-utils';
 import { setUserSettings } from './utils/settings-utils';
@@ -24,11 +24,11 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     // 5つのタブを作成
-    const tabId1 = await createTab(extensionContext, 'about:blank');
-    const tabId2 = await createTab(extensionContext, 'about:blank');
-    const tabId3 = await createTab(extensionContext, 'about:blank');
-    const tabId4 = await createTab(extensionContext, 'about:blank');
-    const tabId5 = await createTab(extensionContext, 'about:blank');
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId4 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId5 = await createTab(extensionContext, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -117,11 +117,11 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await closeTab(extensionContext, initialBrowserTabId);
 
     // 5つのタブを作成
-    const tabId1 = await createTab(extensionContext, 'about:blank');
-    const tabId2 = await createTab(extensionContext, 'about:blank');
-    const tabId3 = await createTab(extensionContext, 'about:blank');
-    const tabId4 = await createTab(extensionContext, 'about:blank');
-    const tabId5 = await createTab(extensionContext, 'about:blank');
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId4 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId5 = await createTab(extensionContext, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -209,10 +209,10 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await closeTab(extensionContext, initialBrowserTabId);
 
     // 4つのタブを作成
-    const tabId1 = await createTab(extensionContext, 'about:blank');
-    const tabId2 = await createTab(extensionContext, 'about:blank');
-    const tabId3 = await createTab(extensionContext, 'about:blank');
-    const tabId4 = await createTab(extensionContext, 'about:blank');
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId4 = await createTab(extensionContext, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -286,10 +286,10 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await closeTab(extensionContext, initialBrowserTabId);
 
     // 4つのタブを作成
-    const parentTabId = await createTab(extensionContext, 'about:blank');
-    const tabId1 = await createTab(extensionContext, 'about:blank');
-    const tabId2 = await createTab(extensionContext, 'about:blank');
-    const tabId3 = await createTab(extensionContext, 'about:blank');
+    const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [

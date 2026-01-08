@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getPseudoSidePanelTabId, getCurrentWindowId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getPseudoSidePanelTabId, getCurrentWindowId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
 import { moveTabToParent } from './utils/drag-drop-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -22,14 +22,14 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, 'https://example.com/parent');
+    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
     await waitForTabInTreeState(extensionContext, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId = await createTab(extensionContext, 'https://example.com/child', parentTabId);
+    const childTabId = await createTab(extensionContext, getTestServerUrl('/child'), parentTabId);
     await waitForTabInTreeState(extensionContext, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -58,15 +58,15 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       return treeStructure !== undefined && treeStructure.length >= 2;
     }, { timeout: 5000, timeoutMessage: 'treeStructure was not saved to storage' });
 
-    const parentEntry = treeStructure!.find(e => e.url === 'https://example.com/parent');
-    const childEntry = treeStructure!.find(e => e.url === 'https://example.com/child');
+    const parentEntry = treeStructure!.find(e => e.url === getTestServerUrl('/parent'));
+    const childEntry = treeStructure!.find(e => e.url === getTestServerUrl('/child'));
 
     expect(parentEntry).toBeDefined();
     expect(childEntry).toBeDefined();
     expect(parentEntry!.parentIndex).toBeNull();
     expect(childEntry!.parentIndex).not.toBeNull();
 
-    const parentIndex = treeStructure!.findIndex(e => e.url === 'https://example.com/parent');
+    const parentIndex = treeStructure!.findIndex(e => e.url === getTestServerUrl('/parent'));
     expect(childEntry!.parentIndex).toBe(parentIndex);
   });
 
@@ -87,14 +87,14 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabAId = await createTab(extensionContext, 'https://example.com/A');
+    const tabAId = await createTab(extensionContext, getTestServerUrl('/A'));
     await waitForTabInTreeState(extensionContext, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    const tabBId = await createTab(extensionContext, 'https://example.com/B', tabAId);
+    const tabBId = await createTab(extensionContext, getTestServerUrl('/B'), tabAId);
     await waitForTabInTreeState(extensionContext, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -102,7 +102,7 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: tabBId, depth: 1 },
     ], 0);
 
-    const tabCId = await createTab(extensionContext, 'https://example.com/C', tabBId);
+    const tabCId = await createTab(extensionContext, getTestServerUrl('/C'), tabBId);
     await waitForTabInTreeState(extensionContext, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -111,7 +111,7 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: tabCId, depth: 2 },
     ], 0);
 
-    const tabDId = await createTab(extensionContext, 'https://example.com/D', tabCId);
+    const tabDId = await createTab(extensionContext, getTestServerUrl('/D'), tabCId);
     await waitForTabInTreeState(extensionContext, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -137,21 +137,21 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
         return treeState?.treeStructure;
       });
       if (!treeStructure) return false;
-      const hasA = treeStructure.some(e => e.url === 'https://example.com/A');
-      const hasB = treeStructure.some(e => e.url === 'https://example.com/B');
-      const hasC = treeStructure.some(e => e.url === 'https://example.com/C');
-      const hasD = treeStructure.some(e => e.url === 'https://example.com/D');
+      const hasA = treeStructure.some(e => e.url === getTestServerUrl('/A'));
+      const hasB = treeStructure.some(e => e.url === getTestServerUrl('/B'));
+      const hasC = treeStructure.some(e => e.url === getTestServerUrl('/C'));
+      const hasD = treeStructure.some(e => e.url === getTestServerUrl('/D'));
       return hasA && hasB && hasC && hasD;
     }, { timeout: 5000, timeoutMessage: 'treeStructure was not saved to storage with all tabs' });
 
-    const entryA = treeStructure!.find(e => e.url === 'https://example.com/A');
-    const entryB = treeStructure!.find(e => e.url === 'https://example.com/B');
-    const entryC = treeStructure!.find(e => e.url === 'https://example.com/C');
-    const entryD = treeStructure!.find(e => e.url === 'https://example.com/D');
+    const entryA = treeStructure!.find(e => e.url === getTestServerUrl('/A'));
+    const entryB = treeStructure!.find(e => e.url === getTestServerUrl('/B'));
+    const entryC = treeStructure!.find(e => e.url === getTestServerUrl('/C'));
+    const entryD = treeStructure!.find(e => e.url === getTestServerUrl('/D'));
 
-    const indexA = treeStructure!.findIndex(e => e.url === 'https://example.com/A');
-    const indexB = treeStructure!.findIndex(e => e.url === 'https://example.com/B');
-    const indexC = treeStructure!.findIndex(e => e.url === 'https://example.com/C');
+    const indexA = treeStructure!.findIndex(e => e.url === getTestServerUrl('/A'));
+    const indexB = treeStructure!.findIndex(e => e.url === getTestServerUrl('/B'));
+    const indexC = treeStructure!.findIndex(e => e.url === getTestServerUrl('/C'));
 
     expect(entryA!.parentIndex).toBeNull();
     expect(entryB!.parentIndex).toBe(indexA);
@@ -176,14 +176,14 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, 'https://example.com/parent');
+    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
     await waitForTabInTreeState(extensionContext, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId = await createTab(extensionContext, 'https://example.com/child', parentTabId);
+    const childTabId = await createTab(extensionContext, getTestServerUrl('/child'), parentTabId);
     await waitForTabInTreeState(extensionContext, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -191,7 +191,7 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: childTabId, depth: 1 },
     ], 0);
 
-    const grandchildTabId = await createTab(extensionContext, 'https://example.com/grandchild', childTabId);
+    const grandchildTabId = await createTab(extensionContext, getTestServerUrl('/grandchild'), childTabId);
     await waitForTabInTreeState(extensionContext, grandchildTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -338,14 +338,14 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, 'https://example.com/dnd-parent');
+    const parentTabId = await createTab(extensionContext, getTestServerUrl('/dnd-parent'));
     await waitForTabInTreeState(extensionContext, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId = await createTab(extensionContext, 'https://example.com/dnd-child');
+    const childTabId = await createTab(extensionContext, getTestServerUrl('/dnd-child'));
     await waitForTabInTreeState(extensionContext, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -380,14 +380,14 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       });
       if (!treeStructure) return false;
 
-      parentEntry = treeStructure.find(e => e.url === 'https://example.com/dnd-parent');
-      childEntry = treeStructure.find(e => e.url === 'https://example.com/dnd-child');
+      parentEntry = treeStructure.find(e => e.url === getTestServerUrl('/dnd-parent'));
+      childEntry = treeStructure.find(e => e.url === getTestServerUrl('/dnd-child'));
 
       if (!parentEntry || !childEntry) return false;
       if (parentEntry.parentIndex !== null) return false;
       if (childEntry.parentIndex === null) return false;
 
-      const parentIndex = treeStructure.findIndex(e => e.url === 'https://example.com/dnd-parent');
+      const parentIndex = treeStructure.findIndex(e => e.url === getTestServerUrl('/dnd-parent'));
       return childEntry.parentIndex === parentIndex;
     }, { timeout: 5000, timeoutMessage: 'D&D parent-child relation was not saved to treeStructure' });
 
@@ -514,7 +514,7 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabAId = await createTab(extensionContext, 'about:blank');
+    const tabAId = await createTab(extensionContext, getTestServerUrl('/page'));
     await waitForTabInTreeState(extensionContext, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
