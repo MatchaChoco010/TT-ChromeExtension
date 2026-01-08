@@ -1058,6 +1058,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
     const aboveNodeId = dropTarget.adjacentNodeIds?.aboveNodeId;
     const belowNodeId = dropTarget.adjacentNodeIds?.belowNodeId;
+    // eslint-disable-next-line react-hooks/refs -- ドロップターゲット変更時の位置計算に現在値が必要
     const topY = calculateIndicatorYByNodeIds(aboveNodeId, belowNodeId, tabPositionsRef.current);
 
     return {

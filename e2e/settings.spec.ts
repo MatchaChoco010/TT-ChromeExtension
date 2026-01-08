@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import type { Page, Worker } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { COMMON_SELECTORS, COMMON_TIMEOUTS, FORM_INPUTS } from './test-data/common-constants';
 import { waitForCondition } from './utils/polling-utils';
 

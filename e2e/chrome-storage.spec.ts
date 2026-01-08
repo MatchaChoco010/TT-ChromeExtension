@@ -3,7 +3,6 @@ import { test, expect } from './fixtures/extension';
 test.describe('chrome.storage API統合', () => {
   test.describe('chrome.storage.local.set() / get()', () => {
     test('chrome.storage.local.set()で設定を保存した場合、設定が永続化される', async ({
-      extensionContext,
       serviceWorker,
     }) => {
       const testSettings = {

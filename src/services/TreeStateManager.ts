@@ -333,7 +333,7 @@ export class TreeStateManager {
       }
 
       await this.persistState();
-    } catch (_error) {
+    } catch {
       // Chromeタブとの同期失敗は無視
     }
   }
@@ -347,7 +347,7 @@ export class TreeStateManager {
     try {
       await this.loadState();
       await this.persistState();
-    } catch (_error) {
+    } catch {
       // ツリー構造のリフレッシュ失敗は無視
     }
   }
@@ -642,6 +642,7 @@ export class TreeStateManager {
         }
       }
     } catch {
+      // 既存状態読み込み失敗は無視
     }
 
     const treeStructure = await this.buildTreeStructure();
@@ -766,7 +767,7 @@ export class TreeStateManager {
           recalculateDepth(node, 0);
         }
       });
-    } catch (_error) {
+    } catch {
       // 状態読み込み失敗は無視
     }
   }
@@ -1007,7 +1008,8 @@ export class TreeStateManager {
         isExpanded: true,
       };
       await chrome.storage.local.set({ groups: existingGroups });
-    } catch (_err) {
+    } catch {
+      // グループ情報保存失敗は無視
     }
 
     return groupNodeId;
@@ -1088,7 +1090,8 @@ export class TreeStateManager {
       if (groups[node.id]) {
         groupName = groups[node.id].name;
       }
-    } catch (_err) {
+    } catch {
+      // グループ情報取得失敗は無視
     }
 
     const children: Array<{ tabId: number; title: string; url: string }> = [];
@@ -1100,7 +1103,8 @@ export class TreeStateManager {
           title: tab.title || '',
           url: tab.url || '',
         });
-      } catch (_err) {
+      } catch {
+        // タブ情報取得失敗は無視
       }
     }
 

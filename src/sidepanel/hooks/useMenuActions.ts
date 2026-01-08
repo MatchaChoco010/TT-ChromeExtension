@@ -78,7 +78,7 @@ export const useMenuActions = () => {
             if (remainingTabs.length === 0) {
               try {
                 await chrome.windows.remove(sourceWindowId);
-              } catch (_) {
+              } catch {
                 // ウィンドウが既に閉じられている場合のエラーは無視
               }
             }
@@ -154,7 +154,7 @@ export const useMenuActions = () => {
               type: 'CREATE_GROUP',
               payload: { tabIds },
             });
-          } catch (_err) {
+          } catch {
             // グループ化APIのエラーは無視（タブが存在しない場合など）
           }
           break;

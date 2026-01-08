@@ -6,6 +6,7 @@ const createMouseEvent = (
   type: string,
   clientX: number,
   clientY: number,
+  // eslint-disable-next-line no-undef -- MouseEventInitはDOM標準型
   options: Partial<MouseEventInit> = {}
 ): MouseEvent => {
   return new MouseEvent(type, {

@@ -362,7 +362,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await sidePanelPage.waitForTimeout(3000);
 
-    const storageBeforeNewTab = await serviceWorker.evaluate(
+    const _storageBeforeNewTab = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
           parentId: string | null;
@@ -403,7 +403,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: newTab, depth: 0 },
     ], 0);
 
-    const storageAfterNewTab = await serviceWorker.evaluate(
+    const _storageAfterNewTab = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
           parentId: string | null;

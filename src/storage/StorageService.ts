@@ -29,7 +29,7 @@ export class StorageService implements IStorageService {
     try {
       const result = await chrome.storage.local.get(key);
       return result[key] ?? null;
-    } catch (_error) {
+    } catch {
       return null;
     }
   }

@@ -204,8 +204,6 @@ test.describe('UI表示の一貫性', () => {
   test.describe('スタートページタイトルの表示', () => {
     test('スタートページURLのタイトル変換ロジックが正しく実装されている', async ({
       sidePanelPage,
-      extensionContext,
-      serviceWorker,
     }) => {
       // Arrange: Side Panelが表示されていることを確認
       await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({

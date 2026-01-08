@@ -32,7 +32,7 @@ async function getCurrentViewId(): Promise<string> {
       return treeState.currentViewId;
     }
     return DEFAULT_VIEW_ID;
-  } catch (_error) {
+  } catch {
     return DEFAULT_VIEW_ID;
   }
 }
@@ -51,15 +51,15 @@ const pendingLinkClicks = new Map<number, number>();
 
 // E2Eテスト等のService Worker評価コンテキストからアクセスするためglobalThisにエクスポート
 declare global {
-  // eslint-disable-next-line no-var
+   
   var pendingTabParents: Map<number, number>;
-  // eslint-disable-next-line no-var
+   
   var pendingDuplicateSources: Map<number, { url: string; windowId: number }>;
-  // eslint-disable-next-line no-var
+   
   var pendingGroupTabIds: Set<number>;
-  // eslint-disable-next-line no-var
+   
   var pendingLinkClicks: Map<number, number>;
-  // eslint-disable-next-line no-var
+   
   var treeStateManager: TreeStateManager;
 }
 globalThis.pendingTabParents = pendingTabParents;
@@ -271,7 +271,8 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     if (shouldMoveToEnd && tab.windowId !== undefined) {
       try {
         await chrome.tabs.move(tab.id, { index: -1 });
-      } catch (_moveError) {
+      } catch {
+        // タブ移動失敗は無視
       }
     }
 
@@ -286,7 +287,8 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     }
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
-  } catch (_error) {
+  } catch {
+    // タブ追加失敗は無視
   }
 }
 
@@ -317,6 +319,7 @@ async function tryCloseEmptyWindow(windowId: number): Promise<void> {
     console.log('[EMPTY WINDOW DEBUG] Stack trace:', new Error().stack);
     await chrome.windows.remove(windowId);
   } catch {
+    // ウィンドウクローズ失敗は無視
   }
 }
 
@@ -349,7 +352,8 @@ export async function handleTabRemoved(
         delete favicons[tabId];
         await storageService.set(STORAGE_KEYS.TAB_FAVICONS, favicons);
       }
-    } catch (_error) {
+    } catch {
+      // ファビコン削除失敗は無視
     }
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
@@ -357,7 +361,8 @@ export async function handleTabRemoved(
     if (!isWindowClosing) {
       await tryCloseEmptyWindow(windowId);
     }
-  } catch (_error) {
+  } catch {
+    // タブ削除処理失敗は無視
   }
 }
 
@@ -370,7 +375,8 @@ export async function handleTabMoved(
 
   try {
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
-  } catch (_error) {
+  } catch {
+    // タブ移動処理失敗は無視
   }
 }
 
@@ -391,7 +397,8 @@ export async function handleTabUpdated(
         const favicons = storedFaviconsResult ? { ...storedFaviconsResult } : {};
         favicons[tabId] = changeInfo.favIconUrl;
         await storageService.set(STORAGE_KEYS.TAB_FAVICONS, favicons);
-      } catch (_error) {
+      } catch {
+        // ファビコン保存失敗は無視
       }
     }
 
@@ -405,7 +412,8 @@ export async function handleTabUpdated(
     ) {
       chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
     }
-  } catch (_error) {
+  } catch {
+    // タブ更新処理失敗は無視
   }
 }
 
@@ -419,7 +427,8 @@ async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promis
 
       chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
     }
-  } catch (_error) {
+  } catch {
+    // タブアクティブ化処理失敗は無視
   }
 }
 
@@ -433,7 +442,8 @@ function handleTabDetached(
 ): void {
   try {
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
-  } catch (_error) {
+  } catch {
+    // メッセージ送信失敗は無視
   }
 }
 
@@ -447,7 +457,8 @@ function handleTabAttached(
 ): void {
   try {
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
-  } catch (_error) {
+  } catch {
+    // メッセージ送信失敗は無視
   }
 }
 
@@ -458,20 +469,22 @@ async function handleWindowCreated(window: chrome.windows.Window): Promise<void>
     }
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
-  } catch (_error) {
+  } catch {
+    // ウィンドウ作成処理失敗は無視
   }
 }
 
 function handleWindowRemoved(_windowId: number): void {
   try {
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
-  } catch (_error) {
+  } catch {
+    // メッセージ送信失敗は無視
   }
 }
 
 function handleMessage(
   message: MessageType,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): boolean {
@@ -759,7 +772,8 @@ async function handleCreateWindowWithSubtree(
                 }
               });
             });
-          } catch (_error) {
+          } catch {
+            // タブ移動失敗は無視
           }
         }
       }
@@ -773,7 +787,8 @@ async function handleCreateWindowWithSubtree(
             console.log('[CREATE_WINDOW_WITH_SUBTREE DEBUG] Stack trace:', new Error().stack);
             await chrome.windows.remove(sourceWindowId);
           }
-        } catch (_error) {
+        } catch {
+          // ウィンドウクローズ失敗は無視
         }
       }
 
@@ -819,7 +834,8 @@ async function handleMoveSubtreeToWindow(
             }
           });
         });
-      } catch (_error) {
+      } catch {
+        // タブ移動失敗は無視
       }
     }
 
@@ -928,7 +944,8 @@ async function handleCreateGroup(
       const firstTab = await chrome.tabs.get(tabIds[0]);
       windowId = firstTab.windowId;
       firstTabIndex = firstTab.index;
-    } catch (_err) {
+    } catch {
+      // タブ情報取得失敗は無視
     }
 
     const createOptions: chrome.tabs.CreateProperties = {

@@ -117,7 +117,7 @@ export class TitlePersistenceService {
   private async saveToStorage(): Promise<void> {
     try {
       await this.storageService.set(STORAGE_KEYS.TAB_TITLES, { ...this.titles });
-    } catch (_error) {
+    } catch {
       // サイレント失敗（次回再試行）
     }
   }

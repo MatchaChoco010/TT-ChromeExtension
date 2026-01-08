@@ -234,11 +234,11 @@ export class SnapshotManager {
           if (this.currentMaxSnapshots && this.currentMaxSnapshots > 0) {
             try {
               await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
-            } catch (_deleteError) {
+            } catch {
               // 古いスナップショット削除失敗は無視
             }
           }
-        } catch (_error) {
+        } catch {
           // 自動スナップショット失敗は無視
         }
       }

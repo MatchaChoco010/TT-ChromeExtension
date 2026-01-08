@@ -507,7 +507,7 @@ async function waitForStorageParentNull(serviceWorker: Worker, childTabId: numbe
         tabToNode: Record<number, string>;
         nodes: Record<string, TreeNode>;
       }
-      const treeState = await serviceWorker.evaluate(async (childId) => {
+      const treeState = await serviceWorker.evaluate(async (_childId) => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state as LocalTreeState | undefined;
       }, childTabId);

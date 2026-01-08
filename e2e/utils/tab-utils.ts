@@ -5,7 +5,7 @@
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 import type { TestGlobals } from '../types';
-import { waitForTabStatusComplete, waitForTabInTreeState } from './polling-utils';
+import { waitForTabStatusComplete } from './polling-utils';
 
 declare const globalThis: typeof globalThis & TestGlobals;
 

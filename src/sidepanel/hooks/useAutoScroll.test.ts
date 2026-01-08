@@ -7,6 +7,7 @@ describe('useAutoScroll', () => {
   let containerRef: React.RefObject<HTMLDivElement>;
   let originalRAF: typeof requestAnimationFrame;
   let originalCAF: typeof cancelAnimationFrame;
+  // eslint-disable-next-line no-undef -- FrameRequestCallbackはDOM標準型
   let rafCallbacks: Array<FrameRequestCallback>;
 
   beforeEach(() => {
@@ -47,6 +48,7 @@ describe('useAutoScroll', () => {
     originalRAF = globalThis.requestAnimationFrame;
     originalCAF = globalThis.cancelAnimationFrame;
 
+    // eslint-disable-next-line no-undef -- FrameRequestCallbackはDOM標準型
     globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
       rafCallbacks.push(callback);
       return rafCallbacks.length;

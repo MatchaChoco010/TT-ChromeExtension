@@ -211,7 +211,7 @@ export class ViewManager {
       };
 
       await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);
-    } catch (_error) {
+    } catch {
       // 状態永続化失敗は無視
     }
   }
@@ -239,7 +239,7 @@ export class ViewManager {
       if (treeState.currentViewId && this.views.has(treeState.currentViewId)) {
         this.currentViewId = treeState.currentViewId;
       }
-    } catch (_error) {
+    } catch {
       // 状態読み込み失敗は無視
     }
   }

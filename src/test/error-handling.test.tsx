@@ -27,7 +27,7 @@ describe('エラーハンドリングとエッジケース', () => {
       await expect(async () => {
         try {
           await chrome.tabs.get(999);
-        } catch (_error) {
+        } catch {
           // エラーをログに記録するが、処理は継続
         }
       }).not.toThrow();
@@ -77,7 +77,7 @@ describe('エラーハンドリングとエッジケース', () => {
       let errorCaught = false;
       try {
         await chrome.tabs.remove(1);
-      } catch (_error) {
+      } catch {
         errorCaught = true;
       }
 
@@ -141,7 +141,7 @@ describe('エラーハンドリングとエッジケース', () => {
 
       try {
         await idbService.saveSnapshot(largeSnapshot);
-      } catch (_error: unknown) {
+      } catch {
         // QuotaExceededError would be handled silently
       }
     });

@@ -10,7 +10,6 @@
  * タイムアウトするまで待機する共通関数を提供する。
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
-import { expect } from '@playwright/test';
 import '../types';
 
 /**
@@ -63,7 +62,7 @@ async function getServiceWorker(context: BrowserContext): Promise<Worker> {
  *   { timeout: 5000, timeoutMessage: `Tab ${tabId} was not added to tree` }
  * );
  */
-export async function pollInServiceWorker<T, R>(
+export async function pollInServiceWorker<T>(
   serviceWorker: Worker,
   conditionFn: (args: T) => Promise<boolean> | boolean,
   args: T,
@@ -79,7 +78,7 @@ export async function pollInServiceWorker<T, R>(
 
   const result = await serviceWorker.evaluate(
     async ({ conditionFnStr, args, iterations, interval }) => {
-      // eslint-disable-next-line no-eval
+       
       const fn = eval(`(${conditionFnStr})`);
       for (let i = 0; i < iterations; i++) {
         try {
@@ -87,6 +86,7 @@ export async function pollInServiceWorker<T, R>(
             return { success: true };
           }
         } catch {
+          // ポーリング中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -128,7 +128,7 @@ export async function waitForTreeStateCondition(
 
   const result = await serviceWorker.evaluate(
     async ({ checkFnStr, iterations, interval }) => {
-      // eslint-disable-next-line no-eval
+       
       const checkFn = eval(`(${checkFnStr})`) as (treeState: unknown) => boolean;
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
@@ -299,6 +299,7 @@ export async function waitForWindowRegistered(
             return { success: true };
           }
         } catch {
+          // ウィンドウ確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -342,6 +343,7 @@ export async function waitForWindowClosed(
             return { success: true };
           }
         } catch {
+          // ウィンドウ確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -387,6 +389,7 @@ export async function waitForTabInWindow(
             return { success: true };
           }
         } catch {
+          // タブ確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -438,6 +441,7 @@ export async function waitForWindowTreeSync(
             }
           }
         } catch {
+          // 同期確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -604,7 +608,7 @@ export async function pollInPage<T>(
 
   const result = await page.evaluate(
     async ({ conditionFnStr, args, iterations, interval }) => {
-      // eslint-disable-next-line no-eval
+       
       const fn = eval(`(${conditionFnStr})`);
       for (let i = 0; i < iterations; i++) {
         try {
@@ -612,6 +616,7 @@ export async function pollInPage<T>(
             return { success: true };
           }
         } catch {
+          // 条件確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -651,6 +656,7 @@ export async function waitForSidePanelReady(
   try {
     await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 5000 });
   } catch {
+    // ローディング表示がない場合は無視
   }
 
   const iterations = Math.ceil(timeout / interval);
@@ -776,6 +782,7 @@ export async function waitForViewSwitcher(
   try {
     await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 5000 });
   } catch {
+    // ローディング表示がない場合は無視
   }
 
   await page.waitForSelector('[data-testid="view-switcher-container"]', { timeout });
@@ -850,6 +857,7 @@ export async function waitForTabStatusComplete(
             return { success: true };
           }
         } catch {
+          // タブ状態確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -892,6 +900,7 @@ export async function waitForTabDiscarded(
             return { success: true };
           }
         } catch {
+          // タブ状態確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -934,6 +943,7 @@ export async function waitForTabNotDiscarded(
             return { success: true };
           }
         } catch {
+          // タブ状態確認中のエラーは無視
         }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
@@ -985,6 +995,7 @@ export async function waitForCondition(
         return;
       }
     } catch {
+      // 条件確認中のエラーは無視
     }
     await new Promise(resolve => setTimeout(resolve, interval));
   }

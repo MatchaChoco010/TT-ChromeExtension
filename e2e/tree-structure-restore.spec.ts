@@ -44,7 +44,7 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       viewId: string;
       isExpanded: boolean;
     }
-    interface TreeState {
+    interface _TreeState {
       treeStructure?: TreeStructureEntry[];
     }
 
@@ -562,7 +562,7 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       ];
 
       const nodeId = treeState.tabToNode[tabAId];
-      const tabIndex = nodeId
+      const _tabIndex = nodeId
         ? Object.entries(treeState.nodes || {}).find(([id]) => id === nodeId)?.[1]
         : null;
 

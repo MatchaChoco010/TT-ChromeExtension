@@ -38,6 +38,7 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({
 
   useEffect(() => {
     loadSnapshots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 初回マウント時のみ実行
   }, []);
 
   const handleCreate = async () => {

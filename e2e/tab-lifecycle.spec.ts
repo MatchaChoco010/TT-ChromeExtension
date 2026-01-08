@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
-import { waitForTabInTreeState, waitForTabRemovedFromTreeState, waitForCondition, waitForTabUrlLoaded, waitForTabStatusComplete } from './utils/polling-utils';
+import { waitForTabRemovedFromTreeState, waitForTabUrlLoaded } from './utils/polling-utils';
 
 test.describe('タブライフサイクルとツリー構造の基本操作', () => {
   test('新しいタブを作成した場合、タブが正常に作成される', async ({

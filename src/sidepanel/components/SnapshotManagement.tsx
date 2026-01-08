@@ -34,6 +34,7 @@ const SnapshotManagement: React.FC<SnapshotManagementProps> = ({
 
   useEffect(() => {
     loadSnapshots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 初回マウント時のみ実行
   }, []);
 
   const handleRestore = async (snapshotId: string) => {

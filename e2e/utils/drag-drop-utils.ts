@@ -355,7 +355,7 @@ async function waitForDropIndicator(page: Page, maxWait: number = 2000): Promise
  * @param maxWait - 最大待機時間（ミリ秒）
  * @throws タイムアウト時にError
  */
-async function waitForTargetHighlight(page: Page, targetTabId: number, maxWait: number = 2000): Promise<void> {
+async function _waitForTargetHighlight(page: Page, targetTabId: number, maxWait: number = 2000): Promise<void> {
   const startTime = Date.now();
   while (Date.now() - startTime < maxWait) {
     const result = await page.evaluate((tabId: number) => {

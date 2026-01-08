@@ -225,7 +225,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      const stateBeforeDrag = await serviceWorker.evaluate(async () => {
+      const _stateBeforeDrag = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return JSON.stringify(result.tree_state);
       });
@@ -233,7 +233,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await startDrag(sidePanelPage, tab3);
       await hoverOverTab(sidePanelPage, tab1);
 
-      const stateDuringDrag = await serviceWorker.evaluate(async () => {
+      const _stateDuringDrag = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return JSON.stringify(result.tree_state);
       });

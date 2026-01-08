@@ -1,6 +1,6 @@
-import { test, expect } from './fixtures/extension';
+import { test } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, clickLinkToOpenTab, activateTab, setupTestLinkPageRoute, getTestLinkPageUrl } from './utils/tab-utils';
-import { waitForTabInTreeState, waitForTabStatusComplete } from './utils/polling-utils';
+import { waitForTabInTreeState } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setUserSettings } from './utils/settings-utils';
 
@@ -36,7 +36,6 @@ test.describe('新しいタブの位置設定', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      // 設定タブを開く（手動で開かれたタブとして扱われる）
       const settingsTabId = await serviceWorker.evaluate(async () => {
         const settingsUrl = chrome.runtime.getURL('settings.html');
         const tab = await chrome.tabs.create({ url: settingsUrl });
@@ -45,7 +44,6 @@ test.describe('新しいタブの位置設定', () => {
 
       await waitForTabInTreeState(extensionContext, settingsTabId!);
 
-      // 設定タブはリストの最後に配置されるべき
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -63,7 +61,6 @@ test.describe('新しいタブの位置設定', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // 最初に設定を'end'にリセット（テスト間で設定が残る可能性があるため）
       await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
       await sidePanelPage.waitForTimeout(100);
 
@@ -76,25 +73,20 @@ test.describe('新しいタブの位置設定', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 親タブを作成（設定は'end'なのでルートに配置される）
       const parentTabId = await createTab(extensionContext, 'about:blank');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      // ここで設定を'child'に変更
       await setUserSettings(extensionContext, { newTabPositionManual: 'child' });
       await sidePanelPage.waitForTimeout(100);
 
-      // 親タブをアクティブにする
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.update(tabId, { active: true });
       }, parentTabId);
       await sidePanelPage.waitForTimeout(100);
 
-      // 新しいタブを作成（アクティブタブの子として配置されるべき）
-      // 手動で開くタブにはopenerTabIdがないため、about:blankでもchildとして配置される
       const newTabId = await serviceWorker.evaluate(async () => {
         const tab = await chrome.tabs.create({ url: 'about:blank' });
         return tab.id;
@@ -102,7 +94,6 @@ test.describe('新しいタブの位置設定', () => {
 
       await waitForTabInTreeState(extensionContext, newTabId!);
 
-      // 新しいタブはparentTabの子として配置されるべき
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },

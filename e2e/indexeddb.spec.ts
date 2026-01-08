@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures/extension';
 import {
-  INDEXEDDB_TIMEOUTS,
   TEST_SNAPSHOT_DATA,
   generateLargeSnapshotData,
   DB_NAME,

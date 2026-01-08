@@ -75,7 +75,7 @@ export async function assertRealTimeUpdate(
  */
 export async function assertSmoothScrolling(
   page: Page,
-  tabCount: number
+  _tabCount: number
 ): Promise<void> {
   const sidePanelRoot = page.locator('[data-testid="side-panel-root"]');
   await expect(sidePanelRoot).toBeVisible({ timeout: 5000 });

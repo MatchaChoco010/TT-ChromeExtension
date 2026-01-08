@@ -103,22 +103,22 @@ export function isTreeState(value: unknown): value is TreeState {
 declare global {
   interface Window extends TestGlobals {}
 
-  // eslint-disable-next-line no-var
+   
   var receivedMessages: TestGlobals['receivedMessages'];
-  // eslint-disable-next-line no-var
+   
   var listenerReady: TestGlobals['listenerReady'];
-  // eslint-disable-next-line no-var
+   
   var stateUpdatedReceived: TestGlobals['stateUpdatedReceived'];
-  // eslint-disable-next-line no-var
+   
   var stateUpdateCount: TestGlobals['stateUpdateCount'];
-  // eslint-disable-next-line no-var
+   
   var testState: TestGlobals['testState'];
-  // eslint-disable-next-line no-var
+   
   var messageLog: TestGlobals['messageLog'];
-  // eslint-disable-next-line no-var
+   
   var receivedCount: TestGlobals['receivedCount'];
-  // eslint-disable-next-line no-var
+   
   var pendingTabParents: TestGlobals['pendingTabParents'];
-  // eslint-disable-next-line no-var
+   
   var pendingDuplicateSources: TestGlobals['pendingDuplicateSources'];
 }

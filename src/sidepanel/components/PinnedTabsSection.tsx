@@ -186,6 +186,7 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
   containerRef,
 }) => {
   const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+    // eslint-disable-next-line react-hooks/immutability -- propsで渡されたrefへの設定は意図的
     (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
   }, [containerRef]);
 

@@ -27,7 +27,7 @@ async function cleanupStaleTabData(): Promise<void> {
     await testTreeStateManager.cleanupStaleNodes(existingTabIds);
 
     testTitlePersistence.cleanup(existingTabIds);
-  } catch (_error) {
+  } catch {
     // エラーを無視（クリーンアップ失敗は致命的ではない）
   }
 }
@@ -47,7 +47,7 @@ async function initializeAutoSnapshot(): Promise<void> {
         snapshotManager.startAutoSnapshot(interval, maxSnapshots);
       }
     }
-  } catch (_error) {
+  } catch {
     // エラーを無視
   }
 }
@@ -104,7 +104,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
     // 以降に作成されるタブにのみ未読バッジを表示する
     testUnreadTracker.setInitialLoadComplete();
-  } catch (_error) {
+  } catch {
     // エラーを無視
   }
 })();
@@ -120,7 +120,7 @@ chrome.action.onClicked.addListener(async () => {
   try {
     const settingsUrl = chrome.runtime.getURL('settings.html');
     await chrome.tabs.create({ url: settingsUrl });
-  } catch (_error) {
+  } catch {
     // エラーを無視
   }
 });

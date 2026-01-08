@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/extension';
 import { createWindow, openSidePanelForWindow } from './utils/window-utils';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
 import { assertTabStructure, assertWindowClosed, assertWindowExists } from './utils/assertion-utils';
 
 test.describe('chrome.windows API統合', () => {

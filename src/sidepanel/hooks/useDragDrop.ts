@@ -438,10 +438,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   }, [dragState]);
 
   useEffect(() => {
+    const handleDragStart = handleDragStartRef.current;
     return () => {
       document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
       document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
-      document.removeEventListener('dragstart', handleDragStartRef.current);
+      document.removeEventListener('dragstart', handleDragStart);
     };
   }, []);
 

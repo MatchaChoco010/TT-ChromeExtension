@@ -89,7 +89,7 @@ test.describe('Ghost Tab Cleanup', () => {
         };
 
         const staleTabIds: number[] = [];
-        for (const [tabIdStr, nodeId] of Object.entries(treeState.tabToNode)) {
+        for (const [tabIdStr, _nodeId] of Object.entries(treeState.tabToNode)) {
           const tabId = parseInt(tabIdStr);
           if (!existingTabIds.includes(tabId)) {
             staleTabIds.push(tabId);

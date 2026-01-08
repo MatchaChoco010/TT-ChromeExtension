@@ -271,7 +271,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       if (result.groups) {
         setGroups(result.groups);
       }
-    } catch (_err) {
+    } catch {
       // グループ読み込みエラーは無視（ストレージが空の場合など）
     }
   }, []);
@@ -282,7 +282,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       if (result[STORAGE_KEYS.UNREAD_TABS]) {
         setUnreadTabIds(new Set(result[STORAGE_KEYS.UNREAD_TABS]));
       }
-    } catch (_err) {
+    } catch {
       // 未読タブ読み込みエラーは無視（ストレージが空の場合など）
     }
   }, []);
@@ -293,7 +293,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       if (activeTab?.id) {
         setActiveTabId(activeTab.id);
       }
-    } catch (_err) {
+    } catch {
       // アクティブタブ取得エラーは無視
     }
   }, []);
@@ -311,7 +311,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       if (currentWindow?.id !== undefined) {
         setCurrentWindowId(currentWindow.id);
       }
-    } catch (_err) {
+    } catch {
       // ウィンドウID取得エラーは無視（APIが利用できない場合はnullのまま）
     }
   }, []);
@@ -351,7 +351,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         }
       }
       setTabInfoMap(newTabInfoMap);
-    } catch (_err) {
+    } catch {
       // タブ情報読み込みエラーは無視
     }
   }, []);
@@ -397,7 +397,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             };
             setTreeState(initialState);
           }
-        } catch (_error) {
+        } catch {
           // 同期に失敗しても初期状態を設定
           const initialState: TreeState = {
             views: [
@@ -541,7 +541,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             const persistedFavicons: Record<number, string> = storedResult[STORAGE_KEYS.TAB_FAVICONS] || {};
             persistedFavicons[tabId] = changeInfo.favIconUrl;
             await chrome.storage.local.set({ [STORAGE_KEYS.TAB_FAVICONS]: persistedFavicons });
-          } catch (_err) {
+          } catch {
             // ファビコン永続化エラーは無視
           }
         }
@@ -552,7 +552,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             const persistedTitles: Record<number, string> = storedResult[STORAGE_KEYS.TAB_TITLES] || {};
             persistedTitles[tabId] = changeInfo.title;
             await chrome.storage.local.set({ [STORAGE_KEYS.TAB_TITLES]: persistedTitles });
-          } catch (_err) {
+          } catch {
             // タイトル永続化エラーは無視
           }
         }
@@ -606,7 +606,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         });
 
         loadTreeState();
-      } catch (_err) {
+      } catch {
         // タブインデックス更新エラーは無視
       }
     };
@@ -693,7 +693,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, []);
 
-  const updateTreeState = async (state: TreeState) => {
+  const updateTreeState = useCallback(async (state: TreeState) => {
     isLocalUpdateRef.current = true;
     try {
       setTreeState(state);
@@ -704,7 +704,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         isLocalUpdateRef.current = false;
       }, 0);
     }
-  };
+  }, []);
 
   /**
    * ビュー切り替え
@@ -717,7 +717,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       currentViewId: viewId,
     };
     updateTreeState(newState);
-  }, [treeState]);
+  }, [treeState, updateTreeState]);
 
   const createView = useCallback(() => {
     if (!treeState) return;
@@ -737,7 +737,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       views: [...treeState.views, newView],
     };
     updateTreeState(newState);
-  }, [treeState]);
+  }, [treeState, updateTreeState]);
 
   /**
    * ビューを削除
@@ -780,7 +780,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       currentViewId: newCurrentViewId,
     };
     updateTreeState(newState);
-  }, [treeState]);
+  }, [treeState, updateTreeState]);
 
   const updateView = useCallback((viewId: string, updates: Partial<View>) => {
     if (!treeState) return;
@@ -794,7 +794,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       views: newViews,
     };
     updateTreeState(newState);
-  }, [treeState]);
+  }, [treeState, updateTreeState]);
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {

@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useMemo,
+  useCallback,
 } from 'react';
 import type { UserSettings } from '@/types';
 
@@ -67,10 +68,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const updateSettings = (newSettings: UserSettings) => {
+  const updateSettings = useCallback((newSettings: UserSettings) => {
     setSettings(newSettings);
     chrome.storage.local.set({ user_settings: newSettings });
-  };
+  }, []);
 
   useEffect(() => {
     if (!settings) return;
@@ -146,7 +147,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         if (!hasError) {
           css += `\n${settings.customCSS}`;
         }
-      } catch (e) {
+      } catch {
         hasError = true;
       }
     }

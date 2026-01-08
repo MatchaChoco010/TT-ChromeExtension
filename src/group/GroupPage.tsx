@@ -52,7 +52,7 @@ export const GroupPage: React.FC = () => {
     try {
       const groupInfo = await fetchGroupInfo(tabId);
       setState({ status: 'loaded', groupInfo });
-    } catch (error) {
+    } catch {
       setState({
         status: 'error',
         message: 'グループ情報の取得に失敗しました',
@@ -61,6 +61,7 @@ export const GroupPage: React.FC = () => {
   }, [tabId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 初回マウント時のデータ読み込みパターン
     loadGroupInfo();
   }, [loadGroupInfo]);
 
