@@ -212,7 +212,7 @@ export class ViewManager {
 
       await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);
     } catch (_error) {
-      // Persist state failed silently
+      // 状態永続化失敗は無視
     }
   }
 
@@ -240,7 +240,7 @@ export class ViewManager {
         this.currentViewId = treeState.currentViewId;
       }
     } catch (_error) {
-      // Load state failed silently
+      // 状態読み込み失敗は無視
     }
   }
 }

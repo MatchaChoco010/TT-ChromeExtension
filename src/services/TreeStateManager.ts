@@ -314,14 +314,13 @@ export class TreeStateManager {
    */
   async syncWithChromeTabs(): Promise<void> {
     try {
-      // IMPORTANT: Load the latest state from storage before syncing
-      // This prevents race conditions where concurrent operations (like handleTabCreated)
-      // might have modified and saved state that we would otherwise overwrite
+      // 同期前にストレージから最新状態を読み込む
+      // 並行操作（handleTabCreatedなど）が保存した状態を上書きしないための競合防止
       await this.loadState();
 
       const tabs = await chrome.tabs.query({});
 
-      // Must match TreeStateProvider's default currentViewId
+      // TreeStateProviderのdefaultのcurrentViewIdと一致させる必要がある
       const defaultViewId = 'default';
 
       const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
@@ -335,7 +334,7 @@ export class TreeStateManager {
 
       await this.persistState();
     } catch (_error) {
-      // Error syncing with Chrome tabs silently
+      // Chromeタブとの同期失敗は無視
     }
   }
 
@@ -349,7 +348,7 @@ export class TreeStateManager {
       await this.loadState();
       await this.persistState();
     } catch (_error) {
-      // Error refreshing tree structure silently
+      // ツリー構造のリフレッシュ失敗は無視
     }
   }
 
@@ -407,7 +406,7 @@ export class TreeStateManager {
     }
 
     // パス1で新規追加されたタブIDを追跡
-    // 既存ノードはloadState()で正しくparentIdが設定されているため、Pass2で上書きしない
+    // 既存ノードはloadState()で正しくparentIdが設定されているため、パス2で上書きしない
     const newlyAddedTabIds = new Set<number>();
 
     for (let i = 0; i < treeStructure.length; i++) {
@@ -617,8 +616,7 @@ export class TreeStateManager {
   private async persistState(): Promise<void> {
     const nodesRecord: Record<string, TabNode> = {};
     this.nodes.forEach((node, id) => {
-      // children配列の順序を保持するため、各子ノードのIDを保存
-      // 循環参照を避けるため、子ノードの完全なオブジェクトではなくIDのみを保存
+      // 循環参照を避けるため、子ノードはIDのみ保存（children配列の順序を保持）
       nodesRecord[id] = {
         ...node,
         children: node.children.map(child => ({ id: child.id })) as unknown as TabNode[],
@@ -723,14 +721,14 @@ export class TreeStateManager {
       });
 
       // ストレージに保存されたchildren配列の順序を維持して再構築
-      // 2段階で処理: 1. 保存された順序で追加、2. parentIdで関連付けられているが未追加の子を追加
+      // 2段階処理: 1. 保存順序で追加、2. parentIdで関連付けられた未追加の子を追加
       const addedChildIds = new Set<string>();
 
+      // 第1段階: 保存されたchildren配列の順序で子を追加
       Object.entries(state.nodes).forEach(([parentId, parentNode]) => {
         const parent = this.nodes.get(parentId);
         if (!parent) return;
 
-        // 保存されたchildren配列がある場合はその順序を使用
         if (parentNode.children && Array.isArray(parentNode.children)) {
           for (const storedChild of parentNode.children) {
             if (!storedChild || typeof storedChild !== 'object') continue;
@@ -745,7 +743,7 @@ export class TreeStateManager {
         }
       });
 
-      // フォールバック: parentIdで関連付けられているが、まだ追加されていない子を追加
+      // 第2段階: parentIdで関連付けられているが未追加の子を追加（フォールバック）
       this.nodes.forEach((node, id) => {
         if (addedChildIds.has(id)) return;
         if (node.parentId) {
@@ -769,7 +767,7 @@ export class TreeStateManager {
         }
       });
     } catch (_error) {
-      // Error loading state silently
+      // 状態読み込み失敗は無視
     }
   }
 

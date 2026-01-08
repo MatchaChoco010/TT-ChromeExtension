@@ -172,7 +172,6 @@ function flattenTreeDFS(
     (node) => node.parentId === null && node.viewId === currentViewId
   );
 
-  // ルートノードをtabInfoMapのインデックスでソート（buildTreeと同じ順序）
   rootNodes.sort((a, b) => {
     const indexA = tabInfoMap[a.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
     const indexB = tabInfoMap[b.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
@@ -232,7 +231,6 @@ async function syncTreeToChromeTabs(
     if (currentIndex !== undefined && currentIndex !== expectedIndex) {
       try {
         await chrome.tabs.move(tabId, { index: expectedIndex });
-        // 移動後は他のタブのインデックスも変わるので、再取得
         const updatedTabs = await chrome.tabs.query({ currentWindow: true });
         currentIndexMap.clear();
         for (const tab of updatedTabs) {
@@ -274,7 +272,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         setGroups(result.groups);
       }
     } catch (_err) {
-      // Failed to load groups silently
+      // グループ読み込みエラーは無視（ストレージが空の場合など）
     }
   }, []);
 
@@ -285,7 +283,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         setUnreadTabIds(new Set(result[STORAGE_KEYS.UNREAD_TABS]));
       }
     } catch (_err) {
-      // Failed to load unread tabs silently
+      // 未読タブ読み込みエラーは無視（ストレージが空の場合など）
     }
   }, []);
 
@@ -296,7 +294,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         setActiveTabId(activeTab.id);
       }
     } catch (_err) {
-      // Failed to load active tab silently
+      // アクティブタブ取得エラーは無視
     }
   }, []);
 
@@ -314,8 +312,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         setCurrentWindowId(currentWindow.id);
       }
     } catch (_err) {
-      // Failed to load current window ID silently
-      // APIが利用できない場合はnullのまま（全タブを表示）
+      // ウィンドウID取得エラーは無視（APIが利用できない場合はnullのまま）
     }
   }, []);
 
@@ -355,7 +352,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       }
       setTabInfoMap(newTabInfoMap);
     } catch (_err) {
-      // Failed to load tab info silently
+      // タブ情報読み込みエラーは無視
     }
   }, []);
 
@@ -545,7 +542,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             persistedFavicons[tabId] = changeInfo.favIconUrl;
             await chrome.storage.local.set({ [STORAGE_KEYS.TAB_FAVICONS]: persistedFavicons });
           } catch (_err) {
-            // Failed to persist favicon silently
+            // ファビコン永続化エラーは無視
           }
         }
 
@@ -556,7 +553,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
             persistedTitles[tabId] = changeInfo.title;
             await chrome.storage.local.set({ [STORAGE_KEYS.TAB_TITLES]: persistedTitles });
           } catch (_err) {
-            // Failed to persist title silently
+            // タイトル永続化エラーは無視
           }
         }
       }
@@ -610,7 +607,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
         loadTreeState();
       } catch (_err) {
-        // Failed to update tab indices silently
+        // タブインデックス更新エラーは無視
       }
     };
 
@@ -699,9 +696,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const updateTreeState = async (state: TreeState) => {
     isLocalUpdateRef.current = true;
     try {
-      // Update local state first for immediate UI response
       setTreeState(state);
-      // Then save to storage (storage listener will also trigger, but with same data)
       await chrome.storage.local.set({ tree_state: state });
     } finally {
       // フラグをリセット（次のイベントループでストレージリスナーが完了した後）
@@ -937,7 +932,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       }
 
       chrome.runtime.sendMessage({ type: 'REFRESH_TREE_STRUCTURE' }).catch(() => {
-        // Ignore errors when no listeners are available
+        // リスナーが存在しない場合のエラーは無視
       });
     },
     [treeState, updateTreeState, tabInfoMap, selectedNodeIds]
@@ -1157,7 +1152,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       }
 
       chrome.runtime.sendMessage({ type: 'REFRESH_TREE_STRUCTURE' }).catch((_error) => {
-        // Ignore errors when no listeners are available
+        // リスナーが存在しない場合のエラーは無視
       });
     },
     [treeState, updateTreeState, tabInfoMap, selectedNodeIds]
@@ -1318,7 +1313,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         }
         return tabInfo.isPinned;
       })
-      // ブラウザのタブ順序と同期するために、indexでソートする
       .sort((a, b) => a.index - b.index)
       .map(tabInfo => tabInfo.id);
   }, [tabInfoMap, currentWindowId]);
@@ -1426,7 +1420,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         updatedNodes[nodeId] = {
           ...updatedNodes[nodeId],
           viewId,
-          // 親子関係をルートに移動（異なるビューへの移動時）
           parentId: null,
         };
       }

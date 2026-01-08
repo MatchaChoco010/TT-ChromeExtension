@@ -3,12 +3,6 @@ import type { Page, Worker } from '@playwright/test';
 import { COMMON_SELECTORS, COMMON_TIMEOUTS, FORM_INPUTS } from './test-data/common-constants';
 import { waitForCondition } from './utils/polling-utils';
 
-/**
- * 設定ページを新規タブで開くヘルパー関数
- * @param extensionContext - BrowserContext
- * @param extensionId - 拡張機能のID
- * @returns 設定ページのPage
- */
 async function openSettingsInNewTab(
   extensionContext: import('@playwright/test').BrowserContext,
   extensionId: string
@@ -25,12 +19,12 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   test('サイドパネルに設定ボタンが存在しない', async ({
     sidePanelPage,
   }) => {
-    // Arrange: Side Panelが表示されていることを確認
+    // Arrange
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
 
-    // Assert: 設定ボタンがサイドパネルに存在しないことを確認
+    // Assert
     const openSettingsButton = sidePanelPage.locator('[data-testid="open-settings-button"]');
     await expect(openSettingsButton).not.toBeVisible();
   });
@@ -39,7 +33,7 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
     extensionContext,
     extensionId,
   }) => {
-    // Act: 設定ページを直接URLで開く
+    // Act
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     expect(settingsPage.url()).toContain(`chrome-extension://${extensionId}/settings.html`);
@@ -421,7 +415,7 @@ test.describe('スナップショット自動保存設定', () => {
     extensionId,
     serviceWorker,
   }) => {
-    // Arrange: 設定ページを開く
+    // Arrange
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
@@ -449,7 +443,6 @@ test.describe('スナップショット自動保存設定', () => {
 
     await settingsPage.close();
 
-    // ページをリロード（ブラウザ再起動のシミュレーション）
     await sidePanelPage.reload();
     await sidePanelPage.waitForLoadState('domcontentloaded');
     await sidePanelPage.waitForSelector(COMMON_SELECTORS.reactRoot, { timeout: COMMON_TIMEOUTS.medium });

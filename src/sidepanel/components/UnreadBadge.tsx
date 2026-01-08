@@ -12,16 +12,6 @@ interface UnreadBadgeProps {
   className?: string;
 }
 
-/**
- * UnreadBadge コンポーネント
- *
- * タブの未読状態を示す三角形切り欠きインジケーターを表示する
- *
- * - 左下角に小さな三角形の切り欠きとして表示
- * - タブ要素に重なる形で配置
- * - 既読状態への変化時に非表示化
- * - タブのdepthに応じた位置にインデント表示
- */
 const UnreadBadge: React.FC<UnreadBadgeProps> = ({
   isUnread,
   showIndicator,

@@ -155,7 +155,7 @@ export const useMenuActions = () => {
               payload: { tabIds },
             });
           } catch (_err) {
-            // グループ化に失敗
+            // グループ化APIのエラーは無視（タブが存在しない場合など）
           }
           break;
 

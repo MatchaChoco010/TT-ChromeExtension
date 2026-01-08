@@ -1,23 +1,8 @@
-/**
- * SubMenu コンポーネント
- * 汎用サブメニューコンポーネント
- *
- * ホバーで展開する汎用サブメニューを提供します。
- * - 親メニュー項目ホバーで子メニュー表示
- * - 画面端での位置自動調整
- * - キーボードナビゲーション対応
- */
-
 import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import type { SubMenuItem, SubMenuProps } from '@/types';
 
 export type { SubMenuItem, SubMenuProps };
 
-/**
- * SubMenu コンポーネント
- *
- * 親メニュー項目にネストして使用するサブメニューを提供します。
- */
 export const SubMenu: React.FC<SubMenuProps> = ({
   label,
   items,

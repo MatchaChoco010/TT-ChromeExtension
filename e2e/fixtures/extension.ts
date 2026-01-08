@@ -202,9 +202,8 @@ const createExtensionContext = async (
 
   const userDataDir = createUniqueUserDataDir();
 
-  // Persistent Contextを作成して拡張機能をロード
-  // 重要: Chrome拡張機能はheadlessモードで正式サポートされていないため、
-  // --headless=new を使用する（Playwrightのheadlessオプションではなく）
+  // Chrome拡張機能はheadlessモードで正式サポートされていないため、
+  // --headless=newを使用する（Playwrightのheadlessオプションではなく）
   const context = await chromium.launchPersistentContext(userDataDir, {
     // headlessオプションは使用しない（--headless=new を args で指定）
     headless: false,
@@ -342,7 +341,7 @@ export const test = base.extend<ExtensionFixtures>({
     }
 
     await serviceWorker.evaluate(async () => {
-      // Wait for tree_state to be initialized
+      // tree_stateが初期化されるまで待機
       for (let i = 0; i < 50; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
@@ -360,7 +359,7 @@ export const test = base.extend<ExtensionFixtures>({
       });
     });
 
-    // Initialize user settings for tests
+    // テスト用のユーザー設定を初期化
     await serviceWorker.evaluate(async () => {
       await chrome.storage.local.set({
         user_settings: {

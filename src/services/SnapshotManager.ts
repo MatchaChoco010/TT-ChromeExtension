@@ -235,11 +235,11 @@ export class SnapshotManager {
             try {
               await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
             } catch (_deleteError) {
-              // Failed to delete old snapshots silently
+              // 古いスナップショット削除失敗は無視
             }
           }
         } catch (_error) {
-          // Auto-snapshot failed silently
+          // 自動スナップショット失敗は無視
         }
       }
     };

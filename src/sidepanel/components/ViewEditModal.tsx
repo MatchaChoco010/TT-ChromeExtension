@@ -34,15 +34,6 @@ export interface ViewEditModalProps {
   onImmediateUpdate?: (view: View) => void;
 }
 
-/**
- * ViewEditModal コンポーネント
- *
- * ビュー編集用のモーダルダイアログを提供します。
- * - ビュー名の編集
- * - 色の選択（カラーピッカー + プリセット）
- * - アイコンURLの設定（オプション）
- * - 保存/キャンセル操作
- */
 export const ViewEditModal: React.FC<ViewEditModalProps> = ({
   view,
   isOpen,

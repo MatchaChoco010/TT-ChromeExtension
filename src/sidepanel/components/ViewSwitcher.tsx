@@ -1,11 +1,3 @@
-/**
- * ViewSwitcher コンポーネント
- *
- * サイドパネル上部で複数のビューをファビコンサイズのアイコンボタンで切り替えるUIを提供します。
- * ビューボタンを右クリックするとコンテキストメニューが表示され、編集・削除が可能です。
- * マウスホイールでビューを切り替えることができます。
- */
-
 import React, { useState, useCallback } from 'react';
 import type { View } from '@/types';
 import { ViewContextMenu } from './ViewContextMenu';

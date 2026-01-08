@@ -358,7 +358,6 @@ async function waitForDropIndicator(page: Page, maxWait: number = 2000): Promise
 async function waitForTargetHighlight(page: Page, targetTabId: number, maxWait: number = 2000): Promise<void> {
   const startTime = Date.now();
   while (Date.now() - startTime < maxWait) {
-    // ハイライトクラスとdropTarget状態を確認
     const result = await page.evaluate((tabId: number) => {
       const targetNode = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
       const dragContainer = document.querySelector('[data-drag-container]');
@@ -367,8 +366,6 @@ async function waitForTargetHighlight(page: Page, targetTabId: number, maxWait: 
                            targetNode?.classList.contains('ring-gray-400');
       const dropTargetType = dragContainer?.getAttribute('data-drop-target-type');
 
-      // ハイライトが表示され、かつdropTargetTypeが'tab'であることを確認
-      // これにより、Tabドロップターゲットが正しく設定されていることを保証する
       return {
         hasHighlight,
         dropTargetType,

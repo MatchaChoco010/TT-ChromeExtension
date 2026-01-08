@@ -9,12 +9,11 @@ interface SnapshotRecord {
   createdAt: number;
   name: string;
   isAutoSave: boolean;
-  data: string; // JSON stringified SnapshotData
+  data: string; // JSON文字列化された SnapshotData
 }
 
 /**
  * IndexedDB を使用したスナップショット管理サービス
- * スナップショットの保存、取得、削除、履歴管理機能を提供
  */
 export class IndexedDBService implements IIndexedDBService {
   private dbPromise: Promise<IDBDatabase> | null = null;

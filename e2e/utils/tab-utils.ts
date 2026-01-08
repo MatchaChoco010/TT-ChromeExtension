@@ -140,7 +140,7 @@ export async function createTab(
           const parentDepth = treeState.nodes[parentNodeId].depth || 0;
           treeState.nodes[childNodeId].depth = parentDepth + 1;
 
-          // Expand parent node when child is created (mimics handleTabCreated behavior)
+          // 子タブ作成時に親ノードを展開（handleTabCreatedの動作を模倣）
           treeState.nodes[parentNodeId].isExpanded = true;
           if (!treeState.expandedNodes) {
             treeState.expandedNodes = [];
@@ -151,8 +151,8 @@ export async function createTab(
 
           await chrome.storage.local.set({ tree_state: treeState });
 
-          // IMPORTANT: Reload treeStateManager from storage to sync the in-memory state
-          // and then call syncWithChromeTabs to rebuild treeStructure
+          // ストレージからtreeStateManagerを再読み込みしてメモリ内状態を同期し、
+          // syncWithChromeTabsを呼び出してtreeStructureを再構築する
           // @ts-expect-error accessing global treeStateManager
           if (globalThis.treeStateManager) {
             // @ts-expect-error accessing global treeStateManager
@@ -164,7 +164,7 @@ export async function createTab(
           try {
             await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
           } catch {
-            // Ignore errors when no listeners are available
+            // リスナーが存在しない場合のエラーは無視
           }
         }
       },
@@ -384,7 +384,7 @@ export async function refreshSidePanel(
     try {
       await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
     } catch {
-      // Ignore errors when no listeners are available
+      // リスナーが存在しない場合のエラーは無視
     }
   });
 

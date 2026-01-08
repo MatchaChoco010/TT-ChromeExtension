@@ -16,7 +16,6 @@ export const STORAGE_KEYS = {
 
 /**
  * chrome.storage.local の型安全なラッパー
- * ストレージキーと値の型を厳密に管理し、get/set/remove/onChange 操作を提供する
  */
 export class StorageService implements IStorageService {
   /**
@@ -86,7 +85,4 @@ export class StorageService implements IStorageService {
   }
 }
 
-/**
- * StorageService のシングルトンインスタンス
- */
 export const storageService = new StorageService();

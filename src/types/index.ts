@@ -252,7 +252,6 @@ export interface DragEndResult {
 export interface SiblingDropInfo {
   /** ドラッグ中のノードID */
   activeNodeId: string;
-  /** 挿入先のインデックス（gapIndex） */
   insertIndex: number;
   /** 上のノードのID（リスト先頭の場合はundefined） */
   aboveNodeId?: string;

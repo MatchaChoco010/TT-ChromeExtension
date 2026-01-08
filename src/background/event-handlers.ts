@@ -37,39 +37,19 @@ async function getCurrentViewId(): Promise<string> {
   }
 }
 
-// Track pending parent relationships for tabs being created
-// Map<tabId, openerTabId>
-// This is needed because Chrome doesn't reliably include openerTabId in the onCreated event
 const pendingTabParents = new Map<number, number>();
 
-// Track source tabs for pending duplications
-// Map<sourceTabId, { url: string; windowId: number }>
-// When a tab is duplicated, we want the new tab to be placed as a sibling, not a child
-// We store URL and windowId to identify the duplicated tab since openerTabId might not be set correctly
 const pendingDuplicateSources = new Map<number, { url: string; windowId: number }>();
 
-// Track group tabs being created
-// Set<tabId>
-// Group tabs are created via createGroupWithRealTab and should be skipped in handleTabCreated
 const pendingGroupTabIds = new Set<number>();
 
-// Flag to indicate that a group tab is currently being created
-// Used to handle race condition between chrome.tabs.create and onCreated event
 let isCreatingGroupTab = false;
 
-// Track the last active tab ID for each window
-// Map<windowId, tabId>
-// This is used to determine the parent for manually opened tabs with 'child' setting
-// When a new tab is created without openerTabId, we use the last active tab as the parent
 const lastActiveTabByWindow = new Map<number, number>();
 
-// Track link clicks detected by webNavigation.onCreatedNavigationTarget
-// Map<tabId, sourceTabId>
-// This event fires specifically when a link is clicked or window.open() is called
-// It does NOT fire for chrome.tabs.create(), bookmarks, address bar, or Ctrl+T
 const pendingLinkClicks = new Map<number, number>();
 
-// Export to globalThis for access from service worker evaluation contexts (e.g., E2E tests)
+// E2Eテスト等のService Worker評価コンテキストからアクセスするためglobalThisにエクスポート
 declare global {
   // eslint-disable-next-line no-var
   var pendingTabParents: Map<number, number>;
@@ -89,7 +69,7 @@ globalThis.pendingLinkClicks = pendingLinkClicks;
 globalThis.treeStateManager = treeStateManager;
 
 /**
- * Register all Chrome tabs event listeners
+ * Chromeタブイベントリスナーを登録
  */
 export function registerTabEventListeners(): void {
   chrome.tabs.onCreated.addListener(handleTabCreated);
@@ -102,7 +82,7 @@ export function registerTabEventListeners(): void {
 }
 
 /**
- * Register all Chrome windows event listeners
+ * Chromeウィンドウイベントリスナーを登録
  */
 export function registerWindowEventListeners(): void {
   chrome.windows.onCreated.addListener(handleWindowCreated);
@@ -110,22 +90,22 @@ export function registerWindowEventListeners(): void {
 }
 
 /**
- * Register webNavigation event listeners
- * onCreatedNavigationTarget fires when a link is clicked or window.open() is called
- * This is the reliable way to detect link clicks as it does NOT fire for:
+ * webNavigationイベントリスナーを登録
+ * onCreatedNavigationTargetはリンククリックまたはwindow.open()呼び出し時に発火する。
+ * 以下のケースでは発火しないため、リンククリックを確実に検出できる:
  * - chrome.tabs.create()
- * - Bookmarks
- * - Address bar navigation
- * - Ctrl+T (new tab)
+ * - ブックマーク
+ * - アドレスバー操作
+ * - Ctrl+T（新規タブ）
  */
 export function registerWebNavigationListeners(): void {
   chrome.webNavigation.onCreatedNavigationTarget.addListener(handleCreatedNavigationTarget);
 }
 
 /**
- * Handle webNavigation.onCreatedNavigationTarget event
- * This event fires when a new tab is created due to a link click or window.open()
- * We track this to reliably identify tabs opened from link clicks
+ * webNavigation.onCreatedNavigationTargetイベントを処理
+ * リンククリックまたはwindow.open()で新しいタブが作成された際に発火する。
+ * リンククリックから開かれたタブを確実に識別するために追跡する。
  */
 function handleCreatedNavigationTarget(
   details: chrome.webNavigation.WebNavigationSourceCallbackDetails
@@ -139,7 +119,7 @@ function handleCreatedNavigationTarget(
 }
 
 /**
- * Register Chrome runtime message listener
+ * Chromeランタイムメッセージリスナーを登録
  */
 export function registerMessageListener(): void {
   chrome.runtime.onMessage.addListener(handleMessage);
@@ -161,8 +141,8 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
   if (!tab.id) return;
 
-  // IMPORTANT: Capture lastActiveTabByWindow immediately before any async operations
-  // This prevents race condition where onActivated updates the map before we read it
+  // 非同期操作の前にlastActiveTabByWindowをキャプチャ
+  // onActivatedがmapを更新する前に値を取得する必要がある
   const capturedLastActiveTabId = tab.windowId !== undefined
     ? lastActiveTabByWindow.get(tab.windowId)
     : undefined;
@@ -192,15 +172,12 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
   }
 
   try {
-    // IMPORTANT: Load the latest state from storage before adding a new tab
-    // This ensures we don't overwrite parent-child relationships set by Side Panel's drag & drop
-    // Side Panel updates storage directly, so we need to sync our in-memory state first
+    // ストレージから最新状態を読み込む（Side Panelのドラッグ&ドロップで設定された親子関係を上書きしないため）
     await treeStateManager.loadState();
 
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
 
-    // Chrome's onCreated event doesn't always include openerTabId,
-    // so we need to refresh the tab object to get it
+    // ChromeのonCreatedイベントは常にopenerTabIdを含むとは限らないため、タブを再取得して確認する
     let openerTabIdFromChrome: number | undefined = tab.openerTabId;
     if (openerTabIdFromChrome === undefined) {
       try {
@@ -240,9 +217,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     let isDuplicatedTab = false;
     let duplicateSourceTabId: number | null = null;
 
-    // 複製タブの検出: URLとwindowIdで照合
-    // chrome.tabs.duplicate()から作成されたタブはopenerTabIdが呼び出し元のタブ（サイドパネル）に
-    // 設定される場合があるため、URLで照合する
+    // 複製タブの検出: chrome.tabs.duplicate()はopenerTabIdが正しく設定されない場合があるためURLで照合する
     const tabUrl = tab.url || tab.pendingUrl || '';
     for (const [sourceTabId, sourceInfo] of pendingDuplicateSources.entries()) {
       if (sourceInfo.url === tabUrl && sourceInfo.windowId === tab.windowId) {
@@ -276,10 +251,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
         insertAfterNodeId = openerNode.id;
       }
     } else if (!isLinkClick && newTabPosition === 'child') {
-      // 手動で開かれたタブで'child'設定の場合、最後にアクティブだったタブを親とする
-      // タブが作成されると新しいタブがアクティブになるため、chrome.tabs.queryではなく
-      // capturedLastActiveTabIdを使用して、タブ作成前にアクティブだったタブを取得する
-      // (関数の最初でキャプチャしておく必要がある。onActivatedが先に実行されるため)
+      // 手動で開かれたタブで'child'設定の場合、関数先頭でキャプチャした最後のアクティブタブを親とする
       if (capturedLastActiveTabId !== undefined && capturedLastActiveTabId !== tab.id) {
         const lastActiveNode = treeStateManager.getNodeByTabId(capturedLastActiveTabId);
         if (lastActiveNode) {
@@ -356,8 +328,7 @@ export async function handleTabRemoved(
   const { windowId, isWindowClosing } = removeInfo;
 
   try {
-    // IMPORTANT: Load the latest state from storage before removing a tab
-    // This ensures we don't overwrite parent-child relationships set by Side Panel's drag & drop
+    // ストレージから最新状態を読み込む（Side Panelのドラッグ&ドロップで設定された親子関係を上書きしないため）
     await treeStateManager.loadState();
 
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
@@ -424,7 +395,7 @@ export async function handleTabUpdated(
       }
     }
 
-    // Only notify UI for meaningful changes (title, url, status, favIconUrl, discarded)
+    // タイトル、URL、ステータス、ファビコン、discardedの変更時のみUI通知（statusのみの変更では通知しない）
     if (
       changeInfo.title !== undefined ||
       changeInfo.url !== undefined ||
@@ -440,8 +411,7 @@ export async function handleTabUpdated(
 
 async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promise<void> {
   try {
-    // Track the last active tab for each window
-    // This is used to determine the parent for manually opened tabs with 'child' setting
+    // 'child'設定の手動タブ作成時に親を決定するために記録
     lastActiveTabByWindow.set(activeInfo.windowId, activeInfo.tabId);
 
     if (unreadTracker.isUnread(activeInfo.tabId)) {
@@ -604,7 +574,7 @@ function handleMessage(
     });
   }
 
-  // Return true to indicate async response (required by Chrome extension API)
+  // Chrome拡張APIは非同期レスポンスを示すためにtrueを返す必要がある
   return true;
 }
 
@@ -686,8 +656,7 @@ async function handleCloseSubtree(
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    // IMPORTANT: Load the latest state from storage
-    // This ensures we get accurate subtree when storage was directly updated (e.g., in tests)
+    // ストレージから最新状態を読み込む（テスト等で直接更新された場合に正確なサブツリーを取得するため）
     await treeStateManager.loadState();
 
     const subtree = treeStateManager.getSubtree(tabId);
@@ -896,7 +865,7 @@ export function setDragState(
 }
 
 /**
- * Handle SYNC_TABS message - sync TreeStateManager with Chrome tabs
+ * SYNC_TABSメッセージを処理し、TreeStateManagerをChromeタブと同期
  */
 async function handleSyncTabs(
   sendResponse: (response: MessageResponse<unknown>) => void,
@@ -913,9 +882,9 @@ async function handleSyncTabs(
 }
 
 /**
- * Handle REFRESH_TREE_STRUCTURE message
- * Side Panelからのドラッグ&ドロップ操作後に呼び出す
- * ストレージから最新の状態を読み込み、treeStructureを再構築して保存
+ * REFRESH_TREE_STRUCTUREメッセージを処理
+ * Side Panelからのドラッグ&ドロップ操作後に呼び出す。
+ * ストレージから最新の状態を読み込み、treeStructureを再構築して保存する。
  */
 async function handleRefreshTreeStructure(
   sendResponse: (response: MessageResponse<unknown>) => void,
@@ -933,12 +902,9 @@ async function handleRefreshTreeStructure(
 
 /**
  * グループ作成（実タブ作成版）
- * 複数タブが選択されている状態でグループ化を実行
- * - chrome.tabs.create()でグループタブを実際に作成
- * - 選択されたすべてのタブを新しいグループの子要素として移動
- * - グループ化後に親子関係を正しくツリーに反映
+ * 複数タブが選択されている状態でグループ化を実行する。
  *
- * レースコンディション対策:
+ * レースコンディション対策として以下の順序で処理:
  * 1. グループタブをバックグラウンドで作成（active: false）
  * 2. ツリー状態を更新（グループ情報を登録）
  * 3. ツリー状態更新完了を待ってからアクティブ化
@@ -976,7 +942,7 @@ async function handleCreateGroup(
       createOptions.index = firstTabIndex;
     }
 
-    // Set flag to prevent race condition with handleTabCreated
+    // handleTabCreatedとのレースコンディションを防止
     isCreatingGroupTab = true;
     const groupTab = await chrome.tabs.create(createOptions);
 
@@ -1044,10 +1010,8 @@ async function handleDissolveGroup(
 
 /**
  * 複製元タブの登録
- * 複製されたタブを元のタブの兄弟として配置するために、
- * 複製される前に複製元のタブIDを登録する
- * URLとwindowIdを保存して、openerTabIdが正しく設定されない場合でも
- * 複製タブを識別できるようにする
+ * openerTabIdが正しく設定されない場合でも複製タブを識別できるよう、
+ * URLとwindowIdを保存する。
  */
 async function handleRegisterDuplicateSource(
   sourceTabId: number,
@@ -1071,7 +1035,7 @@ async function handleRegisterDuplicateSource(
 
 /**
  * サブツリーを複製
- * 親タブが閉じられた状態で複製された場合、サブツリー全体を複製する
+ * 対象タブとその全ての子孫タブを複製し、元のツリー構造を維持する。
  */
 async function handleDuplicateSubtree(
   tabId: number,

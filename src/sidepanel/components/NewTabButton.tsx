@@ -2,16 +2,11 @@ import React from 'react';
 
 interface NewTabButtonProps {
   /**
-   * 新規タブ追加後に呼び出されるコールバック
-   * 新規タブが作成された後に追加の処理が必要な場合に使用
+   * 新規タブ作成後に呼び出されるコールバック
    */
   onNewTab?: () => void;
 }
 
-/**
- * 新規タブ追加ボタンコンポーネント
- * タブツリーの末尾に表示され、クリックで新しいタブを作成する
- */
 const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();

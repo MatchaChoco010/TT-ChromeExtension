@@ -315,8 +315,6 @@ test.describe('タブ複製時の配置', () => {
 
       await waitForTabInTreeState(extensionContext, duplicatedTabId!);
 
-      // sibling設定では、複製タブは元のタブの兄弟（同じ親）として配置される
-      // childTabの親はparentTabなので、複製タブもparentTabの子になる（depth: 1）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
