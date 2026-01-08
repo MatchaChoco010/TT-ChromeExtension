@@ -455,12 +455,8 @@ test.describe('ピン留めタブセクション', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
 
-      await expect(async () => {
-        const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
-        await expect(pinnedTab).toBeVisible();
-      }).toPass({ timeout: 10000 });
-
       const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+      await expect(pinnedTab).toBeVisible();
       await pinnedTab.click({ button: 'right' });
 
       const contextMenu = sidePanelPage.locator('[role="menu"]');
@@ -474,10 +470,8 @@ test.describe('ピン留めタブセクション', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      await expect(async () => {
-        const pinnedTabAfter = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
-        await expect(pinnedTabAfter).not.toBeVisible();
-      }).toPass({ timeout: 10000 });
+      const pinnedTabAfter = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+      await expect(pinnedTabAfter).not.toBeVisible();
 
       const isPinned = await serviceWorker.evaluate(async (tabId: number) => {
         const tab = await chrome.tabs.get(tabId);

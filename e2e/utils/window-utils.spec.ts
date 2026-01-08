@@ -10,6 +10,7 @@ import {
   moveTabToWindow,
   assertWindowTreeSync,
   openSidePanelForWindow,
+  closeWindow,
 } from './window-utils';
 import {
   createTab,
@@ -62,8 +63,8 @@ test.describe('WindowTestUtils', () => {
 
     await moveTabToWindow(extensionContext, tabId, newWindowId);
 
-    await newWindowSidePanel.reload();
-    await sidePanelPage.reload();
+    await newWindowSidePanel.reload({ waitUntil: 'domcontentloaded' });
+    await sidePanelPage.reload({ waitUntil: 'domcontentloaded' });
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -76,6 +77,7 @@ test.describe('WindowTestUtils', () => {
     ], 0);
 
     await newWindowSidePanel.close();
+    await closeWindow(extensionContext, newWindowId);
   });
 
   test('クロスウィンドウでタブを別ウィンドウに移動する（moveTabToWindow）', async ({
@@ -112,8 +114,8 @@ test.describe('WindowTestUtils', () => {
 
     await moveTabToWindow(extensionContext, tabId, newWindowId);
 
-    await newWindowSidePanel.reload();
-    await sidePanelPage.reload();
+    await newWindowSidePanel.reload({ waitUntil: 'domcontentloaded' });
+    await sidePanelPage.reload({ waitUntil: 'domcontentloaded' });
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -125,6 +127,7 @@ test.describe('WindowTestUtils', () => {
     ], 0);
 
     await newWindowSidePanel.close();
+    await closeWindow(extensionContext, newWindowId);
   });
 
   test('assertWindowTreeSyncは各ウィンドウのツリー状態が正しく同期されることを検証する', async ({
@@ -148,6 +151,7 @@ test.describe('WindowTestUtils', () => {
     ).resolves.not.toThrow();
 
     await newWindowSidePanel.close();
+    await closeWindow(extensionContext, newWindowId);
   });
 
   test('複数ウィンドウ間でタブを移動した後、各ウィンドウのツリー状態が正しく同期されることを検証する', async ({
@@ -191,8 +195,8 @@ test.describe('WindowTestUtils', () => {
 
     await moveTabToWindow(extensionContext, tab1Id, newWindowId);
 
-    await newWindowSidePanel.reload();
-    await sidePanelPage.reload();
+    await newWindowSidePanel.reload({ waitUntil: 'domcontentloaded' });
+    await sidePanelPage.reload({ waitUntil: 'domcontentloaded' });
 
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -209,6 +213,7 @@ test.describe('WindowTestUtils', () => {
     await assertWindowTreeSync(extensionContext, newWindowId);
 
     await newWindowSidePanel.close();
+    await closeWindow(extensionContext, newWindowId);
   });
 
   test('子タブを持つ親タブを別ウィンドウに移動した場合、サブツリー全体が一緒に移動する', async ({
@@ -256,8 +261,8 @@ test.describe('WindowTestUtils', () => {
 
     await moveTabToWindow(extensionContext, parentTabId, newWindowId);
 
-    await newWindowSidePanel.reload();
-    await sidePanelPage.reload();
+    await newWindowSidePanel.reload({ waitUntil: 'domcontentloaded' });
+    await sidePanelPage.reload({ waitUntil: 'domcontentloaded' });
 
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -273,5 +278,6 @@ test.describe('WindowTestUtils', () => {
     await assertWindowTreeSync(extensionContext, newWindowId);
 
     await newWindowSidePanel.close();
+    await closeWindow(extensionContext, newWindowId);
   });
 });

@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
-import { createWindow, openSidePanelForWindow } from './utils/window-utils';
+import { createWindow, openSidePanelForWindow, closeWindow } from './utils/window-utils';
 import { assertTabStructure, assertWindowCount, assertWindowExists } from './utils/assertion-utils';
 import { waitForSidePanelReady } from './utils/polling-utils';
 
@@ -41,7 +41,7 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    await tabNode.click({ button: 'right' });
+    await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
 
     const contextMenu = sidePanelPage.locator('[role="menu"]');
     await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -88,10 +88,10 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    await tabNode.click({ button: 'right' });
+    await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
-    await sidePanelPage.getByRole('menuitem', { name: 'タブを閉じる' }).click();
+    await sidePanelPage.getByRole('menuitem', { name: 'タブを閉じる' }).click({ force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     await assertTabStructure(sidePanelPage, windowId, [
@@ -148,12 +148,12 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    await parentNode.click({ button: 'right' });
+    await parentNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
     const closeSubtreeItem = sidePanelPage.getByRole('menuitem', { name: 'サブツリーを閉じる' });
     await expect(closeSubtreeItem).toBeVisible({ timeout: 3000 });
-    await closeSubtreeItem.click();
+    await closeSubtreeItem.click({ force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     await assertTabStructure(sidePanelPage, windowId, [
@@ -195,16 +195,16 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    await tabNode.click({ button: 'right' });
+    await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
     const moveToWindowTrigger = sidePanelPage.locator('[data-testid="context-menu-move-to-window"]');
-    await moveToWindowTrigger.hover();
+    await moveToWindowTrigger.hover({ force: true, noWaitAfter: true });
 
     const newWindowOption = sidePanelPage.getByRole('menuitem', { name: '新しいウィンドウ' });
     await expect(newWindowOption).toBeVisible({ timeout: 3000 });
 
-    await newWindowOption.click();
+    await newWindowOption.click({ force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     await assertTabStructure(sidePanelPage, windowId, [
@@ -261,8 +261,6 @@ test.describe('コンテキストメニュー操作', () => {
 
     await sidePanelPage.bringToFront();
 
-    await sidePanelPage.waitForTimeout(500);
-
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabToMove}"]`);
 
     await sidePanelPage.waitForFunction(
@@ -276,11 +274,11 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    await tabNode.click({ button: 'right' });
+    await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
     const moveToWindowTrigger = sidePanelPage.locator('[data-testid="context-menu-move-to-window"]');
-    await moveToWindowTrigger.hover();
+    await moveToWindowTrigger.hover({ force: true, noWaitAfter: true });
 
     const newWindowOption = sidePanelPage.getByRole('menuitem', { name: '新しいウィンドウ' });
     await expect(newWindowOption).toBeVisible({ timeout: 3000 });
@@ -289,15 +287,13 @@ test.describe('コンテキストメニュー操作', () => {
       hasText: new RegExp(`ウィンドウ ${window2Id}.*タブ`)
     });
     await expect(existingWindowOption).toBeVisible({ timeout: 5000 });
-    await existingWindowOption.click();
+    await existingWindowOption.click({ force: true, noWaitAfter: true });
 
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-    await sidePanelPage.waitForTimeout(500);
-
-    await sidePanelPage.reload();
+    await sidePanelPage.reload({ waitUntil: 'domcontentloaded' });
     await waitForSidePanelReady(sidePanelPage, serviceWorker);
-    await sidePanelPage2.reload();
+    await sidePanelPage2.reload({ waitUntil: 'domcontentloaded' });
     await waitForSidePanelReady(sidePanelPage2, serviceWorker);
 
     await assertTabStructure(sidePanelPage, window1Id, [
@@ -313,6 +309,7 @@ test.describe('コンテキストメニュー操作', () => {
     await assertWindowCount(extensionContext, 2);
 
     await sidePanelPage2.close();
+    await closeWindow(extensionContext, window2Id);
   });
 
   test('コンテキストメニューから"URLをコピー"を選択した場合、クリップボードにURLがコピーされる', async ({
@@ -349,13 +346,13 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    await tabNode.click({ button: 'right' });
+    await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
     const copyUrlItem = sidePanelPage.getByRole('menuitem', { name: 'URLをコピー' });
     await expect(copyUrlItem).toBeVisible();
 
-    await copyUrlItem.click();
+    await copyUrlItem.click({ force: true, noWaitAfter: true });
 
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
@@ -402,25 +399,19 @@ test.describe('コンテキストメニュー操作', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    await tabNode.click({ button: 'right' });
+    await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
 
     const contextMenu = sidePanelPage.locator('[role="menu"]');
-    await expect(async () => {
-      await expect(contextMenu).toBeVisible();
-    }).toPass({ timeout: 5000 });
+    await expect(contextMenu).toBeVisible({ timeout: 3000 });
 
-    await expect(async () => {
-      if (await contextMenu.isVisible()) {
-        const menuBox = await contextMenu.boundingBox();
-        if (menuBox) {
-          await sidePanelPage.mouse.click(
-            menuBox.x + menuBox.width + 50,
-            menuBox.y + menuBox.height + 50
-          );
-        }
-      }
-      await expect(contextMenu).not.toBeVisible();
-    }).toPass({ timeout: 10000, intervals: [200, 500, 1000, 2000] });
+    const menuBox = await contextMenu.boundingBox();
+    if (menuBox) {
+      await sidePanelPage.mouse.click(
+        menuBox.x + menuBox.width + 50,
+        menuBox.y + menuBox.height + 50
+      );
+    }
+    await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
     await closeTab(extensionContext, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
@@ -462,7 +453,7 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    await tabNode.click({ button: 'right' });
+    await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
 
     const contextMenu = sidePanelPage.locator('[role="menu"]');
     await expect(contextMenu).toBeVisible({ timeout: 3000 });

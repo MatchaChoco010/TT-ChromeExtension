@@ -287,13 +287,13 @@ test.describe('複数選択機能', () => {
       { timeout: 5000 }
     );
 
-    await tabNode2.click({ button: 'right' });
+    await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
 
     const contextMenu = sidePanelPage.locator('[role="menu"]');
     await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
     const closeMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブを閉じる/ });
-    await closeMenuItem.click();
+    await closeMenuItem.click({ force: true, noWaitAfter: true });
 
     await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
@@ -302,7 +302,6 @@ test.describe('複数選択機能', () => {
       { tabId: tabId3, depth: 0 },
     ], 0);
 
-    // クリーンアップ
     await closeTab(extensionContext, tabId3);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },

@@ -12,7 +12,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -48,7 +47,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -84,7 +82,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -158,7 +155,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -194,7 +190,6 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);

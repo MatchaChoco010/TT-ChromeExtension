@@ -360,8 +360,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    await sidePanelPage.waitForTimeout(3000);
-
     const _storageBeforeNewTab = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
@@ -787,8 +785,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    await sidePanelPage.waitForTimeout(2000);
-
     const storageBeforeWindow = await serviceWorker.evaluate(
       async ({ childTabId }) => {
         interface TreeNode {
@@ -823,8 +819,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       const newWindow = await chrome.windows.create({ type: 'normal' });
       return newWindow.id as number;
     });
-
-    await sidePanelPage.waitForTimeout(2000);
 
     const storageAfterWindow = await serviceWorker.evaluate(
       async ({ childTabId }) => {
@@ -908,8 +902,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    await sidePanelPage.waitForTimeout(2000);
-
     const storageBeforeSync = await serviceWorker.evaluate(
       async ({ childTabId }) => {
         interface TreeNode { parentId: string | null; depth: number; }
@@ -933,8 +925,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
         chrome.runtime.sendMessage({ type: 'SYNC_TABS' }, () => resolve());
       });
     });
-
-    await sidePanelPage.waitForTimeout(2000);
 
     const storageAfterSync = await serviceWorker.evaluate(
       async ({ childTabId }) => {
@@ -1002,9 +992,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    await sidePanelPage.waitForTimeout(2000);
-
-    // REFRESH_TREE_STRUCTUREが失敗した場合をシミュレート
     await serviceWorker.evaluate(async () => {
       interface LocalTreeState {
         treeStructure?: unknown[];
@@ -1024,8 +1011,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
         chrome.runtime.sendMessage({ type: 'SYNC_TABS' }, () => resolve());
       });
     });
-
-    await sidePanelPage.waitForTimeout(2000);
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },

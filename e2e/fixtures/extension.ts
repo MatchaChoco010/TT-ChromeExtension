@@ -216,7 +216,6 @@ const createExtensionContext = async (
       `--load-extension=${extensionPath}`,
       // 安定性向上のための設定
       '--disable-gpu',
-      '--disable-dev-shm-usage',
       '--no-sandbox',
       '--disable-background-networking',
       '--disable-default-apps',
@@ -318,14 +317,11 @@ export const test = base.extend<ExtensionFixtures>({
    * これにより、サイドパネルは現在のウィンドウのタブのみを表示する
    */
   sidePanelPage: async ({ extensionContext, extensionId, serviceWorker }, use) => {
-    const currentWindow = await serviceWorker.evaluate(() => {
-      return chrome.windows.getCurrent();
-    });
-    const windowId = currentWindow.id;
+    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
 
     const page = await extensionContext.newPage();
 
-    await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
 
     await page.waitForLoadState('domcontentloaded');
 
@@ -341,17 +337,17 @@ export const test = base.extend<ExtensionFixtures>({
     }
 
     await serviceWorker.evaluate(async () => {
-      // tree_stateが初期化されるまで待機
       for (let i = 0; i < 50; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
         if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
           break;
         }
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
+    });
 
-      // SYNC_TABSでsyncWithChromeTabsの完了を待機し、handleTabCreatedとのrace conditionを防ぐ
+    await serviceWorker.evaluate(async () => {
       await new Promise<void>((resolve) => {
         chrome.runtime.sendMessage({ type: 'SYNC_TABS' }, () => {
           resolve();
@@ -359,7 +355,6 @@ export const test = base.extend<ExtensionFixtures>({
       });
     });
 
-    // テスト用のユーザー設定を初期化
     await serviceWorker.evaluate(async () => {
       await chrome.storage.local.set({
         user_settings: {

@@ -12,7 +12,6 @@ test.describe('新しいタブの位置設定', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -62,7 +61,6 @@ test.describe('新しいタブの位置設定', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -80,12 +78,10 @@ test.describe('新しいタブの位置設定', () => {
       ], 0);
 
       await setUserSettings(extensionContext, { newTabPositionManual: 'child' });
-      await sidePanelPage.waitForTimeout(100);
 
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.update(tabId, { active: true });
       }, parentTabId);
-      await sidePanelPage.waitForTimeout(100);
 
       const pageUrl = getTestServerUrl('/page');
       const newTabId = await serviceWorker.evaluate(async (url) => {
@@ -113,7 +109,6 @@ test.describe('新しいタブの位置設定', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionManual: 'end', newTabPositionFromLink: 'end' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -170,7 +165,6 @@ test.describe('新しいタブの位置設定', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { newTabPositionManual: 'end', newTabPositionFromLink: 'child' });
-      await sidePanelPage.waitForTimeout(100);
 
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);

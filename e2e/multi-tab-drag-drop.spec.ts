@@ -10,9 +10,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     sidePanelPage,
     serviceWorker,
   }) => {
-    // 設定をリセット
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
-    await sidePanelPage.waitForTimeout(100);
 
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -68,8 +66,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     if (!box5) throw new Error('tabNode5 not found');
 
     // タブ5の下部にマウスを移動（afterの位置）
-    await sidePanelPage.mouse.move(box5.x + box5.width / 2, box5.y + box5.height * 0.85, { steps: 15 });
-    await sidePanelPage.waitForTimeout(200);
+    await sidePanelPage.mouse.move(box5.x + box5.width / 2, box5.y + box5.height * 0.85, { steps: 5 });
 
     // ドロップインジケーターが表示されるのを待つ
     const dropIndicator = sidePanelPage.locator('[data-testid="drop-indicator"]');
@@ -78,9 +75,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     // ドロップ
     await dropTab(sidePanelPage);
     await waitForDragEnd(sidePanelPage, 2000);
-
-    // ストレージ更新を待つ
-    await sidePanelPage.waitForTimeout(300);
 
     // 全ての選択されたタブ（1, 2, 3）がタブ5の後に移動しているべき
     // 期待される順序: sidepanel, tab4, tab5, tab1, tab2, tab3
@@ -106,9 +100,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     sidePanelPage,
     serviceWorker,
   }) => {
-    // 設定をリセット
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
-    await sidePanelPage.waitForTimeout(100);
 
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -163,16 +155,11 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const box2 = await tabNode2.boundingBox();
     if (!box2) throw new Error('tabNode2 not found');
 
-    // タブ2の上部にマウスを移動（beforeの位置）
-    await sidePanelPage.mouse.move(box2.x + box2.width / 2, box2.y + box2.height * 0.15, { steps: 15 });
-    await sidePanelPage.waitForTimeout(100);
+    await sidePanelPage.mouse.move(box2.x + box2.width / 2, box2.y + box2.height * 0.15, { steps: 5 });
 
     // ドロップ
     await dropTab(sidePanelPage);
     await waitForDragEnd(sidePanelPage, 2000);
-
-    // ストレージ更新を待つ
-    await sidePanelPage.waitForTimeout(300);
 
     // 全ての選択されたタブ（1, 3, 5）がタブ2の前に移動しているべき
     // 期待される順序: sidepanel, tab1, tab3, tab5, tab2, tab4
@@ -198,9 +185,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     sidePanelPage,
     serviceWorker,
   }) => {
-    // 設定をリセット
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
-    await sidePanelPage.waitForTimeout(100);
 
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -245,13 +230,10 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const box4 = await tabNode4.boundingBox();
     if (!box4) throw new Error('tabNode4 not found');
 
-    await sidePanelPage.mouse.move(box4.x + box4.width / 2, box4.y + box4.height * 0.85, { steps: 15 });
-    await sidePanelPage.waitForTimeout(100);
+    await sidePanelPage.mouse.move(box4.x + box4.width / 2, box4.y + box4.height * 0.85, { steps: 5 });
 
     await dropTab(sidePanelPage);
     await waitForDragEnd(sidePanelPage, 2000);
-
-    await sidePanelPage.waitForTimeout(300);
 
     // タブ3だけが移動し、選択は解除される
     // 期待される順序: sidepanel, tab1, tab2, tab4, tab3
@@ -275,9 +257,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     sidePanelPage,
     serviceWorker,
   }) => {
-    // 設定をリセット
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
-    await sidePanelPage.waitForTimeout(100);
 
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
@@ -324,13 +304,10 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const boxParent = await parentNode.boundingBox();
     if (!boxParent) throw new Error('parentNode not found');
 
-    await sidePanelPage.mouse.move(boxParent.x + boxParent.width / 2, boxParent.y + boxParent.height / 2, { steps: 15 });
-    await sidePanelPage.waitForTimeout(100);
+    await sidePanelPage.mouse.move(boxParent.x + boxParent.width / 2, boxParent.y + boxParent.height / 2, { steps: 5 });
 
     await dropTab(sidePanelPage);
     await waitForDragEnd(sidePanelPage, 2000);
-
-    await sidePanelPage.waitForTimeout(300);
 
     // 全ての選択されたタブ（1, 2, 3）がparentTabの子になる
     await assertTabStructure(sidePanelPage, windowId, [

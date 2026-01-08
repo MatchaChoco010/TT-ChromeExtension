@@ -79,7 +79,7 @@ test.describe('アクティブタブのハイライト', () => {
       await expect(treeNode1).toHaveClass(/bg-gray-600/);
       await expect(treeNode2).not.toHaveClass(/bg-gray-600/);
 
-      await treeNode2.click();
+      await treeNode2.click({ force: true, noWaitAfter: true });
 
       await waitForTabActive(extensionContext, tabId2);
 
@@ -171,7 +171,7 @@ test.describe('アクティブタブのハイライト', () => {
       await expect(pinnedTab1).toHaveClass(/bg-gray-600/);
       await expect(pinnedTab2).not.toHaveClass(/bg-gray-600/);
 
-      await pinnedTab2.click();
+      await pinnedTab2.click({ force: true, noWaitAfter: true });
 
       await expect(async () => {
         await expect(pinnedTab2).toHaveClass(/bg-gray-600/);
@@ -227,7 +227,7 @@ test.describe('アクティブタブのハイライト', () => {
       await expect(normalTab).toHaveClass(/bg-gray-600/);
       await expect(pinnedTab).not.toHaveClass(/bg-gray-600/);
 
-      await pinnedTab.click();
+      await pinnedTab.click({ force: true, noWaitAfter: true });
 
       await expect(async () => {
         await expect(normalTab).not.toHaveClass(/bg-gray-600/);
@@ -278,7 +278,7 @@ test.describe('アクティブタブのハイライト', () => {
       await expect(pinnedTab).toHaveClass(/bg-gray-600/);
       await expect(normalTab).not.toHaveClass(/bg-gray-600/);
 
-      await normalTab.click();
+      await normalTab.click({ force: true, noWaitAfter: true });
 
       await expect(async () => {
         await expect(pinnedTab).not.toHaveClass(/bg-gray-600/);
@@ -301,8 +301,8 @@ test.describe('アクティブタブのハイライト', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
       const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+
       await closeTab(extensionContext, initialBrowserTabId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -376,31 +376,31 @@ test.describe('アクティブタブのハイライト', () => {
 
       await expect(async () => {
         expect(await countHighlightedTabs()).toBe(1);
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 500 });
 
-      await pinnedTab1.click();
+      await pinnedTab1.click({ force: true, noWaitAfter: true });
       await expect(async () => {
         expect(await countHighlightedTabs()).toBe(1);
         await expect(pinnedTab1).toHaveClass(/bg-gray-600/);
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 500 });
 
-      await normalTab2.click();
+      await normalTab2.click({ force: true, noWaitAfter: true });
       await expect(async () => {
         expect(await countHighlightedTabs()).toBe(1);
         await expect(normalTab2).toHaveClass(/bg-gray-600/);
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 500 });
 
-      await pinnedTab2.click();
+      await pinnedTab2.click({ force: true, noWaitAfter: true });
       await expect(async () => {
         expect(await countHighlightedTabs()).toBe(1);
         await expect(pinnedTab2).toHaveClass(/bg-gray-600/);
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 500 });
 
-      await normalTab1.click();
+      await normalTab1.click({ force: true, noWaitAfter: true });
       await expect(async () => {
         expect(await countHighlightedTabs()).toBe(1);
         await expect(normalTab1).toHaveClass(/bg-gray-600/);
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 500 });
 
       await closeTab(extensionContext, normalTabId1);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId2, depth: 0 }], 0);

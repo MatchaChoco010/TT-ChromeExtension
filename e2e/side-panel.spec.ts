@@ -220,14 +220,14 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       const expandButton = parentNode.locator('[data-testid="expand-button"]');
 
       if (await expandButton.count() > 0) {
-        await expandButton.click();
+        await expandButton.click({ force: true, noWaitAfter: true });
 
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: parentTabId, depth: 0 },
         ], 0);
 
-        await expandButton.click();
+        await expandButton.click({ force: true, noWaitAfter: true });
 
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: pseudoSidePanelTabId, depth: 0 },

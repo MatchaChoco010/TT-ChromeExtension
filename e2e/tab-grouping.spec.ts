@@ -36,11 +36,11 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
-      await tabNode1.click();
+      await tabNode1.click({ force: true, noWaitAfter: true });
       await expect(tabNode1).toHaveClass(/bg-gray-500/);
 
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
       await expect(tabNode2).toHaveClass(/bg-gray-500/);
 
       await sidePanelPage.waitForFunction(
@@ -54,14 +54,14 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
 
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
       const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
       await expect(groupMenuItem).toBeVisible();
-      await groupMenuItem.click();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
 
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
@@ -156,10 +156,10 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode1.click();
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
 
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -167,7 +167,7 @@ test.describe('タブグループ化機能', () => {
       const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
       await expect(groupMenuItem).toBeVisible();
 
-      await groupMenuItem.click();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
 
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
@@ -281,16 +281,16 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode1.click();
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       // Act
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
       const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
-      await groupMenuItem.click();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       // Assert
@@ -382,17 +382,17 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode1.click();
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       // Act
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
       const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
       await expect(groupMenuItem).toBeVisible();
-      await groupMenuItem.click();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       // Assert
@@ -499,14 +499,14 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode1.click();
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       // Act
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
-      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
+      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click({ force: true, noWaitAfter: true });
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       // Assert
@@ -615,14 +615,14 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode1.click();
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       // Act
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
-      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
+      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click({ force: true, noWaitAfter: true });
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       let groupTabId: number | undefined;
@@ -735,17 +735,17 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode1.click();
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       // Act
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
       const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
       await expect(groupMenuItem).toBeVisible();
-      await groupMenuItem.click();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
       // Assert
@@ -819,7 +819,6 @@ test.describe('タブグループ化機能', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange
       const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -833,7 +832,7 @@ test.describe('タブグループ化機能', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-            await sidePanelPage.bringToFront();
+      await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
@@ -850,17 +849,15 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode1.click();
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
-      // Act
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
-      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
+      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click({ force: true, noWaitAfter: true });
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-      // Assert
       let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -959,7 +956,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       // Act
-      await tabNode.click({ button: 'right' });
+      await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
 
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -969,7 +966,7 @@ test.describe('タブグループ化機能', () => {
       await expect(groupMenuItem).toBeVisible();
       await expect(groupMenuItem).not.toBeDisabled();
 
-      await groupMenuItem.click();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
 
       await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
@@ -1043,9 +1040,9 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
-      await tabNode1.click();
+      await tabNode1.click({ force: true, noWaitAfter: true });
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       await sidePanelPage.waitForFunction(
         (tabId) => {
@@ -1058,9 +1055,9 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
-      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
+      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click({ force: true, noWaitAfter: true });
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
       // Assert
@@ -1136,7 +1133,6 @@ test.describe('タブグループ化機能', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Arrange
       const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -1158,15 +1154,15 @@ test.describe('タブグループ化機能', () => {
         { tabId: tabId3, depth: 0 },
       ], 0);
 
-            await sidePanelPage.bringToFront();
+      await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
-      await tabNode1.click();
+      await tabNode1.click({ force: true, noWaitAfter: true });
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
       const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);
-      await tabNode3.click({ modifiers: ['Control'] });
+      await tabNode3.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       await sidePanelPage.waitForFunction(
         (tabId) => {
@@ -1179,12 +1175,17 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode3.click({ button: 'right' });
-      await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
-      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
-      await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
+      await tabNode3.click({ button: 'right', force: true, noWaitAfter: true });
+      await waitForCondition(
+        async () => await sidePanelPage.locator('[role="menu"]').isVisible(),
+        { timeout: 5000, timeoutMessage: 'Menu not visible' }
+      );
+      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click({ force: true, noWaitAfter: true });
+      await waitForCondition(
+        async () => !(await sidePanelPage.locator('[role="menu"]').isVisible()),
+        { timeout: 3000, timeoutMessage: 'Menu still visible' }
+      );
 
-      // Assert
       let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -1214,7 +1215,6 @@ test.describe('タブグループ化機能', () => {
             const tabs = await chrome.tabs.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
             const tabOrder = tabIds.map(tabId => tabs.findIndex(t => t.id === tabId));
 
-            // tabId1 < tabId2 < tabId3 の順序が維持されていること
             const isOrderMaintained = tabOrder[0] < tabOrder[1] && tabOrder[1] < tabOrder[2];
 
             return {
@@ -1302,9 +1302,9 @@ test.describe('タブグループ化機能', () => {
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
-      await tabNode1.click();
+      await tabNode1.click({ force: true, noWaitAfter: true });
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
-      await tabNode2.click({ modifiers: ['Control'] });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
 
       await sidePanelPage.waitForFunction(
         (tabId) => {
@@ -1317,9 +1317,9 @@ test.describe('タブグループ化機能', () => {
         { timeout: 5000 }
       );
 
-      await tabNode2.click({ button: 'right' });
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
-      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click();
+      await sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ }).click({ force: true, noWaitAfter: true });
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
       // Assert

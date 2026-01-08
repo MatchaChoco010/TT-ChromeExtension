@@ -25,7 +25,7 @@ export interface PollingOptions {
 }
 
 const DEFAULT_TIMEOUT = 5000;
-const DEFAULT_INTERVAL = 100;
+const DEFAULT_INTERVAL = 16.667;
 
 /**
  * Service Workerを取得するヘルパー関数
@@ -78,7 +78,6 @@ export async function pollInServiceWorker<T>(
 
   const result = await serviceWorker.evaluate(
     async ({ conditionFnStr, args, iterations, interval }) => {
-       
       const fn = eval(`(${conditionFnStr})`);
       for (let i = 0; i < iterations; i++) {
         try {
@@ -88,7 +87,7 @@ export async function pollInServiceWorker<T>(
         } catch {
           // ポーリング中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -128,14 +127,15 @@ export async function waitForTreeStateCondition(
 
   const result = await serviceWorker.evaluate(
     async ({ checkFnStr, iterations, interval }) => {
-       
-      const checkFn = eval(`(${checkFnStr})`) as (treeState: unknown) => boolean;
+      const checkFn = eval(`(${checkFnStr})`) as (
+        treeState: unknown
+      ) => boolean;
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
         if (checkFn(result.tree_state)) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -172,11 +172,13 @@ export async function waitForTabInTreeState(
     async ({ tabId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as
+          | { tabToNode?: Record<number, string> }
+          | undefined;
         if (treeState?.tabToNode?.[tabId]) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -213,11 +215,13 @@ export async function waitForTabRemovedFromTreeState(
     async ({ tabId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as
+          | { tabToNode?: Record<number, string> }
+          | undefined;
         if (!treeState?.tabToNode?.[tabId]) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -257,7 +261,7 @@ export async function waitForTabActive(
         if (tab.active) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -295,13 +299,13 @@ export async function waitForWindowRegistered(
       for (let i = 0; i < iterations; i++) {
         try {
           const windows = await chrome.windows.getAll();
-          if (windows.find(w => w.id === windowId)) {
+          if (windows.find((w) => w.id === windowId)) {
             return { success: true };
           }
         } catch {
           // ウィンドウ確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -339,13 +343,13 @@ export async function waitForWindowClosed(
       for (let i = 0; i < iterations; i++) {
         try {
           const windows = await chrome.windows.getAll();
-          if (!windows.find(w => w.id === windowId)) {
+          if (!windows.find((w) => w.id === windowId)) {
             return { success: true };
           }
         } catch {
           // ウィンドウ確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -391,7 +395,7 @@ export async function waitForTabInWindow(
         } catch {
           // タブ確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -430,7 +434,9 @@ export async function waitForWindowTreeSync(
         try {
           const tabs = await chrome.tabs.query({ windowId });
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+          const treeState = result.tree_state as
+            | { tabToNode?: Record<number, string> }
+            | undefined;
 
           if (treeState?.tabToNode && tabs.length > 0) {
             const allTabsSynced = tabs.every(
@@ -443,7 +449,7 @@ export async function waitForWindowTreeSync(
         } catch {
           // 同期確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -492,7 +498,7 @@ export async function waitForGroupInStorage(
             return { success: true };
           }
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -533,7 +539,7 @@ export async function waitForGroupRemovedFromStorage(
         if (!groups || !groups[groupId]) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -568,11 +574,13 @@ export async function waitForTreeStateInitialized(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
+        const treeState = result.tree_state as
+          | { nodes?: Record<string, unknown> }
+          | undefined;
         if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -608,7 +616,6 @@ export async function pollInPage<T>(
 
   const result = await page.evaluate(
     async ({ conditionFnStr, args, iterations, interval }) => {
-       
       const fn = eval(`(${conditionFnStr})`);
       for (let i = 0; i < iterations; i++) {
         try {
@@ -618,7 +625,7 @@ export async function pollInPage<T>(
         } catch {
           // 条件確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -654,7 +661,10 @@ export async function waitForSidePanelReady(
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout });
 
   try {
-    await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('text=Loading', {
+      state: 'hidden',
+      timeout: 5000,
+    });
   } catch {
     // ローディング表示がない場合は無視
   }
@@ -664,11 +674,13 @@ export async function waitForSidePanelReady(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
+        const treeState = result.tree_state as
+          | { nodes?: Record<string, unknown> }
+          | undefined;
         if (treeState?.nodes) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -707,7 +719,7 @@ export async function waitForMessageReceived(
         if (messages && messages.some((msg) => msg.type === messageType)) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -744,13 +756,16 @@ export async function waitForCounterIncreased(
   const result = await page.evaluate(
     async ({ counterName, initialValue, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        const count = counterName === 'stateUpdateCount' ? window.stateUpdateCount :
-                      counterName === 'receivedCount' ? window.receivedCount :
-                      undefined;
+        const count =
+          counterName === 'stateUpdateCount'
+            ? window.stateUpdateCount
+            : counterName === 'receivedCount'
+              ? window.receivedCount
+              : undefined;
         if (count !== undefined && count > initialValue) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -780,12 +795,17 @@ export async function waitForViewSwitcher(
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout });
 
   try {
-    await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('text=Loading', {
+      state: 'hidden',
+      timeout: 5000,
+    });
   } catch {
     // ローディング表示がない場合は無視
   }
 
-  await page.waitForSelector('[data-testid="view-switcher-container"]', { timeout });
+  await page.waitForSelector('[data-testid="view-switcher-container"]', {
+    timeout,
+  });
 }
 
 /**
@@ -806,23 +826,26 @@ export async function waitForTabUrlLoaded(
   expectedUrlPart: string,
   timeout: number = 10000
 ): Promise<chrome.tabs.Tab> {
-  const result = await serviceWorker.evaluate(async ({ id, urlPart, maxWait }) => {
-    const startTime = Date.now();
-    while (Date.now() - startTime < maxWait) {
-      const tab = await chrome.tabs.get(id);
-      if (tab.url && tab.url.includes(urlPart)) {
-        return { success: true, tab };
+  const result = await serviceWorker.evaluate(
+    async ({ id, urlPart, maxWait }) => {
+      const startTime = Date.now();
+      while (Date.now() - startTime < maxWait) {
+        const tab = await chrome.tabs.get(id);
+        if (tab.url && tab.url.includes(urlPart)) {
+          return { success: true, tab };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    const finalTab = await chrome.tabs.get(id);
-    return { success: false, tab: finalTab };
-  }, { id: tabId, urlPart: expectedUrlPart, maxWait: timeout });
+      const finalTab = await chrome.tabs.get(id);
+      return { success: false, tab: finalTab };
+    },
+    { id: tabId, urlPart: expectedUrlPart, maxWait: timeout }
+  );
 
   if (!result.success) {
     throw new Error(
       `waitForTabUrlLoaded: Timeout waiting for tab ${tabId} URL to contain "${expectedUrlPart}". ` +
-      `Current URL: "${result.tab.url}", pendingUrl: "${result.tab.pendingUrl}"`
+        `Current URL: "${result.tab.url}", pendingUrl: "${result.tab.pendingUrl}"`
     );
   }
   return result.tab;
@@ -859,7 +882,7 @@ export async function waitForTabStatusComplete(
         } catch {
           // タブ状態確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -902,7 +925,7 @@ export async function waitForTabDiscarded(
         } catch {
           // タブ状態確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -945,7 +968,7 @@ export async function waitForTabNotDiscarded(
         } catch {
           // タブ状態確認中のエラーは無視
         }
-        await new Promise(resolve => setTimeout(resolve, interval));
+        await new Promise((resolve) => setTimeout(resolve, interval));
       }
       return { success: false };
     },
@@ -997,7 +1020,7 @@ export async function waitForCondition(
     } catch {
       // 条件確認中のエラーは無視
     }
-    await new Promise(resolve => setTimeout(resolve, interval));
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
 
   throw new Error(timeoutMessage);

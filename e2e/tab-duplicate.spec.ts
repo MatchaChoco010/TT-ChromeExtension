@@ -349,8 +349,6 @@ test.describe('タブ複製時の配置', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { duplicateTabPosition: 'end' });
-      await sidePanelPage.waitForTimeout(100);
-
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
@@ -427,8 +425,6 @@ test.describe('タブ複製時の配置', () => {
       serviceWorker,
     }) => {
       await setUserSettings(extensionContext, { duplicateTabPosition: 'sibling' });
-      await sidePanelPage.waitForTimeout(100);
-
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
@@ -556,14 +552,18 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      await sidePanelPage.waitForTimeout(500);
+      await expect.poll(async () => {
+        const tabs = await serviceWorker.evaluate(async () => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
+        });
+        return tabs.length;
+      }, { timeout: 5000 }).toBe(6);
 
       const allTabIds = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
         return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
       });
-
-      expect(allTabIds.length).toBe(6);
 
       await closeTab(extensionContext, tabId1);
       await closeTab(extensionContext, tabId2);
@@ -628,14 +628,18 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      await sidePanelPage.waitForTimeout(500);
+      await expect.poll(async () => {
+        const tabs = await serviceWorker.evaluate(async () => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
+        });
+        return tabs.length;
+      }, { timeout: 5000 }).toBe(6);
 
       const allTabIds = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
         return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
       });
-
-      expect(allTabIds.length).toBe(6);
 
       await closeTab(extensionContext, tabId1);
       await closeTab(extensionContext, tabId2);

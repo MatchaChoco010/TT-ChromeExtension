@@ -3,6 +3,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 async function globalSetup() {
+  const playwrightTmpDir = path.join(process.cwd(), '.playwright-tmp');
+  if (fs.existsSync(playwrightTmpDir)) {
+    fs.rmSync(playwrightTmpDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(playwrightTmpDir, { recursive: true });
+
   console.log('🔨 E2Eテスト実行前にビルドを開始します...');
 
   try {
