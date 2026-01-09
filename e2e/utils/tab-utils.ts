@@ -2,12 +2,17 @@
  * TabTestUtils
  *
  * タブ操作（作成、削除、アクティブ化、検証）の共通ヘルパー関数
+ *
+ * 重要: すべての関数は Worker を直接受け取る。
+ * context.serviceWorkers()[0] から新しい参照を取得する getServiceWorker() は廃止。
+ * これにより、Service Worker が再起動された場合に即座にエラーが発生し、
+ * 根本原因が明確になる。
  */
-import type { BrowserContext, Page, Worker } from '@playwright/test';
+import type { Page, Worker } from '@playwright/test';
 import type { TestGlobals } from '../types';
 import { waitForTabStatusComplete } from './polling-utils';
 
-declare const globalThis: typeof globalThis & TestGlobals;
+declare let globalThis: TestGlobals;
 
 /**
  * タブ作成オプション
@@ -28,30 +33,16 @@ export interface CreateTabOptions {
 }
 
 /**
- * Service Workerを取得
- *
- * @param context - ブラウザコンテキスト
- * @returns Service Worker
- */
-async function getServiceWorker(context: BrowserContext): Promise<Worker> {
-  let [serviceWorker] = context.serviceWorkers();
-  if (!serviceWorker) {
-    serviceWorker = await context.waitForEvent('serviceworker');
-  }
-  return serviceWorker;
-}
-
-/**
  * タブを作成し、ツリーに表示されるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param url - タブのURL
  * @param parentTabId - 親タブのID（オプション）
  * @param options - タブ作成オプション
  * @returns 作成されたタブのID
  */
 export async function createTab(
-  context: BrowserContext,
+  serviceWorker: Worker,
   url: string,
   parentTabIdOrOptions?: number | CreateTabOptions,
   options: CreateTabOptions = {}
@@ -70,8 +61,21 @@ export async function createTab(
     resolvedOptions = options;
   }
 
-  const { active = true, index, windowId } = resolvedOptions;
-  const serviceWorker = await getServiceWorker(context);
+  const { active = true, index, windowId: specifiedWindowId } = resolvedOptions;
+
+  // windowIdが未指定の場合、sidePanelTabのwindowIdを自動取得
+  // これにより、リセット後にChromeの「現在のウィンドウ」が
+  // sidePanelTabのウィンドウと異なる場合でも正しく動作する
+  const windowId = specifiedWindowId ?? await serviceWorker.evaluate(async () => {
+    const extensionId = chrome.runtime.id;
+    const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
+    const tabs = await chrome.tabs.query({});
+    const sidePanelTab = tabs.find(t => {
+      const url = t.url || t.pendingUrl || '';
+      return url.startsWith(sidePanelUrlPrefix);
+    });
+    return sidePanelTab?.windowId;
+  });
 
   const tab = await serviceWorker.evaluate(
     async ({ url, parentTabId, active, index, windowId }) => {
@@ -168,7 +172,7 @@ export async function createTab(
           }
         }
       },
-      { tabId: tab.id, parentTabId }
+      { tabId: tab.id!, parentTabId }
     );
 
     await serviceWorker.evaluate(
@@ -196,7 +200,7 @@ export async function createTab(
           await new Promise(resolve => setTimeout(resolve, 50));
         }
       },
-      { parentTabId, childTabId: tab.id }
+      { parentTabId, childTabId: tab.id! }
     );
   }
 
@@ -206,12 +210,10 @@ export async function createTab(
 /**
  * タブを閉じ、ツリーから削除されることを検証
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - 閉じるタブのID
  */
-export async function closeTab(context: BrowserContext, tabId: number): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
+export async function closeTab(serviceWorker: Worker, tabId: number): Promise<void> {
   await serviceWorker.evaluate((tabId) => {
     return chrome.tabs.remove(tabId);
   }, tabId);
@@ -239,15 +241,13 @@ export async function closeTab(context: BrowserContext, tabId: number): Promise<
 /**
  * タブをアクティブ化し、ツリーでハイライトされることを検証
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - アクティブ化するタブのID
  */
 export async function activateTab(
-  context: BrowserContext,
+  serviceWorker: Worker,
   tabId: number
 ): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
   await serviceWorker.evaluate((tabId) => {
     return chrome.tabs.update(tabId, { active: true });
   }, tabId);
@@ -274,12 +274,10 @@ export async function activateTab(
 /**
  * タブをピン留めする
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - ピン留めするタブのID
  */
-export async function pinTab(context: BrowserContext, tabId: number): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
+export async function pinTab(serviceWorker: Worker, tabId: number): Promise<void> {
   await serviceWorker.evaluate(async (id) => {
     await chrome.tabs.update(id, { pinned: true });
   }, tabId);
@@ -306,12 +304,10 @@ export async function pinTab(context: BrowserContext, tabId: number): Promise<vo
 /**
  * タブのピン留めを解除する
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - ピン留め解除するタブのID
  */
-export async function unpinTab(context: BrowserContext, tabId: number): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
+export async function unpinTab(serviceWorker: Worker, tabId: number): Promise<void> {
   await serviceWorker.evaluate(async (id) => {
     await chrome.tabs.update(id, { pinned: false });
   }, tabId);
@@ -338,13 +334,11 @@ export async function unpinTab(context: BrowserContext, tabId: number): Promise<
 /**
  * タブのURLを更新する
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - 更新するタブのID
  * @param url - 新しいURL
  */
-export async function updateTabUrl(context: BrowserContext, tabId: number, url: string): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
+export async function updateTabUrl(serviceWorker: Worker, tabId: number, url: string): Promise<void> {
   await serviceWorker.evaluate(async ({ id, newUrl }) => {
     await chrome.tabs.update(id, { url: newUrl });
   }, { id: tabId, newUrl: url });
@@ -371,15 +365,13 @@ export async function updateTabUrl(context: BrowserContext, tabId: number, url: 
 /**
  * Side PanelのUIを再読み込みして最新のストレージ状態を反映
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param page - Side PanelのPage
  */
 export async function refreshSidePanel(
-  context: BrowserContext,
+  serviceWorker: Worker,
   page: Page
 ): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
   await serviceWorker.evaluate(async () => {
     try {
       await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
@@ -395,12 +387,27 @@ export async function refreshSidePanel(
 /**
  * 現在のウィンドウIDを取得
  *
+ * sidePanelTabが存在するウィンドウのIDを返す。
+ * chrome.windows.getCurrent()はheadless環境で信頼性が低いため、
+ * sidePanelTabのwindowIdを直接取得する。
+ *
  * @param serviceWorker - Service Worker
  * @returns 現在のウィンドウID
  */
 export async function getCurrentWindowId(serviceWorker: Worker): Promise<number> {
-  const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-  return currentWindow.id!;
+  return await serviceWorker.evaluate(async () => {
+    const extensionId = chrome.runtime.id;
+    const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
+    const tabs = await chrome.tabs.query({});
+    const sidePanelTab = tabs.find(t => {
+      const url = t.url || t.pendingUrl || '';
+      return url.startsWith(sidePanelUrlPrefix);
+    });
+    if (!sidePanelTab?.windowId) {
+      throw new Error('Could not find sidePanelTab to determine windowId');
+    }
+    return sidePanelTab.windowId;
+  });
 }
 
 /**
@@ -515,20 +522,18 @@ export type ClickType = 'normal' | 'middle' | 'ctrl';
  * これは「状態の検証」ではなく「必要な情報の取得」である。
  * タブ構造の検証は呼び出し元でassertTabStructureを使用すること。
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param page - リンクを含むページ
  * @param selector - クリックするリンクのセレクタ（デフォルト: '#test-link'）
  * @param clickType - クリックの種類（'normal': 通常クリック、'middle': 中クリック、'ctrl': Ctrl+クリック）
  * @returns 新しく開かれたタブのID
  */
 export async function clickLinkToOpenTab(
-  context: BrowserContext,
+  serviceWorker: Worker,
   page: Page,
   selector: string = '#test-link',
   clickType: ClickType = 'middle'
 ): Promise<number> {
-  const serviceWorker = await getServiceWorker(context);
-
   const tabIdsBefore = await serviceWorker.evaluate(async () => {
     const tabs = await chrome.tabs.query({});
     return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
@@ -572,17 +577,15 @@ export async function clickLinkToOpenTab(
  * 通常クリック（target属性なしのリンク）で現在のタブのURLを変更する。
  * この場合、新しいタブは作成されない。
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param page - リンクを含むページ
  * @param selector - クリックするリンクのセレクタ
  */
 export async function clickLinkToNavigate(
-  context: BrowserContext,
+  serviceWorker: Worker,
   page: Page,
   selector: string
 ): Promise<void> {
-  const serviceWorker = await getServiceWorker(context);
-
   const tabId = await serviceWorker.evaluate(async (url) => {
     const tabs = await chrome.tabs.query({});
     const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));

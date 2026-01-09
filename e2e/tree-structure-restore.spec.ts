@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getPseudoSidePanelTabId, getCurrentWindowId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getPseudoSidePanelTabId, getCurrentWindowId, getTestServerUrl } from './utils/tab-utils';
 import { moveTabToParent } from './utils/drag-drop-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -16,21 +16,19 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
-    await waitForTabInTreeState(extensionContext, parentTabId);
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
+    await waitForTabInTreeState(serviceWorker, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId = await createTab(extensionContext, getTestServerUrl('/child'), parentTabId);
-    await waitForTabInTreeState(extensionContext, childTabId);
+    const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'), parentTabId);
+    await waitForTabInTreeState(serviceWorker, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
@@ -81,29 +79,27 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabAId = await createTab(extensionContext, getTestServerUrl('/A'));
-    await waitForTabInTreeState(extensionContext, tabAId);
+    const tabAId = await createTab(serviceWorker, getTestServerUrl('/A'));
+    await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    const tabBId = await createTab(extensionContext, getTestServerUrl('/B'), tabAId);
-    await waitForTabInTreeState(extensionContext, tabBId);
+    const tabBId = await createTab(serviceWorker, getTestServerUrl('/B'), tabAId);
+    await waitForTabInTreeState(serviceWorker, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
     ], 0);
 
-    const tabCId = await createTab(extensionContext, getTestServerUrl('/C'), tabBId);
-    await waitForTabInTreeState(extensionContext, tabCId);
+    const tabCId = await createTab(serviceWorker, getTestServerUrl('/C'), tabBId);
+    await waitForTabInTreeState(serviceWorker, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
@@ -111,8 +107,8 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: tabCId, depth: 2 },
     ], 0);
 
-    const tabDId = await createTab(extensionContext, getTestServerUrl('/D'), tabCId);
-    await waitForTabInTreeState(extensionContext, tabDId);
+    const tabDId = await createTab(serviceWorker, getTestServerUrl('/D'), tabCId);
+    await waitForTabInTreeState(serviceWorker, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
@@ -170,29 +166,27 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
-    await waitForTabInTreeState(extensionContext, parentTabId);
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
+    await waitForTabInTreeState(serviceWorker, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId = await createTab(extensionContext, getTestServerUrl('/child'), parentTabId);
-    await waitForTabInTreeState(extensionContext, childTabId);
+    const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'), parentTabId);
+    await waitForTabInTreeState(serviceWorker, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
 
-    const grandchildTabId = await createTab(extensionContext, getTestServerUrl('/grandchild'), childTabId);
-    await waitForTabInTreeState(extensionContext, grandchildTabId);
+    const grandchildTabId = await createTab(serviceWorker, getTestServerUrl('/grandchild'), childTabId);
+    await waitForTabInTreeState(serviceWorker, grandchildTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
@@ -206,7 +200,7 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
         const treeState = result.tree_state as { treeStructure?: unknown[] } | undefined;
         return treeState?.treeStructure && treeState.treeStructure.length > 0;
       });
-      return hasTreeStructure;
+      return Boolean(hasTreeStructure);
     }, { timeout: 5000, timeoutMessage: 'treeStructure was not saved to storage' });
 
     await serviceWorker.evaluate(async () => {
@@ -332,21 +326,19 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const parentTabId = await createTab(extensionContext, getTestServerUrl('/dnd-parent'));
-    await waitForTabInTreeState(extensionContext, parentTabId);
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/dnd-parent'));
+    await waitForTabInTreeState(serviceWorker, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId = await createTab(extensionContext, getTestServerUrl('/dnd-child'));
-    await waitForTabInTreeState(extensionContext, childTabId);
+    const childTabId = await createTab(serviceWorker, getTestServerUrl('/dnd-child'));
+    await waitForTabInTreeState(serviceWorker, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
@@ -508,14 +500,12 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabAId = await createTab(extensionContext, getTestServerUrl('/page'));
-    await waitForTabInTreeState(extensionContext, tabAId);
+    const tabAId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },

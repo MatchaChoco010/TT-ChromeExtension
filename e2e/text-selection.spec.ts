@@ -4,7 +4,6 @@ import {
   closeTab,
   getCurrentWindowId,
   getPseudoSidePanelTabId,
-  getInitialBrowserTabId,
   getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -19,28 +18,21 @@ test.describe('テキスト選択禁止機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // Arrange: 複数のタブを作成
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page1'));
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'));
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
 
-    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page3'));
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -68,20 +60,20 @@ test.describe('テキスト選択禁止機能', () => {
     expect(selectedText).toBe('');
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId1);
+    await closeTab(serviceWorker, tabId1);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId2, depth: 0 },
       { tabId: tabId3, depth: 0 },
     ], 0);
 
-    await closeTab(extensionContext, tabId2);
+    await closeTab(serviceWorker, tabId2);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId3, depth: 0 },
     ], 0);
 
-    await closeTab(extensionContext, tabId3);
+    await closeTab(serviceWorker, tabId3);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
@@ -96,15 +88,8 @@ test.describe('テキスト選択禁止機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // Arrange: タブを作成
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -141,7 +126,7 @@ test.describe('テキスト選択禁止機能', () => {
     }
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
@@ -156,15 +141,8 @@ test.describe('テキスト選択禁止機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // Arrange: タブを作成してツリービューを表示
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -175,7 +153,7 @@ test.describe('テキスト選択禁止機能', () => {
     await expect(treeView).toHaveClass(/select-none/);
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
@@ -190,15 +168,8 @@ test.describe('テキスト選択禁止機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // Arrange: タブを作成
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -209,7 +180,7 @@ test.describe('テキスト選択禁止機能', () => {
     await expect(tabNode).toHaveClass(/select-none/);
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
@@ -224,15 +195,8 @@ test.describe('テキスト選択禁止機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // Arrange: タブを作成
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -255,7 +219,7 @@ test.describe('テキスト選択禁止機能', () => {
     expect(treeViewUserSelect).toBe('none');
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);

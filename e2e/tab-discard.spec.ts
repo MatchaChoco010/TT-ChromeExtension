@@ -4,7 +4,6 @@ import {
   closeTab,
   getCurrentWindowId,
   getPseudoSidePanelTabId,
-  getInitialBrowserTabId,
   getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -18,10 +17,7 @@ test.describe('タブの休止機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -34,7 +30,7 @@ test.describe('タブの休止機能', () => {
     await expect(discardButton).toBeVisible();
     await expect(discardButton).toContainText('タブを休止');
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
   });
 
   test('複数タブ選択時にコンテキストメニューに件数が表示される', async ({
@@ -45,11 +41,8 @@ test.describe('タブの休止機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -68,8 +61,8 @@ test.describe('タブの休止機能', () => {
     const discardButton = sidePanelPage.locator('[data-testid="context-menu-discard"]');
     await expect(discardButton).toContainText('タブを休止 (2件)');
 
-    await closeTab(extensionContext, tabId1);
-    await closeTab(extensionContext, tabId2);
+    await closeTab(serviceWorker, tabId1);
+    await closeTab(serviceWorker, tabId2);
   });
 
 });

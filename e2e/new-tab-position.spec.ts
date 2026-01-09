@@ -1,5 +1,5 @@
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, clickLinkToOpenTab, activateTab, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, clickLinkToOpenTab, activateTab, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabInTreeState } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setUserSettings } from './utils/settings-utils';
@@ -16,19 +16,13 @@ test.describe('新しいタブの位置設定', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -41,7 +35,7 @@ test.describe('新しいタブの位置設定', () => {
         return tab.id;
       });
 
-      await waitForTabInTreeState(extensionContext, settingsTabId!);
+      await waitForTabInTreeState(serviceWorker, settingsTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -50,9 +44,9 @@ test.describe('新しいタブの位置設定', () => {
         { tabId: settingsTabId!, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId1);
-      await closeTab(extensionContext, tabId2);
-      await closeTab(extensionContext, settingsTabId!);
+      await closeTab(serviceWorker, tabId1);
+      await closeTab(serviceWorker, tabId2);
+      await closeTab(serviceWorker, settingsTabId!);
     });
 
     test('設定が"child"の場合、新しいタブはアクティブタブの子として配置される', async ({
@@ -65,13 +59,7 @@ test.describe('新しいタブの位置設定', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
@@ -89,7 +77,7 @@ test.describe('新しいタブの位置設定', () => {
         return tab.id;
       }, pageUrl);
 
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      await waitForTabInTreeState(serviceWorker, newTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -97,8 +85,8 @@ test.describe('新しいタブの位置設定', () => {
         { tabId: newTabId!, depth: 1 },
       ], 0);
 
-      await closeTab(extensionContext, newTabId!);
-      await closeTab(extensionContext, parentTabId);
+      await closeTab(serviceWorker, newTabId!);
+      await closeTab(serviceWorker, parentTabId);
     });
   });
 
@@ -113,12 +101,6 @@ test.describe('新しいタブの位置設定', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const openerPage = await extensionContext.newPage();
       await openerPage.goto(linkPageUrl);
@@ -129,23 +111,23 @@ test.describe('新しいタブの位置設定', () => {
         const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
       }, linkPageUrl);
-      await waitForTabInTreeState(extensionContext, openerTabId!);
+      await waitForTabInTreeState(serviceWorker, openerTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0 },
       ], 0);
 
-      const anotherTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const anotherTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0 },
         { tabId: anotherTabId, depth: 0 },
       ], 0);
 
-      await activateTab(extensionContext, openerTabId!);
+      await activateTab(serviceWorker, openerTabId!);
 
-      const linkClickedTabId = await clickLinkToOpenTab(extensionContext, openerPage);
+      const linkClickedTabId = await clickLinkToOpenTab(serviceWorker, openerPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -154,9 +136,9 @@ test.describe('新しいタブの位置設定', () => {
         { tabId: linkClickedTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, openerTabId!);
-      await closeTab(extensionContext, anotherTabId);
-      await closeTab(extensionContext, linkClickedTabId);
+      await closeTab(serviceWorker, openerTabId!);
+      await closeTab(serviceWorker, anotherTabId);
+      await closeTab(serviceWorker, linkClickedTabId);
     });
 
     test('設定が"child"の場合、リンクから開かれたタブは親タブの子として配置される', async ({
@@ -169,12 +151,6 @@ test.describe('新しいタブの位置設定', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const openerPage = await extensionContext.newPage();
       await openerPage.goto(linkPageUrl);
@@ -185,16 +161,16 @@ test.describe('新しいタブの位置設定', () => {
         const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
         return tab?.id;
       }, linkPageUrl);
-      await waitForTabInTreeState(extensionContext, openerTabId!);
+      await waitForTabInTreeState(serviceWorker, openerTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0 },
       ], 0);
 
-      await activateTab(extensionContext, openerTabId!);
+      await activateTab(serviceWorker, openerTabId!);
 
-      const linkClickedTabId = await clickLinkToOpenTab(extensionContext, openerPage);
+      const linkClickedTabId = await clickLinkToOpenTab(serviceWorker, openerPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -202,8 +178,8 @@ test.describe('新しいタブの位置設定', () => {
         { tabId: linkClickedTabId, depth: 1 },
       ], 0);
 
-      await closeTab(extensionContext, linkClickedTabId);
-      await closeTab(extensionContext, openerTabId!);
+      await closeTab(serviceWorker, linkClickedTabId);
+      await closeTab(serviceWorker, openerTabId!);
     });
   });
 });

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabInTreeState } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setUserSettings } from './utils/settings-utils';
@@ -14,13 +14,7 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -57,7 +51,7 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, tabId);
 
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      await waitForTabInTreeState(serviceWorker, newTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -65,13 +59,13 @@ test.describe('タブ複製時の配置', () => {
         { tabId: newTabId!, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, newTabId!);
+      await closeTab(serviceWorker, newTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -87,26 +81,20 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -145,7 +133,7 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [tabId1, tabId2, tabId3]);
 
-      await waitForTabInTreeState(extensionContext, duplicatedTabId!);
+      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -155,7 +143,7 @@ test.describe('タブ複製時の配置', () => {
         { tabId: tabId3, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId1);
+      await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: duplicatedTabId!, depth: 0 },
@@ -163,20 +151,20 @@ test.describe('タブ複製時の配置', () => {
         { tabId: tabId3, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId2);
+      await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: duplicatedTabId!, depth: 0 },
         { tabId: tabId3, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId3);
+      await closeTab(serviceWorker, tabId3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: duplicatedTabId!, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, duplicatedTabId!);
+      await closeTab(serviceWorker, duplicatedTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -190,13 +178,7 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -233,7 +215,7 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [tabId1]);
 
-      await waitForTabInTreeState(extensionContext, duplicatedTabId!);
+      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -241,13 +223,13 @@ test.describe('タブ複製時の配置', () => {
         { tabId: duplicatedTabId!, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId1);
+      await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: duplicatedTabId!, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, duplicatedTabId!);
+      await closeTab(serviceWorker, duplicatedTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -263,19 +245,13 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      const childTabId = await createTab(extensionContext, getTestServerUrl('/page'), parentTabId);
+      const childTabId = await createTab(serviceWorker, getTestServerUrl('/page'), parentTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
@@ -313,7 +289,7 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [parentTabId, childTabId]);
 
-      await waitForTabInTreeState(extensionContext, duplicatedTabId!);
+      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -322,20 +298,20 @@ test.describe('タブ複製時の配置', () => {
         { tabId: duplicatedTabId!, depth: 1 },
       ], 0);
 
-      await closeTab(extensionContext, duplicatedTabId!);
+      await closeTab(serviceWorker, duplicatedTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
 
-      await closeTab(extensionContext, childTabId);
+      await closeTab(serviceWorker, childTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, parentTabId);
+      await closeTab(serviceWorker, parentTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -352,19 +328,13 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -402,7 +372,7 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [tabId1, tabId2]);
 
-      await waitForTabInTreeState(extensionContext, duplicatedTabId!);
+      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -411,9 +381,9 @@ test.describe('タブ複製時の配置', () => {
         { tabId: duplicatedTabId!, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId1);
-      await closeTab(extensionContext, tabId2);
-      await closeTab(extensionContext, duplicatedTabId!);
+      await closeTab(serviceWorker, tabId1);
+      await closeTab(serviceWorker, tabId2);
+      await closeTab(serviceWorker, duplicatedTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -428,19 +398,13 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -478,7 +442,7 @@ test.describe('タブ複製時の配置', () => {
         return sortedTabs[0]?.id;
       }, [tabId1, tabId2]);
 
-      await waitForTabInTreeState(extensionContext, duplicatedTabId!);
+      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -487,9 +451,9 @@ test.describe('タブ複製時の配置', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId1);
-      await closeTab(extensionContext, tabId2);
-      await closeTab(extensionContext, duplicatedTabId!);
+      await closeTab(serviceWorker, tabId1);
+      await closeTab(serviceWorker, tabId2);
+      await closeTab(serviceWorker, duplicatedTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -505,15 +469,9 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
-      const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -565,11 +523,11 @@ test.describe('タブ複製時の配置', () => {
         return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
       });
 
-      await closeTab(extensionContext, tabId1);
-      await closeTab(extensionContext, tabId2);
-      await closeTab(extensionContext, tabId3);
+      await closeTab(serviceWorker, tabId1);
+      await closeTab(serviceWorker, tabId2);
+      await closeTab(serviceWorker, tabId3);
       for (const tabId of allTabIds.filter(id => id !== pseudoSidePanelTabId && id !== tabId1 && id !== tabId2 && id !== tabId3)) {
-        await closeTab(extensionContext, tabId);
+        await closeTab(serviceWorker, tabId);
       }
     });
 
@@ -581,15 +539,9 @@ test.describe('タブ複製時の配置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
-      const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -641,11 +593,11 @@ test.describe('タブ複製時の配置', () => {
         return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
       });
 
-      await closeTab(extensionContext, tabId1);
-      await closeTab(extensionContext, tabId2);
-      await closeTab(extensionContext, tabId3);
+      await closeTab(serviceWorker, tabId1);
+      await closeTab(serviceWorker, tabId2);
+      await closeTab(serviceWorker, tabId3);
       for (const tabId of allTabIds.filter(id => id !== pseudoSidePanelTabId && id !== tabId1 && id !== tabId2 && id !== tabId3)) {
-        await closeTab(extensionContext, tabId);
+        await closeTab(serviceWorker, tabId);
       }
     });
   });

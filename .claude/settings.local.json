@@ -2,9 +2,11 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:playwright.dev)"
+      "WebFetch(domain:playwright.dev)",
+      "WebFetch(domain:developer.chrome.com)"
     ]
   },
+  "language": "japanese",
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true

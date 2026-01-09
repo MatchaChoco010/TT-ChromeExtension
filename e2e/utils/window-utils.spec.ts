@@ -14,7 +14,6 @@ import {
 } from './window-utils';
 import {
   createTab,
-  closeTab,
   getCurrentWindowId,
   getPseudoSidePanelTabId,
   getInitialBrowserTabId,
@@ -37,13 +36,7 @@ test.describe('WindowTestUtils', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -88,13 +81,7 @@ test.describe('WindowTestUtils', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -162,19 +149,13 @@ test.describe('WindowTestUtils', () => {
     const currentWindowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, currentWindowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, currentWindowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, currentWindowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tab1Id = await createTab(extensionContext, getTestServerUrl('/page1'));
+    const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1Id, depth: 0 },
     ], 0);
 
-    const tab2Id = await createTab(extensionContext, getTestServerUrl('/page2'));
+    const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1Id, depth: 0 },
@@ -224,20 +205,14 @@ test.describe('WindowTestUtils', () => {
     const currentWindowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, currentWindowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, currentWindowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, currentWindowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
     await assertTabStructure(sidePanelPage, currentWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
     const childTabId = await createTab(
-      extensionContext,
+      serviceWorker,
       getTestServerUrl('/child'),
       parentTabId
     );

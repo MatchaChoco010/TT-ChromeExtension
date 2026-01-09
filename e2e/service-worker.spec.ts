@@ -19,7 +19,6 @@ import {
   closeTab,
   getCurrentWindowId,
   getPseudoSidePanelTabId,
-  getInitialBrowserTabId,
   getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -63,13 +62,7 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -91,7 +84,7 @@ test.describe('Service Workerとの通信', () => {
 
       expect(isActive).toBe(true);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -104,13 +97,7 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -181,8 +168,8 @@ test.describe('Service Workerとの通信', () => {
         return window.receivedMessages;
       });
 
-      expect(receivedMessages.length).toBeGreaterThan(0);
-      expect(receivedMessages.some((msg: { type: string }) => msg.type === 'TEST_MESSAGE')).toBe(true);
+      expect(receivedMessages!.length).toBeGreaterThan(0);
+      expect(receivedMessages!.some((msg: { type: string }) => msg.type === 'TEST_MESSAGE')).toBe(true);
     });
 
     test('STATE_UPDATEDメッセージがSide Panelで正しく受信されること', async ({
@@ -225,11 +212,6 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await sidePanelPage.evaluate(() => {
         window.stateUpdateCount = 0;
@@ -244,7 +226,7 @@ test.describe('Service Workerとの通信', () => {
         return window.stateUpdateCount;
       });
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -258,7 +240,7 @@ test.describe('Service Workerとの通信', () => {
 
       expect(finalCount).toBeGreaterThan(initialCount ?? 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -271,19 +253,13 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       await sidePanelPage.evaluate(() => {
         window.stateUpdateCount = 0;
@@ -298,12 +274,12 @@ test.describe('Service Workerとの通信', () => {
         return window.stateUpdateCount;
       });
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount);
+      await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount ?? 0);
 
       const finalCount = await sidePanelPage.evaluate(() => {
         return window.stateUpdateCount;
@@ -319,19 +295,13 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       await sidePanelPage.evaluate(() => {
         window.stateUpdateCount = 0;
@@ -350,7 +320,7 @@ test.describe('Service Workerとの通信', () => {
         return chrome.tabs.update(tabId, { url: 'chrome://newtab' });
       }, tabId);
 
-      await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount);
+      await waitForCounterIncreased(sidePanelPage, 'stateUpdateCount', initialCount ?? 0);
 
       const finalCount = await sidePanelPage.evaluate(() => {
         return window.stateUpdateCount;
@@ -358,7 +328,7 @@ test.describe('Service Workerとの通信', () => {
 
       expect(finalCount).toBeGreaterThan(initialCount ?? 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -371,27 +341,22 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tab1 = await createTab(extensionContext, getTestServerUrl('/page'), { active: true });
+      const tab1 = await createTab(serviceWorker, getTestServerUrl('/page'), { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tab2 = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tab1);
-      await waitForTabInTreeState(extensionContext, tab2);
+      await waitForTabInTreeState(serviceWorker, tab1);
+      await waitForTabInTreeState(serviceWorker, tab2);
 
       await sidePanelPage.evaluate(() => {
         window.stateUpdateCount = 0;
@@ -406,7 +371,7 @@ test.describe('Service Workerとの通信', () => {
         return chrome.tabs.update(tabId, { active: true });
       }, tab2);
 
-      await waitForTabActive(extensionContext, tab2);
+      await waitForTabActive(serviceWorker, tab2);
 
       const activeTabId = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -415,13 +380,13 @@ test.describe('Service Workerとの通信', () => {
 
       expect(activeTabId).toBe(tab2);
 
-      await closeTab(extensionContext, tab1);
+      await closeTab(serviceWorker, tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tab2);
+      await closeTab(serviceWorker, tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -553,11 +518,6 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await sidePanelPage.evaluate(() => {
         window.messageLog = [];
@@ -569,7 +529,7 @@ test.describe('Service Workerとの通信', () => {
         });
       });
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -587,7 +547,7 @@ test.describe('Service Workerとの通信', () => {
         return window.messageLog;
       });
 
-      const hasStateUpdated = messageLog.some(
+      const hasStateUpdated = messageLog!.some(
         (msg: { type: string }) => msg.type === 'STATE_UPDATED'
       );
       expect(hasStateUpdated).toBe(true);
@@ -597,7 +557,7 @@ test.describe('Service Workerとの通信', () => {
         payload: { tabId: tabId },
       });
 
-      await waitForTabActive(extensionContext, tabId);
+      await waitForTabActive(serviceWorker, tabId);
 
       const activeTabId = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -637,11 +597,6 @@ test.describe('Service Workerとの通信', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       const sidePanelPage2 = await extensionContext.newPage();
       await sidePanelPage2.goto(`chrome-extension://${extensionId}/sidepanel.html`);
@@ -684,7 +639,7 @@ test.describe('Service Workerとの通信', () => {
         });
       });
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: sidePanelTab2Id, depth: 0 },
@@ -710,7 +665,7 @@ test.describe('Service Workerとの通信', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -726,7 +681,7 @@ test.describe('Service Workerとの通信', () => {
       });
 
       expect((response as { success: boolean }).success).toBe(false);
-      expect((response as { error: string }).error).toBe('Unknown message type');
+      expect((response as { error: string }).error).toBe('Unknown message type: UNKNOWN_TYPE');
     });
 
     test('存在しないタブIDに対する操作でエラーが返ること', async ({

@@ -671,7 +671,9 @@ describe('useDragDrop', () => {
         document.dispatchEvent(createMouseEvent('mouseup', 100, 20));
       });
 
-      expect(onDragEnd).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(onDragEnd).toHaveBeenCalled();
+      });
 
       document.body.removeChild(horizontalContainer);
     });

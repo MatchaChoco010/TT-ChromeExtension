@@ -1,5 +1,5 @@
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId } from './utils/tab-utils';
 import { startDrag, hoverOverTab, dropTab } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import type { Page } from '@playwright/test';
@@ -29,26 +29,24 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
+      const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'data:text/html,<h1>Tab3</h1>');
+      const tab3 = await createTab(serviceWorker, 'data:text/html,<h1>Tab3</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -88,19 +86,17 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
+      const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -133,26 +129,24 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
+      const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'data:text/html,<h1>Tab3</h1>');
+      const tab3 = await createTab(serviceWorker, 'data:text/html,<h1>Tab3</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -160,7 +154,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      const tab4 = await createTab(extensionContext, 'data:text/html,<h1>Tab4</h1>');
+      const tab4 = await createTab(serviceWorker, 'data:text/html,<h1>Tab4</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -195,26 +189,24 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
+      const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, 'data:text/html,<h1>Tab3</h1>');
+      const tab3 = await createTab(serviceWorker, 'data:text/html,<h1>Tab3</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -258,19 +250,17 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
+      const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -299,19 +289,17 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
+      const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -344,19 +332,17 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab1 = await createTab(extensionContext, 'data:text/html,<h1>Tab1</h1>');
+      const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, 'data:text/html,<h1>Tab2</h1>');
+      const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -386,26 +372,24 @@ test.describe('ドラッグ&ドロップ改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const parentTab = await createTab(extensionContext, 'data:text/html,<h1>Parent</h1>');
+      const parentTab = await createTab(serviceWorker, 'data:text/html,<h1>Parent</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
-      const childTab = await createTab(extensionContext, 'data:text/html,<h1>Child</h1>', parentTab);
+      const childTab = await createTab(serviceWorker, 'data:text/html,<h1>Child</h1>', parentTab);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
 
-      const siblingTab = await createTab(extensionContext, 'data:text/html,<h1>Sibling</h1>');
+      const siblingTab = await createTab(serviceWorker, 'data:text/html,<h1>Sibling</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },

@@ -226,6 +226,28 @@ await assertTabStructure(sidePanelPage, windowId, [
 ], 0);
 ```
 
+### Service Workerイベントハンドラーの必須パターン（E2Eテスト対応）
+
+Service Workerの全ての非同期イベントハンドラーは`trackHandler()`でラップする必要がある。これはE2Eテストのリセット処理が正しく動作するために必須。
+
+**背景**: Chromeはイベントリスナーのコールバック完了を待たない。そのため、テスト間のリセット処理中に前のテストのハンドラーがバックグラウンドで実行され続け、状態の競合が発生する。
+
+```typescript
+// ✅ 正しい: trackHandlerでラップ
+chrome.tabs.onCreated.addListener((tab) => {
+  trackHandler(() => handleTabCreated(tab));
+});
+
+// ❌ 禁止: 直接呼び出し
+chrome.tabs.onCreated.addListener((tab) => {
+  handleTabCreated(tab);
+});
+```
+
+**新しいイベントハンドラーを追加する際のチェックリスト**:
+- [ ] `event-handlers.ts`で`trackHandler()`を使用してラップしているか
+- [ ] `registerTabEventListeners()`または`registerWindowEventListeners()`内で登録しているか
+
 ### フレーキーテスト防止
 
 - **固定時間待機（`waitForTimeout`）禁止**: ポーリングで状態確定を待つ
@@ -235,26 +257,19 @@ await assertTabStructure(sidePanelPage, windowId, [
 
 ### テスト初期化パターン（必須）
 
-テスト開始時は以下のパターンで初期化すること。ブラウザ起動時のデフォルトタブは必ず閉じる。
+テスト開始時は以下のパターンで初期化すること。ブラウザ起動時のデフォルトタブは閉じずに、assertTabStructureに含める。
 
 ```typescript
-// ウィンドウIDと擬似サイドパネルタブIDを取得
+// ウィンドウIDと各種タブIDを取得
 const windowId = await getCurrentWindowId(serviceWorker);
 const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-// ブラウザ起動時のデフォルトタブを閉じる
 const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-await closeTab(extensionContext, initialBrowserTabId);
-
-// 初期状態を検証（擬似サイドパネルタブのみ）
-await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
-], 0);
 
 // ここからテスト用のタブを作成
 const tab1 = await createTab(extensionContext, 'about:blank');
 await assertTabStructure(sidePanelPage, windowId, [
   { tabId: pseudoSidePanelTabId, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
   { tabId: tab1, depth: 0 },
 ], 0);
 ```
@@ -300,10 +315,7 @@ await assertTabStructure(sidePanelPage, windowId, [
 npm run test:e2e 2>&1 | tee e2e-test.log
 
 # サマリーを確認
-grep -E "failed|passed|skipped" e2e-test.log | tail -1
-
-# 失敗があれば詳細を確認（ログファイルから必要な部分を読む）
-cat e2e-test.log
+grep -E "failed|passed|skipped" e2e-test.log
 ```
 
 ```bash

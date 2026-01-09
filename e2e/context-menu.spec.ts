@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { createWindow, openSidePanelForWindow, closeWindow } from './utils/window-utils';
 import { assertTabStructure, assertWindowCount, assertWindowExists } from './utils/assertion-utils';
 import { waitForSidePanelReady } from './utils/polling-utils';
@@ -13,14 +13,7 @@ test.describe('コンテキストメニュー操作', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -48,7 +41,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     await expect(sidePanelPage.getByRole('menuitem', { name: 'タブを閉じる' })).toBeVisible();
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
@@ -62,14 +55,7 @@ test.describe('コンテキストメニュー操作', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -107,27 +93,20 @@ test.describe('コンテキストメニュー操作', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId1 = await createTab(extensionContext, getTestServerUrl('/page'), parentTabId);
+    const childTabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId1, depth: 1 },
     ], 0);
 
-    const childTabId2 = await createTab(extensionContext, getTestServerUrl('/page'), parentTabId);
+    const childTabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
@@ -169,14 +148,7 @@ test.describe('コンテキストメニュー操作', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -222,14 +194,7 @@ test.describe('コンテキストメニュー操作', () => {
     const window1Id = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId1 = await getPseudoSidePanelTabId(serviceWorker, window1Id);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, window1Id);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, window1Id, [
-      { tabId: pseudoSidePanelTabId1, depth: 0 },
-    ], 0);
-
-    const tabToMove = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabToMove = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, window1Id, [
       { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: tabToMove, depth: 0 },
@@ -252,7 +217,7 @@ test.describe('コンテキストメニュー操作', () => {
       (t) => t.id !== pseudoSidePanelTabId2
     );
     if (defaultTabInWindow2?.id) {
-      await closeTab(extensionContext, defaultTabInWindow2.id);
+      await closeTab(serviceWorker, defaultTabInWindow2.id);
     }
 
     await assertTabStructure(sidePanelPage2, window2Id, [
@@ -320,14 +285,7 @@ test.describe('コンテキストメニュー操作', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -356,7 +314,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
@@ -370,14 +328,7 @@ test.describe('コンテキストメニュー操作', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -413,7 +364,7 @@ test.describe('コンテキストメニュー操作', () => {
     }
     await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
@@ -427,14 +378,7 @@ test.describe('コンテキストメニュー操作', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -462,7 +406,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);

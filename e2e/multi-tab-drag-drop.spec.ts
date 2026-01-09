@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { startDrag, dropTab, waitForDragEnd } from './utils/drag-drop-utils';
 import { setUserSettings } from './utils/settings-utils';
@@ -15,18 +15,12 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // 5つのタブを作成
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId4 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId5 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -88,11 +82,11 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId1);
-    await closeTab(extensionContext, tabId2);
-    await closeTab(extensionContext, tabId3);
-    await closeTab(extensionContext, tabId4);
-    await closeTab(extensionContext, tabId5);
+    await closeTab(serviceWorker, tabId1);
+    await closeTab(serviceWorker, tabId2);
+    await closeTab(serviceWorker, tabId3);
+    await closeTab(serviceWorker, tabId4);
+    await closeTab(serviceWorker, tabId5);
   });
 
   test('Ctrl+クリックで飛び飛びに選択したタブをドラッグ&ドロップすると全てが移動する', async ({
@@ -105,15 +99,12 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
     // 5つのタブを作成
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId4 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId5 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -173,11 +164,11 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId1);
-    await closeTab(extensionContext, tabId2);
-    await closeTab(extensionContext, tabId3);
-    await closeTab(extensionContext, tabId4);
-    await closeTab(extensionContext, tabId5);
+    await closeTab(serviceWorker, tabId1);
+    await closeTab(serviceWorker, tabId2);
+    await closeTab(serviceWorker, tabId3);
+    await closeTab(serviceWorker, tabId4);
+    await closeTab(serviceWorker, tabId5);
   });
 
   test('選択されていないタブをドラッグするとそのタブだけが移動する', async ({
@@ -190,14 +181,11 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
     // 4つのタブを作成
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId4 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -246,10 +234,10 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId1);
-    await closeTab(extensionContext, tabId2);
-    await closeTab(extensionContext, tabId3);
-    await closeTab(extensionContext, tabId4);
+    await closeTab(serviceWorker, tabId1);
+    await closeTab(serviceWorker, tabId2);
+    await closeTab(serviceWorker, tabId3);
+    await closeTab(serviceWorker, tabId4);
   });
 
   test('複数選択したタブを別のタブの子としてドロップすると全て子になる', async ({
@@ -262,14 +250,11 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
     // 4つのタブを作成
-    const parentTabId = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
-    const tabId3 = await createTab(extensionContext, getTestServerUrl('/page'));
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
@@ -319,9 +304,9 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     // クリーンアップ
-    await closeTab(extensionContext, tabId1);
-    await closeTab(extensionContext, tabId2);
-    await closeTab(extensionContext, tabId3);
-    await closeTab(extensionContext, parentTabId);
+    await closeTab(serviceWorker, tabId1);
+    await closeTab(serviceWorker, tabId2);
+    await closeTab(serviceWorker, tabId3);
+    await closeTab(serviceWorker, parentTabId);
   });
 });

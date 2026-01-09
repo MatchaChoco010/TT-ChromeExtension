@@ -12,7 +12,6 @@ import {
   createTab,
   getCurrentWindowId,
   getPseudoSidePanelTabId,
-  getInitialBrowserTabId,
   closeTab,
   getTestServerUrl,
 } from './utils/tab-utils';
@@ -32,17 +31,14 @@ test.describe('設定タブのタイトル表示', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
 
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     const settingsTabId = await createTab(
-      extensionContext,
+      serviceWorker,
       `chrome-extension://${extensionId}/settings.html`,
       { active: true, windowId }
     );
 
-    await waitForTabInTreeState(extensionContext, settingsTabId, {
+    await waitForTabInTreeState(serviceWorker, settingsTabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `Settings tab ${settingsTabId} was not added to tree`,
     });
@@ -83,7 +79,7 @@ test.describe('設定タブのタイトル表示', () => {
       }
     );
 
-    await closeTab(extensionContext, settingsTabId);
+    await closeTab(serviceWorker, settingsTabId);
     await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 
@@ -114,17 +110,14 @@ test.describe('内部ページのタイトル表示', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
 
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     const tabId = await createTab(
-      extensionContext,
+      serviceWorker,
       'chrome://version',
       { active: true, windowId }
     );
 
-    await waitForTabInTreeState(extensionContext, tabId, {
+    await waitForTabInTreeState(serviceWorker, tabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `chrome://version tab ${tabId} was not added to tree`,
     });
@@ -160,7 +153,7 @@ test.describe('内部ページのタイトル表示', () => {
       }
     );
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 
@@ -176,17 +169,14 @@ test.describe('内部ページのタイトル表示', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
 
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     const tabId = await createTab(
-      extensionContext,
+      serviceWorker,
       'chrome://settings',
       { active: true, windowId }
     );
 
-    await waitForTabInTreeState(extensionContext, tabId, {
+    await waitForTabInTreeState(serviceWorker, tabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `chrome://settings tab ${tabId} was not added to tree`,
     });
@@ -227,7 +217,7 @@ test.describe('内部ページのタイトル表示', () => {
       }
     );
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 
@@ -243,17 +233,14 @@ test.describe('内部ページのタイトル表示', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
 
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     const tabId = await createTab(
-      extensionContext,
+      serviceWorker,
       getTestServerUrl('/page'),
       { active: true, windowId }
     );
 
-    await waitForTabInTreeState(extensionContext, tabId, {
+    await waitForTabInTreeState(serviceWorker, tabId, {
       timeout: COMMON_TIMEOUTS.medium,
       timeoutMessage: `test page tab ${tabId} was not added to tree`,
     });
@@ -279,7 +266,7 @@ test.describe('内部ページのタイトル表示', () => {
       }
     );
 
-    await closeTab(extensionContext, tabId);
+    await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
   });
 });
@@ -298,21 +285,18 @@ test.describe('タイトル表示の安定性テスト', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
 
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
 
     const tabIds: number[] = [];
 
     for (let i = 0; i < 3; i++) {
       const tabId = await createTab(
-        extensionContext,
+      serviceWorker,
         `chrome-extension://${extensionId}/settings.html`,
         { active: true, windowId }
       );
       tabIds.push(tabId);
 
-      await waitForTabInTreeState(extensionContext, tabId, {
+      await waitForTabInTreeState(serviceWorker, tabId, {
         timeout: COMMON_TIMEOUTS.medium,
       });
 
@@ -356,7 +340,7 @@ test.describe('タイトル表示の安定性テスト', () => {
     }
 
     for (let i = tabIds.length - 1; i >= 0; i--) {
-      await closeTab(extensionContext, tabIds[i]);
+      await closeTab(serviceWorker, tabIds[i]);
       const remainingTabs = tabIds.slice(0, i);
       const expectedStructure = [
         { tabId: pseudoSidePanelTabId, depth: 0 },

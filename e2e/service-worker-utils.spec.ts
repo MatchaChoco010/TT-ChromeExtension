@@ -8,7 +8,7 @@ import {
   assertEventListenersRegistered,
   assertServiceWorkerLifecycle,
 } from './utils/service-worker-utils';
-import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, createTab, getTestServerUrl } from './utils/tab-utils';
+import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, createTab, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import './types';
 
@@ -31,13 +31,8 @@ test.describe('ServiceWorkerUtils', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -50,7 +45,7 @@ test.describe('ServiceWorkerUtils', () => {
         success: true,
       });
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);

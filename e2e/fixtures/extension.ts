@@ -1,11 +1,5 @@
 /**
- * ExtensionFixture
- *
- * Chrome拡張機能をPlaywrightでロードするためのカスタムフィクスチャ。
- * Service Workerの起動を待機し、Extension IDを抽出して、
- * テストコンテキストに提供します。
- *
- * @see https://playwright.dev/docs/chrome-extensions
+ * Chrome拡張機能をPlaywrightでロードするためのカスタムフィクスチャ
  */
 import { test as base, chromium, type BrowserContext } from '@playwright/test';
 import type { Page, Worker } from '@playwright/test';
@@ -13,50 +7,22 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
+import { resetExtensionState } from '../utils/reset-utils';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * ExtensionFixturesのインターフェース
- */
 export interface ExtensionFixtures {
-  /**
-   * 拡張機能がロードされたブラウザコンテキスト
-   * Persistent Contextとして作成され、テスト終了後に自動的にクローズされます
-   */
   extensionContext: BrowserContext;
-
-  /**
-   * 拡張機能のID
-   * chrome-extension://<extensionId>/... の形式で使用されます
-   */
   extensionId: string;
-
-  /**
-   * Service Workerへの参照
-   * Manifest v3のバックグラウンドスクリプトです
-   */
   serviceWorker: Worker;
-
-  /**
-   * Side PanelのPage
-   * chrome-extension://<extensionId>/sidepanel.html として開かれます
-   */
   sidePanelPage: Page;
 }
 
-/**
- * 拡張機能のビルドディレクトリへのパス
- */
 const getExtensionPath = () => {
   return path.join(__dirname, '../../dist');
 };
 
-/**
- * 拡張機能のビルド成果物を検証するヘルパー関数
- * 拡張機能のロード前に必要なファイルが存在するか確認
- */
 const validateExtensionBuild = (extensionPath: string): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];
   const requiredFiles = [
@@ -92,19 +58,6 @@ const validateExtensionBuild = (extensionPath: string): { valid: boolean; errors
   return { valid: errors.length === 0, errors };
 };
 
-/**
- * Service Workerの起動を待機するヘルパー関数
- * extensionContextフィクスチャで使用し、他のフィクスチャは
- * 起動済みのService Workerを利用する
- *
- * 実装方針:
- * 1. まず既存のService Workerをチェック
- * 2. 見つからなければシンプルなポーリングで待機
- *
- * 注: Promise.any + waitForEvent の複雑な実装は
- * ブラウザコンテキストがクローズされた際にエラーが発生するため、
- * シンプルなポーリング方式を採用
- */
 const waitForServiceWorker = async (
   context: BrowserContext,
   timeout: number = 60000
@@ -143,19 +96,6 @@ const waitForServiceWorker = async (
   );
 };
 
-/**
- * 一意なユーザーデータディレクトリを作成するヘルパー関数
- *
- * 並列実行時の安定性を確保するため、各テストワーカーごとに
- * 独立したユーザーデータディレクトリを作成する。
- *
- * 注意: launchPersistentContext('') で空文字列を渡すとPlaywrightが
- * 一時ディレクトリを管理するが、並列実行時に競合が発生することがある。
- * 明示的にディレクトリを作成することでこの問題を回避する。
- *
- * リポジトリ内の .playwright-tmp/ ディレクトリを使用することで、
- * サンドボックス環境でも安全に動作する。
- */
 const createUniqueUserDataDir = (): string => {
   const projectRoot = path.join(__dirname, '../..');
   const tmpDir = path.join(projectRoot, '.playwright-tmp');
@@ -167,9 +107,6 @@ const createUniqueUserDataDir = (): string => {
   return userDataDir;
 };
 
-/**
- * ユーザーデータディレクトリを削除するヘルパー関数
- */
 const removeUserDataDir = (userDataDir: string): void => {
   try {
     fs.rmSync(userDataDir, { recursive: true, force: true });
@@ -178,19 +115,6 @@ const removeUserDataDir = (userDataDir: string): void => {
   }
 };
 
-/**
- * ブラウザコンテキストを作成し、拡張機能をロードするヘルパー関数
- *
- * 重要: Service Workerの検出はコンテキスト作成と同時に行う必要がある。
- * launchPersistentContext が完了した時点で、Service Workerが既に起動している
- * 可能性があるため、イベントリスナーを後から設定すると見逃すことがある。
- *
- * 解決策: launchPersistentContext の直後に即座に serviceWorkers() を確認し、
- * 存在しない場合のみイベント待機を行う。
- *
- * 並列実行対策: 各テストワーカーに独自のユーザーデータディレクトリを割り当て、
- * ブラウザインスタンス間の競合を完全に防止する。
- */
 const createExtensionContext = async (
   extensionPath: string,
   headless: boolean
@@ -202,19 +126,13 @@ const createExtensionContext = async (
 
   const userDataDir = createUniqueUserDataDir();
 
-  // Chrome拡張機能はheadlessモードで正式サポートされていないため、
-  // --headless=newを使用する（Playwrightのheadlessオプションではなく）
   const context = await chromium.launchPersistentContext(userDataDir, {
-    // headlessオプションは使用しない（--headless=new を args で指定）
     headless: false,
     channel: 'chromium',
     args: [
-      // Chrome拡張機能をサポートする新しいheadlessモード
       ...(headless ? ['--headless=new'] : []),
-      // 拡張機能のロード
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
-      // 安定性向上のための設定
       '--disable-gpu',
       '--no-sandbox',
       '--disable-background-networking',
@@ -224,7 +142,6 @@ const createExtensionContext = async (
       '--metrics-recording-only',
       '--mute-audio',
       '--no-first-run',
-      // Service Worker起動の安定性向上
       '--disable-features=TranslateUI',
       '--disable-component-extensions-with-background-pages',
     ],
@@ -236,40 +153,101 @@ const createExtensionContext = async (
   return { context, userDataDir };
 };
 
+// 自動リセットフィクスチャ（テストスコープ）
+interface TestFixtures {
+  autoReset: void;
+}
+
+// ワーカーごとの前回テストを追跡
+const workerLastTest = new Map<number, string>();
+
 /**
- * ExtensionFixtureの定義
+ * Service Workerが応答可能か確認する
+ * シンプルな計算を実行して応答性をテストする
+ * Chrome APIは使用しない（ハングする可能性があるため）
  */
-export const test = base.extend<ExtensionFixtures>({
-  /**
-   * extensionContext フィクスチャ
-   * 拡張機能をロードしたPersistent Contextを作成します
-   * Service Workerの起動を待機してから返すことで、
-   * 他のフィクスチャのタイムアウトを防ぎます
-   *
-   * 並列実行対策: 各テストワーカーに独自のユーザーデータディレクトリを
-   * 割り当て、テスト終了後にクリーンアップする
-   */
-  extensionContext: async ({}, use) => {
+const isWorkerAlive = async (worker: Worker, timeout: number = 2000): Promise<boolean> => {
+  try {
+    const result = await Promise.race([
+      worker.evaluate(() => {
+        return 1 + 1 === 2;
+      }),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), timeout)),
+    ]);
+    return result === true;
+  } catch {
+    return false;
+  }
+};
+
+export const test = base.extend<TestFixtures, ExtensionFixtures>({
+  // 自動リセットフィクスチャ: 各テスト前に状態をリセット
+  autoReset: [async ({ extensionContext, sidePanelPage, serviceWorker }, use, testInfo) => {
+    const workerId = testInfo.parallelIndex;
+    const testTitle = `${testInfo.file}:${testInfo.line} - ${testInfo.title}`;
+    const prevTest = workerLastTest.get(workerId);
+
+    try {
+      // テスト開始時にワーカー番号を出力
+      console.error(`\n[WORKER #${workerId}] TEST START: ${testInfo.title} (${testInfo.file}:${testInfo.line})`);
+
+      // テスト実行前にワーカースコープのフィクスチャが有効か検証
+      if (sidePanelPage.isClosed()) {
+        throw new Error(
+          'Fixture validation failed: sidePanelPage is closed. ' +
+          'The browser context may have become corrupted.'
+        );
+      }
+
+      const workerAlive = await isWorkerAlive(serviceWorker, 3000);
+      console.error(`[WORKER #${workerId}] isWorkerAlive: ${workerAlive}`);
+
+      // Service Workerの参照が有効かも確認
+      const currentWorkers = extensionContext.serviceWorkers();
+      console.error(`[WORKER #${workerId}] Current serviceWorkers count: ${currentWorkers.length}`);
+      if (currentWorkers.length > 0) {
+        console.error(`[WORKER #${workerId}] Current SW URL: ${currentWorkers[0].url()}`);
+        const isSameWorker = currentWorkers[0] === serviceWorker;
+        console.error(`[WORKER #${workerId}] Is same worker reference: ${isSameWorker}`);
+      }
+
+      if (!workerAlive) {
+        throw new Error(
+          'Fixture validation failed: Worker-scoped serviceWorker fixture is stale or unresponsive. ' +
+          'The Service Worker may have been restarted by Chrome.'
+        );
+      }
+
+      await resetExtensionState(serviceWorker, extensionContext, sidePanelPage);
+      workerLastTest.set(workerId, testTitle);
+      const testStartTime = Date.now();
+      await use();
+      const testEndTime = Date.now();
+      console.error(`[WORKER #${workerId}] TEST END at ${new Date().toISOString()} (duration: ${testEndTime - testStartTime}ms)`);
+    } catch (error) {
+      const lastError = error instanceof Error ? error : new Error(String(error));
+      console.error('\n=== RESET FAILED ===');
+      console.error(`Worker #${workerId}`);
+      console.error(`Current test: ${testTitle}`);
+      console.error(`Previous test on this worker: ${prevTest || 'None (first test)'}`);
+      console.error(`Error: ${lastError.message}`);
+      console.error('====================\n');
+      throw lastError;
+    }
+  }, { auto: true }],
+
+  extensionContext: [async ({}, use) => {
     const pathToExtension = getExtensionPath();
-
     const headless = process.env.HEADED !== 'true';
-
     const { context, userDataDir } = await createExtensionContext(pathToExtension, headless);
 
     await use(context);
 
     await context.close();
-
     removeUserDataDir(userDataDir);
-  },
+  }, { scope: 'worker' }],
 
-  /**
-   * extensionId フィクスチャ
-   * Service Worker URLからExtension IDを抽出します
-   * 注: extensionContextフィクスチャでService Workerの起動を待機済みなので、
-   * ここでは即座に取得できます
-   */
-  extensionId: async ({ extensionContext }, use) => {
+  extensionId: [async ({ extensionContext }, use) => {
     const workers = extensionContext.serviceWorkers();
 
     if (workers.length === 0) {
@@ -279,7 +257,6 @@ export const test = base.extend<ExtensionFixtures>({
     }
 
     const serviceWorker = workers[0];
-
     const extensionId = serviceWorker.url().split('/')[2];
 
     if (!extensionId || extensionId.length !== 32) {
@@ -289,15 +266,9 @@ export const test = base.extend<ExtensionFixtures>({
     }
 
     await use(extensionId);
-  },
+  }, { scope: 'worker' }],
 
-  /**
-   * serviceWorker フィクスチャ
-   * Service Workerへの参照を提供します
-   * 注: extensionContextフィクスチャでService Workerの起動を待機済みなので、
-   * ここでは即座に取得できます
-   */
-  serviceWorker: async ({ extensionContext }, use) => {
+  serviceWorker: [async ({ extensionContext }, use, workerInfo) => {
     const workers = extensionContext.serviceWorkers();
 
     if (workers.length === 0) {
@@ -306,23 +277,27 @@ export const test = base.extend<ExtensionFixtures>({
       );
     }
 
-    await use(workers[0]);
-  },
+    const worker = workers[0];
+    const workerIndex = workerInfo.parallelIndex;
 
-  /**
-   * sidePanelPage フィクスチャ
-   * Side Panelページを開いて提供します
-   *
-   * windowIdパラメータを含めてサイドパネルを開く
-   * これにより、サイドパネルは現在のウィンドウのタブのみを表示する
-   */
-  sidePanelPage: async ({ extensionContext, extensionId, serviceWorker }, use) => {
+    worker.on('close', () => {
+      console.error(`\n[WORKER #${workerIndex}] Service Worker CLOSED at ${new Date().toISOString()}`);
+    });
+
+    extensionContext.on('serviceworker', (newWorker) => {
+      console.error(`\n[WORKER #${workerIndex}] NEW Service Worker created at ${new Date().toISOString()}`);
+      console.error(`[WORKER #${workerIndex}] URL: ${newWorker.url()}`);
+      console.error(`[WORKER #${workerIndex}] This may indicate the Service Worker was restarted.`);
+    });
+
+    await use(worker);
+  }, { scope: 'worker' }],
+
+  sidePanelPage: [async ({ extensionContext, extensionId, serviceWorker }, use) => {
     const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-
     const page = await extensionContext.newPage();
 
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
-
     await page.waitForLoadState('domcontentloaded');
 
     try {
@@ -363,7 +338,7 @@ export const test = base.extend<ExtensionFixtures>({
           customCSS: '',
           newTabPosition: 'end',
           newTabPositionManual: 'end',
-          newTabPositionFromLink: 'end',
+          newTabPositionFromLink: 'child',
           duplicateTabPosition: 'sibling',
           closeWarningThreshold: 10,
           showUnreadIndicator: true,
@@ -376,13 +351,9 @@ export const test = base.extend<ExtensionFixtures>({
     await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
 
     await use(page);
-
-    await page.close();
-  },
+  }, { scope: 'worker' }],
 });
 
-/**
- * expectのエクスポート
- * テストファイルでの使用を簡素化します
- */
+// Note: beforeEach is replaced by autoReset auto-fixture above
+
 export { expect } from '@playwright/test';

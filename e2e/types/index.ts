@@ -16,52 +16,6 @@ export type {
 } from '../../src/types';
 
 /**
- * chrome.storage.local.get('tree_state') の戻り値の型
- */
-export interface TreeStateResult {
-  tree_state?: TreeState;
-}
-
-/**
- * chrome.storage.local.get('groups') の戻り値の型
- */
-export interface GroupsResult {
-  groups?: Record<string, Group>;
-}
-
-/**
- * テスト用のグローバル拡張
- * window や globalThis に追加されるテスト用プロパティの型定義
- */
-export interface TestGlobals {
-  receivedMessages?: Array<{ type: string; [key: string]: unknown }>;
-  listenerReady?: boolean;
-  stateUpdatedReceived?: boolean;
-  stateUpdateCount?: number;
-  testState?: { initialized: boolean; timestamp: number };
-  messageLog?: Array<{ type: string; timestamp: number }>;
-  receivedCount?: number;
-  pendingTabParents?: Map<number, number>;
-  pendingDuplicateSources?: Set<number>;
-}
-
-/**
- * TreeState 型を再定義（evaluate 内で使用するため）
- * src/types/index.ts と同じ構造
- */
-export interface E2ETreeState {
-  views: Array<{
-    id: string;
-    name: string;
-    color: string;
-    icon?: string;
-  }>;
-  currentViewId: string;
-  nodes: Record<string, E2ETabNode>;
-  tabToNode: Record<number, string>;
-}
-
-/**
  * TabNode 型を再定義（evaluate 内で使用するため）
  * src/types/index.ts と同じ構造
  */
@@ -81,6 +35,52 @@ export interface E2EGroup {
   name: string;
   color: string;
   isExpanded: boolean;
+}
+
+/**
+ * TreeState 型を再定義（evaluate 内で使用するため）
+ * src/types/index.ts と同じ構造
+ */
+export interface E2ETreeState {
+  views: Array<{
+    id: string;
+    name: string;
+    color: string;
+    icon?: string;
+  }>;
+  currentViewId: string;
+  nodes: Record<string, E2ETabNode>;
+  tabToNode: Record<number, string>;
+}
+
+/**
+ * chrome.storage.local.get('tree_state') の戻り値の型
+ */
+export interface TreeStateResult {
+  tree_state?: TreeState;
+}
+
+/**
+ * chrome.storage.local.get('groups') の戻り値の型
+ */
+export interface GroupsResult {
+  groups?: Record<string, E2EGroup>;
+}
+
+/**
+ * テスト用のグローバル拡張
+ * window や globalThis に追加されるテスト用プロパティの型定義
+ */
+export interface TestGlobals {
+  receivedMessages?: Array<{ type: string; [key: string]: unknown }>;
+  listenerReady?: boolean;
+  stateUpdatedReceived?: boolean;
+  stateUpdateCount?: number;
+  testState?: { initialized: boolean; timestamp: number };
+  messageLog?: Array<{ type: string; timestamp: number }>;
+  receivedCount?: number;
+  pendingTabParents?: Map<number, number>;
+  pendingDuplicateSources?: Set<number>;
 }
 
 import type { TreeState } from '../../src/types';
@@ -103,22 +103,22 @@ export function isTreeState(value: unknown): value is TreeState {
 declare global {
   interface Window extends TestGlobals {}
 
-   
+
   var receivedMessages: TestGlobals['receivedMessages'];
-   
+
   var listenerReady: TestGlobals['listenerReady'];
-   
+
   var stateUpdatedReceived: TestGlobals['stateUpdatedReceived'];
-   
+
   var stateUpdateCount: TestGlobals['stateUpdateCount'];
-   
+
   var testState: TestGlobals['testState'];
-   
+
   var messageLog: TestGlobals['messageLog'];
-   
+
   var receivedCount: TestGlobals['receivedCount'];
-   
+
   var pendingTabParents: TestGlobals['pendingTabParents'];
-   
+
   var pendingDuplicateSources: TestGlobals['pendingDuplicateSources'];
 }

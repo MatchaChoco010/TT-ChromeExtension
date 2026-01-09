@@ -1,5 +1,5 @@
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import {
   waitForTabInTreeState,
   waitForTabRemovedFromTreeState,
@@ -16,26 +16,17 @@ test.describe('親子関係不整合解消', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    // 初期状態を検証（擬似サイドパネルタブのみ）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // 親タブ1を作成
-    const parent1TabId = await createTab(extensionContext, getTestServerUrl('/parent1'));
-    await waitForTabInTreeState(extensionContext, parent1TabId);
+    const parent1TabId = await createTab(serviceWorker, getTestServerUrl('/parent1'));
+    await waitForTabInTreeState(serviceWorker, parent1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0 },
     ], 0);
 
     // 親タブ1の子タブを作成
-    const child1TabId = await createTab(extensionContext, getTestServerUrl('/child1'), parent1TabId);
-    await waitForTabInTreeState(extensionContext, child1TabId);
+    const child1TabId = await createTab(serviceWorker, getTestServerUrl('/child1'), parent1TabId);
+    await waitForTabInTreeState(serviceWorker, child1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -43,8 +34,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 親タブ2を作成
-    const parent2TabId = await createTab(extensionContext, getTestServerUrl('/parent2'));
-    await waitForTabInTreeState(extensionContext, parent2TabId);
+    const parent2TabId = await createTab(serviceWorker, getTestServerUrl('/parent2'));
+    await waitForTabInTreeState(serviceWorker, parent2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -53,8 +44,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 親タブ2の子タブを作成
-    const child2TabId = await createTab(extensionContext, getTestServerUrl('/child2'), parent2TabId);
-    await waitForTabInTreeState(extensionContext, child2TabId);
+    const child2TabId = await createTab(serviceWorker, getTestServerUrl('/child2'), parent2TabId);
+    await waitForTabInTreeState(serviceWorker, child2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -64,8 +55,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 独立したタブを作成
-    const tempTabId = await createTab(extensionContext, getTestServerUrl('/temp'));
-    await waitForTabInTreeState(extensionContext, tempTabId);
+    const tempTabId = await createTab(serviceWorker, getTestServerUrl('/temp'));
+    await waitForTabInTreeState(serviceWorker, tempTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -76,8 +67,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 独立したタブを閉じる
-    await closeTab(extensionContext, tempTabId);
-    await waitForTabRemovedFromTreeState(extensionContext, tempTabId);
+    await closeTab(serviceWorker, tempTabId);
+    await waitForTabRemovedFromTreeState(serviceWorker, tempTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -96,25 +87,16 @@ test.describe('親子関係不整合解消', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    // 初期状態を検証（擬似サイドパネルタブのみ）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // 親タブ1と子タブを作成
-    const parent1TabId = await createTab(extensionContext, getTestServerUrl('/parent1'));
-    await waitForTabInTreeState(extensionContext, parent1TabId);
+    const parent1TabId = await createTab(serviceWorker, getTestServerUrl('/parent1'));
+    await waitForTabInTreeState(serviceWorker, parent1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0 },
     ], 0);
 
-    const child1TabId = await createTab(extensionContext, getTestServerUrl('/child1'), parent1TabId);
-    await waitForTabInTreeState(extensionContext, child1TabId);
+    const child1TabId = await createTab(serviceWorker, getTestServerUrl('/child1'), parent1TabId);
+    await waitForTabInTreeState(serviceWorker, child1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -122,8 +104,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 親タブ2と子タブを作成（こちらの親子関係が維持されることを検証）
-    const parent2TabId = await createTab(extensionContext, getTestServerUrl('/parent2'));
-    await waitForTabInTreeState(extensionContext, parent2TabId);
+    const parent2TabId = await createTab(serviceWorker, getTestServerUrl('/parent2'));
+    await waitForTabInTreeState(serviceWorker, parent2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -131,8 +113,8 @@ test.describe('親子関係不整合解消', () => {
       { tabId: parent2TabId, depth: 0 },
     ], 0);
 
-    const child2TabId = await createTab(extensionContext, getTestServerUrl('/child2'), parent2TabId);
-    await waitForTabInTreeState(extensionContext, child2TabId);
+    const child2TabId = await createTab(serviceWorker, getTestServerUrl('/child2'), parent2TabId);
+    await waitForTabInTreeState(serviceWorker, child2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -142,8 +124,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 親タブ1を閉じる（子タブ1は昇格する）
-    await closeTab(extensionContext, parent1TabId);
-    await waitForTabRemovedFromTreeState(extensionContext, parent1TabId);
+    await closeTab(serviceWorker, parent1TabId);
+    await waitForTabRemovedFromTreeState(serviceWorker, parent1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: child1TabId, depth: 0 },
@@ -161,25 +143,16 @@ test.describe('親子関係不整合解消', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    // 初期状態を検証（擬似サイドパネルタブのみ）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // 親子関係を作成
-    const parentTabId = await createTab(extensionContext, getTestServerUrl('/parent'));
-    await waitForTabInTreeState(extensionContext, parentTabId);
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
+    await waitForTabInTreeState(serviceWorker, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
-    const childTabId = await createTab(extensionContext, getTestServerUrl('/child'), parentTabId);
-    await waitForTabInTreeState(extensionContext, childTabId);
+    const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'), parentTabId);
+    await waitForTabInTreeState(serviceWorker, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
@@ -188,8 +161,8 @@ test.describe('親子関係不整合解消', () => {
 
     // 連続でタブを作成して削除（5回繰り返す）
     for (let i = 0; i < 5; i++) {
-      const tempTabId = await createTab(extensionContext, getTestServerUrl(`/temp${i}`));
-      await waitForTabInTreeState(extensionContext, tempTabId);
+      const tempTabId = await createTab(serviceWorker, getTestServerUrl(`/temp${i}`));
+      await waitForTabInTreeState(serviceWorker, tempTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
@@ -197,8 +170,8 @@ test.describe('親子関係不整合解消', () => {
         { tabId: tempTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tempTabId);
-      await waitForTabRemovedFromTreeState(extensionContext, tempTabId);
+      await closeTab(serviceWorker, tempTabId);
+      await waitForTabRemovedFromTreeState(serviceWorker, tempTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
@@ -216,33 +189,24 @@ test.describe('親子関係不整合解消', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    // 初期状態を検証（擬似サイドパネルタブのみ）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // 3階層の親子関係を作成
-    const rootTabId = await createTab(extensionContext, getTestServerUrl('/root'));
-    await waitForTabInTreeState(extensionContext, rootTabId);
+    const rootTabId = await createTab(serviceWorker, getTestServerUrl('/root'));
+    await waitForTabInTreeState(serviceWorker, rootTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTabId, depth: 0 },
     ], 0);
 
-    const middleTabId = await createTab(extensionContext, getTestServerUrl('/middle'), rootTabId);
-    await waitForTabInTreeState(extensionContext, middleTabId);
+    const middleTabId = await createTab(serviceWorker, getTestServerUrl('/middle'), rootTabId);
+    await waitForTabInTreeState(serviceWorker, middleTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTabId, depth: 0, expanded: true },
       { tabId: middleTabId, depth: 1 },
     ], 0);
 
-    const leafTabId = await createTab(extensionContext, getTestServerUrl('/leaf'), middleTabId);
-    await waitForTabInTreeState(extensionContext, leafTabId);
+    const leafTabId = await createTab(serviceWorker, getTestServerUrl('/leaf'), middleTabId);
+    await waitForTabInTreeState(serviceWorker, leafTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTabId, depth: 0, expanded: true },
@@ -251,8 +215,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 独立したタブをいくつか作成
-    const temp1TabId = await createTab(extensionContext, getTestServerUrl('/temp1'));
-    await waitForTabInTreeState(extensionContext, temp1TabId);
+    const temp1TabId = await createTab(serviceWorker, getTestServerUrl('/temp1'));
+    await waitForTabInTreeState(serviceWorker, temp1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTabId, depth: 0, expanded: true },
@@ -261,8 +225,8 @@ test.describe('親子関係不整合解消', () => {
       { tabId: temp1TabId, depth: 0 },
     ], 0);
 
-    const temp2TabId = await createTab(extensionContext, getTestServerUrl('/temp2'));
-    await waitForTabInTreeState(extensionContext, temp2TabId);
+    const temp2TabId = await createTab(serviceWorker, getTestServerUrl('/temp2'));
+    await waitForTabInTreeState(serviceWorker, temp2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTabId, depth: 0, expanded: true },
@@ -273,8 +237,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // いくつかのタブを削除
-    await closeTab(extensionContext, temp1TabId);
-    await waitForTabRemovedFromTreeState(extensionContext, temp1TabId);
+    await closeTab(serviceWorker, temp1TabId);
+    await waitForTabRemovedFromTreeState(serviceWorker, temp1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTabId, depth: 0, expanded: true },
@@ -293,34 +257,25 @@ test.describe('親子関係不整合解消', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    // 初期状態を検証（擬似サイドパネルタブのみ）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // 3つの独立した親子関係を作成
     // 関係1: parent1 -> child1a, child1b
-    const parent1TabId = await createTab(extensionContext, getTestServerUrl('/parent1'));
-    await waitForTabInTreeState(extensionContext, parent1TabId);
+    const parent1TabId = await createTab(serviceWorker, getTestServerUrl('/parent1'));
+    await waitForTabInTreeState(serviceWorker, parent1TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0 },
     ], 0);
 
-    const child1aTabId = await createTab(extensionContext, getTestServerUrl('/child1a'), parent1TabId);
-    await waitForTabInTreeState(extensionContext, child1aTabId);
+    const child1aTabId = await createTab(serviceWorker, getTestServerUrl('/child1a'), parent1TabId);
+    await waitForTabInTreeState(serviceWorker, child1aTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1aTabId, depth: 1 },
     ], 0);
 
-    const child1bTabId = await createTab(extensionContext, getTestServerUrl('/child1b'), parent1TabId);
-    await waitForTabInTreeState(extensionContext, child1bTabId);
+    const child1bTabId = await createTab(serviceWorker, getTestServerUrl('/child1b'), parent1TabId);
+    await waitForTabInTreeState(serviceWorker, child1bTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -329,8 +284,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 関係2: parent2 -> child2
-    const parent2TabId = await createTab(extensionContext, getTestServerUrl('/parent2'));
-    await waitForTabInTreeState(extensionContext, parent2TabId);
+    const parent2TabId = await createTab(serviceWorker, getTestServerUrl('/parent2'));
+    await waitForTabInTreeState(serviceWorker, parent2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -339,8 +294,8 @@ test.describe('親子関係不整合解消', () => {
       { tabId: parent2TabId, depth: 0 },
     ], 0);
 
-    const child2TabId = await createTab(extensionContext, getTestServerUrl('/child2'), parent2TabId);
-    await waitForTabInTreeState(extensionContext, child2TabId);
+    const child2TabId = await createTab(serviceWorker, getTestServerUrl('/child2'), parent2TabId);
+    await waitForTabInTreeState(serviceWorker, child2TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -351,8 +306,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 関係3: parent3 -> child3
-    const parent3TabId = await createTab(extensionContext, getTestServerUrl('/parent3'));
-    await waitForTabInTreeState(extensionContext, parent3TabId);
+    const parent3TabId = await createTab(serviceWorker, getTestServerUrl('/parent3'));
+    await waitForTabInTreeState(serviceWorker, parent3TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -363,8 +318,8 @@ test.describe('親子関係不整合解消', () => {
       { tabId: parent3TabId, depth: 0 },
     ], 0);
 
-    const child3TabId = await createTab(extensionContext, getTestServerUrl('/child3'), parent3TabId);
-    await waitForTabInTreeState(extensionContext, child3TabId);
+    const child3TabId = await createTab(serviceWorker, getTestServerUrl('/child3'), parent3TabId);
+    await waitForTabInTreeState(serviceWorker, child3TabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -377,8 +332,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 一部のタブを削除（child1a）
-    await closeTab(extensionContext, child1aTabId);
-    await waitForTabRemovedFromTreeState(extensionContext, child1aTabId);
+    await closeTab(serviceWorker, child1aTabId);
+    await waitForTabRemovedFromTreeState(serviceWorker, child1aTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -390,8 +345,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // 新しいタブを作成
-    const newTabId = await createTab(extensionContext, getTestServerUrl('/new'));
-    await waitForTabInTreeState(extensionContext, newTabId);
+    const newTabId = await createTab(serviceWorker, getTestServerUrl('/new'));
+    await waitForTabInTreeState(serviceWorker, newTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
@@ -413,36 +368,27 @@ test.describe('親子関係不整合解消', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    // ブラウザ起動時のデフォルトタブを閉じる
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
-    // 初期状態を検証（擬似サイドパネルタブのみ）
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
-
     // 3階層の構造を作成:
     // tabA (root)
     //   └── tabB
     //         └── tabC
-    const tabAId = await createTab(extensionContext, getTestServerUrl('/A'));
-    await waitForTabInTreeState(extensionContext, tabAId);
+    const tabAId = await createTab(serviceWorker, getTestServerUrl('/A'));
+    await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    const tabBId = await createTab(extensionContext, getTestServerUrl('/B'), tabAId);
-    await waitForTabInTreeState(extensionContext, tabBId);
+    const tabBId = await createTab(serviceWorker, getTestServerUrl('/B'), tabAId);
+    await waitForTabInTreeState(serviceWorker, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
     ], 0);
 
-    const tabCId = await createTab(extensionContext, getTestServerUrl('/C'), tabBId);
-    await waitForTabInTreeState(extensionContext, tabCId);
+    const tabCId = await createTab(serviceWorker, getTestServerUrl('/C'), tabBId);
+    await waitForTabInTreeState(serviceWorker, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
@@ -451,8 +397,8 @@ test.describe('親子関係不整合解消', () => {
     ], 0);
 
     // ルート親タブAを閉じる
-    await closeTab(extensionContext, tabAId);
-    await waitForTabRemovedFromTreeState(extensionContext, tabAId);
+    await closeTab(serviceWorker, tabAId);
+    await waitForTabRemovedFromTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabBId, depth: 0, expanded: true },

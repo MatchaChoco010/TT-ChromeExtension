@@ -6,7 +6,6 @@ import {
   closeTab,
   getCurrentWindowId,
   getPseudoSidePanelTabId,
-  getInitialBrowserTabId,
   getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure, assertUnreadBadge } from './utils/assertion-utils';
@@ -18,15 +17,12 @@ extensionTest.describe('未読インジケータ機能', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -39,7 +35,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertUnreadBadge(sidePanelPage, bgTabId);
 
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -53,15 +49,12 @@ extensionTest.describe('未読インジケータ機能', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -74,7 +67,7 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertUnreadBadge(sidePanelPage, bgTabId);
 
-      await activateTab(extensionContext, bgTabId);
+      await activateTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -85,7 +78,7 @@ extensionTest.describe('未読インジケータ機能', () => {
       const unreadBadgeInNode = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadgeInNode).toHaveCount(0, { timeout: 10000 });
 
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -99,15 +92,12 @@ extensionTest.describe('未読インジケータ機能', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: true }
@@ -119,7 +109,7 @@ extensionTest.describe('未読インジケータ機能', () => {
       ], 0);
 
       const childTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         parentTabId,
         { active: false }
@@ -139,14 +129,14 @@ extensionTest.describe('未読インジケータ機能', () => {
       await expect(parentUnreadChildIndicator).toHaveCount(0);
       await expect(parentUnreadCount).toHaveCount(0);
 
-      await closeTab(extensionContext, childTabId);
+      await closeTab(serviceWorker, childTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, parentTabId);
+      await closeTab(serviceWorker, parentTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -160,15 +150,12 @@ extensionTest.describe('未読インジケータ機能', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId1 = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -180,7 +167,7 @@ extensionTest.describe('未読インジケータ機能', () => {
       ], 0);
 
       const bgTabId2 = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -193,7 +180,7 @@ extensionTest.describe('未読インジケータ機能', () => {
       ], 0);
 
       const bgTabId3 = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -210,7 +197,7 @@ extensionTest.describe('未読インジケータ機能', () => {
       await assertUnreadBadge(sidePanelPage, bgTabId2);
       await assertUnreadBadge(sidePanelPage, bgTabId3);
 
-      await closeTab(extensionContext, bgTabId3);
+      await closeTab(serviceWorker, bgTabId3);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -218,14 +205,14 @@ extensionTest.describe('未読インジケータ機能', () => {
         { tabId: bgTabId2, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, bgTabId2);
+      await closeTab(serviceWorker, bgTabId2);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, bgTabId1);
+      await closeTab(serviceWorker, bgTabId1);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -241,15 +228,12 @@ extensionTest.describe('未読インジケーター位置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -279,7 +263,7 @@ extensionTest.describe('未読インジケーター位置', () => {
         expect(badgeBottom).toBeLessThanOrEqual(tabNodeBottom + 2);
       }
 
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -293,15 +277,12 @@ extensionTest.describe('未読インジケーター位置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const shortTitleTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -313,7 +294,7 @@ extensionTest.describe('未読インジケーター位置', () => {
       ], 0);
 
       const longTitleTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -359,14 +340,14 @@ extensionTest.describe('未読インジケーター位置', () => {
         expect(Math.abs(shortTitleBadgeBounds.x - longTitleBadgeBounds.x)).toBeLessThanOrEqual(2);
       }
 
-      await closeTab(extensionContext, longTitleTabId);
+      await closeTab(serviceWorker, longTitleTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, shortTitleTabId);
+      await closeTab(serviceWorker, shortTitleTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -380,15 +361,12 @@ extensionTest.describe('未読インジケーター位置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -416,7 +394,7 @@ extensionTest.describe('未読インジケーター位置', () => {
         expect(badgeBounds.x + badgeBounds.width).toBeLessThan(tabNodeCenter);
       }
 
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -430,15 +408,12 @@ extensionTest.describe('未読インジケーター位置', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const shortTitleTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -450,7 +425,7 @@ extensionTest.describe('未読インジケーター位置', () => {
       ], 0);
 
       const longTitleTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -496,14 +471,14 @@ extensionTest.describe('未読インジケーター位置', () => {
         expect(Math.abs(shortRightX - longRightX)).toBeLessThanOrEqual(5);
       }
 
-      await closeTab(extensionContext, longTitleTabId);
+      await closeTab(serviceWorker, longTitleTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, shortTitleTabId);
+      await closeTab(serviceWorker, shortTitleTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -519,15 +494,12 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const rootTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -553,7 +525,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       expect(badgeStyles.left).toBe('0px');
 
-      await closeTab(extensionContext, rootTabId);
+      await closeTab(serviceWorker, rootTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -567,15 +539,12 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: true }
@@ -587,7 +556,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       ], 0);
 
       const childTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         parentTabId,
         { active: false }
@@ -614,14 +583,14 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       expect(badgeStyles.left).toBe('20px');
 
-      await closeTab(extensionContext, childTabId);
+      await closeTab(serviceWorker, childTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, parentTabId);
+      await closeTab(serviceWorker, parentTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -635,15 +604,12 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: true }
@@ -655,7 +621,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       ], 0);
 
       const childTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         parentTabId,
         { active: true }
@@ -668,7 +634,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       ], 0);
 
       const grandchildTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         childTabId,
         { active: false }
@@ -696,7 +662,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       expect(badgeStyles.left).toBe('40px');
 
-      await closeTab(extensionContext, grandchildTabId);
+      await closeTab(serviceWorker, grandchildTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -704,14 +670,14 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
         { tabId: childTabId, depth: 1 },
       ], 0);
 
-      await closeTab(extensionContext, childTabId);
+      await closeTab(serviceWorker, childTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, parentTabId);
+      await closeTab(serviceWorker, parentTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -725,15 +691,12 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const rootTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -745,7 +708,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       ], 0);
 
       const parentTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: true }
@@ -758,7 +721,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
       ], 0);
 
       const childTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         parentTabId,
         { active: false }
@@ -793,7 +756,7 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       expect(childLeft - rootLeft).toBe(20);
 
-      await closeTab(extensionContext, childTabId);
+      await closeTab(serviceWorker, childTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -801,14 +764,14 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, parentTabId);
+      await closeTab(serviceWorker, parentTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, rootTabId);
+      await closeTab(serviceWorker, rootTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -824,15 +787,12 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -880,7 +840,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       expect(badgeStyles.bottom).toBe('0px');
       expect(badgeStyles.borderStyle).toBe('solid');
 
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -894,15 +854,12 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -936,7 +893,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
         );
       }
 
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -950,15 +907,12 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -971,7 +925,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertUnreadBadge(sidePanelPage, bgTabId);
 
-      await activateTab(extensionContext, bgTabId);
+      await activateTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -982,7 +936,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       const unreadBadgeInNode = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadgeInNode).toHaveCount(0, { timeout: 10000 });
 
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -996,15 +950,12 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId1 = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -1016,7 +967,7 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       ], 0);
 
       const bgTabId2 = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -1073,14 +1024,14 @@ extensionTest.describe('未読インジケーターUI改善', () => {
       expect(badge1Styles.bottom).toBe(badge2Styles.bottom);
       expect(badge1Styles.borderStyle).toBe(badge2Styles.borderStyle);
 
-      await closeTab(extensionContext, bgTabId2);
+      await closeTab(serviceWorker, bgTabId2);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, bgTabId1);
+      await closeTab(serviceWorker, bgTabId1);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },

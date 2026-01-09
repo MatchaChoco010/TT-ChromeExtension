@@ -3,15 +3,15 @@ import {
   registerWindowEventListeners,
   registerMessageListener,
   registerWebNavigationListeners,
+  trackHandler,
 } from './event-handlers';
 
-import { testTreeStateManager, testTitlePersistence, testUnreadTracker } from './event-handlers';
+import { testTreeStateManager, testTitlePersistence, testUnreadTracker, testSnapshotManager } from './event-handlers';
 
-import { SnapshotManager } from '@/services';
-import { storageService, indexedDBService, STORAGE_KEYS } from '@/storage';
+import { storageService, STORAGE_KEYS } from '@/storage';
 import type { UserSettings } from '@/types';
 
-const snapshotManager = new SnapshotManager(indexedDBService, storageService);
+const snapshotManager = testSnapshotManager;
 
 /**
  * 古いタブデータをクリーンアップ
@@ -116,30 +116,14 @@ registerMessageListener();
 
 registerSettingsChangeListener();
 
-chrome.action.onClicked.addListener(async () => {
-  try {
-    const settingsUrl = chrome.runtime.getURL('settings.html');
-    await chrome.tabs.create({ url: settingsUrl });
-  } catch {
-    // エラーを無視
-  }
+chrome.action.onClicked.addListener(() => {
+  trackHandler(async () => {
+    try {
+      const settingsUrl = chrome.runtime.getURL('settings.html');
+      await chrome.tabs.create({ url: settingsUrl });
+    } catch {
+      // エラーを無視
+    }
+  });
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === 'CREATE_SNAPSHOT') {
-    (async () => {
-      try {
-        const timestamp = new Date().toLocaleString();
-        const name = `Manual Snapshot - ${timestamp}`;
-        await snapshotManager.createSnapshot(name, false);
-        sendResponse({ success: true });
-      } catch (error) {
-        sendResponse({
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    })();
-    return true;
-  }
-});

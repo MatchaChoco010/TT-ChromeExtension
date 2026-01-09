@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
 import { waitForTabActive } from './utils/polling-utils';
 
@@ -13,9 +13,6 @@ test.describe('アクティブタブのハイライト', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -23,10 +20,10 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId1, depth: 0 }], 0);
 
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -39,10 +36,10 @@ test.describe('アクティブタブのハイライト', () => {
       await expect(treeNode2).toHaveClass(/bg-gray-600/);
       await expect(treeNode1).not.toHaveClass(/bg-gray-600/);
 
-      await closeTab(extensionContext, tabId1);
+      await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId2, depth: 0 }], 0);
 
-      await closeTab(extensionContext, tabId2);
+      await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
     });
 
@@ -54,9 +51,6 @@ test.describe('アクティブタブのハイライト', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -64,10 +58,10 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId1, depth: 0 }], 0);
 
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
@@ -81,17 +75,17 @@ test.describe('アクティブタブのハイライト', () => {
 
       await treeNode2.click({ force: true, noWaitAfter: true });
 
-      await waitForTabActive(extensionContext, tabId2);
+      await waitForTabActive(serviceWorker, tabId2);
 
       await expect(async () => {
         await expect(treeNode2).toHaveClass(/bg-gray-600/);
         await expect(treeNode1).not.toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      await closeTab(extensionContext, tabId1);
+      await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: tabId2, depth: 0 }], 0);
 
-      await closeTab(extensionContext, tabId2);
+      await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
     });
   });
@@ -105,9 +99,6 @@ test.describe('アクティブタブのハイライト', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -115,17 +106,17 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const pinnedTabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
+      const pinnedTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId, depth: 0 }], 0);
 
-      await pinTab(extensionContext, pinnedTabId);
+      await pinTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
       const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${pinnedTabId}"]`);
       await expect(pinnedTab).toHaveClass(/bg-gray-600/);
 
-      await closeTab(extensionContext, pinnedTabId);
+      await closeTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
@@ -138,9 +129,6 @@ test.describe('アクティブタブのハイライト', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -148,21 +136,21 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const pinnedTabId1 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
+      const pinnedTabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId1, depth: 0 }], 0);
 
-      const pinnedTabId2 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const pinnedTabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: pinnedTabId1, depth: 0 },
         { tabId: pinnedTabId2, depth: 0 },
       ], 0);
 
-      await pinTab(extensionContext, pinnedTabId1);
+      await pinTab(serviceWorker, pinnedTabId1);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId2, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }], 0);
 
-      await pinTab(extensionContext, pinnedTabId2);
+      await pinTab(serviceWorker, pinnedTabId2);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }, { tabId: pinnedTabId2 }], 0);
 
@@ -178,11 +166,11 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(pinnedTab1).not.toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      await closeTab(extensionContext, pinnedTabId1);
+      await closeTab(serviceWorker, pinnedTabId1);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId2 }], 0);
 
-      await closeTab(extensionContext, pinnedTabId2);
+      await closeTab(serviceWorker, pinnedTabId2);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
@@ -197,9 +185,6 @@ test.describe('アクティブタブのハイライト', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -207,17 +192,17 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const normalTabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
+      const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
 
-      const pinnedTabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const pinnedTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
         { tabId: pinnedTabId, depth: 0 },
       ], 0);
 
-      await pinTab(extensionContext, pinnedTabId);
+      await pinTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
@@ -234,11 +219,11 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(pinnedTab).toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      await closeTab(extensionContext, normalTabId);
+      await closeTab(serviceWorker, normalTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
-      await closeTab(extensionContext, pinnedTabId);
+      await closeTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
@@ -251,9 +236,6 @@ test.describe('アクティブタブのハイライト', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -261,14 +243,14 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const pinnedTabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
+      const pinnedTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: pinnedTabId, depth: 0 }], 0);
 
-      await pinTab(extensionContext, pinnedTabId);
+      await pinTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
-      const normalTabId = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId }], 0);
 
@@ -285,11 +267,11 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(normalTab).toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 5000 });
 
-      await closeTab(extensionContext, pinnedTabId);
+      await closeTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
-      await closeTab(extensionContext, normalTabId);
+      await closeTab(serviceWorker, normalTabId);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });
@@ -301,28 +283,20 @@ test.describe('アクティブタブのハイライト', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-
-      await closeTab(extensionContext, initialBrowserTabId);
-
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const normalTabId1 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: true });
+      const normalTabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId1, depth: 0 }], 0);
 
-      const normalTabId2 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const normalTabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
         { tabId: normalTabId2, depth: 0 },
       ], 0);
 
-      const pinnedTabId1 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const pinnedTabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
@@ -330,7 +304,7 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pinnedTabId1, depth: 0 },
       ], 0);
 
-      const pinnedTabId2 = await createTab(extensionContext, getTestServerUrl('/page'), undefined, { active: false });
+      const pinnedTabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
@@ -339,7 +313,7 @@ test.describe('アクティブタブのハイライト', () => {
         { tabId: pinnedTabId2, depth: 0 },
       ], 0);
 
-      await pinTab(extensionContext, pinnedTabId1);
+      await pinTab(serviceWorker, pinnedTabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
@@ -348,7 +322,7 @@ test.describe('アクティブタブのハイライト', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }], 0);
 
-      await pinTab(extensionContext, pinnedTabId2);
+      await pinTab(serviceWorker, pinnedTabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId1, depth: 0 },
@@ -402,19 +376,19 @@ test.describe('アクティブタブのハイライト', () => {
         await expect(normalTab1).toHaveClass(/bg-gray-600/);
       }).toPass({ timeout: 500 });
 
-      await closeTab(extensionContext, normalTabId1);
+      await closeTab(serviceWorker, normalTabId1);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }, { tabId: normalTabId2, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }, { tabId: pinnedTabId2 }], 0);
 
-      await closeTab(extensionContext, normalTabId2);
+      await closeTab(serviceWorker, normalTabId2);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId1 }, { tabId: pinnedTabId2 }], 0);
 
-      await closeTab(extensionContext, pinnedTabId1);
+      await closeTab(serviceWorker, pinnedTabId1);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: pinnedTabId2 }], 0);
 
-      await closeTab(extensionContext, pinnedTabId2);
+      await closeTab(serviceWorker, pinnedTabId2);
       await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     });

@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabStatusComplete } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -20,15 +20,12 @@ test.describe.skip('休止タブの視覚的区別', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // アクティブタブは休止できないため、代替タブを先に作成してアクティブにしておく
-    const alternativeTabId = await createTab(extensionContext, getTestServerUrl('/page1'), undefined, {
+    const alternativeTabId = await createTab(serviceWorker, getTestServerUrl('/page1'), undefined, {
       active: true,
     });
     await assertTabStructure(sidePanelPage, windowId, [
@@ -38,7 +35,7 @@ test.describe.skip('休止タブの視覚的区別', () => {
     await waitForTabStatusComplete(serviceWorker, alternativeTabId);
 
     // テスト対象のタブを非アクティブで作成
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page2'), undefined, {
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page2'), undefined, {
       active: false,
     });
     await assertTabStructure(sidePanelPage, windowId, [
@@ -78,15 +75,12 @@ test.describe.skip('休止タブの視覚的区別', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     // アクティブタブは休止できないため、代替タブを先に作成してアクティブにしておく
-    const alternativeTabId = await createTab(extensionContext, getTestServerUrl('/page1'), undefined, {
+    const alternativeTabId = await createTab(serviceWorker, getTestServerUrl('/page1'), undefined, {
       active: true,
     });
     await assertTabStructure(sidePanelPage, windowId, [
@@ -96,7 +90,7 @@ test.describe.skip('休止タブの視覚的区別', () => {
     await waitForTabStatusComplete(serviceWorker, alternativeTabId);
 
     // テスト対象のタブを非アクティブで作成
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page2'), undefined, {
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page2'), undefined, {
       active: false,
     });
     await assertTabStructure(sidePanelPage, windowId, [

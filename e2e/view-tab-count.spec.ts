@@ -3,7 +3,7 @@ import {
   waitForViewSwitcher,
   waitForCondition,
 } from './utils/polling-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ビューのタブカウント正確性', () => {
@@ -16,16 +16,9 @@ test.describe('ビューのタブカウント正確性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      // 初期状態のタブ数を取得
       const getTabCountBadge = async () => {
         // デフォルトビューのタブカウントバッジを取得
         const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
@@ -39,7 +32,7 @@ test.describe('ビューのタブカウント正確性', () => {
       const initialCount = await getTabCountBadge();
 
       // 新しいタブを作成
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -59,7 +52,7 @@ test.describe('ビューのタブカウント正確性', () => {
       );
 
       // クリーンアップ: 作成したタブを閉じる
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -73,17 +66,10 @@ test.describe('ビューのタブカウント正確性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      // タブを作成して初期状態を確立
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -111,7 +97,7 @@ test.describe('ビューのタブカウント正確性', () => {
       const countBeforeDelete = await getTabCountBadge();
 
       // タブを削除
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -138,14 +124,8 @@ test.describe('ビューのタブカウント正確性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       const getTabCountBadge = async () => {
         const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
@@ -158,16 +138,15 @@ test.describe('ビューのタブカウント正確性', () => {
 
       const initialCount = await getTabCountBadge();
 
-      // 3つのタブを追加
       const tabIds: number[] = [];
-      const tab1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       tabIds.push(tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       tabIds.push(tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -175,7 +154,7 @@ test.describe('ビューのタブカウント正確性', () => {
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       tabIds.push(tab3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -198,20 +177,20 @@ test.describe('ビューのタブカウント正確性', () => {
       );
 
       // クリーンアップ
-      await closeTab(extensionContext, tab1);
+      await closeTab(serviceWorker, tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tab2);
+      await closeTab(serviceWorker, tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tab3);
+      await closeTab(serviceWorker, tab3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -227,17 +206,10 @@ test.describe('ビューのタブカウント正確性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      // 1. 正常なタブを作成
-      const normalTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
@@ -370,7 +342,7 @@ test.describe('ビューのタブカウント正確性', () => {
       );
 
       // クリーンアップ
-      await closeTab(extensionContext, normalTabId);
+      await closeTab(serviceWorker, normalTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -384,17 +356,10 @@ test.describe('ビューのタブカウント正確性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      // 1. タブを作成
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -421,7 +386,7 @@ test.describe('ビューのタブカウント正確性', () => {
       const tabCountWithTab = await getTabCountBadge();
 
       // 3. タブを削除
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -453,16 +418,9 @@ test.describe('タブ数表示の視認性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      // タブカウントバッジを取得するヘルパー関数
       const getTabCountBadge = async () => {
         const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
         if (await badge.isVisible()) {
@@ -472,24 +430,22 @@ test.describe('タブ数表示の視認性', () => {
         return 0;
       };
 
-      // 初期タブ数を取得
       const initialCount = await getTabCountBadge();
 
-      // 複数のタブを追加（2桁の数字を表示するため）
-      const tab1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
-      const tab2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
 
-      const tab3 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -513,20 +469,20 @@ test.describe('タブ数表示の視認性', () => {
       );
 
       // クリーンアップ
-      await closeTab(extensionContext, tab1);
+      await closeTab(serviceWorker, tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tab2);
+      await closeTab(serviceWorker, tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tab3);
+      await closeTab(serviceWorker, tab3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -540,16 +496,9 @@ test.describe('タブ数表示の視認性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      // タブカウントバッジを取得するヘルパー関数
       const getTabCountBadge = async () => {
         const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
         if (await badge.isVisible()) {
@@ -559,16 +508,14 @@ test.describe('タブ数表示の視認性', () => {
         return 0;
       };
 
-      // 初期タブ数を取得
       const initialCount = await getTabCountBadge();
 
-      // 10個以上のタブを追加して2桁の数字を表示
       const tabIds: number[] = [];
       const targetTotal = 10;
       const tabsToAdd = Math.max(0, targetTotal - initialCount);
 
       for (let i = 0; i < tabsToAdd; i++) {
-        const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+        const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
         tabIds.push(tabId);
         // 各タブ作成後にassertTabStructure
         await assertTabStructure(sidePanelPage, windowId, [
@@ -599,7 +546,7 @@ test.describe('タブ数表示の視認性', () => {
 
       // クリーンアップ
       for (let i = 0; i < tabIds.length; i++) {
-        await closeTab(extensionContext, tabIds[i]);
+        await closeTab(serviceWorker, tabIds[i]);
         const remainingTabIds = tabIds.slice(i + 1);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -618,17 +565,10 @@ test.describe('タブ数表示の視認性', () => {
       // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
-      // テスト初期化
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      // タブを追加してバッジを表示
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
@@ -669,7 +609,7 @@ test.describe('タブ数表示の視認性', () => {
       );
 
       // クリーンアップ
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);

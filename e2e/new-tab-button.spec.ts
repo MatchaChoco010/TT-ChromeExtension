@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 
@@ -12,13 +12,6 @@ test.describe('新規タブ追加ボタン', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
@@ -34,13 +27,6 @@ test.describe('新規タブ追加ボタン', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
@@ -72,13 +58,6 @@ test.describe('新規タブ追加ボタン', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
 
@@ -103,7 +82,7 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      await waitForTabInTreeState(serviceWorker, newTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -119,13 +98,6 @@ test.describe('新規タブ追加ボタン', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
 
@@ -150,7 +122,7 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      await waitForTabInTreeState(serviceWorker, newTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -168,14 +140,7 @@ test.describe('新規タブ追加ボタン', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const existingTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const existingTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -210,7 +175,7 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
       );
 
-      await waitForTabInTreeState(extensionContext, newTabId!);
+      await waitForTabInTreeState(serviceWorker, newTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -226,13 +191,6 @@ test.describe('新規タブ追加ボタン', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
@@ -258,7 +216,7 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'First new tab was not created' }
       );
 
-      await waitForTabInTreeState(extensionContext, firstNewTabId!);
+      await waitForTabInTreeState(serviceWorker, firstNewTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -292,7 +250,7 @@ test.describe('新規タブ追加ボタン', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'Second new tab was not created' }
       );
 
-      await waitForTabInTreeState(extensionContext, secondNewTabId!);
+      await waitForTabInTreeState(serviceWorker, secondNewTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },

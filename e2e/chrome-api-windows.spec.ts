@@ -38,14 +38,14 @@ test.describe('chrome.windows API統合', () => {
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), { windowId, active: false });
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), { windowId, active: false });
     await assertTabStructure(newWindowSidePanel, windowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'), { windowId, active: false });
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'), { windowId, active: false });
     await assertTabStructure(newWindowSidePanel, windowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
@@ -156,14 +156,14 @@ test.describe('chrome.windows API統合', () => {
       { tabId: pseudoSidePanelTabId2, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'), { windowId: windowId1, active: false });
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), { windowId: windowId1, active: false });
     await assertTabStructure(sidePanel1, windowId1, [
       { tabId: initialTabId1, depth: 0 },
       { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/page2'), { windowId: windowId2, active: false });
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'), { windowId: windowId2, active: false });
     await assertTabStructure(sidePanel2, windowId2, [
       { tabId: initialTabId2, depth: 0 },
       { tabId: pseudoSidePanelTabId2, depth: 0 },

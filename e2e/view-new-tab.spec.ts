@@ -6,7 +6,6 @@ import {
   closeTab,
   getCurrentWindowId,
   getPseudoSidePanelTabId,
-  getInitialBrowserTabId,
   getTestServerUrl,
 } from './utils/tab-utils';
 
@@ -17,18 +16,8 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      // 初期状態を検証（デフォルトビュー: index 0）
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -60,7 +49,7 @@ test.describe('ビューへの新規タブ追加', () => {
       await expect(emptyMessage).toBeVisible({ timeout: 5000 });
 
       // createTab関数を使って新しいタブを作成
-      const newTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const newTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       // タブ作成直後にassertTabStructureで検証
       // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残り、
@@ -95,18 +84,8 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      // 初期状態を検証（デフォルトビュー: index 0）
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -133,7 +112,7 @@ test.describe('ビューへの新規タブ追加', () => {
       ], 1);
 
       // createTab関数を使って新しいタブを作成
-      const newTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const newTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       // タブ作成直後にassertTabStructureで検証（ビューindex 1が維持されていることも確認）
       // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残り、新しいタブだけがカスタムビュー(index 1)に追加される
@@ -153,18 +132,8 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      // 初期状態を検証（デフォルトビュー: index 0）
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -192,18 +161,18 @@ test.describe('ビューへの新規タブ追加', () => {
 
       // 3つのタブを順番に追加（各タブ作成直後にassertTabStructure）
       // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残るため、新しいビュー(index 1)には含まれない
-      const tab1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: tab1, depth: 0 },
       ], 1);
 
-      const tab2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 1);
 
-      const tab3 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tab3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -224,18 +193,8 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      // 初期状態を検証（デフォルトビュー: index 0）
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -254,7 +213,7 @@ test.describe('ビューへの新規タブ追加', () => {
       ], 0);
 
       // createTab関数を使って新しいタブを作成
-      const newTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const newTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       // タブ作成直後にassertTabStructureで検証
       await assertTabStructure(sidePanelPage, windowId, [
@@ -284,18 +243,8 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      // 初期状態を検証（デフォルトビュー: index 0）
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -363,7 +312,7 @@ test.describe('ビューへの新規タブ追加', () => {
       expect(viewAId).not.toBe(viewBId);
 
       // createTab関数を使って新しいタブを作成
-      const newTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const newTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       // タブ作成直後にassertTabStructureで検証
       // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残るため、ビューB(index 2)には含まれない
@@ -397,18 +346,8 @@ test.describe('ビューへの新規タブ追加', () => {
       sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト初期化: windowIdと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      // 初期状態を検証（デフォルトビュー: index 0）
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -478,7 +417,7 @@ test.describe('ビューへの新規タブ追加', () => {
       }
 
       // 新しいタブがツリーに追加されるまで待機
-      await waitForTabInTreeState(extensionContext, newTabId);
+      await waitForTabInTreeState(serviceWorker, newTabId);
 
       // タブ作成直後にassertTabStructureで検証
       // pseudoSidePanelTabIdはデフォルトビュー(index 0)に残るため、カスタムビュー(index 1)には含まれない

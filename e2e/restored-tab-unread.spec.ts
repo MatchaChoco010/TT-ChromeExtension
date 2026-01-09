@@ -5,7 +5,7 @@
  */
 import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
-import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 extensionTest.describe('復元タブの未読状態', () => {
@@ -44,12 +44,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       // 初期状態では未読バッジがないことを確認
       const initialUnreadBadges = sidePanelPage.locator('[data-testid="unread-badge"]');
@@ -57,7 +51,7 @@ extensionTest.describe('復元タブの未読状態', () => {
 
       // バックグラウンドで新しいタブを作成
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -74,7 +68,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
 
       // クリーンアップ
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -95,16 +89,10 @@ extensionTest.describe('復元タブの未読状態', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       // アクティブ状態で新しいタブを作成
       const activeTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: true }
@@ -121,7 +109,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       await expect(unreadBadge).toHaveCount(0, { timeout: 5000 });
 
       // クリーンアップ
-      await closeTab(extensionContext, activeTabId);
+      await closeTab(serviceWorker, activeTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -142,16 +130,10 @@ extensionTest.describe('復元タブの未読状態', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       // バックグラウンドで新しいタブを作成（未読状態になる）
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -168,7 +150,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
 
       // タブをアクティブにして既読にする
-      await activateTab(extensionContext, bgTabId);
+      await activateTab(serviceWorker, bgTabId);
       // activateTabはアクティブタブを変更するだけなのでツリー構造は変わらない
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -196,7 +178,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       await expect(reloadedUnreadBadge).toHaveCount(0, { timeout: 5000 });
 
       // クリーンアップ
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -217,16 +199,10 @@ extensionTest.describe('復元タブの未読状態', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      // ブラウザ起動時のデフォルトタブを閉じる
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       // バックグラウンドで新しいタブを作成
       const bgTabId = await createTab(
-        extensionContext,
+      serviceWorker,
         getTestServerUrl('/page'),
         undefined,
         { active: false }
@@ -250,7 +226,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       expect(unreadTabs).toContain(bgTabId);
 
       // タブをアクティブにして既読にする
-      await activateTab(extensionContext, bgTabId);
+      await activateTab(serviceWorker, bgTabId);
       // activateTabはアクティブタブを変更するだけなのでツリー構造は変わらない
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -268,7 +244,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       expect(unreadTabsAfter || []).not.toContain(bgTabId);
 
       // クリーンアップ
-      await closeTab(extensionContext, bgTabId);
+      await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);

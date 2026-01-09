@@ -8,8 +8,13 @@
  * E2Eテストでは、非同期の状態変更を待機する必要があることが多い。
  * このモジュールでは、ポーリングで条件をチェックし、条件が満たされるか
  * タイムアウトするまで待機する共通関数を提供する。
+ *
+ * 重要: すべての関数は Worker を直接受け取る。
+ * context.serviceWorkers()[0] から新しい参照を取得する getServiceWorker() は廃止。
+ * これにより、Service Worker が再起動された場合に即座にエラーが発生し、
+ * 根本原因が明確になる。
  */
-import type { BrowserContext, Page, Worker } from '@playwright/test';
+import type { Page, Worker } from '@playwright/test';
 import '../types';
 
 /**
@@ -26,17 +31,6 @@ export interface PollingOptions {
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_INTERVAL = 16.667;
-
-/**
- * Service Workerを取得するヘルパー関数
- */
-async function getServiceWorker(context: BrowserContext): Promise<Worker> {
-  let [serviceWorker] = context.serviceWorkers();
-  if (!serviceWorker) {
-    serviceWorker = await context.waitForEvent('serviceworker');
-  }
-  return serviceWorker;
-}
 
 /**
  * Service Workerコンテキストでポーリング待機を行う
@@ -80,12 +74,8 @@ export async function pollInServiceWorker<T>(
     async ({ conditionFnStr, args, iterations, interval }) => {
       const fn = eval(`(${conditionFnStr})`);
       for (let i = 0; i < iterations; i++) {
-        try {
-          if (await fn(args)) {
-            return { success: true };
-          }
-        } catch {
-          // ポーリング中のエラーは無視
+        if (await fn(args)) {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -107,12 +97,12 @@ export async function pollInServiceWorker<T>(
 /**
  * ストレージ内のツリー状態が条件を満たすまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param checkFn - tree_stateをチェックする条件関数（Service Workerコンテキストで実行）
  * @param options - ポーリングオプション
  */
 export async function waitForTreeStateCondition(
-  context: BrowserContext,
+  serviceWorker: Worker,
   checkFnStr: string,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -122,7 +112,6 @@ export async function waitForTreeStateCondition(
     timeoutMessage = 'Timeout waiting for tree state condition to be met',
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
@@ -150,12 +139,12 @@ export async function waitForTreeStateCondition(
 /**
  * タブがツリーに追加されるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - 待機するタブのID
  * @param options - ポーリングオプション
  */
 export async function waitForTabInTreeState(
-  context: BrowserContext,
+  serviceWorker: Worker,
   tabId: number,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -165,7 +154,6 @@ export async function waitForTabInTreeState(
     timeoutMessage = `Timeout waiting for tab ${tabId} to be added to tree`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
@@ -193,12 +181,12 @@ export async function waitForTabInTreeState(
 /**
  * タブがツリーから削除されるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - 待機するタブのID
  * @param options - ポーリングオプション
  */
 export async function waitForTabRemovedFromTreeState(
-  context: BrowserContext,
+  serviceWorker: Worker,
   tabId: number,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -208,7 +196,6 @@ export async function waitForTabRemovedFromTreeState(
     timeoutMessage = `Timeout waiting for tab ${tabId} to be removed from tree`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
@@ -236,12 +223,12 @@ export async function waitForTabRemovedFromTreeState(
 /**
  * タブがアクティブになるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - 待機するタブのID
  * @param options - ポーリングオプション
  */
 export async function waitForTabActive(
-  context: BrowserContext,
+  serviceWorker: Worker,
   tabId: number,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -251,7 +238,6 @@ export async function waitForTabActive(
     timeoutMessage = `Timeout waiting for tab ${tabId} to become active`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
@@ -276,12 +262,12 @@ export async function waitForTabActive(
 /**
  * ウィンドウがChrome内部状態に登録されるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param windowId - 待機するウィンドウのID
  * @param options - ポーリングオプション
  */
 export async function waitForWindowRegistered(
-  context: BrowserContext,
+  serviceWorker: Worker,
   windowId: number,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -291,19 +277,14 @@ export async function waitForWindowRegistered(
     timeoutMessage = `Timeout waiting for window ${windowId} to be registered`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
     async ({ windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        try {
-          const windows = await chrome.windows.getAll();
-          if (windows.find((w) => w.id === windowId)) {
-            return { success: true };
-          }
-        } catch {
-          // ウィンドウ確認中のエラーは無視
+        const windows = await chrome.windows.getAll();
+        if (windows.find((w) => w.id === windowId)) {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -320,12 +301,12 @@ export async function waitForWindowRegistered(
 /**
  * ウィンドウが閉じられるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param windowId - 待機するウィンドウのID
  * @param options - ポーリングオプション
  */
 export async function waitForWindowClosed(
-  context: BrowserContext,
+  serviceWorker: Worker,
   windowId: number,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -335,19 +316,14 @@ export async function waitForWindowClosed(
     timeoutMessage = `Timeout waiting for window ${windowId} to be closed`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
     async ({ windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        try {
-          const windows = await chrome.windows.getAll();
-          if (!windows.find((w) => w.id === windowId)) {
-            return { success: true };
-          }
-        } catch {
-          // ウィンドウ確認中のエラーは無視
+        const windows = await chrome.windows.getAll();
+        if (!windows.find((w) => w.id === windowId)) {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -364,13 +340,13 @@ export async function waitForWindowClosed(
 /**
  * タブが指定ウィンドウに移動するまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param tabId - 移動するタブのID
  * @param windowId - 移動先のウィンドウID
  * @param options - ポーリングオプション
  */
 export async function waitForTabInWindow(
-  context: BrowserContext,
+  serviceWorker: Worker,
   tabId: number,
   windowId: number,
   options: PollingOptions = {}
@@ -381,19 +357,14 @@ export async function waitForTabInWindow(
     timeoutMessage = `Timeout waiting for tab ${tabId} to be in window ${windowId}`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
     async ({ tabId, windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        try {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab.windowId === windowId) {
-            return { success: true };
-          }
-        } catch {
-          // タブ確認中のエラーは無視
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.windowId === windowId) {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -410,12 +381,12 @@ export async function waitForTabInWindow(
 /**
  * ウィンドウのタブがストレージに同期されるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param windowId - 待機するウィンドウのID
  * @param options - ポーリングオプション
  */
 export async function waitForWindowTreeSync(
-  context: BrowserContext,
+  serviceWorker: Worker,
   windowId: number,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -425,29 +396,25 @@ export async function waitForWindowTreeSync(
     timeoutMessage = `Timeout waiting for window ${windowId} tabs to sync with tree state`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
     async ({ windowId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        try {
-          const tabs = await chrome.tabs.query({ windowId });
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as
-            | { tabToNode?: Record<number, string> }
-            | undefined;
+        const tabs = await chrome.tabs.query({ windowId });
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as
+          | { tabToNode?: Record<number, string> }
+          | undefined;
 
-          if (treeState?.tabToNode && tabs.length > 0) {
-            const allTabsSynced = tabs.every(
-              (tab: chrome.tabs.Tab) => tab.id && treeState.tabToNode[tab.id]
-            );
-            if (allTabsSynced) {
-              return { success: true };
-            }
+        if (treeState?.tabToNode && tabs.length > 0) {
+          const tabToNode = treeState.tabToNode;
+          const allTabsSynced = tabs.every(
+            (tab: chrome.tabs.Tab) => tab.id && tabToNode[tab.id]
+          );
+          if (allTabsSynced) {
+            return { success: true };
           }
-        } catch {
-          // 同期確認中のエラーは無視
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -464,12 +431,12 @@ export async function waitForWindowTreeSync(
 /**
  * グループがストレージに保存されるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param groupName - 待機するグループの名前
  * @param options - ポーリングオプション
  */
 export async function waitForGroupInStorage(
-  context: BrowserContext,
+  serviceWorker: Worker,
   groupName: string,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -479,7 +446,6 @@ export async function waitForGroupInStorage(
     timeoutMessage = `Timeout waiting for group "${groupName}" to be saved in storage`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
@@ -513,12 +479,12 @@ export async function waitForGroupInStorage(
 /**
  * グループがストレージから削除されるまで待機
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param groupId - 削除を待機するグループのID
  * @param options - ポーリングオプション
  */
 export async function waitForGroupRemovedFromStorage(
-  context: BrowserContext,
+  serviceWorker: Worker,
   groupId: string,
   options: PollingOptions = {}
 ): Promise<void> {
@@ -528,7 +494,6 @@ export async function waitForGroupRemovedFromStorage(
     timeoutMessage = `Timeout waiting for group "${groupId}" to be removed from storage`,
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
@@ -554,11 +519,11 @@ export async function waitForGroupRemovedFromStorage(
 /**
  * ツリー状態が初期化されるまで待機（ノードが存在するまで）
  *
- * @param context - ブラウザコンテキスト
+ * @param serviceWorker - Service Worker
  * @param options - ポーリングオプション
  */
 export async function waitForTreeStateInitialized(
-  context: BrowserContext,
+  serviceWorker: Worker,
   options: PollingOptions = {}
 ): Promise<void> {
   const {
@@ -567,7 +532,6 @@ export async function waitForTreeStateInitialized(
     timeoutMessage = 'Timeout waiting for tree state to be initialized',
   } = options;
 
-  const serviceWorker = await getServiceWorker(context);
   const iterations = Math.ceil(timeout / interval);
 
   const result = await serviceWorker.evaluate(
@@ -618,12 +582,8 @@ export async function pollInPage<T>(
     async ({ conditionFnStr, args, iterations, interval }) => {
       const fn = eval(`(${conditionFnStr})`);
       for (let i = 0; i < iterations; i++) {
-        try {
-          if (await fn(args)) {
-            return { success: true };
-          }
-        } catch {
-          // 条件確認中のエラーは無視
+        if (await fn(args)) {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -874,13 +834,9 @@ export async function waitForTabStatusComplete(
   const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        try {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab.status === 'complete') {
-            return { success: true };
-          }
-        } catch {
-          // タブ状態確認中のエラーは無視
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.status === 'complete') {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -917,13 +873,9 @@ export async function waitForTabDiscarded(
   const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        try {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab.discarded === true) {
-            return { success: true };
-          }
-        } catch {
-          // タブ状態確認中のエラーは無視
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.discarded === true) {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -960,13 +912,9 @@ export async function waitForTabNotDiscarded(
   const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        try {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab.discarded === false) {
-            return { success: true };
-          }
-        } catch {
-          // タブ状態確認中のエラーは無視
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.discarded === false) {
+          return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
@@ -1012,13 +960,9 @@ export async function waitForCondition(
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeout) {
-    try {
-      const result = await conditionFn();
-      if (result) {
-        return;
-      }
-    } catch {
-      // 条件確認中のエラーは無視
+    const result = await conditionFn();
+    if (result) {
+      return;
     }
     await new Promise((resolve) => setTimeout(resolve, interval));
   }

@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import SidePanelRoot from '@/sidepanel/components/SidePanelRoot';
 import { IndexedDBService } from '@/storage/IndexedDBService';
+import { chromeMock } from '@/test/chrome-mock';
 import type { TabNode, Snapshot } from '@/types';
 
 function measurePerformance(fn: () => void | Promise<void>): number {
@@ -39,63 +40,23 @@ function generateMockTabs(count: number): TabNode[] {
 }
 
 describe('パフォーマンステスト', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    chromeMock.clearAllListeners();
+  });
+
   describe('100タブ以上でのレンダリング性能', () => {
     it('100タブのレンダリングが500ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(100);
 
-      const chromeMock = {
-        runtime: {
-          sendMessage: vi.fn().mockResolvedValue({
-            success: true,
-            data: {
-              nodes: mockTabs,
-              currentViewId: 'default-view',
-              views: [{ id: 'default-view', name: 'Default', color: '#000000' }],
-            },
-          }),
-          onMessage: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
+      chromeMock.runtime.sendMessage.mockResolvedValue({
+        success: true,
+        data: {
+          nodes: mockTabs,
+          currentViewId: 'default-view',
+          views: [{ id: 'default-view', name: 'Default', color: '#000000' }],
         },
-        storage: {
-          local: {
-            get: vi.fn().mockResolvedValue({}),
-            set: vi.fn().mockResolvedValue(undefined),
-          },
-          onChanged: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-        },
-        tabs: {
-          onActivated: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onUpdated: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onMoved: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onCreated: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onRemoved: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          query: vi.fn().mockResolvedValue([]),
-        },
-        windows: {
-          getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
-        },
-      };
-      vi.stubGlobal('chrome', chromeMock);
+      });
 
       const renderTime = await measureAsyncPerformance(async () => {
         await act(async () => {
@@ -109,59 +70,14 @@ describe('パフォーマンステスト', () => {
     it('200タブのレンダリングが1000ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(200);
 
-      const chromeMock = {
-        runtime: {
-          sendMessage: vi.fn().mockResolvedValue({
-            success: true,
-            data: {
-              nodes: mockTabs,
-              currentViewId: 'default-view',
-              views: [{ id: 'default-view', name: 'Default', color: '#000000' }],
-            },
-          }),
-          onMessage: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
+      chromeMock.runtime.sendMessage.mockResolvedValue({
+        success: true,
+        data: {
+          nodes: mockTabs,
+          currentViewId: 'default-view',
+          views: [{ id: 'default-view', name: 'Default', color: '#000000' }],
         },
-        storage: {
-          local: {
-            get: vi.fn().mockResolvedValue({}),
-            set: vi.fn().mockResolvedValue(undefined),
-          },
-          onChanged: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-        },
-        tabs: {
-          onActivated: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onUpdated: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onMoved: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onCreated: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          onRemoved: {
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          query: vi.fn().mockResolvedValue([]),
-        },
-        windows: {
-          getCurrent: vi.fn().mockResolvedValue({ id: 1 }),
-        },
-      };
-      vi.stubGlobal('chrome', chromeMock);
+      });
 
       const renderTime = await measureAsyncPerformance(async () => {
         await act(async () => {
@@ -233,7 +149,6 @@ describe('パフォーマンステスト', () => {
     });
 
     it('全スナップショット取得が100ms以内に完了すること', async () => {
-      // 10個のスナップショットを作成
       for (let i = 0; i < 10; i++) {
         const snapshot: Snapshot = {
           id: `perf-test-all-${i}`,
@@ -293,17 +208,6 @@ describe('パフォーマンステスト', () => {
 
   describe('ストレージ操作のバッチ性能', () => {
     it('複数のストレージ書き込みが適切にデバウンスされること', async () => {
-      const mockStorage = {
-        set: vi.fn().mockResolvedValue(undefined),
-      };
-
-      const chromeMock = {
-        storage: {
-          local: mockStorage,
-        },
-      };
-      vi.stubGlobal('chrome', chromeMock);
-
       const writeOperations = Array.from({ length: 100 }, (_, i) => ({
         key: 'tree_state',
         value: { updateCount: i },
@@ -311,10 +215,13 @@ describe('パフォーマンステスト', () => {
 
       const totalTime = await measureAsyncPerformance(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
-        await mockStorage.set(writeOperations[writeOperations.length - 1].key, writeOperations[writeOperations.length - 1].value);
+        await chromeMock.storage.local.set({
+          [writeOperations[writeOperations.length - 1].key]:
+            writeOperations[writeOperations.length - 1].value,
+        });
       });
 
-      expect(mockStorage.set).toHaveBeenCalledTimes(1);
+      expect(chromeMock.storage.local.set).toHaveBeenCalledTimes(1);
       expect(totalTime).toBeLessThan(50);
     });
   });

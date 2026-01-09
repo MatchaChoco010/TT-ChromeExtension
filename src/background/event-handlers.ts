@@ -2,18 +2,128 @@ import type { MessageType, MessageResponse, TabNode } from '@/types';
 import { TreeStateManager } from '@/services/TreeStateManager';
 import { UnreadTracker } from '@/services/UnreadTracker';
 import { TitlePersistenceService } from '@/services/TitlePersistenceService';
+import { SnapshotManager } from '@/services/SnapshotManager';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
+import { indexedDBService } from '@/storage/IndexedDBService';
 
 const storageService = new StorageService();
 const treeStateManager = new TreeStateManager(storageService);
 const unreadTracker = new UnreadTracker(storageService);
 const titlePersistence = new TitlePersistenceService(storageService);
+const snapshotManager = new SnapshotManager(indexedDBService, storageService);
 
 unreadTracker.loadFromStorage().catch(() => {});
 
 titlePersistence.loadFromStorage().catch(() => {});
 
-export { storageService as testStorageService, treeStateManager as testTreeStateManager, unreadTracker as testUnreadTracker, titlePersistence as testTitlePersistence };
+export { storageService as testStorageService, treeStateManager as testTreeStateManager, unreadTracker as testUnreadTracker, titlePersistence as testTitlePersistence, snapshotManager as testSnapshotManager };
+
+/**
+ * イベントハンドラー完了追跡システム
+ *
+ * 【目的】
+ * E2Eテストのリセット処理で、前のテストの非同期ハンドラーが完了してから
+ * リセットを開始するために必要。本番機能には影響しない。
+ *
+ * 【背景】
+ * Chromeはイベントリスナーのコールバック完了を待たない。
+ * そのため、テストでタブを閉じた後すぐにリセット処理を開始すると、
+ * handleTabRemoved等のハンドラーがバックグラウンドで実行中のまま
+ * 状態がクリアされ、競合が発生する。
+ *
+ * 【重要】
+ * Service Workerの全ての非同期イベントハンドラーはtrackHandler()で
+ * ラップする必要がある。ラップし忘れると、そのハンドラーの完了を
+ * waitForPendingHandlers()で待機できなくなる。
+ */
+let pendingHandlerCount = 0;
+let pendingHandlerResolvers: (() => void)[] = [];
+
+/**
+ * 非同期イベントハンドラーをラップして完了を追跡する
+ *
+ * 【使用方法】
+ * chrome.tabs.onCreated.addListener((tab) => {
+ *   trackHandler(() => handleTabCreated(tab));
+ * });
+ *
+ * 【注意】
+ * - E2Eテストのリセット機能のためにのみ必要
+ * - 本番機能の動作には影響しない
+ * - 新しいイベントハンドラーを追加する際は必ずこれでラップすること
+ */
+export async function trackHandler<T>(fn: () => Promise<T>): Promise<T> {
+  pendingHandlerCount++;
+  try {
+    return await fn();
+  } finally {
+    pendingHandlerCount--;
+    if (pendingHandlerCount === 0) {
+      const resolvers = pendingHandlerResolvers;
+      pendingHandlerResolvers = [];
+      resolvers.forEach(resolve => resolve());
+    }
+  }
+}
+
+/**
+ * 全ての実行中イベントハンドラーの完了を待機する
+ *
+ * 【用途】
+ * E2Eテストのリセット時に使用。前のテストで発生した非同期ハンドラーが
+ * 完了してからリセット処理を開始することで、状態の競合を防ぐ。
+ *
+ * 【注意】
+ * - 本番機能では使用しない（E2Eテスト専用）
+ * - trackHandler()でラップされたハンドラーのみ追跡可能
+ */
+async function waitForPendingHandlers(timeoutMs: number = 5000): Promise<void> {
+  if (pendingHandlerCount === 0) {
+    return;
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      const index = pendingHandlerResolvers.indexOf(wrappedResolve);
+      if (index !== -1) {
+        pendingHandlerResolvers.splice(index, 1);
+      }
+      reject(new Error(
+        `waitForPendingHandlers timed out after ${timeoutMs}ms. ` +
+        `${pendingHandlerCount} handler(s) still running.`
+      ));
+    }, timeoutMs);
+
+    const wrappedResolve = () => {
+      clearTimeout(timeoutId);
+      resolve();
+    };
+
+    pendingHandlerResolvers.push(wrappedResolve);
+  });
+}
+
+/**
+ * E2Eテスト用のリセット関数
+ *
+ * 【機能】
+ * 1. 実行中の非同期イベントハンドラーの完了を待機
+ * 2. IndexedDBのキャッシュ接続を閉じる
+ *
+ * 【用途】
+ * E2Eテストのリセット処理で使用。テスト間で状態をクリーンにリセットする。
+ * この関数を呼ぶことで、前のテストの副作用が次のテストに影響しない。
+ *
+ * 【背景】
+ * - 非同期ハンドラー: Chromeはイベントリスナーの完了を待たないため、
+ *   ハンドラーがバックグラウンドで実行中のままリセットが始まる可能性がある
+ * - IndexedDB: deleteDatabase()は開いている接続があるとブロックされるため、
+ *   キャッシュされた接続を先に閉じる必要がある
+ */
+async function prepareForReset(): Promise<void> {
+  await waitForPendingHandlers();
+  await indexedDBService.closeConnection();
+}
 
 let dragState: { tabId: number; treeData: TabNode[]; sourceWindowId: number } | null =
   null;
@@ -51,42 +161,70 @@ const pendingLinkClicks = new Map<number, number>();
 
 // E2Eテスト等のService Worker評価コンテキストからアクセスするためglobalThisにエクスポート
 declare global {
-   
+
   var pendingTabParents: Map<number, number>;
-   
+
   var pendingDuplicateSources: Map<number, { url: string; windowId: number }>;
-   
+
   var pendingGroupTabIds: Set<number>;
-   
+
   var pendingLinkClicks: Map<number, number>;
-   
+
   var treeStateManager: TreeStateManager;
+
+  /**
+   * E2Eテスト用リセット準備関数
+   * - 実行中の非同期ハンドラーの完了を待機
+   * - IndexedDBのキャッシュ接続を閉じる
+   */
+  function prepareForReset(): Promise<void>;
 }
 globalThis.pendingTabParents = pendingTabParents;
 globalThis.pendingDuplicateSources = pendingDuplicateSources;
 globalThis.pendingGroupTabIds = pendingGroupTabIds;
 globalThis.pendingLinkClicks = pendingLinkClicks;
 globalThis.treeStateManager = treeStateManager;
+globalThis.prepareForReset = prepareForReset;
 
 /**
  * Chromeタブイベントリスナーを登録
+ * 各ハンドラーをtrackHandlerでラップして完了を追跡する
  */
 export function registerTabEventListeners(): void {
-  chrome.tabs.onCreated.addListener(handleTabCreated);
-  chrome.tabs.onRemoved.addListener(handleTabRemoved);
-  chrome.tabs.onMoved.addListener(handleTabMoved);
-  chrome.tabs.onUpdated.addListener(handleTabUpdated);
-  chrome.tabs.onActivated.addListener(handleTabActivated);
-  chrome.tabs.onDetached.addListener(handleTabDetached);
-  chrome.tabs.onAttached.addListener(handleTabAttached);
+  chrome.tabs.onCreated.addListener((tab) => {
+    trackHandler(() => handleTabCreated(tab));
+  });
+  chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+    trackHandler(() => handleTabRemoved(tabId, removeInfo));
+  });
+  chrome.tabs.onMoved.addListener((tabId, moveInfo) => {
+    trackHandler(() => handleTabMoved(tabId, moveInfo));
+  });
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    trackHandler(() => handleTabUpdated(tabId, changeInfo, tab));
+  });
+  chrome.tabs.onActivated.addListener((activeInfo) => {
+    trackHandler(() => handleTabActivated(activeInfo));
+  });
+  chrome.tabs.onDetached.addListener((tabId, detachInfo) => {
+    trackHandler(() => handleTabDetached(tabId, detachInfo));
+  });
+  chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
+    trackHandler(() => handleTabAttached(tabId, attachInfo));
+  });
 }
 
 /**
  * Chromeウィンドウイベントリスナーを登録
+ * 各ハンドラーをtrackHandlerでラップして完了を追跡する
  */
 export function registerWindowEventListeners(): void {
-  chrome.windows.onCreated.addListener(handleWindowCreated);
-  chrome.windows.onRemoved.addListener(handleWindowRemoved);
+  chrome.windows.onCreated.addListener((window) => {
+    trackHandler(() => handleWindowCreated(window));
+  });
+  chrome.windows.onRemoved.addListener((windowId) => {
+    trackHandler(() => handleWindowRemoved(windowId));
+  });
 }
 
 /**
@@ -299,24 +437,17 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
  * 最後のウィンドウは閉じない（ブラウザ終了防止）
  */
 async function tryCloseEmptyWindow(windowId: number): Promise<void> {
-  console.log('[EMPTY WINDOW DEBUG] tryCloseEmptyWindow called for windowId:', windowId);
   try {
     const tabs = await chrome.tabs.query({ windowId });
-    console.log('[EMPTY WINDOW DEBUG] tabs.length:', tabs.length, 'tabs:', tabs.map(t => ({ id: t.id, url: t.url })));
     if (tabs.length > 0) {
-      console.log('[EMPTY WINDOW DEBUG] Window has tabs, not closing');
       return;
     }
 
     const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-    console.log('[EMPTY WINDOW DEBUG] allWindows.length:', allWindows.length);
     if (allWindows.length <= 1) {
-      console.log('[EMPTY WINDOW DEBUG] Only one window, not closing');
       return;
     }
 
-    console.log('[EMPTY WINDOW DEBUG] CLOSING EMPTY WINDOW:', windowId);
-    console.log('[EMPTY WINDOW DEBUG] Stack trace:', new Error().stack);
     await chrome.windows.remove(windowId);
   } catch {
     // ウィンドウクローズ失敗は無視
@@ -327,7 +458,6 @@ export async function handleTabRemoved(
   tabId: number,
   removeInfo: chrome.tabs.TabRemoveInfo,
 ): Promise<void> {
-  console.log('[TAB REMOVED DEBUG] handleTabRemoved called with tabId:', tabId, 'removeInfo:', removeInfo);
   const { windowId, isWindowClosing } = removeInfo;
 
   try {
@@ -385,7 +515,6 @@ export async function handleTabUpdated(
   changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab,
 ): Promise<void> {
-  console.log('[TAB UPDATED DEBUG] handleTabUpdated called with tabId:', tabId, 'changeInfo:', JSON.stringify(changeInfo));
   try {
     if (changeInfo.title !== undefined && tab.title) {
       titlePersistence.saveTitle(tabId, tab.title);
@@ -436,10 +565,10 @@ async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promis
  * タブがウィンドウから取り外されたときのハンドラ
  * ウィンドウ間のタブ移動で発火する（onMovedはウィンドウ内移動のみ）
  */
-function handleTabDetached(
+async function handleTabDetached(
   _tabId: number,
   _detachInfo: chrome.tabs.TabDetachInfo,
-): void {
+): Promise<void> {
   try {
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
@@ -451,10 +580,10 @@ function handleTabDetached(
  * タブが別のウィンドウにアタッチされたときのハンドラ
  * ウィンドウ間のタブ移動で発火する（onMovedはウィンドウ内移動のみ）
  */
-function handleTabAttached(
+async function handleTabAttached(
   _tabId: number,
   _attachInfo: chrome.tabs.TabAttachInfo,
-): void {
+): Promise<void> {
   try {
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
@@ -474,7 +603,7 @@ async function handleWindowCreated(window: chrome.windows.Window): Promise<void>
   }
 }
 
-function handleWindowRemoved(_windowId: number): void {
+async function handleWindowRemoved(_windowId: number): Promise<void> {
   try {
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
@@ -484,18 +613,18 @@ function handleWindowRemoved(_windowId: number): void {
 
 function handleMessage(
   message: MessageType,
-   
+
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): boolean {
   try {
     switch (message.type) {
       case 'GET_STATE':
-        handleGetState(sendResponse);
+        trackHandler(() => handleGetState(sendResponse));
         break;
 
       case 'UPDATE_TREE':
-        handleUpdateTree(message.payload, sendResponse);
+        trackHandler(() => handleUpdateTree(message.payload, sendResponse));
         break;
 
       case 'ACTIVATE_TAB':
@@ -507,7 +636,7 @@ function handleMessage(
         break;
 
       case 'CLOSE_SUBTREE':
-        handleCloseSubtree(message.payload.tabId, sendResponse);
+        trackHandler(() => handleCloseSubtree(message.payload.tabId, sendResponse));
         break;
 
       case 'MOVE_TAB_TO_WINDOW':
@@ -523,15 +652,15 @@ function handleMessage(
         break;
 
       case 'CREATE_WINDOW_WITH_SUBTREE':
-        handleCreateWindowWithSubtree(message.payload.tabId, message.payload.sourceWindowId, sendResponse);
+        trackHandler(() => handleCreateWindowWithSubtree(message.payload.tabId, message.payload.sourceWindowId, sendResponse));
         break;
 
       case 'MOVE_SUBTREE_TO_WINDOW':
-        handleMoveSubtreeToWindow(
+        trackHandler(() => handleMoveSubtreeToWindow(
           message.payload.tabId,
           message.payload.windowId,
           sendResponse,
-        );
+        ));
         break;
 
       case 'SET_DRAG_STATE':
@@ -547,37 +676,41 @@ function handleMessage(
         break;
 
       case 'SYNC_TABS':
-        handleSyncTabs(sendResponse);
+        trackHandler(() => handleSyncTabs(sendResponse));
         break;
 
       case 'REFRESH_TREE_STRUCTURE':
-        handleRefreshTreeStructure(sendResponse);
+        trackHandler(() => handleRefreshTreeStructure(sendResponse));
         break;
 
       case 'CREATE_GROUP':
-        handleCreateGroup(message.payload.tabIds, sendResponse);
+        trackHandler(() => handleCreateGroup(message.payload.tabIds, sendResponse));
         break;
 
       case 'DISSOLVE_GROUP':
-        handleDissolveGroup(message.payload.tabIds, sendResponse);
+        trackHandler(() => handleDissolveGroup(message.payload.tabIds, sendResponse));
         break;
 
       case 'REGISTER_DUPLICATE_SOURCE':
-        handleRegisterDuplicateSource(message.payload.sourceTabId, sendResponse);
+        trackHandler(() => handleRegisterDuplicateSource(message.payload.sourceTabId, sendResponse));
         break;
 
       case 'DUPLICATE_SUBTREE':
-        handleDuplicateSubtree(message.payload.tabId, sendResponse);
+        trackHandler(() => handleDuplicateSubtree(message.payload.tabId, sendResponse));
         break;
 
       case 'GET_GROUP_INFO':
-        handleGetGroupInfo(message.payload.tabId, sendResponse);
+        trackHandler(() => handleGetGroupInfo(message.payload.tabId, sendResponse));
+        break;
+
+      case 'CREATE_SNAPSHOT':
+        trackHandler(() => handleCreateSnapshot(sendResponse));
         break;
 
       default:
         sendResponse({
           success: false,
-          error: 'Unknown message type',
+          error: `Unknown message type: ${message.type}`,
         });
     }
   } catch (error) {
@@ -781,10 +914,7 @@ async function handleCreateWindowWithSubtree(
       if (sourceWindowId !== undefined) {
         try {
           const remainingTabs = await chrome.tabs.query({ windowId: sourceWindowId });
-          console.log('[CREATE_WINDOW_WITH_SUBTREE DEBUG] remainingTabs in source window:', remainingTabs.length);
           if (remainingTabs.length === 0) {
-            console.log('[CREATE_WINDOW_WITH_SUBTREE DEBUG] CLOSING EMPTY SOURCE WINDOW:', sourceWindowId);
-            console.log('[CREATE_WINDOW_WITH_SUBTREE DEBUG] Stack trace:', new Error().stack);
             await chrome.windows.remove(sourceWindowId);
           }
         } catch {
@@ -1138,6 +1268,25 @@ async function handleGetGroupInfo(
 
     const groupInfo = await treeStateManager.getGroupInfo(tabId);
     sendResponse({ success: true, data: groupInfo });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * スナップショット作成
+ */
+async function handleCreateSnapshot(
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    const timestamp = new Date().toLocaleString();
+    const name = `Manual Snapshot - ${timestamp}`;
+    await snapshotManager.createSnapshot(name, false);
+    sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({
       success: false,

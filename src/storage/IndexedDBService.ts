@@ -207,6 +207,29 @@ export class IndexedDBService implements IIndexedDBService {
       throw error;
     }
   }
+
+  /**
+   * データベース接続を閉じてキャッシュをクリアする
+   *
+   * 【用途】
+   * E2Eテストのリセット処理で使用。indexedDB.deleteDatabase()を呼ぶ前に
+   * この関数を呼んで接続を閉じないと、削除がブロックされる。
+   *
+   * 【注意】
+   * - 本番機能では使用しない（E2Eテスト専用）
+   * - 呼び出し後、次のDB操作時に自動的に再接続される
+   */
+  async closeConnection(): Promise<void> {
+    if (this.dbPromise) {
+      try {
+        const db = await this.dbPromise;
+        db.close();
+      } catch {
+        // 既に閉じられている場合は無視
+      }
+      this.dbPromise = null;
+    }
+  }
 }
 
 export const indexedDBService = new IndexedDBService();

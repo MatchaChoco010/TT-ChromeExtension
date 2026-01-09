@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/extension';
 import { waitForViewSwitcher, waitForCondition } from './utils/polling-utils';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, closeTab, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ビュー切り替え機能', () => {
@@ -213,11 +213,6 @@ test.describe('ビュー切り替え機能', () => {
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -237,7 +232,7 @@ test.describe('ビュー切り替え機能', () => {
       const emptyMessage = sidePanelPage.locator('text=No tabs in this view');
       await expect(emptyMessage).toBeVisible({ timeout: 5000 });
 
-      const newTabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const newTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: newTabId, depth: 0 },
       ], 1);

@@ -3,7 +3,7 @@
  */
 
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
@@ -17,19 +17,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'http://127.0.0.1/test-favicon.ico';
       await serviceWorker.evaluate(
@@ -50,7 +45,7 @@ test.describe('ファビコンの永続化復元', () => {
 
       expect(storedFavicon).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -64,19 +59,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'http://127.0.0.1/favicon.png';
       await serviceWorker.evaluate(
@@ -97,7 +87,7 @@ test.describe('ファビコンの永続化復元', () => {
 
       expect(retrievedFavicon).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -113,19 +103,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'http://127.0.0.1/discarded-tab-favicon.ico';
       await serviceWorker.evaluate(
@@ -146,7 +131,7 @@ test.describe('ファビコンの永続化復元', () => {
 
       expect(storedFavicon).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -162,28 +147,23 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId1 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId1);
+      await waitForTabInTreeState(serviceWorker, tabId1);
 
-      const tabId2 = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId2);
+      await waitForTabInTreeState(serviceWorker, tabId2);
 
       const favicon1 = 'http://127.0.0.1/favicon1.ico';
       const favicon2 = 'http://127.0.0.1/favicon2.ico';
@@ -211,13 +191,13 @@ test.describe('ファビコンの永続化復元', () => {
       expect(storedFavicons.tab1).toBe(favicon1);
       expect(storedFavicons.tab2).toBe(favicon2);
 
-      await closeTab(extensionContext, tabId1);
+      await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId2);
+      await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -231,19 +211,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'http://127.0.0.1/to-be-deleted.ico';
       await serviceWorker.evaluate(
@@ -263,7 +238,7 @@ test.describe('ファビコンの永続化復元', () => {
       }, tabId);
       expect(storedBefore).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -292,19 +267,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const initialFavicon = 'http://127.0.0.1/initial.ico';
       await serviceWorker.evaluate(
@@ -344,7 +314,7 @@ test.describe('ファビコンの永続化復元', () => {
       expect(storedUpdated).toBe(updatedFavicon);
       expect(storedUpdated).not.toBe(initialFavicon);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -361,19 +331,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'https://www.google.com/favicon.ico';
       await serviceWorker.evaluate(
@@ -408,7 +373,7 @@ test.describe('ファビコンの永続化復元', () => {
       const displayedFaviconSrc = await faviconImg.getAttribute('src');
       expect(displayedFaviconSrc).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -423,19 +388,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       const defaultIcon = treeNode.locator('[data-testid="default-icon"]');
@@ -474,7 +434,7 @@ test.describe('ファビコンの永続化復元', () => {
       const displayedFaviconSrc = await faviconImg.getAttribute('src');
       expect(displayedFaviconSrc).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -489,19 +449,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const initialFaviconUrl = 'http://127.0.0.1/initial-favicon.ico';
       await serviceWorker.evaluate(
@@ -555,7 +510,7 @@ test.describe('ファビコンの永続化復元', () => {
       expect(updatedFaviconSrc).toBe(newFaviconUrl);
       expect(updatedFaviconSrc).not.toBe(initialFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -572,19 +527,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'https://www.google.com/favicon.ico';
       await serviceWorker.evaluate(
@@ -620,7 +570,7 @@ test.describe('ファビコンの永続化復元', () => {
       }, tabId);
       expect(faviconAfterReload).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -634,19 +584,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'http://127.0.0.1/auto-persist-test.ico';
       await serviceWorker.evaluate(
@@ -675,7 +620,7 @@ test.describe('ファビコンの永続化復元', () => {
       }, tabId);
       expect(storedFavicon).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
@@ -689,19 +634,14 @@ test.describe('ファビコンの永続化復元', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
 
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await waitForTabInTreeState(extensionContext, tabId);
+      await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'http://127.0.0.1/cleanup-test.ico';
       await serviceWorker.evaluate(
@@ -721,7 +661,7 @@ test.describe('ファビコンの永続化復元', () => {
       }, tabId);
       expect(storedBefore).toBe(testFaviconUrl);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);

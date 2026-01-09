@@ -12,19 +12,14 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
   }) => {
     const originalWindowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, originalWindowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
 
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/tab1'));
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/tab1'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/tab2'));
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/tab2'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -44,7 +39,7 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
       { tabId: newPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId3 = await createTab(extensionContext, getTestServerUrl('/tab3'), { windowId: newWindowId });
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/tab3'), { windowId: newWindowId });
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newInitialBrowserTabId, depth: 0 },
       { tabId: newPseudoSidePanelTabId, depth: 0 },
@@ -79,13 +74,8 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
   }) => {
     const originalWindowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, originalWindowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
 
-    const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
@@ -105,7 +95,7 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
     ], 0);
 
     await moveTabToWindow(extensionContext, tabId, newWindowId);
-    await waitForTabInTreeState(extensionContext, tabId);
+    await waitForTabInTreeState(serviceWorker, tabId);
 
     await newWindowSidePanel.reload();
     await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
@@ -132,19 +122,14 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
   }) => {
     const originalWindowId = await getCurrentWindowId(serviceWorker);
     const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
-    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, originalWindowId);
-    await closeTab(extensionContext, initialBrowserTabId);
-    await assertTabStructure(sidePanelPage, originalWindowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
 
-    const tabId1 = await createTab(extensionContext, getTestServerUrl('/tab1'));
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/tab1'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(extensionContext, getTestServerUrl('/tab2'));
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/tab2'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },

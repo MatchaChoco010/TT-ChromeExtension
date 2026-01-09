@@ -2,7 +2,7 @@
  * エラーハンドリングとエッジケースのE2Eテスト
  */
 import { test as extensionTest } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 
 extensionTest.describe('エラーハンドリングとエッジケース', () => {
@@ -12,24 +12,17 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const longTitle = 'これは非常に長いタブタイトルです。'.repeat(10);
       const dataUrl = `data:text/html,<html><head><title>${encodeURIComponent(longTitle)}</title></head><body>Long title test</body></html>`;
 
-      const tabId = await createTab(extensionContext, dataUrl);
+      const tabId = await createTab(serviceWorker, dataUrl);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -43,22 +36,15 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const dataUrl = 'data:text/html,<html><head><title>No Favicon</title></head><body>No favicon test</body></html>';
-      const tabId = await createTab(extensionContext, dataUrl);
+      const tabId = await createTab(serviceWorker, dataUrl);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -72,22 +58,15 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const dataUrl = 'data:text/html,<html><head><title>Test Page</title></head><body>Content</body></html>';
-      const tabId = await createTab(extensionContext, dataUrl);
+      const tabId = await createTab(serviceWorker, dataUrl);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -101,21 +80,14 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
-      const tabId = await createTab(extensionContext, getTestServerUrl('/page'));
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -149,24 +121,17 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const specialTitle = '<script>alert("XSS")</script>&amp;&lt;&gt;"\'';
       const dataUrl = `data:text/html,<html><head><title>${encodeURIComponent(specialTitle)}</title></head><body>Special chars test</body></html>`;
 
-      const tabId = await createTab(extensionContext, dataUrl);
+      const tabId = await createTab(serviceWorker, dataUrl);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -180,23 +145,16 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const dataUrl = 'data:text/html,<html><head><title></title></head><body>Empty title</body></html>';
 
-      const tabId = await createTab(extensionContext, dataUrl);
+      const tabId = await createTab(serviceWorker, dataUrl);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -210,24 +168,17 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
       const windowId = await getCurrentWindowId(serviceWorker);
       const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-      const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
-      await closeTab(extensionContext, initialBrowserTabId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
-
       const unicodeTitle = '日本語 中文 한국어 🎉🚀💻';
       const dataUrl = `data:text/html,<html><head><title>${encodeURIComponent(unicodeTitle)}</title></head><body>Unicode test</body></html>`;
 
-      const tabId = await createTab(extensionContext, dataUrl);
+      const tabId = await createTab(serviceWorker, dataUrl);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      await closeTab(extensionContext, tabId);
+      await closeTab(serviceWorker, tabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: pseudoSidePanelTabId, depth: 0 },
