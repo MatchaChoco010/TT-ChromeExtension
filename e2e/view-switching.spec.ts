@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/extension';
 import { waitForViewSwitcher, waitForCondition } from './utils/polling-utils';
-import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
-import { assertTabStructure } from './utils/assertion-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId, activateTab, closeTab } from './utils/tab-utils';
+import { assertTabStructure, assertActiveTab, assertActiveTabIsOneOf } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 
 test.describe('ビュー切り替え機能', () => {
@@ -386,6 +386,214 @@ test.describe('ビュー切り替え機能', () => {
 
       const deleteMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを削除' });
       await expect(deleteMenuItem).toBeDisabled({ timeout: 5000 });
+    });
+  });
+
+  test.describe('ビューごとのアクティブタブ管理', () => {
+    test('ビュー切り替え時に、現在のビューのタブがアクティブになる', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+      await waitForViewSwitcher(sidePanelPage);
+
+      const tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      const tabB = await createTab(serviceWorker, getTestServerUrl('/page?id=tabB'));
+
+      await activateTab(serviceWorker, tabA);
+      await assertActiveTab(extensionContext, tabA, windowId);
+
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await addButton.click();
+
+      const newViewButton = sidePanelPage.locator('[aria-label="Switch to View view"]');
+      await expect(newViewButton).toBeVisible({ timeout: 5000 });
+
+      await newViewButton.click();
+      await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      const tabC = await createTab(serviceWorker, getTestServerUrl('/page?id=tabC'));
+      await assertActiveTab(extensionContext, tabC, windowId);
+
+      const defaultViewButton = sidePanelPage.locator('[aria-label="Switch to Default view"]');
+      await defaultViewButton.click();
+      await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      await assertActiveTabIsOneOf(extensionContext, [tabA, tabB], windowId);
+    });
+
+    test('各ビューで最後にアクティブだったタブを記憶する', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+      await waitForViewSwitcher(sidePanelPage);
+
+      const tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      const tabB = await createTab(serviceWorker, getTestServerUrl('/page?id=tabB'));
+
+      await activateTab(serviceWorker, tabB);
+      await assertActiveTab(extensionContext, tabB, windowId);
+
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await addButton.click();
+      const workViewButton = sidePanelPage.locator('[aria-label="Switch to View view"]');
+      await expect(workViewButton).toBeVisible({ timeout: 5000 });
+
+      await workViewButton.click();
+      await expect(workViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      const tabC = await createTab(serviceWorker, getTestServerUrl('/page?id=tabC'));
+      const tabD = await createTab(serviceWorker, getTestServerUrl('/page?id=tabD'));
+      await activateTab(serviceWorker, tabD);
+      await assertActiveTab(extensionContext, tabD, windowId);
+
+      const defaultViewButton = sidePanelPage.locator('[aria-label="Switch to Default view"]');
+      await defaultViewButton.click();
+      await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      await assertActiveTab(extensionContext, tabB, windowId);
+
+      await workViewButton.click();
+      await expect(workViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      await assertActiveTab(extensionContext, tabD, windowId);
+    });
+
+    test('空のビューに切り替えた場合、アクティブタブは変更しない', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+      await waitForViewSwitcher(sidePanelPage);
+
+      const tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      await activateTab(serviceWorker, tabA);
+      await assertActiveTab(extensionContext, tabA, windowId);
+
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await addButton.click();
+      const emptyViewButton = sidePanelPage.locator('[aria-label="Switch to View view"]');
+      await expect(emptyViewButton).toBeVisible({ timeout: 5000 });
+
+      await emptyViewButton.click();
+      await expect(emptyViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      await assertActiveTab(extensionContext, tabA, windowId);
+    });
+  });
+
+  test.describe('タブのビュー間移動', () => {
+    test('親タブを別ビューに移動すると、サブツリー全体が移動する', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
+      await waitForViewSwitcher(sidePanelPage);
+
+      const parentTab = await createTab(serviceWorker, getTestServerUrl('/page?id=parent'));
+      const childTab = await createTab(serviceWorker, getTestServerUrl('/page?id=child'), parentTab);
+
+      await closeTab(serviceWorker, initialBrowserTabId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+      ], 0);
+
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await addButton.click();
+      const personalViewButton = sidePanelPage.locator('[aria-label="Switch to View view"]');
+      await expect(personalViewButton).toBeVisible({ timeout: 5000 });
+
+      const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
+      await parentNode.click({ button: 'right' });
+
+      const contextMenu = sidePanelPage.locator('[data-testid="tab-context-menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      const moveToViewMenuItem = sidePanelPage.locator('text=別のビューへ移動');
+      await moveToViewMenuItem.hover();
+
+      const viewSubMenu = sidePanelPage.locator('[data-testid="submenu"]');
+      await expect(viewSubMenu).toBeVisible({ timeout: 5000 });
+
+      const viewOption = viewSubMenu.locator('button', { hasText: 'View' });
+      await viewOption.click();
+
+      await waitForCondition(
+        async () => {
+          const treeNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
+          const count = await treeNodes.count();
+          return count === 1;
+        },
+        { timeout: 5000, timeoutMessage: 'Tabs did not move to the new view' }
+      );
+
+      await personalViewButton.click();
+      await expect(personalViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+      ], 1);
+    });
+
+    test('子タブだけを別ビューに移動すると、親子関係が切れる', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
+      await waitForViewSwitcher(sidePanelPage);
+
+      const parentTab = await createTab(serviceWorker, getTestServerUrl('/page?id=parent'));
+      const childTab = await createTab(serviceWorker, getTestServerUrl('/page?id=child'), parentTab);
+
+      await closeTab(serviceWorker, initialBrowserTabId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+      ], 0);
+
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await addButton.click();
+      const personalViewButton = sidePanelPage.locator('[aria-label="Switch to View view"]');
+      await expect(personalViewButton).toBeVisible({ timeout: 5000 });
+
+      const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTab}"]`);
+      await childNode.click({ button: 'right' });
+
+      const contextMenu = sidePanelPage.locator('[data-testid="tab-context-menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      const moveToViewMenuItem = sidePanelPage.locator('text=別のビューへ移動');
+      await moveToViewMenuItem.hover();
+
+      const viewSubMenu = sidePanelPage.locator('[data-testid="submenu"]');
+      await expect(viewSubMenu).toBeVisible({ timeout: 5000 });
+
+      const viewOption = viewSubMenu.locator('button', { hasText: 'View' });
+      await viewOption.click();
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
+
+      await personalViewButton.click();
+      await expect(personalViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: childTab, depth: 0 },
+      ], 1);
     });
   });
 });

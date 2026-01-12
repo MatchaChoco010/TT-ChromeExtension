@@ -1,34 +1,34 @@
 import type {
   Snapshot,
   TabSnapshot,
-  IIndexedDBService,
+  IDownloadService,
   IStorageService,
   View,
-  Group,
   TabNode,
+  TreeState,
 } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
 /**
  * SnapshotManager
  *
- * セッションスナップショットの保存・復元・管理を担当するサービス
+ * セッションスナップショットの保存・復元を担当するサービス
+ * スナップショットはchrome.downloads APIでJSONファイルとしてダウンロードフォルダに保存
  */
 export class SnapshotManager {
   private static readonly SNAPSHOT_ID_PREFIX = 'snapshot-';
   private static readonly AUTO_SNAPSHOT_ALARM_NAME = 'auto-snapshot';
+  private static readonly DEFAULT_SUBFOLDER = 'TT-Snapshots';
 
   private alarmListener: ((alarm: chrome.alarms.Alarm) => void) | null = null;
-  private currentMaxSnapshots: number | undefined = undefined;
 
   constructor(
-    private indexedDBService: IIndexedDBService,
+    private downloadService: IDownloadService,
     private storageService: IStorageService,
   ) {}
 
   /**
-   * 現在状態のJSON形式スナップショット作成
-   * スナップショットコマンドを実行し、タブのURL、タイトル、親子関係、グループ情報を含む
+   * 現在状態のスナップショットを作成してダウンロード
    *
    * @param name - スナップショット名
    * @param isAutoSave - 自動保存フラグ（デフォルト: false）
@@ -39,21 +39,13 @@ export class SnapshotManager {
     isAutoSave: boolean = false,
   ): Promise<Snapshot> {
     const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-    const groupsRecord = await this.storageService.get(STORAGE_KEYS.GROUPS);
 
     if (!treeState) {
       throw new Error('Tree state not found');
     }
 
     const views: View[] = treeState.views || [];
-
-    const groups: Group[] = groupsRecord
-      ? Object.values(groupsRecord)
-      : [];
-
-    const tabs: TabSnapshot[] = await this.createTabSnapshots(
-      treeState.nodes,
-    );
+    const tabs: TabSnapshot[] = await this.createTabSnapshots(treeState.nodes);
 
     const snapshot: Snapshot = {
       id: this.generateSnapshotId(),
@@ -63,77 +55,32 @@ export class SnapshotManager {
       data: {
         views,
         tabs,
-        groups,
       },
     };
-
-    await this.indexedDBService.saveSnapshot(snapshot);
-
-    return snapshot;
-  }
-
-  /**
-   * スナップショットからのセッション復元
-   * スナップショットをインポートする
-   *
-   * @param snapshotId - 復元するスナップショットのID
-   */
-  async restoreSnapshot(snapshotId: string): Promise<void> {
-    const snapshot = await this.indexedDBService.getSnapshot(snapshotId);
-
-    if (!snapshot) {
-      throw new Error('Snapshot not found');
-    }
-
-    await this.restoreTabsFromSnapshot(snapshot.data.tabs);
-  }
-
-  /**
-   * スナップショットを削除
-   *
-   * @param snapshotId - 削除するスナップショットのID
-   */
-  async deleteSnapshot(snapshotId: string): Promise<void> {
-    await this.indexedDBService.deleteSnapshot(snapshotId);
-  }
-
-  /**
-   * すべてのスナップショットを取得
-   *
-   * @returns スナップショット配列
-   */
-  async getSnapshots(): Promise<Snapshot[]> {
-    return await this.indexedDBService.getAllSnapshots();
-  }
-
-  /**
-   * スナップショットをJSON文字列としてエクスポート
-   *
-   * @param snapshotId - エクスポートするスナップショットのID
-   * @returns JSON文字列
-   */
-  async exportSnapshot(snapshotId: string): Promise<string> {
-    const snapshot = await this.indexedDBService.getSnapshot(snapshotId);
-
-    if (!snapshot) {
-      throw new Error('Snapshot not found');
-    }
 
     const exportData = {
       ...snapshot,
       createdAt: snapshot.createdAt.toISOString(),
     };
 
-    return JSON.stringify(exportData, null, 2);
+    const jsonContent = JSON.stringify(exportData, null, 2);
+    const filename = this.generateFilename(name, isAutoSave);
+
+    const settings = await this.storageService.get(STORAGE_KEYS.USER_SETTINGS);
+    const subfolder =
+      settings?.snapshotSubfolder ?? SnapshotManager.DEFAULT_SUBFOLDER;
+
+    await this.downloadService.downloadSnapshot(jsonContent, filename, subfolder);
+
+    return snapshot;
   }
 
   /**
-   * JSON文字列からスナップショットをインポート
+   * JSON文字列からタブを復元
    *
    * @param jsonData - JSON文字列
-   * @returns インポートされたスナップショット
    */
-  async importSnapshot(jsonData: string): Promise<Snapshot> {
+  async restoreFromJson(jsonData: string): Promise<void> {
     const parsed = JSON.parse(jsonData);
 
     const snapshot: Snapshot = {
@@ -141,13 +88,13 @@ export class SnapshotManager {
       createdAt: new Date(parsed.createdAt),
     };
 
-    await this.indexedDBService.saveSnapshot(snapshot);
-
-    return snapshot;
+    await this.restoreTabsFromSnapshot(snapshot.data.tabs, snapshot.data.views);
   }
 
   /**
    * タブノードからタブスナップショットを作成
+   *
+   * 各タブにindexを割り当て、parentIdをparentIndexに変換する
    *
    * @param nodes - タブノードのレコード
    * @returns タブスナップショット配列
@@ -156,19 +103,33 @@ export class SnapshotManager {
     nodes: Record<string, TabNode>,
   ): Promise<TabSnapshot[]> {
     const tabSnapshots: TabSnapshot[] = [];
-
     const tabs = await chrome.tabs.query({});
     const tabMap = new Map(tabs.map((tab) => [tab.id, tab]));
 
-    for (const node of Object.values(nodes)) {
+    const nodeArray = Object.values(nodes);
+    const nodeIdToIndex = new Map<string, number>();
+
+    nodeArray.forEach((node, index) => {
+      nodeIdToIndex.set(node.id, index);
+    });
+
+    for (let index = 0; index < nodeArray.length; index++) {
+      const node = nodeArray[index];
       const tab = tabMap.get(node.tabId);
 
       if (tab && tab.url) {
+        const parentIndex = node.parentId
+          ? nodeIdToIndex.get(node.parentId) ?? null
+          : null;
+
         tabSnapshots.push({
+          index,
           url: tab.url,
           title: tab.title || '',
-          parentId: node.parentId,
+          parentIndex,
           viewId: node.viewId,
+          isExpanded: node.isExpanded,
+          pinned: tab.pinned || false,
         });
       }
     }
@@ -179,17 +140,105 @@ export class SnapshotManager {
   /**
    * スナップショットからタブを復元
    *
+   * 親子関係を維持するため、以下のアルゴリズムで復元:
+   * 1. 親を持たないタブ（ルートタブ）を先に作成
+   * 2. 子タブを親の順に作成
+   * 3. 全タブ作成後、ツリー状態を更新して親子関係と展開状態を反映
+   *
    * @param tabs - タブスナップショット配列
+   * @param views - ビュー配列
    */
   private async restoreTabsFromSnapshot(
     tabs: TabSnapshot[],
+    views: View[],
   ): Promise<void> {
-    for (const tabSnapshot of tabs) {
-      await chrome.tabs.create({
-        url: tabSnapshot.url,
-        active: false,
-      });
+    if (tabs.length === 0) return;
+
+    const sortedTabs = [...tabs].sort((a, b) => {
+      if (a.parentIndex === null && b.parentIndex !== null) return -1;
+      if (a.parentIndex !== null && b.parentIndex === null) return 1;
+      return a.index - b.index;
+    });
+
+    const indexToNewTabId = new Map<number, number>();
+    const indexToSnapshot = new Map<number, TabSnapshot>();
+
+    for (const tabSnapshot of sortedTabs) {
+      indexToSnapshot.set(tabSnapshot.index, tabSnapshot);
     }
+
+    for (const tabSnapshot of sortedTabs) {
+      try {
+        const newTab = await chrome.tabs.create({
+          url: tabSnapshot.url,
+          active: false,
+          pinned: tabSnapshot.pinned,
+        });
+
+        if (newTab.id !== undefined) {
+          indexToNewTabId.set(tabSnapshot.index, newTab.id);
+        }
+      } catch (error) {
+        console.error('Failed to create tab:', tabSnapshot.url, error);
+      }
+    }
+
+    const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+    if (!treeState) return;
+
+    const updatedNodes: Record<string, TabNode> = { ...treeState.nodes };
+
+    for (const [index, newTabId] of indexToNewTabId) {
+      const snapshot = indexToSnapshot.get(index);
+      if (!snapshot) continue;
+
+      const nodeId = `tab-${newTabId}`;
+      let parentId: string | null = null;
+      let depth = 0;
+
+      if (snapshot.parentIndex !== null) {
+        const parentTabId = indexToNewTabId.get(snapshot.parentIndex);
+        if (parentTabId !== undefined) {
+          parentId = `tab-${parentTabId}`;
+          const parentNode = updatedNodes[parentId];
+          if (parentNode) {
+            depth = parentNode.depth + 1;
+          }
+        }
+      }
+
+      const newNode: TabNode = {
+        id: nodeId,
+        tabId: newTabId,
+        parentId,
+        children: [],
+        isExpanded: snapshot.isExpanded,
+        depth,
+        viewId: snapshot.viewId,
+      };
+
+      updatedNodes[nodeId] = newNode;
+    }
+
+    for (const nodeId of Object.keys(updatedNodes)) {
+      const node = updatedNodes[nodeId];
+      if (node.parentId && updatedNodes[node.parentId]) {
+        const parent = updatedNodes[node.parentId];
+        const childExists = parent.children.some((c) => c.id === nodeId);
+        if (!childExists) {
+          const childNode = updatedNodes[nodeId];
+          parent.children = [...parent.children, childNode];
+        }
+      }
+    }
+
+    const updatedTreeState: TreeState = {
+      ...treeState,
+      nodes: updatedNodes,
+      views: views.length > 0 ? views : treeState.views,
+    };
+
+    await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);
   }
 
   /**
@@ -204,21 +253,35 @@ export class SnapshotManager {
   }
 
   /**
+   * スナップショットファイル名を生成
+   *
+   * @param name - スナップショット名
+   * @param isAutoSave - 自動保存フラグ
+   * @returns ファイル名
+   */
+  private generateFilename(name: string, isAutoSave: boolean): string {
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '')
+      .replace('T', '_')
+      .slice(0, 15);
+    const suffix = isAutoSave ? '-auto' : '';
+    const safeName = name.replace(/[^a-zA-Z0-9-_\s]/g, '').replace(/\s+/g, '-');
+    return `vivaldi-tt-snapshot-${timestamp}${suffix}-${safeName}.json`;
+  }
+
+  /**
    * 自動スナップショット機能を開始
    * 定期的な自動スナップショット機能を提供する
-   * 最大保持数を超えた古いスナップショットを自動削除する
    *
    * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
-   * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
    */
-  startAutoSnapshot(intervalMinutes: number, maxSnapshots?: number): void {
+  startAutoSnapshot(intervalMinutes: number): void {
     chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
     if (this.alarmListener) {
       chrome.alarms.onAlarm.removeListener(this.alarmListener);
       this.alarmListener = null;
     }
-
-    this.currentMaxSnapshots = maxSnapshots;
 
     if (intervalMinutes === 0) {
       return;
@@ -230,14 +293,6 @@ export class SnapshotManager {
           const timestamp = new Date().toISOString().split('T')[0];
           const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
           await this.createSnapshot(name, true);
-
-          if (this.currentMaxSnapshots && this.currentMaxSnapshots > 0) {
-            try {
-              await this.indexedDBService.deleteOldSnapshots(this.currentMaxSnapshots);
-            } catch {
-              // 古いスナップショット削除失敗は無視
-            }
-          }
         } catch {
           // 自動スナップショット失敗は無視
         }
@@ -256,10 +311,9 @@ export class SnapshotManager {
    * 設定変更時にアラームを再設定する
    *
    * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
-   * @param maxSnapshots - 保持するスナップショットの最大数（省略または0の場合は無制限）
    */
-  updateAutoSnapshotSettings(intervalMinutes: number, maxSnapshots?: number): void {
-    this.startAutoSnapshot(intervalMinutes, maxSnapshots);
+  updateAutoSnapshotSettings(intervalMinutes: number): void {
+    this.startAutoSnapshot(intervalMinutes);
   }
 
   /**

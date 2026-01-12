@@ -8,7 +8,7 @@ import PinnedTabsSection from './PinnedTabsSection';
 import NewTabButton from './NewTabButton';
 import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
-import { indexedDBService } from '@/storage/IndexedDBService';
+import { downloadService } from '@/storage/DownloadService';
 import { storageService } from '@/storage/StorageService';
 import { SnapshotManager } from '@/services/SnapshotManager';
 import type { TabNode, MenuAction, WindowInfo } from '@/types';
@@ -108,7 +108,7 @@ const TreeViewContent: React.FC = () => {
 
   const handleSnapshot = useCallback(async () => {
     try {
-      const snapshotManager = new SnapshotManager(indexedDBService, storageService);
+      const snapshotManager = new SnapshotManager(downloadService, storageService);
       const timestamp = new Date().toISOString().split('T')[0];
       const name = `Manual Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
       await snapshotManager.createSnapshot(name, false);

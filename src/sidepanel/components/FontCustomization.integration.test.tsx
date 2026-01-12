@@ -70,6 +70,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -136,6 +137,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -188,6 +190,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -258,6 +261,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -298,6 +302,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -364,6 +369,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -429,6 +435,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       const onSettingsChange = vi.fn();
@@ -459,6 +466,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       const onSettingsChange = vi.fn();
@@ -489,6 +497,7 @@ describe('フォントカスタマイズ機能', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       const onSettingsChange = vi.fn();

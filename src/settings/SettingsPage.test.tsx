@@ -28,6 +28,7 @@ describe('SettingsPage', () => {
     showUnreadIndicator: true,
     autoSnapshotInterval: 0,
     childTabBehavior: 'promote' as const,
+    snapshotSubfolder: 'TT-Snapshots',
   };
 
   beforeEach(() => {
@@ -93,12 +94,12 @@ describe('SettingsPage', () => {
     });
   });
 
-  describe('スナップショット自動保存設定', () => {
-    it('スナップショット自動保存設定セクションが表示される', async () => {
+  describe('スナップショット設定', () => {
+    it('スナップショット設定セクションが表示される', async () => {
       render(<SettingsPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('スナップショットの自動保存')).toBeInTheDocument();
+        expect(screen.getByText('スナップショット設定')).toBeInTheDocument();
       });
     });
 
@@ -118,11 +119,11 @@ describe('SettingsPage', () => {
       });
     });
 
-    it('最大スナップショット数入力が表示される', async () => {
+    it('保存先フォルダ入力が表示される', async () => {
       render(<SettingsPage />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText('最大スナップショット数')).toBeInTheDocument();
+        expect(screen.getByLabelText(/保存先フォルダ/)).toBeInTheDocument();
       });
     });
   });

@@ -41,10 +41,9 @@ async function initializeAutoSnapshot(): Promise<void> {
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
     if (settings) {
       const interval = settings.autoSnapshotInterval ?? 0;
-      const maxSnapshots = settings.maxSnapshots ?? 10;
 
       if (interval > 0) {
-        snapshotManager.startAutoSnapshot(interval, maxSnapshots);
+        snapshotManager.startAutoSnapshot(interval);
       }
     }
   } catch {
@@ -62,8 +61,7 @@ function registerSettingsChangeListener(): void {
       const newSettings = changes[STORAGE_KEYS.USER_SETTINGS].newValue as UserSettings | undefined;
       if (newSettings) {
         const interval = newSettings.autoSnapshotInterval ?? 0;
-        const maxSnapshots = newSettings.maxSnapshots ?? 10;
-        snapshotManager.updateAutoSnapshotSettings(interval, maxSnapshots);
+        snapshotManager.updateAutoSnapshotSettings(interval);
       }
     }
   });

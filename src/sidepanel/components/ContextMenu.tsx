@@ -167,6 +167,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     <div
       ref={menuRef}
       role="menu"
+      data-testid="tab-context-menu"
       className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[200px] select-none"
       style={{
         left: `${adjustedPosition.x}px`,

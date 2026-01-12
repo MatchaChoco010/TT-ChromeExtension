@@ -72,6 +72,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -213,6 +214,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -290,6 +292,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -351,6 +354,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -432,6 +436,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -469,6 +474,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({
@@ -531,6 +537,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       mockGet.mockResolvedValue({

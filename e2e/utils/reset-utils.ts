@@ -41,7 +41,7 @@ export async function resetExtensionState(
   serviceWorker: Worker,
   _extensionContext: BrowserContext
 ): Promise<void> {
-  // Step 1: 前のテストからのリセット準備（ハンドラー待機 + IndexedDB接続クローズ）
+  // Step 1: 前のテストからのリセット準備（ハンドラー待機）
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -61,26 +61,8 @@ export async function resetExtensionState(
       if (chrome.storage.session) {
         await chrome.storage.session.clear();
       }
-
-      await new Promise<void>((resolve) => {
-        const deleteRequest = indexedDB.deleteDatabase('vivaldi-tt-snapshots');
-        const timeoutId = setTimeout(() => {
-          resolve();
-        }, 5000);
-        deleteRequest.onsuccess = () => {
-          clearTimeout(timeoutId);
-          resolve();
-        };
-        deleteRequest.onerror = () => {
-          clearTimeout(timeoutId);
-          resolve();
-        };
-        deleteRequest.onblocked = () => {
-          // ブロックされた場合はタイムアウトを待つ
-        };
-      });
     },
-    15000,
+    10000,
     'clearStorage'
   );
 

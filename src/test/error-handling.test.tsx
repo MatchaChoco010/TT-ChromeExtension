@@ -123,28 +123,6 @@ describe('エラーハンドリングとエッジケース', () => {
       ).rejects.toThrow();
     });
 
-    it('IndexedDB容量超過時にエラーメッセージを表示', async () => {
-      const { IndexedDBService } = await import('@/storage/IndexedDBService');
-      const idbService = new IndexedDBService();
-
-      const largeSnapshot = {
-        id: 'snapshot-1',
-        createdAt: new Date(),
-        name: 'Large Snapshot',
-        isAutoSave: false,
-        data: {
-          views: Array(10000).fill({ id: 'v1', name: 'View', color: '#000' }),
-          tabs: Array(10000).fill({ url: 'http://example.com', title: 'Tab', parentId: null, viewId: 'v1' }),
-          groups: [],
-        },
-      };
-
-      try {
-        await idbService.saveSnapshot(largeSnapshot);
-      } catch {
-        // QuotaExceededError would be handled silently
-      }
-    });
   });
 
   describe('循環参照検出', () => {
@@ -282,6 +260,7 @@ describe('エラーハンドリングとエッジケース', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       // モックストレージに設定を保存
@@ -327,6 +306,7 @@ describe('エラーハンドリングとエッジケース', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       const mockChrome = global.chrome as unknown as MockChrome;
@@ -370,6 +350,7 @@ describe('エラーハンドリングとエッジケース', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       const mockChrome = global.chrome as unknown as MockChrome;
@@ -412,6 +393,7 @@ describe('エラーハンドリングとエッジケース', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       const listeners: Array<(changes: StorageChanges, areaName: string) => void> = [];

@@ -368,7 +368,7 @@ npm run test:e2e   # Playwright E2Eテスト
 ## Key Technical Decisions
 
 - **Vite + @crxjs/vite-plugin**: 高速HMRと拡張機能ビルド両立
-- **IndexedDB**: 大量タブデータ永続化（chrome.storageの容量制限回避）
+- **chrome.downloads API**: スナップショットをJSONファイルとしてダウンロードフォルダに保存
 - **Service Worker**: バックグラウンドでのタブイベント監視とツリー同期
 - **Path Alias `@/`**: `./src/`へのエイリアス
 - **複数ウィンドウ対応**: TreeStateProviderでwindowIdを取得し各ウィンドウで自身のタブのみをフィルタリング表示

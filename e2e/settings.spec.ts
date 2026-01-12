@@ -43,7 +43,7 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
 
     expect(settingsPage.url()).toContain(`chrome-extension://${extensionId}/settings.html`);
 
-    await expect(settingsPage.getByRole('heading', { name: '設定' })).toBeVisible({
+    await expect(settingsPage.getByRole('heading', { name: '設定', level: 1 })).toBeVisible({
       timeout: COMMON_TIMEOUTS.short,
     });
 
@@ -369,54 +369,45 @@ test.describe('スナップショット自動保存設定', () => {
     await settingsPage.close();
   });
 
-  test('最大スナップショット数の設定が保存される', async ({
+  test('保存先フォルダの設定が保存される', async ({
     extensionContext,
     extensionId,
     serviceWorker,
   }) => {
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
-    const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
-    await autoSnapshotToggle.click();
-    await expect(autoSnapshotToggle).toHaveAttribute('aria-checked', 'true');
-
-    const maxSnapshotsInput = settingsPage.locator('#maxSnapshots');
-    await expect(maxSnapshotsInput).toBeEnabled();
-    await maxSnapshotsInput.clear();
-    await maxSnapshotsInput.fill('20');
+    const subfolderInput = settingsPage.locator('#snapshotSubfolder');
+    await subfolderInput.clear();
+    await subfolderInput.fill('MySnapshots');
 
     await expect(async () => {
       const settings = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('user_settings');
-        return result.user_settings as { maxSnapshots?: number } | undefined;
+        return result.user_settings as { snapshotSubfolder?: string } | undefined;
       });
-      expect(settings?.maxSnapshots).toBe(20);
+      expect(settings?.snapshotSubfolder).toBe('MySnapshots');
     }).toPass({ timeout: COMMON_TIMEOUTS.medium });
 
     await settingsPage.close();
   });
 
-  test('自動保存無効時は間隔と最大数の入力が無効化される', async ({
+  test('自動保存無効時は間隔の入力が無効化される', async ({
     extensionContext,
     extensionId,
   }) => {
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     const intervalInput = settingsPage.locator('#autoSnapshotInterval');
-    const maxSnapshotsInput = settingsPage.locator('#maxSnapshots');
     await expect(intervalInput).toBeDisabled();
-    await expect(maxSnapshotsInput).toBeDisabled();
 
     const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');
     await autoSnapshotToggle.click();
 
     await expect(intervalInput).toBeEnabled();
-    await expect(maxSnapshotsInput).toBeEnabled();
 
     await autoSnapshotToggle.click();
 
     await expect(intervalInput).toBeDisabled();
-    await expect(maxSnapshotsInput).toBeDisabled();
 
     await settingsPage.close();
   });
@@ -439,17 +430,17 @@ test.describe('スナップショット自動保存設定', () => {
     await intervalInput.clear();
     await intervalInput.fill('15');
 
-    const maxSnapshotsInput = settingsPage.locator('#maxSnapshots');
-    await maxSnapshotsInput.clear();
-    await maxSnapshotsInput.fill('25');
+    const subfolderInput = settingsPage.locator('#snapshotSubfolder');
+    await subfolderInput.clear();
+    await subfolderInput.fill('TestSnapshots');
 
     await waitForCondition(
       async () => {
         const settings = await serviceWorker.evaluate(async () => {
           const result = await chrome.storage.local.get('user_settings');
-          return result.user_settings as { autoSnapshotInterval?: number; maxSnapshots?: number } | undefined;
+          return result.user_settings as { autoSnapshotInterval?: number; snapshotSubfolder?: string } | undefined;
         });
-        return settings?.autoSnapshotInterval === 15 && settings?.maxSnapshots === 25;
+        return settings?.autoSnapshotInterval === 15 && settings?.snapshotSubfolder === 'TestSnapshots';
       },
       { timeout: 3000, interval: 50, timeoutMessage: 'Snapshot settings were not saved' }
     );
@@ -471,8 +462,8 @@ test.describe('スナップショット自動保存設定', () => {
     const intervalAfterReload = settingsPageAfterReload.locator('#autoSnapshotInterval');
     await expect(intervalAfterReload).toHaveValue('15');
 
-    const maxSnapshotsAfterReload = settingsPageAfterReload.locator('#maxSnapshots');
-    await expect(maxSnapshotsAfterReload).toHaveValue('25');
+    const subfolderAfterReload = settingsPageAfterReload.locator('#snapshotSubfolder');
+    await expect(subfolderAfterReload).toHaveValue('TestSnapshots');
 
     await settingsPageAfterReload.close();
   });

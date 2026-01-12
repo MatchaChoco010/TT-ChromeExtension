@@ -264,6 +264,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [lastSelectedNodeId, setLastSelectedNodeId] = useState<string | null>(null);
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
+  const [viewActiveTabIds, setViewActiveTabIds] = useState<Record<string, number>>({});
 
   const loadGroups = React.useCallback(async () => {
     try {
@@ -455,6 +456,18 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       // ツリー内でのタブクリックでもonActivatedが発火するため、
       // クリック時の選択操作と競合してしまう
       // 代わりに、新しいタブ作成時とタブ削除時にのみ選択を解除する
+
+      // タブのビューを特定し、そのビューのアクティブタブとして記憶
+      if (treeState) {
+        const nodeId = treeState.tabToNode[activeInfo.tabId];
+        const node = nodeId ? treeState.nodes[nodeId] : null;
+        if (node) {
+          setViewActiveTabIds(prev => ({
+            ...prev,
+            [node.viewId]: activeInfo.tabId,
+          }));
+        }
+      }
     };
 
     chrome.tabs.onActivated.addListener(handleTabActivated);
@@ -462,7 +475,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return () => {
       chrome.tabs.onActivated.removeListener(handleTabActivated);
     };
-  }, []);
+  }, [treeState]);
 
   useEffect(() => {
     const handleTabCreated = (tab: chrome.tabs.Tab) => {
@@ -708,16 +721,63 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   /**
    * ビュー切り替え
+   * 切り替え先ビューの最後にアクティブだったタブをChromeでアクティブにする
    */
-  const switchView = useCallback((viewId: string) => {
+  const switchView = useCallback(async (viewId: string) => {
     if (!treeState) return;
+
+    // 現在のビューのアクティブタブを記憶（切り替え前）
+    // React state更新が非同期のため、handleTabActivatedでの記憶が間に合わない場合の対策
+    if (activeTabId !== null) {
+      const currentNodeId = treeState.tabToNode[activeTabId];
+      const currentNode = currentNodeId ? treeState.nodes[currentNodeId] : null;
+      if (currentNode && currentNode.viewId === treeState.currentViewId) {
+        setViewActiveTabIds(prev => ({
+          ...prev,
+          [treeState.currentViewId]: activeTabId,
+        }));
+      }
+    }
 
     const newState: TreeState = {
       ...treeState,
       currentViewId: viewId,
     };
     updateTreeState(newState);
-  }, [treeState, updateTreeState]);
+
+    // 切り替え先ビューのタブをアクティブにする
+    // Note: setViewActiveTabIds は非同期なので、最新値を使うために直接計算
+    let tabIdToActivate = viewActiveTabIds[viewId];
+
+    if (tabIdToActivate !== undefined) {
+      // 記憶されたアクティブタブが存在し、まだそのビューに属しているか確認
+      const nodeId = treeState.tabToNode[tabIdToActivate];
+      const node = nodeId ? treeState.nodes[nodeId] : null;
+      if (node && node.viewId === viewId) {
+        try {
+          await chrome.tabs.update(tabIdToActivate, { active: true });
+          return;
+        } catch {
+          // タブが存在しない場合は無視してフォールバック
+        }
+      }
+    }
+
+    // 記憶されたタブがない、または既に別ビューに移動している場合は、
+    // そのビューの最初のタブをアクティブにする
+    const viewTabs = Object.values(treeState.nodes)
+      .filter(node => node.viewId === viewId)
+      .map(node => node.tabId);
+
+    if (viewTabs.length > 0) {
+      try {
+        await chrome.tabs.update(viewTabs[0], { active: true });
+      } catch {
+        // タブが存在しない場合は無視
+      }
+    }
+    // ビューにタブがない場合は何もしない（アクティブタブは変更しない）
+  }, [treeState, updateTreeState, viewActiveTabIds, activeTabId]);
 
   const createView = useCallback(() => {
     if (!treeState) return;

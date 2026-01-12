@@ -4,13 +4,13 @@ import { UnreadTracker } from '@/services/UnreadTracker';
 import { TitlePersistenceService } from '@/services/TitlePersistenceService';
 import { SnapshotManager } from '@/services/SnapshotManager';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
-import { indexedDBService } from '@/storage/IndexedDBService';
+import { downloadService } from '@/storage/DownloadService';
 
 const storageService = new StorageService();
 const treeStateManager = new TreeStateManager(storageService);
 const unreadTracker = new UnreadTracker(storageService);
 const titlePersistence = new TitlePersistenceService(storageService);
-const snapshotManager = new SnapshotManager(indexedDBService, storageService);
+const snapshotManager = new SnapshotManager(downloadService, storageService);
 
 unreadTracker.loadFromStorage().catch(() => {});
 
@@ -107,22 +107,18 @@ async function waitForPendingHandlers(timeoutMs: number = 5000): Promise<void> {
  * E2Eテスト用のリセット関数
  *
  * 【機能】
- * 1. 実行中の非同期イベントハンドラーの完了を待機
- * 2. IndexedDBのキャッシュ接続を閉じる
+ * 実行中の非同期イベントハンドラーの完了を待機
  *
  * 【用途】
  * E2Eテストのリセット処理で使用。テスト間で状態をクリーンにリセットする。
  * この関数を呼ぶことで、前のテストの副作用が次のテストに影響しない。
  *
  * 【背景】
- * - 非同期ハンドラー: Chromeはイベントリスナーの完了を待たないため、
- *   ハンドラーがバックグラウンドで実行中のままリセットが始まる可能性がある
- * - IndexedDB: deleteDatabase()は開いている接続があるとブロックされるため、
- *   キャッシュされた接続を先に閉じる必要がある
+ * Chromeはイベントリスナーの完了を待たないため、
+ * ハンドラーがバックグラウンドで実行中のままリセットが始まる可能性がある
  */
 async function prepareForReset(): Promise<void> {
   await waitForPendingHandlers();
-  await indexedDBService.closeConnection();
 }
 
 let dragState: { tabId: number; treeData: TabNode[]; sourceWindowId: number } | null =
@@ -158,6 +154,18 @@ let isCreatingGroupTab = false;
 const lastActiveTabByWindow = new Map<number, number>();
 
 const pendingLinkClicks = new Map<number, number>();
+
+/**
+ * スナップショット復元中のタブIDセット
+ * 復元中のタブはhandleTabCreatedでスキップされる
+ */
+const restoringTabIds = new Set<number>();
+
+/**
+ * スナップショット復元中フラグ
+ * trueの間、handleTabCreatedは新しいタブをツリーに追加しない
+ */
+let isRestoringSnapshot = false;
 
 // E2Eテスト等のService Worker評価コンテキストからアクセスするためglobalThisにエクスポート
 declare global {
@@ -309,6 +317,12 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     return;
   }
 
+  // スナップショット復元中はスキップ（復元処理が直接ツリー状態を更新する）
+  if (isRestoringSnapshot || restoringTabIds.has(tab.id)) {
+    restoringTabIds.delete(tab.id);
+    return;
+  }
+
   try {
     // ストレージから最新状態を読み込む（Side Panelのドラッグ&ドロップで設定された親子関係を上書きしないため）
     await treeStateManager.loadState();
@@ -402,7 +416,14 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       pendingTabParents.delete(tab.id);
     }
 
-    const currentViewId = await getCurrentViewId();
+    // 子タブは親タブのビューに追加（ビューを跨いだ親子関係を防ぐ）
+    let viewId: string;
+    if (parentId) {
+      const parentNode = treeStateManager.getNodeById(parentId);
+      viewId = parentNode?.viewId ?? await getCurrentViewId();
+    } else {
+      viewId = await getCurrentViewId();
+    }
 
     const shouldMoveToEnd = (newTabPosition === 'end' && !isDuplicatedTab) ||
                             (isDuplicatedTab && duplicateTabPosition === 'end');
@@ -414,7 +435,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       }
     }
 
-    await treeStateManager.addTab(tab, parentId, currentViewId, insertAfterNodeId);
+    await treeStateManager.addTab(tab, parentId, viewId, insertAfterNodeId);
 
     if (parentId) {
       await treeStateManager.expandNode(parentId);
@@ -705,6 +726,14 @@ function handleMessage(
 
       case 'CREATE_SNAPSHOT':
         trackHandler(() => handleCreateSnapshot(sendResponse));
+        break;
+
+      case 'RESTORE_SNAPSHOT':
+        trackHandler(() => handleRestoreSnapshot(
+          message.payload.jsonData,
+          message.payload.closeCurrentTabs,
+          sendResponse
+        ));
         break;
 
       default:
@@ -1288,6 +1317,193 @@ async function handleCreateSnapshot(
     await snapshotManager.createSnapshot(name, false);
     sendResponse({ success: true, data: null });
   } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * スナップショット復元
+ *
+ * バックグラウンドで一括処理することで、handleTabCreatedとの競合を回避
+ * - 復元中フラグを設定してイベントハンドラをスキップ
+ * - タブ作成後、ツリー状態を直接更新
+ * - 親子関係とビュー配置を正しく復元
+ *
+ * @param jsonData - スナップショットJSON文字列
+ * @param closeCurrentTabs - 既存タブを閉じるかどうか
+ * @param sendResponse - レスポンス送信関数
+ */
+async function handleRestoreSnapshot(
+  jsonData: string,
+  closeCurrentTabs: boolean,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    isRestoringSnapshot = true;
+
+    const parsed = JSON.parse(jsonData);
+    const snapshotTabs: Array<{
+      index: number;
+      url: string;
+      title: string;
+      parentIndex: number | null;
+      viewId: string;
+      isExpanded: boolean;
+      pinned: boolean;
+    }> = parsed.data.tabs;
+    const snapshotViews: Array<{
+      id: string;
+      name: string;
+      color: string;
+    }> = parsed.data.views;
+
+    if (snapshotTabs.length === 0) {
+      sendResponse({ success: true, data: null });
+      isRestoringSnapshot = false;
+      return;
+    }
+
+    // 既存タブを取得（後で閉じるため）
+    // この拡張機能のサイドパネルは操作UIなので閉じない（クエリパラメータを考慮）
+    const sidePanelUrlBase = `chrome-extension://${chrome.runtime.id}/sidepanel.html`;
+    const existingTabs = await chrome.tabs.query({});
+    const existingTabIds = existingTabs
+      .filter(t => t.id !== undefined && !t.url?.startsWith(sidePanelUrlBase))
+      .map(t => t.id as number);
+
+    // 親を持たないタブを先に作成するためソート
+    const sortedTabs = [...snapshotTabs].sort((a, b) => {
+      if (a.parentIndex === null && b.parentIndex !== null) return -1;
+      if (a.parentIndex !== null && b.parentIndex === null) return 1;
+      return a.index - b.index;
+    });
+
+    // タブを作成してマッピングを構築
+    const indexToNewTabId = new Map<number, number>();
+    const indexToSnapshot = new Map<number, typeof sortedTabs[0]>();
+
+    for (const tabSnapshot of sortedTabs) {
+      indexToSnapshot.set(tabSnapshot.index, tabSnapshot);
+    }
+
+    for (const tabSnapshot of sortedTabs) {
+      try {
+        const newTab = await chrome.tabs.create({
+          url: tabSnapshot.url,
+          active: false,
+          pinned: tabSnapshot.pinned,
+        });
+
+        if (newTab.id !== undefined) {
+          indexToNewTabId.set(tabSnapshot.index, newTab.id);
+          restoringTabIds.add(newTab.id);
+        }
+      } catch (error) {
+        console.error('Failed to create tab:', tabSnapshot.url, error);
+      }
+    }
+
+    // ツリー状態を更新
+    await treeStateManager.loadState();
+    const treeState = await storageService.get(STORAGE_KEYS.TREE_STATE);
+
+    if (treeState) {
+      const updatedNodes: Record<string, TabNode> = closeCurrentTabs
+        ? {}
+        : { ...treeState.nodes };
+      const updatedTabToNode: Record<number, string> = closeCurrentTabs
+        ? {}
+        : { ...treeState.tabToNode };
+
+      // 新しいノードを作成
+      for (const [index, newTabId] of indexToNewTabId) {
+        const snapshot = indexToSnapshot.get(index);
+        if (!snapshot) continue;
+
+        const nodeId = `node-${newTabId}`;
+        let parentId: string | null = null;
+        let depth = 0;
+
+        if (snapshot.parentIndex !== null) {
+          const parentTabId = indexToNewTabId.get(snapshot.parentIndex);
+          if (parentTabId !== undefined) {
+            parentId = `node-${parentTabId}`;
+            const parentNode = updatedNodes[parentId];
+            if (parentNode) {
+              depth = parentNode.depth + 1;
+            }
+          }
+        }
+
+        const newNode: TabNode = {
+          id: nodeId,
+          tabId: newTabId,
+          parentId,
+          children: [],
+          isExpanded: snapshot.isExpanded,
+          depth,
+          viewId: snapshot.viewId,
+        };
+
+        updatedNodes[nodeId] = newNode;
+        updatedTabToNode[newTabId] = nodeId;
+      }
+
+      // 親子関係を構築（childrenを設定）
+      for (const nodeId of Object.keys(updatedNodes)) {
+        const node = updatedNodes[nodeId];
+        if (node.parentId && updatedNodes[node.parentId]) {
+          const parent = updatedNodes[node.parentId];
+          const childExists = parent.children.some(c => c.id === nodeId);
+          if (!childExists) {
+            parent.children = [...parent.children, updatedNodes[nodeId]];
+          }
+        }
+      }
+
+      // ビューをマージ（既存ビューを保持しつつスナップショットのビューを追加）
+      const existingViewIds = new Set(treeState.views.map(v => v.id));
+      const mergedViews = [...treeState.views];
+      for (const view of snapshotViews) {
+        if (!existingViewIds.has(view.id)) {
+          mergedViews.push(view);
+        }
+      }
+
+      const updatedTreeState = {
+        ...treeState,
+        nodes: updatedNodes,
+        tabToNode: updatedTabToNode,
+        views: mergedViews,
+      };
+
+      await storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);
+    }
+
+    // 既存タブを閉じる（closeCurrentTabsがtrueの場合）
+    // 新しいタブは上記のforループで全て作成済み（awaitで完了を待機している）
+    if (closeCurrentTabs && existingTabIds.length > 0) {
+      try {
+        await chrome.tabs.remove(existingTabIds);
+      } catch {
+        // タブ削除失敗は無視（既に閉じられている可能性）
+      }
+    }
+
+    // フラグをクリア
+    restoringTabIds.clear();
+    isRestoringSnapshot = false;
+
+    // 状態更新を通知
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    isRestoringSnapshot = false;
+    restoringTabIds.clear();
     sendResponse({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

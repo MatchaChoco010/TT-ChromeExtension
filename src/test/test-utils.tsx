@@ -12,6 +12,7 @@ const defaultSettings: UserSettings = {
   showUnreadIndicator: true,
   autoSnapshotInterval: 0,
   childTabBehavior: 'promote',
+  snapshotSubfolder: 'TT-Snapshots',
 };
 
 vi.mock('@/sidepanel/providers/ThemeProvider', () => ({

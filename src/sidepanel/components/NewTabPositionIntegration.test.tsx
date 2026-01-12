@@ -33,6 +33,7 @@ describe('新規タブ位置の統合テスト', () => {
       showUnreadIndicator: true,
       autoSnapshotInterval: 0,
       childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
     };
     await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, defaultSettings);
 
@@ -56,6 +57,7 @@ describe('新規タブ位置の統合テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -114,6 +116,7 @@ describe('新規タブ位置の統合テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -171,6 +174,7 @@ describe('新規タブ位置の統合テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -222,6 +226,7 @@ describe('新規タブ位置の統合テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -289,6 +294,7 @@ describe('新規タブ位置の統合テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 

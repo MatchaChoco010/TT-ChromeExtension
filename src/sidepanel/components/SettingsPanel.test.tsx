@@ -13,6 +13,7 @@ describe('SettingsPanel', () => {
     showUnreadIndicator: true,
     autoSnapshotInterval: 10,
     childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
   };
 
   let onSettingsChange: (settings: UserSettings) => void;
@@ -481,7 +482,7 @@ describe('SettingsPanel', () => {
     });
   });
 
-  describe('スナップショット自動保存設定', () => {
+  describe('スナップショット設定', () => {
     it('should display snapshot settings section', () => {
       render(
         <SettingsPanel
@@ -490,7 +491,7 @@ describe('SettingsPanel', () => {
         />
       );
 
-      expect(screen.getByText(/スナップショットの自動保存/i)).toBeInTheDocument();
+      expect(screen.getByText(/スナップショット設定/i)).toBeInTheDocument();
     });
 
     it('should display auto-save toggle switch', () => {
@@ -620,81 +621,7 @@ describe('SettingsPanel', () => {
       });
     });
 
-    it('should display max snapshots input field', () => {
-      render(
-        <SettingsPanel
-          settings={defaultSettings}
-          onSettingsChange={onSettingsChange}
-        />
-      );
-
-      expect(screen.getByLabelText(/最大スナップショット数/i)).toBeInTheDocument();
-    });
-
-    it('should display current max snapshots value', () => {
-      const settingsWithMaxSnapshots = {
-        ...defaultSettings,
-        maxSnapshots: 20,
-      };
-
-      render(
-        <SettingsPanel
-          settings={settingsWithMaxSnapshots}
-          onSettingsChange={onSettingsChange}
-        />
-      );
-
-      const input = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
-      expect(input.value).toBe('20');
-    });
-
-    it('should use default value of 10 when maxSnapshots is not set', () => {
-      render(
-        <SettingsPanel
-          settings={defaultSettings}
-          onSettingsChange={onSettingsChange}
-        />
-      );
-
-      const input = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
-      expect(input.value).toBe('10');
-    });
-
-    it('should allow user to change max snapshots', () => {
-      render(
-        <SettingsPanel
-          settings={defaultSettings}
-          onSettingsChange={onSettingsChange}
-        />
-      );
-
-      const input = screen.getByLabelText(/最大スナップショット数/i);
-      fireEvent.change(input, { target: { value: '25' } });
-
-      expect(onSettingsChange).toHaveBeenCalledWith({
-        ...defaultSettings,
-        maxSnapshots: 25,
-      });
-    });
-
-    it('should not accept max snapshots less than 1', () => {
-      render(
-        <SettingsPanel
-          settings={defaultSettings}
-          onSettingsChange={onSettingsChange}
-        />
-      );
-
-      const input = screen.getByLabelText(/最大スナップショット数/i);
-      fireEvent.change(input, { target: { value: '0' } });
-
-      expect(onSettingsChange).not.toHaveBeenCalledWith({
-        ...defaultSettings,
-        maxSnapshots: 0,
-      });
-    });
-
-    it('should disable interval and max snapshots inputs when auto-save is disabled', () => {
+    it('should disable interval input when auto-save is disabled', () => {
       const settingsWithDisabled = {
         ...defaultSettings,
         autoSnapshotInterval: 0,
@@ -708,13 +635,11 @@ describe('SettingsPanel', () => {
       );
 
       const intervalInput = screen.getByLabelText(/自動保存の間隔/i) as HTMLInputElement;
-      const maxSnapshotsInput = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
 
       expect(intervalInput).toBeDisabled();
-      expect(maxSnapshotsInput).toBeDisabled();
     });
 
-    it('should enable interval and max snapshots inputs when auto-save is enabled', () => {
+    it('should enable interval input when auto-save is enabled', () => {
       const settingsWithEnabled = {
         ...defaultSettings,
         autoSnapshotInterval: 10,
@@ -728,10 +653,8 @@ describe('SettingsPanel', () => {
       );
 
       const intervalInput = screen.getByLabelText(/自動保存の間隔/i) as HTMLInputElement;
-      const maxSnapshotsInput = screen.getByLabelText(/最大スナップショット数/i) as HTMLInputElement;
 
       expect(intervalInput).not.toBeDisabled();
-      expect(maxSnapshotsInput).not.toBeDisabled();
     });
 
     it('should display description for interval setting', () => {
@@ -747,7 +670,7 @@ describe('SettingsPanel', () => {
       ).toBeInTheDocument();
     });
 
-    it('should display description for max snapshots setting', () => {
+    it('should display snapshot subfolder input', () => {
       render(
         <SettingsPanel
           settings={defaultSettings}
@@ -755,9 +678,24 @@ describe('SettingsPanel', () => {
         />
       );
 
-      expect(
-        screen.getByText(/保持するスナップショットの最大数/i)
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/保存先フォルダ/i)).toBeInTheDocument();
+    });
+
+    it('should allow user to change snapshot subfolder', () => {
+      render(
+        <SettingsPanel
+          settings={defaultSettings}
+          onSettingsChange={onSettingsChange}
+        />
+      );
+
+      const input = screen.getByLabelText(/保存先フォルダ/i);
+      fireEvent.change(input, { target: { value: 'MySnapshots' } });
+
+      expect(onSettingsChange).toHaveBeenCalledWith({
+        ...defaultSettings,
+        snapshotSubfolder: 'MySnapshots',
+      });
     });
   });
 });

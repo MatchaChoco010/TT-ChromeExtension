@@ -37,6 +37,7 @@ describe('タブ開き方別の位置ルール', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -96,6 +97,7 @@ describe('タブ開き方別の位置ルール', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -154,6 +156,7 @@ describe('タブ開き方別の位置ルール', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -184,6 +187,7 @@ describe('タブ開き方別の位置ルール', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote' as const,
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
@@ -259,6 +263,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 

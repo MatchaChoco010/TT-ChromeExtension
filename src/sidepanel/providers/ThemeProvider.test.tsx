@@ -49,6 +49,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({
@@ -80,6 +81,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({
@@ -113,6 +115,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({
@@ -144,6 +147,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({
@@ -177,6 +181,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({
@@ -244,6 +249,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({
@@ -289,6 +295,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({
@@ -326,6 +333,7 @@ describe('ThemeProvider', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       chromeMock.storage.local.get.mockResolvedValue({

@@ -45,6 +45,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           showUnreadIndicator: true,
           autoSnapshotInterval: 0,
           childTabBehavior: 'promote',
+          snapshotSubfolder: 'TT-Snapshots',
         };
         setSettings(defaultSettings);
         await chrome.storage.local.set({ user_settings: defaultSettings });

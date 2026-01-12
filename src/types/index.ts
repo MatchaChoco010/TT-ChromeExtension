@@ -55,6 +55,7 @@ export interface UserSettings {
   newTabPositionManual?: 'child' | 'sibling' | 'end';
   maxSnapshots?: number;
   duplicateTabPosition?: 'sibling' | 'end';
+  snapshotSubfolder: string;
 }
 
 export type StorageChanges = {
@@ -110,16 +111,18 @@ export interface IStorageService {
 }
 
 export interface TabSnapshot {
+  index: number;
   url: string;
   title: string;
-  parentId: string | null;
+  parentIndex: number | null;
   viewId: string;
+  isExpanded: boolean;
+  pinned: boolean;
 }
 
 export interface SnapshotData {
   views: View[];
   tabs: TabSnapshot[];
-  groups: Group[];
 }
 
 export interface Snapshot {
@@ -130,12 +133,12 @@ export interface Snapshot {
   data: SnapshotData;
 }
 
-export interface IIndexedDBService {
-  saveSnapshot(snapshot: Snapshot): Promise<void>;
-  getSnapshot(id: string): Promise<Snapshot | null>;
-  getAllSnapshots(): Promise<Snapshot[]>;
-  deleteSnapshot(id: string): Promise<void>;
-  deleteOldSnapshots(keepCount: number): Promise<void>;
+export interface IDownloadService {
+  downloadSnapshot(
+    jsonContent: string,
+    filename: string,
+    subfolder?: string,
+  ): Promise<number>;
 }
 
 export interface IUnreadTracker {
@@ -186,6 +189,10 @@ export type MessageType =
   | { type: 'CREATE_GROUP'; payload: { tabIds: number[] } }
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
   | { type: 'CREATE_SNAPSHOT' }
+  | {
+      type: 'RESTORE_SNAPSHOT';
+      payload: { jsonData: string; closeCurrentTabs: boolean };
+    }
   | { type: 'REGISTER_DUPLICATE_SOURCE'; payload: { sourceTabId: number } }
   | { type: 'DUPLICATE_SUBTREE'; payload: { tabId: number } }
   | {

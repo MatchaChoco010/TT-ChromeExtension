@@ -19,6 +19,7 @@ export interface ExtensionFixtures {
   extensionContext: BrowserContext;
   extensionId: string;
   serviceWorker: Worker;
+  downloadDir: string;
 }
 
 const getExtensionPath = () => {
@@ -117,20 +118,29 @@ const removeUserDataDir = (userDataDir: string): void => {
   }
 };
 
+const createDownloadDir = (userDataDir: string): string => {
+  const downloadDir = path.join(userDataDir, 'downloads');
+  fs.mkdirSync(downloadDir, { recursive: true });
+  return downloadDir;
+};
+
 const createExtensionContext = async (
   extensionPath: string,
   headless: boolean
-): Promise<{ context: BrowserContext; userDataDir: string }> => {
+): Promise<{ context: BrowserContext; userDataDir: string; downloadDir: string }> => {
   const validation = validateExtensionBuild(extensionPath);
   if (!validation.valid) {
     throw new Error(`Extension build validation failed:\n${validation.errors.join('\n')}`);
   }
 
   const userDataDir = createUniqueUserDataDir();
+  const downloadDir = createDownloadDir(userDataDir);
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false,
     channel: 'chromium',
+    acceptDownloads: true,
+    downloadsPath: downloadDir,
     args: [
       ...(headless ? ['--headless=new'] : []),
       `--disable-extensions-except=${extensionPath}`,
@@ -152,7 +162,7 @@ const createExtensionContext = async (
   const timeout = 30000;
   await waitForServiceWorker(context, timeout);
 
-  return { context, userDataDir };
+  return { context, userDataDir, downloadDir };
 };
 
 // 自動リセットフィクスチャ（テストスコープ）
@@ -162,6 +172,9 @@ interface TestFixtures {
 
 // ワーカーごとの前回テストを追跡
 const workerLastTest = new Map<number, string>();
+
+// コンテキストごとのダウンロードディレクトリを追跡
+const contextDownloadDirs = new Map<BrowserContext, string>();
 
 /**
  * Service Workerが応答可能か確認する
@@ -217,12 +230,24 @@ export const test = base.extend<TestFixtures, ExtensionFixtures>({
   extensionContext: [async ({}, use) => {
     const pathToExtension = getExtensionPath();
     const headless = process.env.HEADED !== 'true';
-    const { context, userDataDir } = await createExtensionContext(pathToExtension, headless);
+    const { context, userDataDir, downloadDir } = await createExtensionContext(pathToExtension, headless);
+
+    // ダウンロードディレクトリをコンテキストに紐付け
+    contextDownloadDirs.set(context, downloadDir);
 
     await use(context);
 
+    contextDownloadDirs.delete(context);
     await context.close();
     removeUserDataDir(userDataDir);
+  }, { scope: 'worker' }],
+
+  downloadDir: [async ({ extensionContext }, use) => {
+    const downloadDir = contextDownloadDirs.get(extensionContext);
+    if (!downloadDir) {
+      throw new Error('Download directory not found for extension context');
+    }
+    await use(downloadDir);
   }, { scope: 'worker' }],
 
   extensionId: [async ({ extensionContext }, use) => {

@@ -30,7 +30,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } =
+    const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     // Side Panelが表示されることを確認
@@ -64,7 +64,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } =
+    const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     // Side Panelが表示されることを確認
@@ -95,7 +95,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } =
+    const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     // Side Panelが表示されることを確認
@@ -154,7 +154,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } =
+    const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     // Side Panelが表示されることを確認
@@ -197,7 +197,7 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } =
+    const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     // Side Panelが表示されることを確認

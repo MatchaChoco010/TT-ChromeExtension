@@ -621,6 +621,90 @@ export async function assertDropIndicator(
 }
 
 /**
+ * Chromeのアクティブタブが指定されたタブIDであることを検証
+ *
+ * @param context - ブラウザコンテキスト
+ * @param expectedTabId - 期待するアクティブタブID
+ * @param windowId - ウィンドウID
+ * @param timeout - タイムアウト（ミリ秒、デフォルト: 5000）
+ */
+export async function assertActiveTab(
+  context: BrowserContext,
+  expectedTabId: number,
+  windowId: number,
+  timeout: number = 5000
+): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const activeTabId = await serviceWorker.evaluate(async (wId) => {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId: wId });
+      return activeTab?.id;
+    }, windowId);
+
+    if (activeTabId === expectedTabId) {
+      return;
+    }
+
+    await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  }
+
+  const actualActiveTabId = await serviceWorker.evaluate(async (wId) => {
+    const [activeTab] = await chrome.tabs.query({ active: true, windowId: wId });
+    return activeTab?.id;
+  }, windowId);
+
+  throw new Error(
+    `Active tab mismatch (windowId: ${windowId}):\n` +
+    `  Expected: ${expectedTabId}\n` +
+    `  Actual:   ${actualActiveTabId}`
+  );
+}
+
+/**
+ * Chromeのアクティブタブが指定されたタブIDのいずれかであることを検証
+ *
+ * @param context - ブラウザコンテキスト
+ * @param allowedTabIds - 許可されるアクティブタブIDの配列
+ * @param windowId - ウィンドウID
+ * @param timeout - タイムアウト（ミリ秒、デフォルト: 5000）
+ */
+export async function assertActiveTabIsOneOf(
+  context: BrowserContext,
+  allowedTabIds: number[],
+  windowId: number,
+  timeout: number = 5000
+): Promise<void> {
+  const serviceWorker = await getServiceWorker(context);
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const activeTabId = await serviceWorker.evaluate(async (wId) => {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId: wId });
+      return activeTab?.id;
+    }, windowId);
+
+    if (activeTabId !== undefined && allowedTabIds.includes(activeTabId)) {
+      return;
+    }
+
+    await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  }
+
+  const actualActiveTabId = await serviceWorker.evaluate(async (wId) => {
+    const [activeTab] = await chrome.tabs.query({ active: true, windowId: wId });
+    return activeTab?.id;
+  }, windowId);
+
+  throw new Error(
+    `Active tab not in allowed list (windowId: ${windowId}):\n` +
+    `  Allowed: [${allowedTabIds.join(', ')}]\n` +
+    `  Actual:  ${actualActiveTabId}`
+  );
+}
+
+/**
  * ホバー自動展開を検証
  *
  * @param page - Side PanelのPage

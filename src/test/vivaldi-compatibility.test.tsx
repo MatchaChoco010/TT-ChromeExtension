@@ -137,6 +137,7 @@ describe('Vivaldi互換性テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       await chrome.storage.local.set({ user_settings: testSettings });
@@ -287,6 +288,7 @@ describe('Vivaldi互換性テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       await chrome.storage.local.set({ user_settings: customSettings });
@@ -405,6 +407,7 @@ describe('Vivaldi互換性テスト', () => {
         showUnreadIndicator: true,
         autoSnapshotInterval: 10,
         childTabBehavior: 'promote',
+        snapshotSubfolder: 'TT-Snapshots',
       };
 
       await chrome.storage.local.set({ user_settings: settings });

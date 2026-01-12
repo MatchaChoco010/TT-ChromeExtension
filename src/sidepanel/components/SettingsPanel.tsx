@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import type { UserSettings } from '@/types';
+import { SnapshotManager } from '@/services/SnapshotManager';
+import { downloadService } from '@/storage/DownloadService';
+import { storageService } from '@/storage/StorageService';
 
 interface SettingsPanelProps {
   settings: UserSettings;
@@ -10,6 +13,88 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   settings,
   onSettingsChange,
 }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showRestoreOptions, setShowRestoreOptions] = useState(false);
+  const [pendingJsonData, setPendingJsonData] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const snapshotManager = new SnapshotManager(downloadService, storageService);
+
+  const handleCreateSnapshot = async () => {
+    try {
+      setIsProcessing(true);
+      setStatusMessage(null);
+      const timestamp = new Date().toLocaleString();
+      const name = `Manual Snapshot - ${timestamp}`;
+      await snapshotManager.createSnapshot(name, false);
+      setStatusMessage('スナップショットを保存しました');
+      setTimeout(() => setStatusMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to create snapshot:', error);
+      setStatusMessage('スナップショットの作成に失敗しました');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      JSON.parse(text);
+      setPendingJsonData(text);
+      setShowRestoreOptions(true);
+      setStatusMessage(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Failed to read file:', error);
+      setStatusMessage('ファイルの読み込みに失敗しました');
+    }
+  };
+
+  const handleRestore = async (closeCurrentTabs: boolean) => {
+    if (!pendingJsonData) return;
+
+    try {
+      setIsProcessing(true);
+      setShowRestoreOptions(false);
+
+      // バックグラウンドスクリプトに復元を依頼
+      // これにより、handleTabCreatedとの競合を回避し、親子関係とビュー配置を正しく復元
+      const response = await chrome.runtime.sendMessage({
+        type: 'RESTORE_SNAPSHOT',
+        payload: { jsonData: pendingJsonData, closeCurrentTabs },
+      });
+
+      if (response && !response.success) {
+        throw new Error(response.error || 'Unknown error');
+      }
+
+      setPendingJsonData(null);
+      setStatusMessage('スナップショットを復元しました');
+      setTimeout(() => setStatusMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to restore snapshot:', error);
+      setStatusMessage('スナップショットの復元に失敗しました');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCancelRestore = () => {
+    setShowRestoreOptions(false);
+    setPendingJsonData(null);
+  };
   const handleCloseWarningThresholdChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -102,14 +187,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
-  const handleMaxSnapshotsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    if (value >= 1) {
-      onSettingsChange({
-        ...settings,
-        maxSnapshots: value,
-      });
-    }
+  const handleSnapshotSubfolderChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    onSettingsChange({
+      ...settings,
+      snapshotSubfolder: e.target.value,
+    });
   };
 
   const handleDuplicateTabPositionChange = (
@@ -304,7 +388,101 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       </section>
 
       <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-4 text-gray-100">スナップショットの自動保存</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-100">スナップショット設定</h2>
+
+        <div className="mb-4">
+          <div className="flex gap-3 mb-3">
+            <button
+              data-testid="settings-create-snapshot-button"
+              onClick={handleCreateSnapshot}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isProcessing ? '処理中...' : 'スナップショットを作成'}
+            </button>
+            <button
+              data-testid="settings-import-snapshot-button"
+              onClick={handleImportClick}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              インポート
+            </button>
+          </div>
+
+          {statusMessage && (
+            <div className={`mb-3 p-2 rounded text-sm ${
+              statusMessage.includes('失敗') ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300'
+            }`}>
+              {statusMessage}
+            </div>
+          )}
+
+          {showRestoreOptions && (
+            <div className="mb-3 p-3 bg-gray-800 rounded-md border border-gray-700">
+              <p className="text-sm text-gray-300 mb-3">スナップショットを復元します。現在のタブをどうしますか？</p>
+              <div className="flex gap-2">
+                <button
+                  data-testid="settings-restore-close-tabs"
+                  onClick={() => handleRestore(true)}
+                  disabled={isProcessing}
+                  className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded disabled:opacity-50 transition-colors"
+                >
+                  現在のタブを閉じる
+                </button>
+                <button
+                  data-testid="settings-restore-keep-tabs"
+                  onClick={() => handleRestore(false)}
+                  disabled={isProcessing}
+                  className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:opacity-50 transition-colors"
+                >
+                  タブを保持
+                </button>
+                <button
+                  data-testid="settings-restore-cancel"
+                  onClick={handleCancelRestore}
+                  disabled={isProcessing}
+                  className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded disabled:opacity-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            className="hidden"
+            data-testid="settings-snapshot-import-input"
+          />
+
+          <p className="text-xs text-gray-400 mb-4">
+            スナップショットはダウンロードフォルダに保存されます。インポートでファイルから復元できます。
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="snapshotSubfolder"
+            className="block text-sm font-medium text-gray-300 mb-2"
+          >
+            保存先フォルダ
+          </label>
+          <input
+            id="snapshotSubfolder"
+            type="text"
+            value={settings.snapshotSubfolder ?? 'TT-Snapshots'}
+            onChange={handleSnapshotSubfolderChange}
+            className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
+            placeholder="TT-Snapshots"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            ダウンロードフォルダ内のサブフォルダ名
+          </p>
+        </div>
 
         <div className="mb-4">
           <div className="flex items-center justify-between">
@@ -353,27 +531,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           />
           <p className="text-xs text-gray-400 mt-1">
             スナップショットを自動的に保存する間隔（分単位）
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <label
-            htmlFor="maxSnapshots"
-            className="block text-sm font-medium text-gray-300 mb-2"
-          >
-            最大スナップショット数
-          </label>
-          <input
-            id="maxSnapshots"
-            type="number"
-            min="1"
-            value={settings.maxSnapshots ?? 10}
-            onChange={handleMaxSnapshotsChange}
-            disabled={!isAutoSnapshotEnabled}
-            className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100 disabled:bg-gray-800 disabled:text-gray-500"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            保持するスナップショットの最大数（古いものから削除されます）
           </p>
         </div>
       </section>

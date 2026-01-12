@@ -46,8 +46,8 @@
 **Example**: `TreeStateManager.ts`, `SnapshotManager.ts`
 
 ### Storage (`/src/storage/`)
-**Purpose**: データ永続化の抽象化層（IndexedDB操作）
-**Example**: `IndexedDBService.ts`, `StorageService.ts`
+**Purpose**: データ永続化の抽象化層（chrome.storage、chrome.downloads API操作）
+**Example**: `StorageService.ts`, `DownloadService.ts`
 
 ### Types (`/src/types/`)
 **Purpose**: 型定義の集約（プロジェクト全体で共有）

@@ -5,9 +5,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import SidePanelRoot from '@/sidepanel/components/SidePanelRoot';
-import { IndexedDBService } from '@/storage/IndexedDBService';
 import { chromeMock } from '@/test/chrome-mock';
-import type { TabNode, Snapshot } from '@/types';
+import type { TabNode } from '@/types';
 
 function measurePerformance(fn: () => void | Promise<void>): number {
   const start = performance.now();
@@ -89,93 +88,6 @@ describe('パフォーマンステスト', () => {
     });
   });
 
-  describe('IndexedDB操作の性能', () => {
-    let indexedDBService: IndexedDBService;
-
-    beforeEach(() => {
-      indexedDBService = new IndexedDBService();
-    });
-
-    it('スナップショット保存が100ms以内に完了すること', async () => {
-      const snapshot: Snapshot = {
-        id: 'perf-test-1',
-        createdAt: new Date(),
-        name: 'Performance Test Snapshot',
-        isAutoSave: false,
-        data: {
-          views: [{ id: 'view-1', name: 'View 1', color: '#000000' }],
-          tabs: generateMockTabs(100).map((tab) => ({
-            url: `https://example.com/page-${tab.tabId}`,
-            title: `Tab ${tab.tabId}`,
-            parentId: tab.parentId,
-            viewId: tab.viewId,
-          })),
-          groups: [],
-        },
-      };
-
-      const saveTime = await measureAsyncPerformance(async () => {
-        await indexedDBService.saveSnapshot(snapshot);
-      });
-
-      expect(saveTime).toBeLessThan(100);
-    });
-
-    it('スナップショット読み込みが100ms以内に完了すること', async () => {
-      const snapshot: Snapshot = {
-        id: 'perf-test-2',
-        createdAt: new Date(),
-        name: 'Performance Test Snapshot',
-        isAutoSave: false,
-        data: {
-          views: [{ id: 'view-1', name: 'View 1', color: '#000000' }],
-          tabs: generateMockTabs(100).map((tab) => ({
-            url: `https://example.com/page-${tab.tabId}`,
-            title: `Tab ${tab.tabId}`,
-            parentId: tab.parentId,
-            viewId: tab.viewId,
-          })),
-          groups: [],
-        },
-      };
-
-      await indexedDBService.saveSnapshot(snapshot);
-
-      const loadTime = await measureAsyncPerformance(async () => {
-        await indexedDBService.getSnapshot('perf-test-2');
-      });
-
-      expect(loadTime).toBeLessThan(100);
-    });
-
-    it('全スナップショット取得が100ms以内に完了すること', async () => {
-      for (let i = 0; i < 10; i++) {
-        const snapshot: Snapshot = {
-          id: `perf-test-all-${i}`,
-          createdAt: new Date(),
-          name: `Snapshot ${i}`,
-          isAutoSave: false,
-          data: {
-            views: [{ id: 'view-1', name: 'View 1', color: '#000000' }],
-            tabs: generateMockTabs(50).map((tab) => ({
-              url: `https://example.com/page-${tab.tabId}`,
-              title: `Tab ${tab.tabId}`,
-              parentId: tab.parentId,
-              viewId: tab.viewId,
-            })),
-            groups: [],
-          },
-        };
-        await indexedDBService.saveSnapshot(snapshot);
-      }
-
-      const loadAllTime = await measureAsyncPerformance(async () => {
-        await indexedDBService.getAllSnapshots();
-      });
-
-      expect(loadAllTime).toBeLessThan(100);
-    });
-  });
 
   describe('ドラッグ&ドロップのパフォーマンス', () => {
     it('ドラッグ操作中のフレームレートが60fps（16.67ms以下）を維持すること', () => {
