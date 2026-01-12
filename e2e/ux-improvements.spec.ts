@@ -1,24 +1,26 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, pinTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, pinTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure, assertViewStructure } from './utils/assertion-utils';
 import { waitForViewSwitcher, waitForCondition } from './utils/polling-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('UX改善機能', () => {
   test.describe('ピン留めタブの閉じるボタン非表示', () => {
     test('ピン留めタブには閉じるボタンが表示されない', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -26,6 +28,7 @@ test.describe('UX改善機能', () => {
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -41,6 +44,7 @@ test.describe('UX改善機能', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -49,17 +53,18 @@ test.describe('UX改善機能', () => {
     test('通常タブをピン留めすると閉じるボタンが非表示になる', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -67,6 +72,7 @@ test.describe('UX改善機能', () => {
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -78,6 +84,7 @@ test.describe('UX改善機能', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -86,12 +93,14 @@ test.describe('UX改善機能', () => {
 
   test.describe('ビュースクロール切り替え', () => {
     test('ビューリスト上でマウスホイールを下にスクロールすると次のビューに切り替わる', async ({
+      extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
-      await waitForViewSwitcher(sidePanelPage);
-
       const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await waitForViewSwitcher(sidePanelPage);
 
       // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -115,12 +124,14 @@ test.describe('UX改善機能', () => {
     });
 
     test('ビューリスト上でマウスホイールを上にスクロールすると前のビューに切り替わる', async ({
+      extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
-      await waitForViewSwitcher(sidePanelPage);
-
       const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await waitForViewSwitcher(sidePanelPage);
 
       // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -154,12 +165,14 @@ test.describe('UX改善機能', () => {
     });
 
     test('最初のビューで上スクロールしても切り替わらない（ループしない）', async ({
+      extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
-      await waitForViewSwitcher(sidePanelPage);
-
       const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await waitForViewSwitcher(sidePanelPage);
 
       // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -183,12 +196,14 @@ test.describe('UX改善機能', () => {
     });
 
     test('最後のビューで下スクロールしても切り替わらない（ループしない）', async ({
+      extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
-      await waitForViewSwitcher(sidePanelPage);
-
       const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await waitForViewSwitcher(sidePanelPage);
 
       // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -226,13 +241,14 @@ test.describe('UX改善機能', () => {
     test('タブのコンテキストメニューで「別のビューへ移動」にホバーするとサブメニューが表示される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -281,6 +297,7 @@ test.describe('UX改善機能', () => {
       await expect(contextMenu).not.toBeVisible({ timeout: 2000 });
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
@@ -288,13 +305,14 @@ test.describe('UX改善機能', () => {
     test('サブメニューからビューを選択するとタブがそのビューに移動する', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -355,13 +373,14 @@ test.describe('UX改善機能', () => {
     test('現在のビューはサブメニューに表示されない', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -402,6 +421,7 @@ test.describe('UX改善機能', () => {
       await sidePanelPage.keyboard.press('Escape');
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });

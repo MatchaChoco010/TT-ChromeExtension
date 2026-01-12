@@ -1,4 +1,6 @@
 import { test, expect } from './fixtures/extension';
+import { getCurrentWindowId } from './utils/tab-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('ポップアップメニュー', () => {
   test.describe('ポップアップメニューの表示', () => {
@@ -91,8 +93,10 @@ test.describe('ポップアップメニュー', () => {
     test('「スナップショットを取得」ボタンをクリックするとスナップショットが取得される', async ({
       extensionContext,
       extensionId,
-      sidePanelPage,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -121,8 +125,10 @@ test.describe('ポップアップメニュー', () => {
     test('スナップショット取得完了後にユーザーに通知される', async ({
       extensionContext,
       extensionId,
-      sidePanelPage,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 

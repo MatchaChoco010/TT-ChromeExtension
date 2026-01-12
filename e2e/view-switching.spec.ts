@@ -1,13 +1,17 @@
 import { test, expect } from './fixtures/extension';
 import { waitForViewSwitcher, waitForCondition } from './utils/polling-utils';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('ビュー切り替え機能', () => {
   test.describe('ビュー一覧とビュー切り替え', () => {
     test('Side Panelを開いた場合、ビュースイッチャーが表示される', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const viewSwitcher = sidePanelPage.locator(
@@ -17,8 +21,11 @@ test.describe('ビュー切り替え機能', () => {
     });
 
     test('デフォルトビューが表示され、クリックするとアクティブ状態になる', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const defaultViewButton = sidePanelPage.locator(
@@ -32,8 +39,11 @@ test.describe('ビュー切り替え機能', () => {
     });
 
     test('ビューボタンをクリックするとビューが切り替わる', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -56,8 +66,11 @@ test.describe('ビュー切り替え機能', () => {
     });
 
     test('ビュー間を切り替えた場合、ツリー表示が即座に更新される', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const viewSwitcher = sidePanelPage.locator(
@@ -85,8 +98,11 @@ test.describe('ビュー切り替え機能', () => {
 
   test.describe('カスタムビュー作成', () => {
     test('新しいビュー追加ボタンをクリックすると、新しいビューが作成される', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const viewSwitcher = sidePanelPage.locator(
@@ -111,8 +127,11 @@ test.describe('ビュー切り替え機能', () => {
     });
 
     test('カスタムビューを作成した場合、新しいビューがビューリストに追加される', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -128,8 +147,11 @@ test.describe('ビュー切り替え機能', () => {
 
   test.describe('カスタムビュー編集', () => {
     test('ビュー名や色を変更した場合、UI上の表示が即座に反映される', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -172,8 +194,11 @@ test.describe('ビュー切り替え機能', () => {
     });
 
     test('編集をキャンセルした場合、変更は破棄される', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const defaultViewButton = sidePanelPage.locator(
@@ -207,12 +232,12 @@ test.describe('ビュー切り替え機能', () => {
 
   test.describe('ビュー切り替え動作の修正', () => {
     test('ビューを切り替えた後に新しいタブを開いた場合、現在アクティブなビューにタブを追加する', async ({
-      sidePanelPage,
       extensionContext,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -239,8 +264,11 @@ test.describe('ビュー切り替え機能', () => {
     });
 
     test('ビューを追加した場合、ページをリロードしてもビューが永続化されている', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -263,8 +291,11 @@ test.describe('ビュー切り替え機能', () => {
     });
 
     test('ビューの切り替え状態が正しく管理され、意図せず消えない', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -299,8 +330,11 @@ test.describe('ビュー切り替え機能', () => {
 
   test.describe('ビュー削除', () => {
     test('ビューを削除した場合、デフォルトビューに自動的に切り替わる', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -333,7 +367,12 @@ test.describe('ビュー切り替え機能', () => {
       await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
     });
 
-    test('デフォルトビューは削除できない', async ({ sidePanelPage }) => {
+    test('デフォルトビューは削除できない', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const defaultViewButton = sidePanelPage.locator(

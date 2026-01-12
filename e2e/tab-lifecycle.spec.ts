@@ -1,21 +1,21 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, activateTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, activateTab, getCurrentWindowId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { waitForTabRemovedFromTreeState, waitForTabUrlLoaded } from './utils/polling-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('タブライフサイクルとツリー構造の基本操作', () => {
   test('新しいタブを作成した場合、タブが正常に作成される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
-
-    // ウィンドウIDと擬似サイドパネルタブIDを取得
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     // タブを作成
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -26,20 +26,24 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
   });
 
   test('親タブから新しいタブを開いた場合、親子関係が正しく確立される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // ウィンドウIDと擬似サイドパネルタブIDを取得
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     // 親タブを作成
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
     // 親タブから子タブを作成（openerTabIdを指定）
     const childTabId = await createTab(
@@ -48,27 +52,32 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
       parentTabId
     );
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
   });
 
   test('タブを閉じた場合、タブが正常に削除される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // ウィンドウIDと擬似サイドパネルタブIDを取得
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     // タブを作成
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId, depth: 0 },
+    ], 0);
 
     // タブを閉じる
     await closeTab(serviceWorker, tabId);
@@ -76,25 +85,30 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
 
     // タブ削除後の構造を検証
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
   test('子タブを持つ親タブを閉じた場合、親タブが正常に削除される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    // ウィンドウIDと擬似サイドパネルタブIDを取得
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     // 親タブを作成
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
     // 子タブを作成
     const childTabId1 = await createTab(
@@ -103,7 +117,8 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
       parentTabId
     );
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId1, depth: 1 },
     ], 0);
@@ -114,7 +129,8 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
       parentTabId
     );
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId1, depth: 1 },
       { tabId: childTabId2, depth: 1 },
@@ -126,24 +142,24 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
 
     // 親タブ削除後の構造を検証（子タブは昇格）
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: childTabId1, depth: 0 },
       { tabId: childTabId2, depth: 0 },
     ], 0);
   });
 
   test('タブのタイトルまたはURLが変更された場合、変更が反映される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
-
-    // ウィンドウIDと擬似サイドパネルタブIDを取得
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     // タブを作成
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -170,30 +186,31 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
 
     // タブ構造に変化がないことを検証
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
   });
 
   test('タブがアクティブ化された場合、アクティブ状態が正しく設定される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     // Side Panelが表示されることを確認
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
-
-    // ウィンドウIDと擬似サイドパネルタブIDを取得
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     // 複数のタブを作成（非アクティブ）
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, {
       active: false,
     });
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
@@ -201,7 +218,8 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
       active: false,
     });
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
@@ -218,7 +236,8 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
 
     // タブ構造に変化がないことを検証
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
@@ -235,7 +254,8 @@ test.describe('タブライフサイクルとツリー構造の基本操作', ()
 
     // タブ構造に変化がないことを検証
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);

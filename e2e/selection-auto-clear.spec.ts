@@ -3,28 +3,31 @@
  */
 
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('選択状態の自動解除', () => {
   test.describe('新しいタブが開かれたときにタブ選択状態が解除される', () => {
     test('新しいタブを開くと複数選択状態が解除される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -47,7 +50,8 @@ test.describe('選択状態の自動解除', () => {
       // Act: 新しいタブを作成
       const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -60,20 +64,23 @@ test.describe('選択状態の自動解除', () => {
       // Cleanup
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId3, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId3);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -81,28 +88,31 @@ test.describe('選択状態の自動解除', () => {
   test.describe('タブクローズ等の操作時にも選択状態が解除される', () => {
     test('タブをクローズすると選択状態が解除される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -126,7 +136,8 @@ test.describe('選択状態の自動解除', () => {
       // Act: 選択していないタブ（tabId3）をクローズ
       await closeTab(serviceWorker, tabId3);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -138,13 +149,15 @@ test.describe('選択状態の自動解除', () => {
       // Cleanup
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -154,21 +167,23 @@ test.describe('選択状態の自動解除', () => {
 
     test('新規タブボタンをクリックすると選択状態が解除される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -199,7 +214,8 @@ test.describe('選択状態の自動解除', () => {
         return tabs[0]?.id;
       });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: newTabId!, depth: 0 },
@@ -212,20 +228,23 @@ test.describe('選択状態の自動解除', () => {
       // Cleanup
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: newTabId!, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, newTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });

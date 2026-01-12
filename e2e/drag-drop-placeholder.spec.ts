@@ -1,7 +1,8 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { startDrag, hoverOverTab, dropTab } from './utils/drag-drop-utils';
+import { setupWindow } from './utils/setup-utils';
 import type { Page } from '@playwright/test';
 
 async function getTabNodeBoundingBox(
@@ -65,22 +66,23 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
   test.describe('有効なドロップ位置にのみプレースホルダーを表示', () => {
     test('タブとタブの隙間にドラッグするとプレースホルダーが表示されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -88,6 +90,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -118,22 +121,23 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
     test('最初のタブの上にドラッグするとプレースホルダーが表示されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -141,6 +145,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -170,22 +175,23 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
   test.describe('ドロップターゲットとなるタブのハイライト表示', () => {
     test('タブの中央にドラッグするとタブがハイライト表示されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 2つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -215,22 +221,23 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
     test('タブからマウスを離すとハイライトが解除されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -238,6 +245,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -276,22 +284,23 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
   test.describe('プレースホルダー位置の正確性', () => {
     test('プレースホルダーの位置がタブ間の正確な位置にあること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -299,6 +308,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -339,22 +349,23 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
     test('マウスを別の隙間に移動するとプレースホルダーも移動すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 4つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -362,6 +373,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -370,6 +382,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
       const tab4 = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -417,22 +430,23 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
     test('不正な位置（コンテナ外）ではプレースホルダーが表示されないこと', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
-      // テスト開始時にwindowIdとpseudoSidePanelTabIdを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 2つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },

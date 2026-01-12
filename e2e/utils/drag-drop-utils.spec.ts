@@ -5,23 +5,25 @@
  */
 import { test } from '../fixtures/extension';
 import * as dragDropUtils from './drag-drop-utils';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './tab-utils';
 import { assertTabStructure } from './assertion-utils';
+import { setupWindow } from './setup-utils';
 
 test.describe('DragDropUtils', () => {
 
   test.describe('startDrag', () => {
     test('タブノードをドラッグ開始できる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -34,21 +36,23 @@ test.describe('DragDropUtils', () => {
   test.describe('hoverOverTab', () => {
     test('別のタブノード上にホバーできる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
       const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
@@ -62,13 +66,15 @@ test.describe('DragDropUtils', () => {
   });
 
   test.describe('dropTab', () => {
-    test('ドロップを実行できる', async ({ extensionContext, sidePanelPage, serviceWorker }) => {
+    test('ドロップを実行できる', async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -77,7 +83,8 @@ test.describe('DragDropUtils', () => {
       await dragDropUtils.dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
     });
@@ -86,21 +93,23 @@ test.describe('DragDropUtils', () => {
   test.describe('reorderTabs', () => {
     test('同階層のタブを並び替えできる（before）', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
       const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
@@ -108,7 +117,8 @@ test.describe('DragDropUtils', () => {
       await dragDropUtils.reorderTabs(sidePanelPage, tab2Id, tab1Id, 'before');
 
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2Id, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
@@ -116,21 +126,23 @@ test.describe('DragDropUtils', () => {
 
     test('同階層のタブを並び替えできる（after）', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
       const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
@@ -138,7 +150,8 @@ test.describe('DragDropUtils', () => {
       await dragDropUtils.reorderTabs(sidePanelPage, tab1Id, tab2Id, 'after');
 
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2Id, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
@@ -148,21 +161,23 @@ test.describe('DragDropUtils', () => {
   test.describe('moveTabToParent', () => {
     test('タブを別のタブの子にできる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
       const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
         { tabId: childTabId, depth: 0 },
       ], 0);
@@ -170,7 +185,8 @@ test.describe('DragDropUtils', () => {
       await dragDropUtils.moveTabToParent(sidePanelPage, childTabId, parentTabId, serviceWorker);
 
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -180,21 +196,23 @@ test.describe('DragDropUtils', () => {
   test.describe('assertDropIndicator', () => {
     test('ドロップインジケータの表示を検証できる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
       const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
@@ -203,7 +221,8 @@ test.describe('DragDropUtils', () => {
       await dragDropUtils.hoverOverTab(sidePanelPage, tab2Id);
 
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
@@ -215,28 +234,31 @@ test.describe('DragDropUtils', () => {
   test.describe('assertAutoExpand', () => {
     test('ホバー自動展開を検証できる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
       const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'), parentTabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
 
       const dragTabId = await createTab(serviceWorker, getTestServerUrl('/drag'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
         { tabId: dragTabId, depth: 0 },

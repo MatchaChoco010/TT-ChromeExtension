@@ -1,25 +1,29 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getCurrentWindowId, getTestServerUrl } from './utils/tab-utils';
 import { waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('タブグループ化機能', () => {
   test.describe('複数タブのグループ化', () => {
     test('複数タブを選択してグループ化した際にグループ親タブが作成される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -83,6 +87,7 @@ test.describe('タブグループ化機能', () => {
       });
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -91,6 +96,7 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
@@ -98,6 +104,7 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
@@ -107,19 +114,22 @@ test.describe('タブグループ化機能', () => {
   test.describe('複数タブ選択によるグループ化の追加テスト', () => {
     test('複数タブを新しいグループにグループ化できる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -179,6 +189,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -210,6 +221,7 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
@@ -217,6 +229,7 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
@@ -224,20 +237,23 @@ test.describe('タブグループ化機能', () => {
 
     test('複数タブのグループ化時にデフォルト名「新しいグループ」が設定される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -297,6 +313,7 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
@@ -304,12 +321,14 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, groupTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
@@ -318,20 +337,23 @@ test.describe('タブグループ化機能', () => {
   test.describe('実タブグループ化機能', () => {
     test('グループ化するとchrome-extension://スキームのグループタブが作成される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -399,6 +421,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -408,7 +431,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -416,32 +440,37 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('グループ化後にグループ親タブが実際のブラウザタブとして存在する', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -508,6 +537,7 @@ test.describe('タブグループ化機能', () => {
       expect(tabExists).toBe(true);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -517,7 +547,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -525,38 +556,43 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('グループ化後にタブがグループタブの子として配置される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-            await sidePanelPage.bringToFront();
+      await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
@@ -621,6 +657,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -630,7 +667,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -638,38 +676,43 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('複数タブをグループ化すると実タブのグループ親が作成される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-            await sidePanelPage.bringToFront();
+      await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
@@ -733,6 +776,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -742,7 +786,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -750,31 +795,36 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('グループ化後にグループノードがストレージに正しく保存される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -837,6 +887,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -846,7 +897,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -854,12 +906,14 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
@@ -868,19 +922,21 @@ test.describe('タブグループ化機能', () => {
   test.describe('タブグループ化 追加検証', () => {
     test('単一タブを選択してグループ化するとグループ親タブが作成される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
-            await sidePanelPage.bringToFront();
+      await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
@@ -937,6 +993,7 @@ test.describe('タブグループ化機能', () => {
       });
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId, depth: 1 },
@@ -944,6 +1001,7 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
@@ -951,26 +1009,29 @@ test.describe('タブグループ化機能', () => {
 
     test('グループ化後にグループタブは展開状態である', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-            await sidePanelPage.bringToFront();
+      await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
@@ -1026,6 +1087,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -1035,7 +1097,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -1043,31 +1106,36 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('グループ化後に子タブの元の順序が維持される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -1075,6 +1143,7 @@ test.describe('タブグループ化機能', () => {
 
       const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -1161,6 +1230,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -1171,7 +1241,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
           { tabId: tabId3, depth: 0 },
@@ -1180,6 +1251,7 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -1187,38 +1259,43 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId3, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId3);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('グループタブが生成され子タブが正しく配置される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-            await sidePanelPage.bringToFront();
+      await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
@@ -1289,6 +1366,7 @@ test.describe('タブグループ化機能', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
@@ -1298,7 +1376,8 @@ test.describe('タブグループ化機能', () => {
       if (groupTabId) {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: pseudoSidePanelTabId, depth: 0 },
+          { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -1306,12 +1385,14 @@ test.describe('タブグループ化機能', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });

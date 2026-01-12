@@ -1,11 +1,15 @@
 import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
 import { waitForViewSwitcher } from './utils/polling-utils';
+import { getCurrentWindowId } from './utils/tab-utils';
+import { setupWindow } from './utils/setup-utils';
 
 extensionTest.describe('ビューアイコン選択即時反映', () => {
   extensionTest(
     'プリセットからアイコンを選択すると即座に反映される（Selectボタン不要）',
-    async ({ sidePanelPage }) => {
+    async ({ extensionContext, serviceWorker }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // ビュースイッチャーが表示されるまで待機
       await waitForViewSwitcher(sidePanelPage);
 
@@ -77,7 +81,9 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
   extensionTest(
     'アイコン選択後にツリービューパネル上のビューアイコンが即座に更新される',
-    async ({ sidePanelPage }) => {
+    async ({ extensionContext, serviceWorker }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // ビュースイッチャーが表示されるまで待機
       await waitForViewSwitcher(sidePanelPage);
 
@@ -156,7 +162,9 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
   extensionTest(
     'アイコン選択時にIconPickerが即座に閉じる（Selectボタン不要）',
-    async ({ sidePanelPage }) => {
+    async ({ extensionContext, serviceWorker }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // ビュースイッチャーが表示されるまで待機
       await waitForViewSwitcher(sidePanelPage);
 
@@ -218,7 +226,9 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
   extensionTest(
     '複数回アイコンを変更しても正しく反映される',
-    async ({ sidePanelPage }) => {
+    async ({ extensionContext, serviceWorker }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // ビュースイッチャーが表示されるまで待機
       await waitForViewSwitcher(sidePanelPage);
 

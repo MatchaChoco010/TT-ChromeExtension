@@ -1,22 +1,25 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, pinTab, unpinTab, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, pinTab, unpinTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
 import { waitForTabActive } from './utils/polling-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('ピン留めタブセクション', () => {
   test.describe('基本的な表示', () => {
     test('ピン留めタブが上部セクションに横並びで表示される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -24,6 +27,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -37,6 +41,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -45,21 +50,24 @@ test.describe('ピン留めタブセクション', () => {
     test('複数のピン留めタブが横並びで表示される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
@@ -67,6 +75,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await pinTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -74,6 +83,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await pinTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }, { tabId: tabId2 }], 0);
@@ -85,12 +95,14 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId2 }], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -99,15 +111,17 @@ test.describe('ピン留めタブセクション', () => {
     test('ピン留めを解除するとセクションから削除される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -115,6 +129,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -127,6 +142,7 @@ test.describe('ピン留めタブセクション', () => {
       await unpinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: tabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -138,6 +154,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -148,21 +165,24 @@ test.describe('ピン留めタブセクション', () => {
     test('ピン留めタブをクリックするとタブがアクティブ化する', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const pinnedTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: pinnedTabId, depth: 0 },
       ], 0);
 
       const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: pinnedTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
@@ -171,6 +191,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await pinTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
       ], 0);
@@ -200,6 +221,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, pinnedTabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
       ], 0);
@@ -207,6 +229,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, normalTabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -217,21 +240,24 @@ test.describe('ピン留めタブセクション', () => {
     test('ピン留めタブと通常タブの間に区切り線が表示される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -248,6 +274,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -255,16 +282,18 @@ test.describe('ピン留めタブセクション', () => {
 
     test('ピン留めタブが0件の場合は区切り線も非表示になる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
@@ -278,6 +307,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -288,21 +318,24 @@ test.describe('ピン留めタブセクション', () => {
     test('ピン留めタブはピン留めセクションにのみ表示され、ツリービューには表示されない', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -320,6 +353,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -330,21 +364,24 @@ test.describe('ピン留めタブセクション', () => {
     test('ピン留めタブを右クリックするとコンテキストメニューが表示される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -365,6 +402,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -373,21 +411,24 @@ test.describe('ピン留めタブセクション', () => {
     test('コンテキストメニューから「ピン留めを解除」を選択するとピン留めが解除される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
       await pinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
@@ -403,6 +444,7 @@ test.describe('ピン留めタブセクション', () => {
       await unpinMenuItem.click();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: tabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
@@ -418,6 +460,7 @@ test.describe('ピン留めタブセクション', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);

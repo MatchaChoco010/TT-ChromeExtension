@@ -1,7 +1,8 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getPseudoSidePanelTabId, getCurrentWindowId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { moveTabToParent } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('ドラッグ&ドロップによる階層変更（親子関係の作成）', () => {
   // Playwrightのmouse.moveは各ステップで約1秒かかるため、タイムアウトを延長
@@ -9,23 +10,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('タブを別のタブに重ねてドロップした場合、ドロップ先タブの子として配置されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -34,6 +37,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -46,23 +50,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('子タブを持たないタブに初めて子タブを追加した場合、親タブに展開/折りたたみアイコンが表示されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -75,6 +81,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -94,23 +101,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('折りたたまれた親タブに子タブをドロップした場合、親タブが自動的に展開されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const existingChild = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: existingChild, depth: 0 },
@@ -118,6 +127,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, existingChild, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: existingChild, depth: 1 },
@@ -129,12 +139,14 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await expandButton.click();
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: false },
     ], 0);
 
     const newChild = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: false },
       { tabId: newChild, depth: 0 },
@@ -142,6 +154,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, newChild, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: existingChild, depth: 1 },
@@ -151,23 +164,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('既に子を持つ親タブに新しい子をドロップした場合、子タブリストに追加されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const child1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
@@ -175,6 +190,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const newChild = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
@@ -183,6 +199,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
@@ -192,6 +209,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, newChild, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
@@ -201,23 +219,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('深い階層のタブを別の親にドロップした場合、depthが正しく再計算されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const rootTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
     ], 0);
 
     const parentTab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: parentTab1, depth: 0 },
@@ -225,6 +245,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: parentTab1, depth: 0 },
@@ -233,6 +254,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const grandChildTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: parentTab1, depth: 0 },
@@ -242,6 +264,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const parentTab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: parentTab1, depth: 0 },
@@ -252,6 +275,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, parentTab1, rootTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab1, depth: 1 },
@@ -262,6 +286,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, childTab, parentTab1, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab1, depth: 1, expanded: true },
@@ -272,6 +297,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, grandChildTab, childTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab1, depth: 1, expanded: true },
@@ -283,6 +309,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab2, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab1, depth: 1 },
@@ -294,23 +321,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('D&Dで親子関係を作成した後、新規タブを開いても既存の親子関係が維持されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/parent-dnd'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/child-dnd'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -319,6 +348,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -359,6 +389,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     const newTab = await createTab(serviceWorker, getTestServerUrl('/page'));
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -466,23 +497,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('D&Dで複数の親子関係を作成した後、新規タブを開いても全ての親子関係が維持されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parent1 = await createTab(serviceWorker, getTestServerUrl('/parent1-multi'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0 },
     ], 0);
 
     const child1 = await createTab(serviceWorker, getTestServerUrl('/child1-multi'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0 },
       { tabId: child1, depth: 0 },
@@ -490,6 +523,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const parent2 = await createTab(serviceWorker, getTestServerUrl('/parent2-multi'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0 },
       { tabId: child1, depth: 0 },
@@ -498,6 +532,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const child2 = await createTab(serviceWorker, getTestServerUrl('/child2-multi'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0 },
       { tabId: child1, depth: 0 },
@@ -507,6 +542,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, child1, parent1, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
@@ -516,6 +552,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     await moveTabToParent(sidePanelPage, child2, parent2, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
@@ -525,6 +562,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const newTab = await createTab(serviceWorker, getTestServerUrl('/new-tab-multi'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
@@ -590,23 +628,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('D&Dで親子関係を作成した後、別のタブを閉じても既存の親子関係が維持されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/parent-close'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/child-close'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -614,6 +654,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const unrelatedTab = await createTab(serviceWorker, getTestServerUrl('/unrelated-close'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -623,6 +664,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -632,6 +674,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await closeTab(serviceWorker, unrelatedTab);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -701,23 +744,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('D&Dで親子関係を作成した後、新しいウィンドウを開いても既存の親子関係が維持されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/parent-window'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/child-window'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -726,6 +771,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -797,6 +843,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     );
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -812,23 +859,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('D&Dで親子関係を作成した後、SYNC_TABSメッセージを送信しても既存の親子関係が維持されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/parent-sync'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/child-sync'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -837,6 +886,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -885,6 +935,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     );
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -896,23 +947,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
   test('ストレージが破損した場合、背景の正しい状態から復元されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/parent-recover'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/child-recover'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -921,6 +974,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -947,6 +1001,7 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },

@@ -2,7 +2,7 @@
  * Chrome拡張機能をPlaywrightでロードするためのカスタムフィクスチャ
  */
 import { test as base, chromium, type BrowserContext } from '@playwright/test';
-import type { Page, Worker } from '@playwright/test';
+import type { Worker } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -12,11 +12,13 @@ import { resetExtensionState } from '../utils/reset-utils';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * テストに公開するフィクスチャ
+ */
 export interface ExtensionFixtures {
   extensionContext: BrowserContext;
   extensionId: string;
   serviceWorker: Worker;
-  sidePanelPage: Page;
 }
 
 const getExtensionPath = () => {
@@ -182,34 +184,13 @@ const isWorkerAlive = async (worker: Worker, timeout: number = 2000): Promise<bo
 
 export const test = base.extend<TestFixtures, ExtensionFixtures>({
   // 自動リセットフィクスチャ: 各テスト前に状態をリセット
-  autoReset: [async ({ extensionContext, sidePanelPage, serviceWorker }, use, testInfo) => {
+  autoReset: [async ({ extensionContext, serviceWorker }, use, testInfo) => {
     const workerId = testInfo.parallelIndex;
     const testTitle = `${testInfo.file}:${testInfo.line} - ${testInfo.title}`;
     const prevTest = workerLastTest.get(workerId);
 
     try {
-      // テスト開始時にワーカー番号を出力
-      console.error(`\n[WORKER #${workerId}] TEST START: ${testInfo.title} (${testInfo.file}:${testInfo.line})`);
-
-      // テスト実行前にワーカースコープのフィクスチャが有効か検証
-      if (sidePanelPage.isClosed()) {
-        throw new Error(
-          'Fixture validation failed: sidePanelPage is closed. ' +
-          'The browser context may have become corrupted.'
-        );
-      }
-
       const workerAlive = await isWorkerAlive(serviceWorker, 3000);
-      console.error(`[WORKER #${workerId}] isWorkerAlive: ${workerAlive}`);
-
-      // Service Workerの参照が有効かも確認
-      const currentWorkers = extensionContext.serviceWorkers();
-      console.error(`[WORKER #${workerId}] Current serviceWorkers count: ${currentWorkers.length}`);
-      if (currentWorkers.length > 0) {
-        console.error(`[WORKER #${workerId}] Current SW URL: ${currentWorkers[0].url()}`);
-        const isSameWorker = currentWorkers[0] === serviceWorker;
-        console.error(`[WORKER #${workerId}] Is same worker reference: ${isSameWorker}`);
-      }
 
       if (!workerAlive) {
         throw new Error(
@@ -218,12 +199,9 @@ export const test = base.extend<TestFixtures, ExtensionFixtures>({
         );
       }
 
-      await resetExtensionState(serviceWorker, extensionContext, sidePanelPage);
+      await resetExtensionState(serviceWorker, extensionContext);
       workerLastTest.set(workerId, testTitle);
-      const testStartTime = Date.now();
       await use();
-      const testEndTime = Date.now();
-      console.error(`[WORKER #${workerId}] TEST END at ${new Date().toISOString()} (duration: ${testEndTime - testStartTime}ms)`);
     } catch (error) {
       const lastError = error instanceof Error ? error : new Error(String(error));
       console.error('\n=== RESET FAILED ===');
@@ -268,7 +246,7 @@ export const test = base.extend<TestFixtures, ExtensionFixtures>({
     await use(extensionId);
   }, { scope: 'worker' }],
 
-  serviceWorker: [async ({ extensionContext }, use, workerInfo) => {
+  serviceWorker: [async ({ extensionContext }, use) => {
     const workers = extensionContext.serviceWorkers();
 
     if (workers.length === 0) {
@@ -278,82 +256,9 @@ export const test = base.extend<TestFixtures, ExtensionFixtures>({
     }
 
     const worker = workers[0];
-    const workerIndex = workerInfo.parallelIndex;
-
-    worker.on('close', () => {
-      console.error(`\n[WORKER #${workerIndex}] Service Worker CLOSED at ${new Date().toISOString()}`);
-    });
-
-    extensionContext.on('serviceworker', (newWorker) => {
-      console.error(`\n[WORKER #${workerIndex}] NEW Service Worker created at ${new Date().toISOString()}`);
-      console.error(`[WORKER #${workerIndex}] URL: ${newWorker.url()}`);
-      console.error(`[WORKER #${workerIndex}] This may indicate the Service Worker was restarted.`);
-    });
 
     await use(worker);
   }, { scope: 'worker' }],
-
-  sidePanelPage: [async ({ extensionContext, extensionId, serviceWorker }, use) => {
-    const currentWindow = await serviceWorker.evaluate(() => chrome.windows.getCurrent());
-    const page = await extensionContext.newPage();
-
-    await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${currentWindow.id}`);
-    await page.waitForLoadState('domcontentloaded');
-
-    try {
-      await page.waitForSelector('#root', { timeout: 5000 });
-    } catch (error) {
-      await page.screenshot({
-        path: 'test-results/sidepanel-load-error.png',
-      });
-      throw new Error(
-        `Failed to load Side Panel. Root element not found. Screenshot saved to test-results/sidepanel-load-error.png. Error: ${error}`
-      );
-    }
-
-    await serviceWorker.evaluate(async () => {
-      for (let i = 0; i < 50; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
-        if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
-          break;
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    });
-
-    await serviceWorker.evaluate(async () => {
-      await new Promise<void>((resolve) => {
-        chrome.runtime.sendMessage({ type: 'SYNC_TABS' }, () => {
-          resolve();
-        });
-      });
-    });
-
-    await serviceWorker.evaluate(async () => {
-      await chrome.storage.local.set({
-        user_settings: {
-          fontSize: 14,
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          customCSS: '',
-          newTabPosition: 'end',
-          newTabPositionManual: 'end',
-          newTabPositionFromLink: 'child',
-          duplicateTabPosition: 'sibling',
-          closeWarningThreshold: 10,
-          showUnreadIndicator: true,
-          autoSnapshotInterval: 0,
-          childTabBehavior: 'promote',
-        },
-      });
-    });
-
-    await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
-
-    await use(page);
-  }, { scope: 'worker' }],
 });
-
-// Note: beforeEach is replaced by autoReset auto-fixture above
 
 export { expect } from '@playwright/test';

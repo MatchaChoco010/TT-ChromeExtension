@@ -5,10 +5,10 @@ import {
   createTab,
   closeTab,
   getCurrentWindowId,
-  getPseudoSidePanelTabId,
   getTestServerUrl,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 /**
  * 設定ページを新規タブで開くヘルパー関数
@@ -27,24 +27,19 @@ async function openSettingsInNewTab(
 test.describe('UI表示の一貫性', () => {
   test.describe('フォントサイズ設定の反映', () => {
     test('フォントサイズを変更するとタブタイトルのフォントサイズが変更される', async ({
-      sidePanelPage,
       extensionContext,
       extensionId,
       serviceWorker,
     }) => {
-      // 初期化: ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // タブを作成してツリーに表示されるまで待機
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
@@ -89,29 +84,25 @@ test.describe('UI表示の一貫性', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('フォントサイズのプリセットボタンでタブタイトルのサイズが変わる', async ({
-      sidePanelPage,
       extensionContext,
       extensionId,
       serviceWorker,
     }) => {
-      // 初期化: ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // タブを作成してツリーに表示されるまで待機
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
@@ -149,15 +140,18 @@ test.describe('UI表示の一貫性', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('フォントサイズ変更後にページをリロードしても設定が保持される', async ({
-      sidePanelPage,
       extensionContext,
       extensionId,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // Arrange: Side Panelが表示されていることを確認
       await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
         timeout: COMMON_TIMEOUTS.long,
@@ -199,8 +193,11 @@ test.describe('UI表示の一貫性', () => {
 
   test.describe('スタートページタイトルの表示', () => {
     test('スタートページURLのタイトル変換ロジックが正しく実装されている', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // Arrange: Side Panelが表示されていることを確認
       await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
         timeout: COMMON_TIMEOUTS.long,
@@ -279,8 +276,11 @@ test.describe('UI表示の一貫性', () => {
     });
 
     test('新しいタブのURL判定ロジックが正しく動作する', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // Arrange: Side Panelが表示されていることを確認
       await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
         timeout: COMMON_TIMEOUTS.long,
@@ -323,18 +323,12 @@ test.describe('UI表示の一貫性', () => {
     });
 
     test('通常のWebサイトはそのままのタイトルで表示される', async ({
-      sidePanelPage,
       extensionContext,
       serviceWorker,
     }) => {
-      // 初期化: ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange: Side Panelが表示されていることを確認
       await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
@@ -344,7 +338,8 @@ test.describe('UI表示の一貫性', () => {
       // Act: 通常のWebサイトタブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
@@ -370,23 +365,18 @@ test.describe('UI表示の一貫性', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('ローディング中のタブは「Loading...」と表示され、完了後に正しいタイトルになる', async ({
-      sidePanelPage,
       extensionContext,
       serviceWorker,
     }) => {
-      // 初期化: ウィンドウIDと擬似サイドパネルタブIDを取得
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      // ブラウザ起動時のデフォルトタブを閉じる
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange: Side Panelが表示されていることを確認
       await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
@@ -396,7 +386,8 @@ test.describe('UI表示の一貫性', () => {
       // Act: タブを作成（ローディング状態を経る）
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
@@ -427,7 +418,8 @@ test.describe('UI表示の一貫性', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });

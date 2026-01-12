@@ -2,23 +2,24 @@ import { test, expect } from './fixtures/extension';
 import {
   createTab,
   closeTab,
-  getCurrentWindowId,
-  getPseudoSidePanelTabId,
   getTestServerUrl,
+  getCurrentWindowId,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('タブの休止機能', () => {
   test('コンテキストメニューに「タブを休止」オプションが表示される', async ({
     extensionContext,
     serviceWorker,
-    sidePanelPage,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
@@ -36,15 +37,21 @@ test.describe('タブの休止機能', () => {
   test('複数タブ選択時にコンテキストメニューに件数が表示される', async ({
     extensionContext,
     serviceWorker,
-    sidePanelPage,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
-    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
-
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },

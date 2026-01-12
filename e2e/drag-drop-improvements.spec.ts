@@ -1,7 +1,8 @@
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId } from './utils/tab-utils';
+import { createTab, getCurrentWindowId } from './utils/tab-utils';
 import { startDrag, hoverOverTab, dropTab } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 import type { Page } from '@playwright/test';
 
 async function getTabNodeBoundingBox(
@@ -23,24 +24,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
   test.describe('隙間ドロップのインジケーター表示', () => {
     test('タブとタブの間にドラッグすると、ドロップインジケーターが表示されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -48,6 +47,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
       const tab3 = await createTab(serviceWorker, 'data:text/html,<h1>Tab3</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -71,6 +71,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab3, depth: 0 },
@@ -80,24 +81,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
     test('タブの上にホバーするとタブがハイライト表示されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -113,6 +112,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0, expanded: true },
         { tabId: tab2, depth: 1 },
@@ -123,24 +123,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
   test.describe('ドラッグ中のタブ位置固定', () => {
     test('ドラッグ中に他のタブの表示位置が変更されないこと', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -148,6 +146,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
       const tab3 = await createTab(serviceWorker, 'data:text/html,<h1>Tab3</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -156,6 +155,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
       const tab4 = await createTab(serviceWorker, 'data:text/html,<h1>Tab4</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -173,6 +173,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0, expanded: true },
         { tabId: tab4, depth: 1 },
@@ -183,24 +184,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
     test('ドロップ時にのみツリー構造が再構築されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -208,6 +207,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
       const tab3 = await createTab(serviceWorker, 'data:text/html,<h1>Tab3</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -233,6 +233,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0, expanded: true },
         { tabId: tab3, depth: 1 },
@@ -244,24 +245,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
   test.describe('ドラッグ中の横スクロール防止', () => {
     test('ドラッグ中にoverflow-x: hiddenが適用されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -275,6 +274,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -283,24 +283,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
     test('ドラッグ中にマウスを左右に動かしてもビューが横スクロールしないこと', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -318,6 +316,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -326,24 +325,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
     test('ドラッグ終了後に通常のスクロール動作が復元されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, 'data:text/html,<h1>Tab1</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, 'data:text/html,<h1>Tab2</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -356,6 +353,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -366,24 +364,22 @@ test.describe('ドラッグ&ドロップ改善', () => {
   test.describe('depthの視覚的フィードバック', () => {
     test('子タブをドラッグして隙間にホバーするとインジケーターがdepthに応じてインデントされること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTab = await createTab(serviceWorker, 'data:text/html,<h1>Parent</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, 'data:text/html,<h1>Child</h1>', parentTab);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
@@ -391,6 +387,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
 
       const siblingTab = await createTab(serviceWorker, 'data:text/html,<h1>Sibling</h1>');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
@@ -411,6 +408,7 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await dropTab(sidePanelPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: siblingTab, depth: 1 },

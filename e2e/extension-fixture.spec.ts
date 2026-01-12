@@ -3,7 +3,8 @@
  */
 import { test, expect } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
-import { getTestServerUrl } from './utils/tab-utils';
+import { getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe.serial('ExtensionFixture', () => {
   test('拡張機能がロードされ、Extension IDが取得できること', async ({
@@ -32,9 +33,12 @@ test.describe.serial('ExtensionFixture', () => {
   });
 
   test('Side Panelページが正しく開けること', async ({
-    sidePanelPage,
+    extensionContext,
     extensionId,
+    serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     const fullUrl = sidePanelPage.url();
     const baseUrl = `chrome-extension://${extensionId}/sidepanel.html`;
     expect(fullUrl).toContain(baseUrl);
@@ -43,9 +47,9 @@ test.describe.serial('ExtensionFixture', () => {
     const queryString = fullUrl.split('?')[1] || '';
     const params = new URLSearchParams(queryString);
     expect(params.has('windowId')).toBe(true);
-    const windowId = params.get('windowId');
-    expect(windowId).toBeTruthy();
-    expect(Number(windowId)).toBeGreaterThan(0);
+    const urlWindowId = params.get('windowId');
+    expect(urlWindowId).toBeTruthy();
+    expect(Number(urlWindowId)).toBeGreaterThan(0);
 
     await waitForCondition(
       async () => {

@@ -93,17 +93,12 @@ export const useMenuActions = () => {
 
         case 'discard':
           {
-            console.log('[DISCARD DEBUG] Starting discard action with tabIds:', tabIds);
             const tabs = await chrome.tabs.query({ currentWindow: true });
-            console.log('[DISCARD DEBUG] Current window tabs:', tabs.map(t => ({ id: t.id, url: t.url, active: t.active })));
             const activeTab = tabs.find(tab => tab.active);
-            console.log('[DISCARD DEBUG] Active tab:', activeTab?.id, activeTab?.url);
             const tabIdSet = new Set(tabIds);
-            console.log('[DISCARD DEBUG] tabIdSet:', [...tabIdSet]);
 
             // アクティブタブは休止できないため、先に別のタブをアクティブにする
             if (activeTab?.id && tabIdSet.has(activeTab.id)) {
-              console.log('[DISCARD DEBUG] Active tab is in discard set, finding alternative...');
               const alternativeTab = tabs.find(tab =>
                 tab.id &&
                 !tabIdSet.has(tab.id) &&
@@ -117,34 +112,21 @@ export const useMenuActions = () => {
                 !tab.discarded
               );
 
-              console.log('[DISCARD DEBUG] Alternative tab:', alternativeTabWithPinned?.id, alternativeTabWithPinned?.url);
               if (alternativeTabWithPinned?.id) {
                 await chrome.tabs.update(alternativeTabWithPinned.id, { active: true });
-                console.log('[DISCARD DEBUG] Activated alternative tab');
               }
-            } else {
-              console.log('[DISCARD DEBUG] Active tab is NOT in discard set, skipping tab switch');
             }
 
-            console.log('[DISCARD DEBUG] Starting discard loop for:', tabIds);
             for (const tabId of tabIds) {
-              console.log('[DISCARD DEBUG] Processing tabId:', tabId);
               try {
                 const tab = await chrome.tabs.get(tabId);
-                console.log('[DISCARD DEBUG] Tab info:', { id: tab.id, url: tab.url, active: tab.active });
                 if (!tab.active) {
-                  console.log('[DISCARD DEBUG] Discarding tab:', tabId);
                   await chrome.tabs.discard(tabId);
-                  console.log('[DISCARD DEBUG] Successfully discarded tab:', tabId);
-                } else {
-                  console.log('[DISCARD DEBUG] Skipping active tab:', tabId);
                 }
-              } catch (_err) {
-                console.log('[DISCARD DEBUG] Error discarding tab:', tabId, _err);
+              } catch {
                 // タブが既に休止されている場合などはエラーを無視
               }
             }
-            console.log('[DISCARD DEBUG] Discard action completed');
           }
           break;
 

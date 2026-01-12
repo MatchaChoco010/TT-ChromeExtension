@@ -1,7 +1,8 @@
 import { test, expect } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 import './types';
 
 test.describe('Tab Persistence', () => {
@@ -9,15 +10,16 @@ test.describe('Tab Persistence', () => {
     test('タブのタイトルがストレージに永続化されること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. タブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -58,22 +60,24 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('ファビコンがストレージに永続化されること（直接設定）', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. タブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -101,7 +105,8 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -110,21 +115,23 @@ test.describe('Tab Persistence', () => {
     test('ツリーに表示されるタブ数が実際のブラウザタブ数と一致すること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. 複数のタブを作成
-      const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
@@ -162,28 +169,31 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tab1Id);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tab2Id);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
     test('存在しないタブがツリーに表示されないこと', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. 正常なタブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -209,7 +219,8 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -218,15 +229,16 @@ test.describe('Tab Persistence', () => {
     test('タブ内でのページ遷移時にタイトルの永続化データが更新されること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. about:blankタブを作成（タイトルは空）
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: true });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -269,7 +281,8 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -278,15 +291,16 @@ test.describe('Tab Persistence', () => {
     test('ファビコンが変更された際に永続化データが更新されること（直接設定）', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. タブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: true });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -335,7 +349,8 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -344,15 +359,16 @@ test.describe('Tab Persistence', () => {
     test('タブを閉じた際にタイトルの永続化データが削除されること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. タブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -373,7 +389,8 @@ test.describe('Tab Persistence', () => {
       const closedTabId = tabId;
       await closeTab(serviceWorker, closedTabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       // 4. タイトルがストレージから削除されるまで待機
@@ -402,15 +419,16 @@ test.describe('Tab Persistence', () => {
     test('タブを閉じた際にファビコンの永続化データが削除されること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. タブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -438,7 +456,8 @@ test.describe('Tab Persistence', () => {
       const closedTabId = tabId;
       await closeTab(serviceWorker, closedTabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       // 5. ファビコンをクリーンアップ（実際の実装ではonRemovedイベントで自動的に行われる）
@@ -463,15 +482,16 @@ test.describe('Tab Persistence', () => {
     test('ストレージ内のゴーストタブが起動時にクリーンアップされること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. 正常なタブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -618,7 +638,8 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -627,21 +648,23 @@ test.describe('Tab Persistence', () => {
     test('複数タブの作成・更新・削除が正しく永続化されること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. 複数タブを作成
-      const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
       ], 0);
 
-      const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tab2Id = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1Id, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
@@ -666,7 +689,8 @@ test.describe('Tab Persistence', () => {
       // 3. 1つのタブを閉じる
       await closeTab(serviceWorker, tab1Id);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
@@ -694,7 +718,8 @@ test.describe('Tab Persistence', () => {
       // クリーンアップ
       await closeTab(serviceWorker, tab2Id);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });

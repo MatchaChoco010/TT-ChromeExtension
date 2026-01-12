@@ -8,15 +8,19 @@ import {
   assertEventListenersRegistered,
   assertServiceWorkerLifecycle,
 } from './utils/service-worker-utils';
-import { closeTab, getCurrentWindowId, getPseudoSidePanelTabId, createTab, getTestServerUrl } from './utils/tab-utils';
+import { closeTab, createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 import './types';
 
 test.describe('ServiceWorkerUtils', () => {
   test.describe('sendMessageToServiceWorker', () => {
     test('Service Workerに既存のメッセージタイプを送信できること', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       const message = { type: 'GET_STATE' };
       const response = await sendMessageToServiceWorker(sidePanelPage, message);
 
@@ -25,16 +29,17 @@ test.describe('ServiceWorkerUtils', () => {
     });
 
     test('Service Workerから正しいレスポンスを受信できること', async ({
-      sidePanelPage,
-      serviceWorker,
       extensionContext,
+      serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
@@ -47,11 +52,17 @@ test.describe('ServiceWorkerUtils', () => {
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
-    test('タイムアウト時にエラーをスローすること', async ({ sidePanelPage }) => {
+    test('タイムアウト時にエラーをスローすること', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       const message = { type: 'UNKNOWN_TYPE' };
 
       await expect(
@@ -152,8 +163,11 @@ test.describe('ServiceWorkerUtils', () => {
 
   test.describe('統合テスト: Service Workerとの双方向通信', () => {
     test('Side PanelからService Workerへのメッセージ送信とレスポンス受信', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       const response = await sidePanelPage.evaluate(async () => {
         return new Promise((resolve) => {
           chrome.runtime.sendMessage(
@@ -171,9 +185,11 @@ test.describe('ServiceWorkerUtils', () => {
     });
 
     test('Service WorkerからSide Panelへのメッセージ送信', async ({
-      sidePanelPage,
+      extensionContext,
       serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await sidePanelPage.evaluate(() => {
         return new Promise<void>((resolve) => {
           window.receivedMessages = [];
@@ -223,8 +239,11 @@ test.describe('ServiceWorkerUtils', () => {
 
   test.describe('エラーハンドリング', () => {
     test('無効なメッセージ形式でエラーハンドリングできること', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       // @ts-expect-error - 意図的に無効なnullを渡してエラーハンドリングをテスト
       const invalidMessage: Record<string, unknown> = null;
 
@@ -234,8 +253,11 @@ test.describe('ServiceWorkerUtils', () => {
     });
 
     test('Service Workerが応答しない場合のタイムアウト処理', async ({
-      sidePanelPage,
+      extensionContext,
+      serviceWorker,
     }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       let errorThrown = false;
       try {
         await sendMessageToServiceWorker(

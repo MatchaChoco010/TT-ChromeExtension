@@ -1,9 +1,10 @@
 import { test } from './fixtures/extension';
 import type { Worker } from '@playwright/test';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { waitForCondition } from './utils/polling-utils';
 import { moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('ツリー→Chromeタブ同期テスト', () => {
   test.setTimeout(120000);
@@ -23,20 +24,22 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
   test.describe('子タブ配置後のChrome同期', () => {
     test('タブを子として配置した後、Chromeタブインデックスが深さ優先順になること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -44,6 +47,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -52,6 +56,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await moveTabToParent(sidePanelPage, tabB, tabA);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1 },
@@ -72,20 +77,22 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
     test('ネストした子タブを作成した場合、Chromeタブインデックスが深さ優先順になること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -93,6 +100,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -101,6 +109,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabD = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -110,6 +119,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await moveTabToParent(sidePanelPage, tabB, tabA);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1 },
@@ -119,6 +129,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await moveTabToParent(sidePanelPage, tabC, tabB);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1, expanded: true },
@@ -143,20 +154,22 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
   test.describe('兄弟配置後のChrome同期', () => {
     test('タブを兄弟として並び替えた後、Chromeタブインデックスが更新されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -164,6 +177,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -172,6 +186,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await reorderTabs(sidePanelPage, tabC, tabA, 'before');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabC, depth: 0 },
         { tabId: tabA, depth: 0 },
@@ -194,20 +209,22 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
   test.describe('サブツリー移動後のChrome同期', () => {
     test('サブツリーを移動した後、子タブも含めてChromeタブインデックスが更新されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -215,6 +232,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -223,6 +241,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabD = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -232,6 +251,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await moveTabToParent(sidePanelPage, tabC, tabB);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0, expanded: true },
@@ -241,6 +261,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await reorderTabs(sidePanelPage, tabB, tabD, 'after');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabD, depth: 0 },
@@ -265,20 +286,22 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
   test.describe('ツリービューとChromeタブの順序一致確認', () => {
     test('ドラッグ操作後、ツリービューの表示順序とChromeタブインデックスが一致すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -286,6 +309,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -294,6 +318,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabD = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -303,6 +328,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       const tabE = await createTab(serviceWorker, getTestServerUrl('/page5'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -313,6 +339,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await moveTabToParent(sidePanelPage, tabB, tabA);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1 },
@@ -323,6 +350,7 @@ test.describe('ツリー→Chromeタブ同期テスト', () => {
 
       await moveTabToParent(sidePanelPage, tabC, tabB);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1, expanded: true },

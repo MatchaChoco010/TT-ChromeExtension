@@ -1,7 +1,8 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { waitForTabStatusComplete } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 // chrome.tabs.discard() を Playwright から呼び出すと Chrome がクラッシュするため、
 // このテストは常にスキップする。
@@ -10,25 +11,22 @@ import { assertTabStructure } from './utils/assertion-utils';
 // chrome://crashes で確認済み。
 test.describe.skip('休止タブの視覚的区別', () => {
   test('休止状態のタブはグレーアウト表示される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
-
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
 
     // アクティブタブは休止できないため、代替タブを先に作成してアクティブにしておく
     const alternativeTabId = await createTab(serviceWorker, getTestServerUrl('/page1'), undefined, {
       active: true,
     });
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: alternativeTabId, depth: 0 },
     ], 0);
@@ -39,6 +37,7 @@ test.describe.skip('休止タブの視覚的区別', () => {
       active: false,
     });
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: alternativeTabId, depth: 0 },
       { tabId, depth: 0 },
@@ -65,25 +64,22 @@ test.describe.skip('休止タブの視覚的区別', () => {
   });
 
   test('休止タブをアクティブ化するとグレーアウトが解除される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
-
-    const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-    ], 0);
 
     // アクティブタブは休止できないため、代替タブを先に作成してアクティブにしておく
     const alternativeTabId = await createTab(serviceWorker, getTestServerUrl('/page1'), undefined, {
       active: true,
     });
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: alternativeTabId, depth: 0 },
     ], 0);
@@ -94,6 +90,7 @@ test.describe.skip('休止タブの視覚的区別', () => {
       active: false,
     });
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: alternativeTabId, depth: 0 },
       { tabId, depth: 0 },

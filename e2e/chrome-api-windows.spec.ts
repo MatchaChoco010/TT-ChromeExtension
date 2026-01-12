@@ -1,52 +1,58 @@
 import { test, expect } from './fixtures/extension';
-import { createWindow, openSidePanelForWindow } from './utils/window-utils';
-import { createTab, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { createWindow } from './utils/window-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure, assertWindowClosed, assertWindowExists } from './utils/assertion-utils';
+import { setupWindow, createAndSetupWindow } from './utils/setup-utils';
 
 test.describe('chrome.windows API統合', () => {
   test('chrome.windows.create()で新しいウィンドウを作成した場合、新しいウィンドウコンテキストが確立される', async ({
-    sidePanelPage,
-    extensionContext,
-  }) => {
-    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
-    await expect(sidePanelRoot).toBeVisible();
-
-    const windowId = await createWindow(extensionContext);
-
-    await assertWindowExists(extensionContext, windowId);
-  });
-
-  test('chrome.windows.remove()でウィンドウを閉じた場合、ウィンドウ内の全タブがツリーから削除される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const mainWindowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, mainWindowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await createWindow(extensionContext);
+    const newWindowId = await createWindow(extensionContext);
 
-    await assertWindowExists(extensionContext, windowId);
+    await assertWindowExists(extensionContext, newWindowId);
+  });
 
-    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, windowId);
+  test('chrome.windows.remove()でウィンドウを閉じた場合、ウィンドウ内の全タブがツリーから削除される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const mainWindowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, mainWindowId);
 
-    const newWindowPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-    const newWindowInitialTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
+    await expect(sidePanelRoot).toBeVisible();
 
-    await assertTabStructure(newWindowSidePanel, windowId, [
+    const {
+      windowId: newWindowId,
+      initialBrowserTabId: newWindowInitialTabId,
+      sidePanelPage: newWindowSidePanel,
+      pseudoSidePanelTabId: newWindowPseudoSidePanelTabId,
+    } = await createAndSetupWindow(extensionContext, serviceWorker);
+
+    await assertWindowExists(extensionContext, newWindowId);
+
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), { windowId, active: false });
-    await assertTabStructure(newWindowSidePanel, windowId, [
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), { windowId: newWindowId, active: false });
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'), { windowId, active: false });
-    await assertTabStructure(newWindowSidePanel, windowId, [
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'), { windowId: newWindowId, active: false });
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
       { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -57,26 +63,28 @@ test.describe('chrome.windows API統合', () => {
 
     await serviceWorker.evaluate((wId) => {
       return chrome.windows.remove(wId);
-    }, windowId);
+    }, newWindowId);
 
-    await assertWindowClosed(extensionContext, windowId);
+    await assertWindowClosed(extensionContext, newWindowId);
   });
 
   test('chrome.windows.update()でウィンドウをフォーカスした場合、フォーカス状態が正しく更新される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const mainWindowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, mainWindowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId = await createWindow(extensionContext);
+    const newWindowId = await createWindow(extensionContext);
 
-    await assertWindowExists(extensionContext, windowId);
+    await assertWindowExists(extensionContext, newWindowId);
 
     await serviceWorker.evaluate((wId) => {
       return chrome.windows.update(wId, { focused: true });
-    }, windowId);
+    }, newWindowId);
 
     await expect
       .poll(
@@ -84,7 +92,7 @@ test.describe('chrome.windows API統合', () => {
           const windows = await serviceWorker.evaluate(() => {
             return chrome.windows.getAll();
           });
-          const focusedWindow = windows.find((win: chrome.windows.Window) => win.id === windowId);
+          const focusedWindow = windows.find((win: chrome.windows.Window) => win.id === newWindowId);
           return focusedWindow?.focused;
         },
         {
@@ -96,10 +104,12 @@ test.describe('chrome.windows API統合', () => {
   });
 
   test('chrome.windows.getAll()で全ウィンドウを取得した場合、全ウィンドウのタブが正しく列挙される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const mainWindowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, mainWindowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
@@ -125,26 +135,31 @@ test.describe('chrome.windows API統合', () => {
   });
 
   test('複数ウィンドウが存在する場合、各ウィンドウのタブツリーが独立して管理される', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId1 = await createWindow(extensionContext);
-    const windowId2 = await createWindow(extensionContext);
+    const {
+      windowId: windowId1,
+      initialBrowserTabId: initialTabId1,
+      sidePanelPage: sidePanel1,
+      pseudoSidePanelTabId: pseudoSidePanelTabId1,
+    } = await createAndSetupWindow(extensionContext, serviceWorker);
+
+    const {
+      windowId: windowId2,
+      initialBrowserTabId: initialTabId2,
+      sidePanelPage: sidePanel2,
+      pseudoSidePanelTabId: pseudoSidePanelTabId2,
+    } = await createAndSetupWindow(extensionContext, serviceWorker);
 
     await assertWindowExists(extensionContext, windowId1);
     await assertWindowExists(extensionContext, windowId2);
-
-    const sidePanel1 = await openSidePanelForWindow(extensionContext, windowId1);
-    const sidePanel2 = await openSidePanelForWindow(extensionContext, windowId2);
-
-    const pseudoSidePanelTabId1 = await getPseudoSidePanelTabId(serviceWorker, windowId1);
-    const initialTabId1 = await getInitialBrowserTabId(serviceWorker, windowId1);
-    const pseudoSidePanelTabId2 = await getPseudoSidePanelTabId(serviceWorker, windowId2);
-    const initialTabId2 = await getInitialBrowserTabId(serviceWorker, windowId2);
 
     await assertTabStructure(sidePanel1, windowId1, [
       { tabId: initialTabId1, depth: 0 },

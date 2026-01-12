@@ -1,17 +1,18 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('新規タブ追加ボタン', () => {
   test.describe('新規タブ追加ボタンの存在', () => {
     test('新規タブ追加ボタンがサイドパネルに表示される', async ({
-      sidePanelPage,
       extensionContext,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
@@ -21,12 +22,12 @@ test.describe('新規タブ追加ボタン', () => {
     });
 
     test('新規タブ追加ボタンがツリービューの横幅いっぱいの幅を持つ', async ({
-      sidePanelPage,
       extensionContext,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
@@ -53,99 +54,10 @@ test.describe('新規タブ追加ボタン', () => {
     test('新規タブ追加ボタンをクリックすると新しいタブが作成される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
-      await newTabButton.click();
-
-      let newTabId: number | undefined;
-      await waitForCondition(
-        async () => {
-          const tabs = await serviceWorker.evaluate(async (wId) => {
-            const extensionId = chrome.runtime.id;
-            const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
-            const allTabs = await chrome.tabs.query({ windowId: wId });
-            return allTabs.filter(t => {
-              const url = t.url || t.pendingUrl || '';
-              return !url.startsWith(sidePanelUrlPrefix);
-            });
-          }, windowId);
-          if (tabs.length > 0) {
-            newTabId = tabs[tabs.length - 1]?.id;
-            return true;
-          }
-          return false;
-        },
-        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
-      );
-
-      await waitForTabInTreeState(serviceWorker, newTabId!);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: newTabId!, depth: 0 },
-      ], 0);
-    });
-
-    test('新規タブ追加ボタンをクリックすると新しいタブがアクティブになる', async ({
-      extensionContext,
-      serviceWorker,
-      sidePanelPage,
-    }) => {
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
-      await newTabButton.click();
-
-      let newTabId: number | undefined;
-      await waitForCondition(
-        async () => {
-          const tabs = await serviceWorker.evaluate(async (wId) => {
-            const extensionId = chrome.runtime.id;
-            const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
-            const allTabs = await chrome.tabs.query({ windowId: wId });
-            return allTabs.filter(t => {
-              const url = t.url || t.pendingUrl || '';
-              return !url.startsWith(sidePanelUrlPrefix);
-            });
-          }, windowId);
-          if (tabs.length > 0) {
-            newTabId = tabs[tabs.length - 1]?.id;
-            return true;
-          }
-          return false;
-        },
-        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
-      );
-
-      await waitForTabInTreeState(serviceWorker, newTabId!);
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: newTabId!, depth: 0 },
-      ], 0);
-    });
-  });
-
-  test.describe('新規タブがツリー末尾に配置される', () => {
-    test('新規タブはツリーの末尾（最後の位置）に追加される', async ({
-      extensionContext,
-      serviceWorker,
-      sidePanelPage,
-    }) => {
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
-
-      const existingTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-        { tabId: existingTabId, depth: 0 },
-      ], 0);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
@@ -163,6 +75,98 @@ test.describe('新規タブ追加ボタン', () => {
             });
           }, windowId);
           if (tabs.length > 1) {
+            newTabId = tabs[tabs.length - 1]?.id;
+            return true;
+          }
+          return false;
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
+      );
+
+      await waitForTabInTreeState(serviceWorker, newTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId!, depth: 0 },
+      ], 0);
+    });
+
+    test('新規タブ追加ボタンをクリックすると新しいタブがアクティブになる', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
+      await newTabButton.click();
+
+      let newTabId: number | undefined;
+      await waitForCondition(
+        async () => {
+          const tabs = await serviceWorker.evaluate(async (wId) => {
+            const extensionId = chrome.runtime.id;
+            const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
+            const allTabs = await chrome.tabs.query({ windowId: wId });
+            return allTabs.filter(t => {
+              const url = t.url || t.pendingUrl || '';
+              return !url.startsWith(sidePanelUrlPrefix);
+            });
+          }, windowId);
+          if (tabs.length > 1) {
+            newTabId = tabs[tabs.length - 1]?.id;
+            return true;
+          }
+          return false;
+        },
+        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
+      );
+
+      await waitForTabInTreeState(serviceWorker, newTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: newTabId!, depth: 0 },
+      ], 0);
+    });
+  });
+
+  test.describe('新規タブがツリー末尾に配置される', () => {
+    test('新規タブはツリーの末尾（最後の位置）に追加される', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      const existingTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: existingTabId, depth: 0 },
+      ], 0);
+
+      const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
+      await newTabButton.click();
+
+      let newTabId: number | undefined;
+      await waitForCondition(
+        async () => {
+          const tabs = await serviceWorker.evaluate(async (wId) => {
+            const extensionId = chrome.runtime.id;
+            const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
+            const allTabs = await chrome.tabs.query({ windowId: wId });
+            return allTabs.filter(t => {
+              const url = t.url || t.pendingUrl || '';
+              return !url.startsWith(sidePanelUrlPrefix);
+            });
+          }, windowId);
+          if (tabs.length > 2) {
             const activeTab = await serviceWorker.evaluate(async () => {
               const tabs = await chrome.tabs.query({ active: true });
               return tabs[0];
@@ -178,6 +182,7 @@ test.describe('新規タブ追加ボタン', () => {
       await waitForTabInTreeState(serviceWorker, newTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: existingTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
@@ -187,10 +192,10 @@ test.describe('新規タブ追加ボタン', () => {
     test('複数回クリックすると複数のタブが順番に末尾に追加される', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
       await newTabButton.click();
@@ -207,7 +212,7 @@ test.describe('新規タブ追加ボタン', () => {
               return !url.startsWith(sidePanelUrlPrefix);
             });
           }, windowId);
-          if (tabs.length > 0) {
+          if (tabs.length > 1) {
             firstNewTabId = tabs[tabs.length - 1]?.id;
             return true;
           }
@@ -219,6 +224,7 @@ test.describe('新規タブ追加ボタン', () => {
       await waitForTabInTreeState(serviceWorker, firstNewTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstNewTabId!, depth: 0 },
       ], 0);
@@ -237,7 +243,7 @@ test.describe('新規タブ追加ボタン', () => {
               return !url.startsWith(sidePanelUrlPrefix);
             });
           }, windowId);
-          if (tabs.length > 1) {
+          if (tabs.length > 2) {
             const activeTab = await serviceWorker.evaluate(async () => {
               const tabs = await chrome.tabs.query({ active: true });
               return tabs[0];
@@ -253,6 +259,7 @@ test.describe('新規タブ追加ボタン', () => {
       await waitForTabInTreeState(serviceWorker, secondNewTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstNewTabId!, depth: 0 },
         { tabId: secondNewTabId!, depth: 0 },

@@ -231,7 +231,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
 
   const handleDragStartRef = useRef<(e: DragEvent) => void>((e: DragEvent) => {
     e.preventDefault();
-    console.log('[useDragDrop] dragstart prevented');
   });
 
   const handlersRef = useRef<{
@@ -451,15 +450,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
   useEffect(() => {
     const handleMessage = (message: { type: string }) => {
       if (message.type === 'DRAG_SESSION_ENDED') {
-        console.log('[useDragDrop] DRAG_SESSION_ENDED received', {
-          isDragging: dragStateRef.current.isDragging,
-          isPotentialDrag: dragStateRef.current.isPotentialDrag,
-          draggedItemId: dragStateRef.current.draggedItemId,
-          draggedTabId: dragStateRef.current.draggedTabId,
-        });
         const currentState = dragStateRef.current;
         if (currentState.isDragging || currentState.isPotentialDrag) {
-          console.log('[useDragDrop] Resetting drag state due to DRAG_SESSION_ENDED');
           document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
           document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
           document.removeEventListener('dragstart', handleDragStartRef.current);

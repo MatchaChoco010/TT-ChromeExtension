@@ -1,8 +1,9 @@
 import { test } from './fixtures/extension';
 import type { Worker } from '@playwright/test';
-import { createTab, refreshSidePanel, getCurrentWindowId, getPseudoSidePanelTabId } from './utils/tab-utils';
+import { createTab, refreshSidePanel, getCurrentWindowId } from './utils/tab-utils';
 import { startDrag, hoverOverTab, dropTab, moveTabToParent } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 
@@ -25,20 +26,22 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
   test('折りたたまれた親タブの上にタブをホバーした場合、一定時間後に自動的に展開されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
-  }) => {
+    }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTab = await createTab(serviceWorker, 'data:text/html,<h1>Parent</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, 'data:text/html,<h1>Child</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -46,6 +49,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     const dragTab = await createTab(serviceWorker, 'data:text/html,<h1>Drag</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -54,6 +58,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await moveTabToParent(sidePanelPage, childTab, parentTab);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -67,6 +72,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await refreshSidePanel(serviceWorker, sidePanelPage);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: false },
       { tabId: dragTab, depth: 0 },
@@ -89,6 +95,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await dropTab(sidePanelPage);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -98,20 +105,22 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
   test('自動展開のタイムアウト前にホバーを離れた場合、その時点では展開されていないこと', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
-  }) => {
+    }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTab = await createTab(serviceWorker, 'data:text/html,<h1>Parent</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, 'data:text/html,<h1>Child</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -119,6 +128,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     const anotherTab = await createTab(serviceWorker, 'data:text/html,<h1>Another</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -127,6 +137,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     const dragTab = await createTab(serviceWorker, 'data:text/html,<h1>Drag</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -136,6 +147,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await moveTabToParent(sidePanelPage, childTab, parentTab);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -150,6 +162,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await refreshSidePanel(serviceWorker, sidePanelPage);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: false },
       { tabId: anotherTab, depth: 0 },
@@ -180,6 +193,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 500);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: false },
       { tabId: anotherTab, depth: 0 },
@@ -189,22 +203,24 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
   test('深いツリー構造でルートノードへのホバーにより自動展開が機能すること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
-  }) => {
+    }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // level0 (ルートレベル)
     //   └─ level1
     const level0 = await createTab(serviceWorker, 'data:text/html,<h1>Level0</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: level0, depth: 0 },
     ], 0);
 
     const level1 = await createTab(serviceWorker, 'data:text/html,<h1>Level1</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: level0, depth: 0 },
       { tabId: level1, depth: 0 },
@@ -212,6 +228,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     const dragTab = await createTab(serviceWorker, 'data:text/html,<h1>Drag</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: level0, depth: 0 },
       { tabId: level1, depth: 0 },
@@ -220,6 +237,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await moveTabToParent(sidePanelPage, level1, level0);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: level0, depth: 0, expanded: true },
       { tabId: level1, depth: 1 },
@@ -233,6 +251,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await refreshSidePanel(serviceWorker, sidePanelPage);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: level0, depth: 0, expanded: false },
       { tabId: dragTab, depth: 0 },
@@ -255,6 +274,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     await dropTab(sidePanelPage);
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: level0, depth: 0, expanded: true },
       { tabId: level1, depth: 1 },

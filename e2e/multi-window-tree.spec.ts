@@ -1,39 +1,38 @@
 import { test } from './fixtures/extension';
-import { createWindow, moveTabToWindow, openSidePanelForWindow } from './utils/window-utils';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getInitialBrowserTabId, getTestServerUrl } from './utils/tab-utils';
+import { moveTabToWindow } from './utils/window-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure, assertWindowExists } from './utils/assertion-utils';
 import { waitForTabInTreeState, waitForSidePanelReady } from './utils/polling-utils';
+import { setupWindow, createAndSetupWindow } from './utils/setup-utils';
 
 test.describe('Multi-Window Tab Tree Display Separation', () => {
   test('each window should only display its own tabs in the tab tree', async ({
     extensionContext,
     serviceWorker,
-    sidePanelPage,
   }) => {
     const originalWindowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, originalWindowId);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/tab1'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
     const tabId2 = await createTab(serviceWorker, getTestServerUrl('/tab2'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
 
-    const newWindowId = await createWindow(extensionContext);
+    const { windowId: newWindowId, initialBrowserTabId: newInitialBrowserTabId, sidePanelPage: newWindowSidePanel, pseudoSidePanelTabId: newPseudoSidePanelTabId } =
+      await createAndSetupWindow(extensionContext, serviceWorker);
     await assertWindowExists(extensionContext, newWindowId);
 
-    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
-
-    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
-    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newInitialBrowserTabId, depth: 0 },
       { tabId: newPseudoSidePanelTabId, depth: 0 },
@@ -59,6 +58,7 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
     await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
@@ -70,25 +70,22 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
   test('when tab is moved to another window, it should appear in the destination window tree and disappear from source', async ({
     extensionContext,
     serviceWorker,
-    sidePanelPage,
   }) => {
     const originalWindowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, originalWindowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
 
-    const newWindowId = await createWindow(extensionContext);
+    const { windowId: newWindowId, initialBrowserTabId: newInitialBrowserTabId, sidePanelPage: newWindowSidePanel, pseudoSidePanelTabId: newPseudoSidePanelTabId } =
+      await createAndSetupWindow(extensionContext, serviceWorker);
     await assertWindowExists(extensionContext, newWindowId);
 
-    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
-
-    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
-    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newInitialBrowserTabId, depth: 0 },
       { tabId: newPseudoSidePanelTabId, depth: 0 },
@@ -103,6 +100,7 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
     await waitForSidePanelReady(sidePanelPage, serviceWorker);
 
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
@@ -116,34 +114,31 @@ test.describe('Multi-Window Tab Tree Display Separation', () => {
   });
 
   test('new window should have empty tab tree except for default new tab', async ({
-    sidePanelPage,
     extensionContext,
     serviceWorker,
   }) => {
     const originalWindowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, originalWindowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, originalWindowId);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/tab1'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
     const tabId2 = await createTab(serviceWorker, getTestServerUrl('/tab2'));
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
 
-    const newWindowId = await createWindow(extensionContext);
+    const { windowId: newWindowId, initialBrowserTabId: newInitialBrowserTabId, sidePanelPage: newWindowSidePanel, pseudoSidePanelTabId: newPseudoSidePanelTabId } =
+      await createAndSetupWindow(extensionContext, serviceWorker);
     await assertWindowExists(extensionContext, newWindowId);
-
-    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId);
-    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
-
-    const newPseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, newWindowId);
-    const newInitialBrowserTabId = await getInitialBrowserTabId(serviceWorker, newWindowId);
 
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newInitialBrowserTabId, depth: 0 },

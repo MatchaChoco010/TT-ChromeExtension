@@ -2,10 +2,11 @@
  * Gapドロップ精度のE2Eテスト
  */
 import { test } from './fixtures/extension';
-import { createTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { startDrag, dropTab, moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
 import { waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 import type { Page } from '@playwright/test';
 
 /**
@@ -30,20 +31,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
   test.describe('タブ間隙間へのドロップで正確な位置に配置されること', () => {
     test('タブをGap領域にドロップすると、ドロップ操作が正常に完了すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -51,6 +54,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -59,6 +63,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab4 = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -68,6 +73,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await reorderTabs(sidePanelPage, tab4, tab1, 'before');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab4, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -78,20 +84,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
     test('タブをGap領域（after位置）にドロップすると、正常に完了すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -99,6 +107,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -107,6 +116,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await reorderTabs(sidePanelPage, tab3, tab1, 'after');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab3, depth: 0 },
@@ -116,20 +126,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
     test('複数回のGapドロップを連続で行ってもすべてのタブが保持されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -137,6 +149,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -145,6 +158,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab4 = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -154,6 +168,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await reorderTabs(sidePanelPage, tab4, tab1, 'before');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab4, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -163,6 +178,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await reorderTabs(sidePanelPage, tab2, tab3, 'after');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab4, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -175,20 +191,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
   test.describe('異なる深度の隙間へのドロップを検証', () => {
     test('親子関係があるツリーでGapドロップが正しく動作すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const child1 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: child1, depth: 0 },
@@ -196,6 +214,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: child1, depth: 1 },
@@ -203,6 +222,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const rootTab = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: child1, depth: 1 },
@@ -211,6 +231,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await reorderTabs(sidePanelPage, rootTab, parentTab, 'before');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
@@ -220,20 +241,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
     test('子タブとして配置した後もGapドロップが動作すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -241,6 +264,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -249,6 +273,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await moveTabToParent(sidePanelPage, tab2, tab1, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0, expanded: true },
         { tabId: tab2, depth: 1 },
@@ -260,20 +285,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
   test.describe('テストの安定性', () => {
     test('Gapドロップ後にすべてのタブがUIに表示され続けること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -281,6 +308,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -289,6 +317,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab4 = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -298,6 +327,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab5 = await createTab(serviceWorker, getTestServerUrl('/page5'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -308,6 +338,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await reorderTabs(sidePanelPage, tab5, tab1, 'before');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab5, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -318,6 +349,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await reorderTabs(sidePanelPage, tab4, tab2, 'before');
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab5, depth: 0 },
         { tabId: tab1, depth: 0 },
@@ -329,20 +361,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
     test('高速な連続Gapドロップ操作でも安定して動作すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -350,6 +384,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -358,6 +393,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab4 = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -382,6 +418,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab4, depth: 0 },
@@ -392,20 +429,22 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
     test('ドロップインジケーターがGap位置に正しく表示されること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -413,6 +452,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
@@ -436,6 +476,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
 
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab3, depth: 0 },

@@ -1,20 +1,22 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getPseudoSidePanelTabId, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { createWindow, openSidePanelForWindow, closeWindow } from './utils/window-utils';
 import { assertTabStructure, assertWindowCount, assertWindowExists } from './utils/assertion-utils';
 import { waitForSidePanelReady } from './utils/polling-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('コンテキストメニュー操作', () => {
   test('タブノードを右クリックした場合、コンテキストメニューが表示される', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
@@ -43,20 +45,22 @@ test.describe('コンテキストメニュー操作', () => {
 
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
   test('コンテキストメニューから"タブを閉じる"を選択した場合、対象タブが閉じられる', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
@@ -81,26 +85,29 @@ test.describe('コンテキストメニュー操作', () => {
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
   test('コンテキストメニューから"サブツリーを閉じる"を選択した場合、対象タブとその全ての子孫タブが閉じられる', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
     const childTabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId1, depth: 1 },
@@ -108,6 +115,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     const childTabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId1, depth: 1 },
@@ -136,20 +144,22 @@ test.describe('コンテキストメニュー操作', () => {
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
   test('コンテキストメニューから「別のウィンドウに移動」→「新しいウィンドウ」を選択した場合、タブが新しいウィンドウに移動する', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
@@ -180,6 +190,7 @@ test.describe('コンテキストメニュー操作', () => {
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
@@ -188,14 +199,15 @@ test.describe('コンテキストメニュー操作', () => {
 
   test('コンテキストメニューから「別のウィンドウに移動」→既存ウィンドウを選択した場合、タブがそのウィンドウに移動する', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const window1Id = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId1 = await getPseudoSidePanelTabId(serviceWorker, window1Id);
+    const { initialBrowserTabId: initialBrowserTabId1, sidePanelPage, pseudoSidePanelTabId: pseudoSidePanelTabId1 } =
+      await setupWindow(extensionContext, serviceWorker, window1Id);
 
     const tabToMove = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, window1Id, [
+      { tabId: initialBrowserTabId1, depth: 0 },
       { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: tabToMove, depth: 0 },
     ], 0);
@@ -262,6 +274,7 @@ test.describe('コンテキストメニュー操作', () => {
     await waitForSidePanelReady(sidePanelPage2, serviceWorker);
 
     await assertTabStructure(sidePanelPage, window1Id, [
+      { tabId: initialBrowserTabId1, depth: 0 },
       { tabId: pseudoSidePanelTabId1, depth: 0 },
     ], 0);
 
@@ -279,14 +292,15 @@ test.describe('コンテキストメニュー操作', () => {
 
   test('コンテキストメニューから"URLをコピー"を選択した場合、クリップボードにURLがコピーされる', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
@@ -316,20 +330,22 @@ test.describe('コンテキストメニュー操作', () => {
 
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
   test('コンテキストメニューの外側をクリックした場合、メニューが閉じられる', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
@@ -366,20 +382,22 @@ test.describe('コンテキストメニュー操作', () => {
 
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
   test('Escapeキーを押した場合、コンテキストメニューが閉じられる', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
@@ -408,6 +426,7 @@ test.describe('コンテキストメニュー操作', () => {
 
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });

@@ -1,19 +1,20 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { startDrag, dropTab, waitForDragEnd } from './utils/drag-drop-utils';
 import { setUserSettings } from './utils/settings-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('複数タブのドラッグ&ドロップ', () => {
   test('複数選択したタブをドラッグ&ドロップすると全てのタブが移動する', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // 5つのタブを作成
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -24,6 +25,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
@@ -71,8 +73,9 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await waitForDragEnd(sidePanelPage, 2000);
 
     // 全ての選択されたタブ（1, 2, 3）がタブ5の後に移動しているべき
-    // 期待される順序: sidepanel, tab4, tab5, tab1, tab2, tab3
+    // 期待される順序: initialBrowserTab, sidepanel, tab4, tab5, tab1, tab2, tab3
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId4, depth: 0 },
       { tabId: tabId5, depth: 0 },
@@ -91,13 +94,13 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
   test('Ctrl+クリックで飛び飛びに選択したタブをドラッグ&ドロップすると全てが移動する', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // 5つのタブを作成
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -108,6 +111,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
@@ -153,8 +157,9 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await waitForDragEnd(sidePanelPage, 2000);
 
     // 全ての選択されたタブ（1, 3, 5）がタブ2の前に移動しているべき
-    // 期待される順序: sidepanel, tab1, tab3, tab5, tab2, tab4
+    // 期待される順序: initialBrowserTab, sidepanel, tab1, tab3, tab5, tab2, tab4
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId3, depth: 0 },
@@ -173,13 +178,13 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
   test('選択されていないタブをドラッグするとそのタブだけが移動する', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // 4つのタブを作成
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -189,6 +194,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
@@ -224,8 +230,9 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await waitForDragEnd(sidePanelPage, 2000);
 
     // タブ3だけが移動し、選択は解除される
-    // 期待される順序: sidepanel, tab1, tab2, tab4, tab3
+    // 期待される順序: initialBrowserTab, sidepanel, tab1, tab2, tab4, tab3
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
@@ -242,13 +249,13 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
   test('複数選択したタブを別のタブの子としてドロップすると全て子になる', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // 4つのタブを作成
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -258,6 +265,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -296,6 +304,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     // 全ての選択されたタブ（1, 2, 3）がparentTabの子になる
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: tabId1, depth: 1 },

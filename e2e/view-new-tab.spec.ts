@@ -3,21 +3,20 @@ import { waitForViewSwitcher, waitForTabInTreeState, waitForCondition } from './
 import { assertTabStructure, assertViewStructure } from './utils/assertion-utils';
 import {
   createTab,
-  closeTab,
-  getCurrentWindowId,
-  getPseudoSidePanelTabId,
   getTestServerUrl,
+  getCurrentWindowId,
 } from './utils/tab-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('ビューへの新規タブ追加', () => {
   test.describe('ビューを開いている状態で新しいタブをそのビューに追加', () => {
     test('カスタムビューを開いている状態で新しいタブを開いた場合、そのビューに追加される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -81,11 +80,11 @@ test.describe('ビューへの新規タブ追加', () => {
   test.describe('新規タブ追加後もViewSwitcherが現在のビューを維持（ビューが閉じずに維持される）', () => {
     test('新しいタブを開いた後もビュースイッチャーは同じビューを表示し続ける', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -129,11 +128,11 @@ test.describe('ビューへの新規タブ追加', () => {
 
     test('複数のタブを追加してもビュースイッチャーは同じビューを維持する', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -190,11 +189,11 @@ test.describe('ビューへの新規タブ追加', () => {
   test.describe('デフォルトビュー以外のビューでも新規タブが現在ビューに属する', () => {
     test('デフォルトビューで新しいタブを開いた場合、デフォルトビューに追加される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -217,6 +216,7 @@ test.describe('ビューへの新規タブ追加', () => {
 
       // タブ作成直後にassertTabStructureで検証
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId, depth: 0 },
       ], 0);
@@ -240,11 +240,11 @@ test.describe('ビューへの新規タブ追加', () => {
 
     test('カスタムビューAからカスタムビューBに切り替えた後、新しいタブはビューBに追加される', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
@@ -343,11 +343,11 @@ test.describe('ビューへの新規タブ追加', () => {
   test.describe('E2Eテスト検証', () => {
     test('NewTabButtonを使用してカスタムビューに新規タブを追加できる', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 

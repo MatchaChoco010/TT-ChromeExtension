@@ -1,7 +1,8 @@
 import { test } from './fixtures/extension';
-import { createTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { dragOutside, startDrag, moveTo, dropTab } from './utils/drag-drop-utils';
 import { assertTabStructure, assertWindowExists, assertWindowCount } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
   // マウス操作は各ステップで時間がかかるため、タイムアウトを延長
@@ -9,16 +10,16 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
 
   test('タブをサイドパネル外にドロップした際に新しいウィンドウが作成されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
-    // 初期セットアップ
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // 準備: タブを作成
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
@@ -31,6 +32,7 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
 
     // ドラッグアウト後、元ウィンドウのタブ構造を検証（ドラッグしたタブは移動済み）
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
@@ -50,16 +52,16 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
 
   test('ドロップしたタブが新しいウィンドウに正確に移動されること', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
-    // 初期セットアップ
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // 準備: タブを作成
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
@@ -72,6 +74,7 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
 
     // ドラッグアウト後、元ウィンドウのタブ構造を検証（ドラッグしたタブは移動済み）
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
@@ -91,16 +94,16 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
 
   test('サイドパネル内の空白領域（タブツリー下部）へのドラッグでは新規ウィンドウを作成しないこと', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
-    // 初期セットアップ
     const windowId = await getCurrentWindowId(serviceWorker);
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
 
     // 準備: タブを作成
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
@@ -127,6 +130,7 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
 
     // ドロップ後、タブが元のウィンドウに残っていることをassertTabStructureで確認
     await assertTabStructure(sidePanelPage, originalWindowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);

@@ -2,6 +2,8 @@ import { test, expect } from './fixtures/extension';
 import type { Page } from '@playwright/test';
 import { COMMON_SELECTORS, COMMON_TIMEOUTS, FORM_INPUTS } from './test-data/common-constants';
 import { waitForCondition } from './utils/polling-utils';
+import { getCurrentWindowId } from './utils/tab-utils';
+import { setupWindow } from './utils/setup-utils';
 
 async function openSettingsInNewTab(
   extensionContext: import('@playwright/test').BrowserContext,
@@ -17,9 +19,12 @@ async function openSettingsInNewTab(
 
 test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   test('サイドパネルに設定ボタンが存在しない', async ({
-    sidePanelPage,
+    extensionContext,
+    serviceWorker,
   }) => {
     // Arrange
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
@@ -76,11 +81,12 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('フォントサイズを変更した場合、設定が保存される', async ({
-    sidePanelPage,
     extensionContext,
     extensionId,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
@@ -138,11 +144,12 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('フォントファミリーを変更した場合、設定が保存される', async ({
-    sidePanelPage,
     extensionContext,
     extensionId,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     const fontFamilyInput = settingsPage.locator(FORM_INPUTS.fontFamily);
@@ -171,11 +178,12 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('カスタムCSSを設定した場合、Side Panelに適用される', async ({
-    sidePanelPage,
     extensionContext,
     extensionId,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     const customCSSTextarea = settingsPage.locator(FORM_INPUTS.customCSS);
@@ -205,11 +213,12 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('設定を保存した場合、ブラウザを再起動しても設定が保持される（設定の永続化）', async ({
-    sidePanelPage,
     extensionContext,
     extensionId,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     const fontSizeInput = settingsPage.locator(FORM_INPUTS.fontSize);
@@ -253,8 +262,11 @@ test.describe('設定変更とUI/UXカスタマイゼーション', () => {
   });
 
   test('サイドパネル内には設定パネルが表示されない', async ({
-    sidePanelPage,
+    extensionContext,
+    serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
@@ -410,12 +422,13 @@ test.describe('スナップショット自動保存設定', () => {
   });
 
   test('スナップショット自動保存設定がブラウザ再起動後も保持される', async ({
-    sidePanelPage,
     extensionContext,
     extensionId,
     serviceWorker,
   }) => {
     // Arrange
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
     const settingsPage = await openSettingsInNewTab(extensionContext, extensionId);
 
     const autoSnapshotToggle = settingsPage.locator('#autoSnapshotEnabled');

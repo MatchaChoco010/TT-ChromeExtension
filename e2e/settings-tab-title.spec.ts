@@ -10,27 +10,26 @@ import {
 } from './utils/polling-utils';
 import {
   createTab,
-  getCurrentWindowId,
-  getPseudoSidePanelTabId,
   closeTab,
   getTestServerUrl,
+  getCurrentWindowId,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 test.describe('設定タブのタイトル表示', () => {
   test('設定タブがツリーで「Settings」というタイトルで表示される', async ({
     extensionContext,
     extensionId,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
-
-    const windowId = await getCurrentWindowId(serviceWorker);
-
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     const settingsTabId = await createTab(
       serviceWorker,
@@ -44,6 +43,7 @@ test.describe('設定タブのタイトル表示', () => {
     });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: settingsTabId, depth: 0 },
     ], 0);
@@ -80,7 +80,10 @@ test.describe('設定タブのタイトル表示', () => {
     );
 
     await closeTab(serviceWorker, settingsTabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('設定タブのHTMLタイトルが「Settings」である', async ({
@@ -100,16 +103,15 @@ test.describe('設定タブのタイトル表示', () => {
 test.describe('内部ページのタイトル表示', () => {
   test('chrome://versionページがツリーでブラウザのタイトルと同じタイトルで表示される', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
-
-    const windowId = await getCurrentWindowId(serviceWorker);
-
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     const tabId = await createTab(
       serviceWorker,
@@ -123,6 +125,7 @@ test.describe('内部ページのタイトル表示', () => {
     });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
@@ -154,21 +157,23 @@ test.describe('内部ページのタイトル表示', () => {
     );
 
     await closeTab(serviceWorker, tabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('chrome://settingsページがツリーでブラウザのタイトルと同じタイトルで表示される', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
-
-    const windowId = await getCurrentWindowId(serviceWorker);
-
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     const tabId = await createTab(
       serviceWorker,
@@ -182,6 +187,7 @@ test.describe('内部ページのタイトル表示', () => {
     });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
@@ -218,21 +224,23 @@ test.describe('内部ページのタイトル表示', () => {
     );
 
     await closeTab(serviceWorker, tabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 
   test('テストページがツリーで適切なタイトルで表示される', async ({
     extensionContext,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
-
-    const windowId = await getCurrentWindowId(serviceWorker);
-
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     const tabId = await createTab(
       serviceWorker,
@@ -246,6 +254,7 @@ test.describe('内部ページのタイトル表示', () => {
     });
 
     await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
@@ -267,7 +276,10 @@ test.describe('内部ページのタイトル表示', () => {
     );
 
     await closeTab(serviceWorker, tabId);
-    await assertTabStructure(sidePanelPage, windowId, [{ tabId: pseudoSidePanelTabId, depth: 0 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
   });
 });
 
@@ -275,16 +287,15 @@ test.describe('タイトル表示の安定性テスト', () => {
   test('複数の設定タブを連続で開いても正しくタイトルが表示される', async ({
     extensionContext,
     extensionId,
-    sidePanelPage,
     serviceWorker,
   }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
       timeout: COMMON_TIMEOUTS.long,
     });
-
-    const windowId = await getCurrentWindowId(serviceWorker);
-
-    const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
     const tabIds: number[] = [];
 
@@ -301,7 +312,8 @@ test.describe('タイトル表示の安定性テスト', () => {
       });
 
       const expectedStructure = [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         ...tabIds.map(id => ({ tabId: id, depth: 0 })),
       ];
       await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);
@@ -343,7 +355,8 @@ test.describe('タイトル表示の安定性テスト', () => {
       await closeTab(serviceWorker, tabIds[i]);
       const remainingTabs = tabIds.slice(0, i);
       const expectedStructure = [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         ...remainingTabs.map(id => ({ tabId: id, depth: 0 })),
       ];
       await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);

@@ -1,59 +1,22 @@
 import { expect } from '@playwright/test';
 import { test as extensionTest } from './fixtures/extension';
-import { createTab, activateTab, closeTab, getCurrentWindowId, getPseudoSidePanelTabId, getTestServerUrl } from './utils/tab-utils';
+import { createTab, activateTab, closeTab, getCurrentWindowId, getTestServerUrl } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 
 extensionTest.describe('未読インジケーター復元時制御', () => {
   extensionTest(
     'ブラウザ起動時の既存タブに未読インジケーターが表示されない',
-    async ({ extensionContext, sidePanelPage }) => {
+    async ({ extensionContext, serviceWorker }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
       // Side Panelが初期化されてツリービューが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
-      // 初期タブを取得（ブラウザ起動時に開かれているタブ）
-      const [initialPage] = extensionContext.pages();
-      await initialPage.waitForLoadState('load');
-
-      // 初期タブのIDを取得
-      const pages = extensionContext.pages();
-      let initialTabId: number | undefined;
-      for (const page of pages) {
-        const url = page.url();
-        // chrome-extension:// または about: 以外のページを探す
-        if (!url.startsWith('chrome-extension://') && !url.startsWith('about:')) {
-          // Service Workerでタブを取得してIDを確認
-          const serviceWorker = extensionContext.serviceWorkers()[0];
-          const tabs = await serviceWorker.evaluate(async () => {
-            return chrome.tabs.query({});
-          });
-          const tab = tabs.find((t: chrome.tabs.Tab) => t.url === url);
-          if (tab?.id) {
-            initialTabId = tab.id;
-            break;
-          }
-        }
-      }
-
-      // 初期タブが見つからなかった場合、任意のタブを使用
-      if (!initialTabId) {
-        const serviceWorker = extensionContext.serviceWorkers()[0];
-        const tabs = await serviceWorker.evaluate(async () => {
-          return chrome.tabs.query({});
-        });
-        // ピン留めされていない最初のタブを使用
-        const regularTab = tabs.find((t: chrome.tabs.Tab) => !t.pinned && t.id);
-        if (regularTab?.id) {
-          initialTabId = regularTab.id;
-        }
-      }
-
-      if (!initialTabId) {
-        // テストをスキップ（タブが見つからなかった場合）
-        return;
-      }
-
+      // initialBrowserTabIdを使用して検証
       // タブノードがDOMに表示されるまで待機
-      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${initialTabId}"]`);
+      const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${initialBrowserTabId}"]`);
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
       // 初期タブに未読バッジが表示されていないことを確認
@@ -65,16 +28,15 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
 
   extensionTest(
     '起動完了後に作成されたバックグラウンドタブに未読インジケーターが表示される',
-    async ({ extensionContext, sidePanelPage, serviceWorker }) => {
-      // アクティブなタブを取得
-      const [initialPage] = extensionContext.pages();
-      await initialPage.waitForLoadState('load');
-
-      // Side Panelが初期化されるまで待機
-      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
-
+    async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       const bgTabId = await createTab(
       serviceWorker,
@@ -83,7 +45,8 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
         { active: false }
       );
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -96,23 +59,23 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // クリーンアップ
       await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
 
   extensionTest(
     '起動完了後のタブをアクティブ化すると未読インジケーターが消える',
-    async ({ extensionContext, sidePanelPage, serviceWorker }) => {
-      // アクティブなタブを取得
-      const [initialPage] = extensionContext.pages();
-      await initialPage.waitForLoadState('load');
-
-      // Side Panelが初期化されるまで待機
-      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
-
+    async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       const bgTabId = await createTab(
       serviceWorker,
@@ -121,7 +84,8 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
         { active: false }
       );
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -134,7 +98,8 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       await activateTab(serviceWorker, bgTabId);
       // activateTabはアクティブタブを変更するだけなのでツリー構造は変わらない
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -144,23 +109,23 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // クリーンアップ
       await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
 
   extensionTest(
     '複数のバックグラウンドタブを同時に作成した場合も正しく未読インジケーターが表示される',
-    async ({ extensionContext, sidePanelPage, serviceWorker }) => {
-      // アクティブなタブを取得
-      const [initialPage] = extensionContext.pages();
-      await initialPage.waitForLoadState('load');
-
-      // Side Panelが初期化されるまで待機
-      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
-
+    async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       const bgTabId1 = await createTab(
       serviceWorker,
@@ -169,7 +134,8 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
         { active: false }
       );
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
@@ -180,7 +146,8 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
         { active: false }
       );
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
         { tabId: bgTabId2, depth: 0 },
       ], 0);
@@ -196,29 +163,30 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // クリーンアップ
       await closeTab(serviceWorker, bgTabId2);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, bgTabId1);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
 
   extensionTest(
     'アクティブとして作成されたタブには未読インジケーターが表示されない',
-    async ({ extensionContext, sidePanelPage, serviceWorker }) => {
-      // アクティブなタブを取得
-      const [initialPage] = extensionContext.pages();
-      await initialPage.waitForLoadState('load');
-
-      // Side Panelが初期化されるまで待機
-      await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
-
+    async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       const activeTabId = await createTab(
       serviceWorker,
@@ -227,7 +195,8 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
         { active: true }
       );
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: activeTabId, depth: 0 },
       ], 0);
 
@@ -239,7 +208,8 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       // クリーンアップ
       await closeTab(serviceWorker, activeTabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );

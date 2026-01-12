@@ -157,6 +157,26 @@ export default [
       },
     },
   },
+  // CommonJS files (Node.js scripts)
+  {
+    files: ['**/*.cjs'],
+    languageOptions: {
+      globals: {
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+        exports: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+        Buffer: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+      },
+    },
+  },
   // E2E tests - disable React hooks rules (Playwright fixtures use 'use' function)
   {
     files: ['e2e/**/*.ts', 'e2e/**/*.tsx'],

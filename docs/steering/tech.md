@@ -308,7 +308,9 @@ await assertTabStructure(sidePanelPage, windowId, [
 
 ### E2Eテスト実行時の結果確認（必須）
 
-テスト結果は**ログファイルに保存**してから確認する。出力を切り捨てると失敗テストの情報が失われ、再実行が必要になる。
+テスト結果は**リポジトリ内のログファイルに保存**してから確認する。出力を切り捨てると失敗テストの情報が失われ、再実行が必要になる。
+
+**重要**: ログファイルは必ずリポジトリ内に保存すること。`/tmp/`や他のリポジトリ外のディレクトリへの書き込みは禁止。
 
 ```bash
 # ✅ 正しい: ログをリポジトリ内に保存しながら実行
@@ -323,6 +325,9 @@ grep -E "failed|passed|skipped" e2e-test.log
 npm run test:e2e 2>&1 | tail -50
 npm run test:e2e 2>&1 | head -100
 npm run test:e2e 2>&1 | grep ...
+
+# ❌ 禁止: リポジトリ外への書き込み
+npm run test:e2e 2>&1 | tee /tmp/e2e-test.log
 ```
 
 **テスト結果の解釈**:

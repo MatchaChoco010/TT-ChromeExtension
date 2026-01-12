@@ -387,9 +387,9 @@ export async function refreshSidePanel(
 /**
  * 現在のウィンドウIDを取得
  *
- * sidePanelTabが存在するウィンドウのIDを返す。
- * chrome.windows.getCurrent()はheadless環境で信頼性が低いため、
- * sidePanelTabのwindowIdを直接取得する。
+ * sidePanelTabが存在する場合はそのwindowIdを返す。
+ * sidePanelTabが存在しない場合（autoReset直後など）は、
+ * 最初に見つかったタブのwindowIdを返す。
  *
  * @param serviceWorker - Service Worker
  * @returns 現在のウィンドウID
@@ -399,14 +399,22 @@ export async function getCurrentWindowId(serviceWorker: Worker): Promise<number>
     const extensionId = chrome.runtime.id;
     const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
     const tabs = await chrome.tabs.query({});
+
+    // sidePanelTabが存在する場合はそのwindowIdを返す
     const sidePanelTab = tabs.find(t => {
       const url = t.url || t.pendingUrl || '';
       return url.startsWith(sidePanelUrlPrefix);
     });
-    if (!sidePanelTab?.windowId) {
-      throw new Error('Could not find sidePanelTab to determine windowId');
+    if (sidePanelTab?.windowId) {
+      return sidePanelTab.windowId;
     }
-    return sidePanelTab.windowId;
+
+    // sidePanelTabが存在しない場合は最初のタブのwindowIdを返す
+    if (tabs.length > 0 && tabs[0].windowId) {
+      return tabs[0].windowId;
+    }
+
+    throw new Error('Could not determine windowId: no tabs found');
   });
 }
 

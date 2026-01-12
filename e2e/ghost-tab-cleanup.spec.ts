@@ -6,11 +6,11 @@ import { waitForCondition } from './utils/polling-utils';
 import {
   createTab,
   closeTab,
-  getCurrentWindowId,
-  getPseudoSidePanelTabId,
   getTestServerUrl,
+  getCurrentWindowId,
 } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
+import { setupWindow } from './utils/setup-utils';
 import './types';
 
 test.describe('Ghost Tab Cleanup', () => {
@@ -18,17 +18,19 @@ test.describe('Ghost Tab Cleanup', () => {
     test('ストレージにのみ存在するゴーストタブが起動時にクリーンアップされること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const tab = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const tab = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab, depth: 0 },
       ], 0);
@@ -121,12 +123,14 @@ test.describe('Ghost Tab Cleanup', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tab);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
@@ -136,12 +140,13 @@ test.describe('Ghost Tab Cleanup', () => {
     test('TreeStateManager.cleanupStaleNodesが正しくゴーストタブを削除すること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
@@ -180,13 +185,14 @@ test.describe('Ghost Tab Cleanup', () => {
   test.describe('Loadingのまま消せないゴーストタブの発生を防止', () => {
     test('Side Panelに表示されているタブがすべてChrome APIに存在すること', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
@@ -220,13 +226,14 @@ test.describe('Ghost Tab Cleanup', () => {
 
     test('タブツリーにLoadingのまま動かないタブが存在しないこと', async ({
       extensionContext,
-      sidePanelPage,
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
@@ -268,17 +275,19 @@ test.describe('Ghost Tab Cleanup', () => {
     test('複数のゴーストタブが一度にクリーンアップされること', async ({
       extensionContext,
       serviceWorker,
-      sidePanelPage,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      const normalTab = await createTab(serviceWorker, getTestServerUrl('/page'), { active: false });
+      const normalTab = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTab, depth: 0 },
       ], 0);
@@ -358,12 +367,14 @@ test.describe('Ghost Tab Cleanup', () => {
       );
 
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTab, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, normalTab);
       await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });

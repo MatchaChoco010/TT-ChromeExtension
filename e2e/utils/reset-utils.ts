@@ -1,11 +1,11 @@
-import type { BrowserContext, Page, Worker } from '@playwright/test';
+import type { BrowserContext, Worker } from '@playwright/test';
+import { waitForWindowClosed } from './polling-utils';
 
 /**
  * Service Worker evaluateをタイムアウト付きで実行する
  *
  * 任意の引数を渡せる必要があるため、anyを使用する
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function evaluateWithTimeout<T>(
   serviceWorker: Worker,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,25 +31,17 @@ async function evaluateWithTimeout<T>(
 
 /**
  * テスト間で拡張機能の状態をリセットする
- * 前のテストの非同期イベントハンドラーが完了してからリセット処理を開始する
+ *
+ * sidePanelPageは作成せず、クリーンアップ処理のみを行う。
+ * リセット後の状態: 1ウィンドウ、initialTabのみ（sidePanelTabなし）
+ *
+ * 各テストはsetupWindow()を呼び出してsidePanelPageを作成する。
  */
 export async function resetExtensionState(
   serviceWorker: Worker,
-  _extensionContext: BrowserContext,
-  sidePanelPage: Page
+  _extensionContext: BrowserContext
 ): Promise<void> {
-  // Step 0: コンテキストの有効性チェック
-  if (sidePanelPage.isClosed()) {
-    throw new Error(
-      'Reset aborted: sidePanelPage is already closed. ' +
-      'The browser context may have been corrupted by a previous test.'
-    );
-  }
-
   // Step 1: 前のテストからのリセット準備（ハンドラー待機 + IndexedDB接続クローズ）
-  // prepareForReset()は以下を行う:
-  // - 非同期イベントハンドラーの完了待機
-  // - IndexedDBのキャッシュ接続を閉じる（deleteDatabase()のブロックを防ぐ）
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -60,28 +52,7 @@ export async function resetExtensionState(
     'prepareForReset'
   );
 
-  // Step 2: sidePanelTabのIDを取得
-  const sidePanelTabId = await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
-      const extensionId = chrome.runtime.id;
-      const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
-      const tabs = await chrome.tabs.query({});
-      const sidePanelTab = tabs.find(tab => {
-        const url = tab.url || tab.pendingUrl || '';
-        return url.startsWith(sidePanelUrlPrefix);
-      });
-      if (!sidePanelTab?.id) {
-        throw new Error('Side panel tab not found');
-      }
-      return sidePanelTab.id;
-    },
-    10000,
-    'getSidePanelTabId'
-  );
-
-  // Step 3: ストレージをクリア
-  // 注: IndexedDB接続はStep 1のprepareForReset()で既に閉じられている
+  // Step 2: ストレージをクリア
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -91,12 +62,9 @@ export async function resetExtensionState(
         await chrome.storage.session.clear();
       }
 
-      // IndexedDBを削除（短いタイムアウト付き）
-      // 接続はprepareForReset()で閉じられているため、ブロックされない
       await new Promise<void>((resolve) => {
         const deleteRequest = indexedDB.deleteDatabase('vivaldi-tt-snapshots');
         const timeoutId = setTimeout(() => {
-          // 5秒でブロックされたままなら諦めて続行
           resolve();
         }, 5000);
         deleteRequest.onsuccess = () => {
@@ -116,7 +84,7 @@ export async function resetExtensionState(
     'clearStorage'
   );
 
-  // Step 4: メモリ上の状態をクリア
+  // Step 3: メモリ上の状態をクリア
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -130,7 +98,6 @@ export async function resetExtensionState(
         treeStateManager.currentViewId = 'default';
       }
 
-      // pending系Mapのクリア
       const g = globalThis as unknown as { pendingTabParents?: Map<unknown, unknown>; pendingDuplicateSources?: Map<unknown, unknown>; pendingGroupTabIds?: Map<unknown, unknown>; pendingLinkClicks?: Map<unknown, unknown> };
       g.pendingTabParents?.clear();
       g.pendingDuplicateSources?.clear();
@@ -141,7 +108,8 @@ export async function resetExtensionState(
     'clearMemoryState'
   );
 
-  // Step 5: 新しいウィンドウを作成
+  // Step 4: 新しいクリーンなウィンドウを作成
+  // 前のテストの状態が残らないよう、完全に新しいウィンドウを作成する
   const newWindowId = await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -149,27 +117,18 @@ export async function resetExtensionState(
       return newWindow.id!;
     },
     10000,
-    'createWindow'
+    'createCleanWindow'
   );
 
-  // Step 6: sidePanelTabを新しいウィンドウに移動
-  await evaluateWithTimeout(
-    serviceWorker,
-    async (params: { tabId: number; windowId: number }) => {
-      await chrome.tabs.move(params.tabId, { windowId: params.windowId, index: 0 });
-    },
-    10000,
-    'moveTabToNewWindow',
-    { tabId: sidePanelTabId, windowId: newWindowId }
-  );
-
-  // Step 7: 新しいウィンドウ以外のウィンドウをすべて閉じる
-  await evaluateWithTimeout(
+  // Step 5: 新しいウィンドウ以外のすべてのウィンドウを閉じる
+  const windowsToClose = await evaluateWithTimeout(
     serviceWorker,
     async (keepWindowId: number) => {
       const windows = await chrome.windows.getAll();
+      const closeIds: number[] = [];
       for (const window of windows) {
         if (window.id !== keepWindowId) {
+          closeIds.push(window.id!);
           try {
             await chrome.windows.remove(window.id!);
           } catch {
@@ -177,34 +136,19 @@ export async function resetExtensionState(
           }
         }
       }
+      return closeIds;
     },
     10000,
     'closeOtherWindows',
     newWindowId
   );
 
-  // Step 8: sidePanelTab以外のタブを閉じる
-  await evaluateWithTimeout(
-    serviceWorker,
-    async (keepTabId: number) => {
-      const tabs = await chrome.tabs.query({});
-      for (const tab of tabs) {
-        if (tab.id !== keepTabId) {
-          try {
-            await chrome.tabs.remove(tab.id!);
-          } catch {
-            // タブが既に閉じられている場合は正常動作
-          }
-        }
-      }
-    },
-    10000,
-    'closeOtherTabs',
-    sidePanelTabId
-  );
+  // 閉じたウィンドウが実際に閉じられたことを確認
+  for (const windowId of windowsToClose) {
+    await waitForWindowClosed(serviceWorker, windowId, { timeout: 5000 });
+  }
 
-  // Step 9: タブ・ウィンドウ削除のハンドラー完了を待機
-  // prepareForReset()を再度呼び出して、削除操作のハンドラー完了を待機
+  // Step 6: タブ・ウィンドウ削除のハンドラー完了を待機
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -215,8 +159,7 @@ export async function resetExtensionState(
     'prepareForReset2'
   );
 
-  // Step 10: デフォルト設定を書き込む
-  // 本番コードのデフォルト値と一致させる必要がある
+  // Step 7: デフォルト設定を書き込む
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -240,8 +183,7 @@ export async function resetExtensionState(
     'setDefaultSettings'
   );
 
-  // Step 11: tree_stateにデフォルトのviewsを明示的に設定
-  // 色は TreeStateProvider.tsx の getDefaultViews() と一致させる（#3B82F6）
+  // Step 8: tree_stateにデフォルトのviewsを明示的に設定
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -264,7 +206,7 @@ export async function resetExtensionState(
     'setDefaultTreeState'
   );
 
-  // Step 12: Chromeタブと同期
+  // Step 9: Chromeタブと同期
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -277,38 +219,7 @@ export async function resetExtensionState(
     'syncWithChromeTabs'
   );
 
-  // Step 13: タブレベルの状態をクリアするためにabout:blankにナビゲート
-  await sidePanelPage.goto('about:blank');
-  await sidePanelPage.waitForLoadState('domcontentloaded');
-
-  // Step 14: 新しいウィンドウのsidepanel URLにナビゲート（Reactを完全に新規マウント）
-  const extensionId = await serviceWorker.evaluate(() => chrome.runtime.id);
-  await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${newWindowId}`);
-  await sidePanelPage.waitForLoadState('domcontentloaded');
-
-  // Step 15: sidePanelのルート要素が表示されるまで待機
-  await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
-
-  // Step 16: ツリー状態が初期化されるまでポーリングで待機
-  await serviceWorker.evaluate(async () => {
-    for (let i = 0; i < 50; i++) {
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as { nodes?: Record<string, unknown> } | undefined;
-      if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
-        break;
-      }
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-  });
-
-  // Step 17: UIに同期を通知
-  await serviceWorker.evaluate(async () => {
-    await new Promise<void>((resolve) => {
-      chrome.runtime.sendMessage({ type: 'SYNC_TABS' }, () => resolve());
-    });
-  });
-
-  // Step 18: リセット後の状態を検証（sidePanelタブのみ存在すること）
+  // Step 10: リセット後の状態を検証（新しいウィンドウのタブのみ存在すること）
   const remainingTabCount = await serviceWorker.evaluate(async () => {
     const tabs = await chrome.tabs.query({});
     return tabs.length;
@@ -317,25 +228,6 @@ export async function resetExtensionState(
   if (remainingTabCount !== 1) {
     throw new Error(
       `Reset failed: Expected 1 tab after reset, but found ${remainingTabCount} tabs`
-    );
-  }
-
-  // Step 19: UIが正しい状態になるまでポーリングで待機（tree-node要素が1つになるまで）
-  const startTime = Date.now();
-  const timeout = 5000;
-  while (Date.now() - startTime < timeout) {
-    const treeNodeCount = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
-    if (treeNodeCount === 1) {
-      break;
-    }
-    await sidePanelPage.waitForTimeout(50);
-  }
-
-  // 最終確認
-  const finalTreeNodeCount = await sidePanelPage.locator('[data-testid^="tree-node-"]').count();
-  if (finalTreeNodeCount !== 1) {
-    throw new Error(
-      `Reset failed: Expected 1 tree node in UI after reset, but found ${finalTreeNodeCount} tree nodes`
     );
   }
 }
