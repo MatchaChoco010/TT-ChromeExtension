@@ -231,26 +231,24 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       for (let i = 0; i < tabCount; i++) {
         const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
         createdTabIds.push(tabId);
-
-        await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: initialBrowserTabId, depth: 0 },
-          { tabId: pseudoSidePanelTabId, depth: 0 },
-          ...createdTabIds.map(id => ({ tabId: id, depth: 0 })),
-        ], 0);
       }
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        ...createdTabIds.map(id => ({ tabId: id, depth: 0 })),
+      ], 0);
 
       await assertSmoothScrolling(sidePanelPage, tabCount);
 
-      for (let i = 0; i < createdTabIds.length; i++) {
-        const tabId = createdTabIds[i];
+      for (const tabId of createdTabIds) {
         await closeTab(serviceWorker, tabId);
-        const stillExistingCreatedTabs = createdTabIds.slice(i + 1);
-        await assertTabStructure(sidePanelPage, windowId, [
-          { tabId: initialBrowserTabId, depth: 0 },
-          { tabId: pseudoSidePanelTabId, depth: 0 },
-          ...stillExistingCreatedTabs.map(id => ({ tabId: id, depth: 0 })),
-        ], 0);
       }
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 

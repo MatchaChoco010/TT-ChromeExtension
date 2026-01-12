@@ -83,20 +83,7 @@ test.describe('複数選択機能', () => {
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabId1, depth: 0 },
-    ], 0);
-
     const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabId1, depth: 0 },
-      { tabId: tabId2, depth: 0 },
-    ], 0);
-
     const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },

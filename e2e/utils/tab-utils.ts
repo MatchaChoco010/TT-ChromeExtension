@@ -103,13 +103,13 @@ export async function createTab(
 
   await serviceWorker.evaluate(
     async (tabId) => {
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 100; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
         if (treeState?.tabToNode?.[tabId!]) {
           return;
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
       throw new Error(`Timeout waiting for tab ${tabId} to be added to tree`);
     },
@@ -129,8 +129,6 @@ export async function createTab(
           nodes: Record<string, TreeNode>;
           expandedNodes?: string[];
         }
-
-        await new Promise(resolve => setTimeout(resolve, 100));
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
@@ -184,7 +182,7 @@ export async function createTab(
           tabToNode: Record<number, string>;
           nodes: Record<string, TreeNode>;
         }
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 50; i++) {
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
           if (treeState?.nodes && treeState?.tabToNode) {
@@ -197,7 +195,7 @@ export async function createTab(
               }
             }
           }
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 20));
         }
       },
       { parentTabId, childTabId: tab.id! }
@@ -220,13 +218,13 @@ export async function closeTab(serviceWorker: Worker, tabId: number): Promise<vo
 
   const result = await serviceWorker.evaluate(
     async (tabId) => {
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 100; i++) {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
         if (!treeState?.tabToNode?.[tabId]) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
       return { success: false };
     },
@@ -254,12 +252,12 @@ export async function activateTab(
 
   const result = await serviceWorker.evaluate(
     async (tabId) => {
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 100; i++) {
         const tab = await chrome.tabs.get(tabId);
         if (tab.active) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
       return { success: false };
     },
@@ -284,12 +282,12 @@ export async function pinTab(serviceWorker: Worker, tabId: number): Promise<void
 
   const result = await serviceWorker.evaluate(
     async (id) => {
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 100; i++) {
         const tab = await chrome.tabs.get(id);
         if (tab.pinned) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
       return { success: false };
     },
@@ -314,12 +312,12 @@ export async function unpinTab(serviceWorker: Worker, tabId: number): Promise<vo
 
   const result = await serviceWorker.evaluate(
     async (id) => {
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 100; i++) {
         const tab = await chrome.tabs.get(id);
         if (!tab.pinned) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
       return { success: false };
     },
@@ -345,12 +343,12 @@ export async function updateTabUrl(serviceWorker: Worker, tabId: number, url: st
 
   const result = await serviceWorker.evaluate(
     async ({ id, expectedUrl }) => {
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 200; i++) {
         const tab = await chrome.tabs.get(id);
         if (tab.url?.includes(expectedUrl) || tab.pendingUrl?.includes(expectedUrl)) {
           return { success: true };
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
       return { success: false };
     },
@@ -565,13 +563,13 @@ export async function clickLinkToOpenTab(
   }
 
   const newTabId = await serviceWorker.evaluate(async (previousIds) => {
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 200; i++) {
       const tabs = await chrome.tabs.query({});
       const newTab = tabs.find(t => t.id !== undefined && !previousIds.includes(t.id));
       if (newTab?.id) {
         return newTab.id;
       }
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 20));
     }
     throw new Error('Timeout waiting for new tab to be created');
   }, tabIdsBefore);

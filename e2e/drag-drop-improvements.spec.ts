@@ -310,8 +310,8 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await startDrag(sidePanelPage, tab2);
 
       const tab2Box = await getTabNodeBoundingBox(sidePanelPage, tab2);
-      await sidePanelPage.mouse.move(tab2Box.x - 100, tab2Box.y, { steps: 5 });
-      await sidePanelPage.mouse.move(tab2Box.x + 200, tab2Box.y, { steps: 5 });
+      await sidePanelPage.mouse.move(tab2Box.x - 100, tab2Box.y, { steps: 1 });
+      await sidePanelPage.mouse.move(tab2Box.x + 200, tab2Box.y, { steps: 1 });
 
       await dropTab(sidePanelPage);
 

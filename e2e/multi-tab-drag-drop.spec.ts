@@ -62,7 +62,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     if (!box5) throw new Error('tabNode5 not found');
 
     // タブ5の下部にマウスを移動（afterの位置）
-    await sidePanelPage.mouse.move(box5.x + box5.width / 2, box5.y + box5.height * 0.85, { steps: 5 });
+    await sidePanelPage.mouse.move(box5.x + box5.width / 2, box5.y + box5.height * 0.85, { steps: 1 });
 
     // ドロップインジケーターが表示されるのを待つ
     const dropIndicator = sidePanelPage.locator('[data-testid="drop-indicator"]');
@@ -150,7 +150,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const box2 = await tabNode2.boundingBox();
     if (!box2) throw new Error('tabNode2 not found');
 
-    await sidePanelPage.mouse.move(box2.x + box2.width / 2, box2.y + box2.height * 0.15, { steps: 5 });
+    await sidePanelPage.mouse.move(box2.x + box2.width / 2, box2.y + box2.height * 0.15, { steps: 1 });
 
     // ドロップ
     await dropTab(sidePanelPage);
@@ -224,7 +224,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const box4 = await tabNode4.boundingBox();
     if (!box4) throw new Error('tabNode4 not found');
 
-    await sidePanelPage.mouse.move(box4.x + box4.width / 2, box4.y + box4.height * 0.85, { steps: 5 });
+    await sidePanelPage.mouse.move(box4.x + box4.width / 2, box4.y + box4.height * 0.85, { steps: 1 });
 
     await dropTab(sidePanelPage);
     await waitForDragEnd(sidePanelPage, 2000);
@@ -297,7 +297,7 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const boxParent = await parentNode.boundingBox();
     if (!boxParent) throw new Error('parentNode not found');
 
-    await sidePanelPage.mouse.move(boxParent.x + boxParent.width / 2, boxParent.y + boxParent.height / 2, { steps: 5 });
+    await sidePanelPage.mouse.move(boxParent.x + boxParent.width / 2, boxParent.y + boxParent.height / 2, { steps: 1 });
 
     await dropTab(sidePanelPage);
     await waitForDragEnd(sidePanelPage, 2000);

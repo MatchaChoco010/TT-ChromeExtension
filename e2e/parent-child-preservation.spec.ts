@@ -47,7 +47,9 @@ test.describe('新規タブ作成時の親子関係維持', () => {
     extensionContext,
     serviceWorker,
   }) => {
+
     const windowId = await getCurrentWindowId(serviceWorker);
+
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 

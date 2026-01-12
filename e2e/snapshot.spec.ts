@@ -12,6 +12,7 @@ import {
   readSnapshotFile,
   cleanupDownloadDir,
 } from './utils/download-utils';
+import { waitForCondition } from './utils/polling-utils';
 import type { Worker } from '@playwright/test';
 
 /**
@@ -39,10 +40,7 @@ test.describe('スナップショット機能', () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
     });
 
-    // ダウンロードが完了するまで少し待機
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // ダウンロードファイルが作成されるのを待機
+    // ダウンロードファイルが作成されるのを待機（waitForSnapshotFileが内部でポーリング）
     const snapshotFile = await waitForSnapshotFile(downloadDir, 10000);
 
     expect(snapshotFile).not.toBeNull();
@@ -78,10 +76,7 @@ test.describe('スナップショット機能', () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
     });
 
-    // ダウンロードが完了するまで少し待機
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // ダウンロードファイルが作成されていることを確認
+    // ダウンロードファイルが作成されていることを確認（waitForSnapshotFileが内部でポーリング）
     const snapshotFile = await waitForSnapshotFile(downloadDir, 10000);
     expect(snapshotFile).not.toBeNull();
 
@@ -111,18 +106,25 @@ test.describe('スナップショット機能', () => {
     await newPage.goto(testUrl);
     await newPage.waitForLoadState('domcontentloaded');
 
-    // 少し待機してツリー状態が更新されるのを待つ
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // タブがツリー状態に追加されるまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const treeState = await getTreeState(serviceWorker);
+        if (!treeState?.nodes) return false;
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        const testTab = tabs.find(t => t.url?.includes('/page'));
+        if (!testTab) return false;
+        return Object.values(treeState.nodes).some((n: { tabId: number }) => n.tabId === testTab.id);
+      },
+      { timeout: 5000, timeoutMessage: 'Test tab did not appear in tree state' }
+    );
 
     // サイドパネルからスナップショット作成をトリガー
     await sidePanelPage.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
     });
 
-    // ダウンロードが完了するまで少し待機
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // ダウンロードファイルを確認
+    // ダウンロードファイルを確認（waitForSnapshotFileが内部でポーリング）
     const snapshotFile = await waitForSnapshotFile(downloadDir, 10000);
     expect(snapshotFile).not.toBeNull();
 
@@ -192,8 +194,16 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 少し待機
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 復元されたタブが存在するまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        const hasParent = tabs.some(t => t.url?.includes('/parent'));
+        const hasChild = tabs.some(t => t.url?.includes('/child'));
+        return hasParent && hasChild;
+      },
+      { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
+    );
 
     // ツリー状態を確認
     const treeState = await getTreeState(serviceWorker);
@@ -281,8 +291,16 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 少し待機
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 復元されたタブが存在するまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        const hasWork = tabs.some(t => t.url?.includes('/work-tab'));
+        const hasPersonal = tabs.some(t => t.url?.includes('/personal-tab'));
+        return hasWork && hasPersonal;
+      },
+      { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
+    );
 
     // ツリー状態を確認
     const treeState = await getTreeState(serviceWorker);
@@ -331,7 +349,19 @@ test.describe('スナップショット復元機能', () => {
     const existingPage = await extensionContext.newPage();
     await existingPage.goto(getTestServerUrl('/existing'));
     await existingPage.waitForLoadState('domcontentloaded');
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // タブがツリー状態に追加されるまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const treeState = await getTreeState(serviceWorker);
+        if (!treeState?.nodes) return false;
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        const existingTab = tabs.find(t => t.url?.includes('/existing'));
+        if (!existingTab) return false;
+        return Object.values(treeState.nodes).some((n: { tabId: number }) => n.tabId === existingTab.id);
+      },
+      { timeout: 5000, timeoutMessage: 'Existing tab did not appear in tree state' }
+    );
 
     // 復元前のタブ数を確認
     const tabsBeforeRestore = await serviceWorker.evaluate(async () => {
@@ -379,8 +409,18 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 少し待機
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // 復元されたタブが存在するまでポーリングで待機
+    await waitForCondition(
+      async () => {
+        const tabs = await serviceWorker.evaluate(async () => {
+          return await chrome.tabs.query({});
+        });
+        const hasRestoredTab1 = tabs.some(t => t.url?.includes('/restored-tab-1'));
+        const hasRestoredTab2 = tabs.some(t => t.url?.includes('/restored-tab-2'));
+        return hasRestoredTab1 && hasRestoredTab2;
+      },
+      { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
+    );
 
     // 復元後のタブを確認
     const tabsAfterRestore = await serviceWorker.evaluate(async () => {

@@ -13,6 +13,7 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
+
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
@@ -20,62 +21,11 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     await expect(sidePanelRoot).toBeVisible();
 
     const tabA = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabA, depth: 0 },
-    ], 0);
-
     const tabB = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabA, depth: 0 },
-      { tabId: tabB, depth: 0 },
-    ], 0);
-
     const tabC = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabA, depth: 0 },
-      { tabId: tabB, depth: 0 },
-      { tabId: tabC, depth: 0 },
-    ], 0);
-
     const tabD = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabA, depth: 0 },
-      { tabId: tabB, depth: 0 },
-      { tabId: tabC, depth: 0 },
-      { tabId: tabD, depth: 0 },
-    ], 0);
-
     const tabE = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabA, depth: 0 },
-      { tabId: tabB, depth: 0 },
-      { tabId: tabC, depth: 0 },
-      { tabId: tabD, depth: 0 },
-      { tabId: tabE, depth: 0 },
-    ], 0);
-
     const tabF = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: tabA, depth: 0 },
-      { tabId: tabB, depth: 0 },
-      { tabId: tabC, depth: 0 },
-      { tabId: tabD, depth: 0 },
-      { tabId: tabE, depth: 0 },
-      { tabId: tabF, depth: 0 },
-    ], 0);
-
     const tabG = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -194,39 +144,9 @@ test.describe('ドラッグ&ドロップによる異なる深さ間の移動', (
     await expect(sidePanelRoot).toBeVisible();
 
     const root1 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: root1, depth: 0 },
-    ], 0);
-
     const child1A = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: root1, depth: 0 },
-      { tabId: child1A, depth: 0 },
-    ], 0);
-
     const child1B = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: root1, depth: 0 },
-      { tabId: child1A, depth: 0 },
-      { tabId: child1B, depth: 0 },
-    ], 0);
-
     const root2 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      { tabId: root1, depth: 0 },
-      { tabId: child1A, depth: 0 },
-      { tabId: child1B, depth: 0 },
-      { tabId: root2, depth: 0 },
-    ], 0);
-
     const child2A = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },

@@ -386,12 +386,8 @@ test.describe('ピン留めタブセクション', () => {
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId }], 0);
 
-      await expect(async () => {
-        const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
-        await expect(pinnedTab).toBeVisible();
-      }).toPass({ timeout: 10000 });
-
       const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${tabId}"]`);
+      await expect(pinnedTab).toBeVisible({ timeout: 5000 });
       await pinnedTab.click({ button: 'right' });
 
       const contextMenu = sidePanelPage.locator('[role="menu"]');

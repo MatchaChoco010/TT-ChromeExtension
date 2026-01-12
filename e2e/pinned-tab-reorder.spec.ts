@@ -99,7 +99,7 @@ test.describe('ピン留めタブの並び替え', () => {
         await sidePanelPage.mouse.move(startX, startY);
         await sidePanelPage.mouse.down();
         await sidePanelPage.mouse.move(startX + 10, startY, { steps: 2 });
-        await sidePanelPage.mouse.move(endX, endY, { steps: 5 });
+        await sidePanelPage.mouse.move(endX, endY, { steps: 1 });
         await sidePanelPage.mouse.up();
       }
 
@@ -398,7 +398,7 @@ test.describe('ピン留めタブの並び替え', () => {
         await sidePanelPage.mouse.move(startX, startY);
         await sidePanelPage.mouse.down();
         await sidePanelPage.mouse.move(startX + 10, startY, { steps: 2 });
-        await sidePanelPage.mouse.move(endX, endY, { steps: 5 });
+        await sidePanelPage.mouse.move(endX, endY, { steps: 1 });
         await sidePanelPage.mouse.up();
       }
 
