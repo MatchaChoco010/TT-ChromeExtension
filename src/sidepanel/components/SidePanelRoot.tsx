@@ -38,10 +38,12 @@ const TreeViewContent: React.FC = () => {
     getTabInfo,
     isNodeSelected,
     selectNode,
+    clearSelection,
     getSelectedTabIds,
     viewTabCounts,
     moveTabsToView,
     currentWindowId,
+    currentViewId,
   } = useTreeState();
 
   const sidePanelRef = useRef<HTMLDivElement>(null);
@@ -156,6 +158,10 @@ const TreeViewContent: React.FC = () => {
       if (shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId)) {
         return;
       }
+      // 現在のビュー以外のノードはスキップ
+      if (node.viewId !== currentViewId) {
+        return;
+      }
       nodesWithChildren[id] = {
         ...node,
         children: [],
@@ -176,14 +182,31 @@ const TreeViewContent: React.FC = () => {
 
     const rootNodes: TabNode[] = [];
     Object.values(nodesWithChildren).forEach((node) => {
-      if (!node.parentId) {
+      // 親がいない、または親がフィルタリングされた（ピン留めタブや別ウィンドウ）場合はルートノードとして扱う
+      if (!node.parentId || !nodesWithChildren[node.parentId]) {
         rootNodes.push(node);
       }
     });
 
+    // フィルタリング後のツリー構造に対してdepthを再計算
+    const recalculateDepth = (node: TabNode, depth: number): void => {
+      node.depth = depth;
+      for (const child of node.children) {
+        recalculateDepth(child, depth + 1);
+      }
+    };
+
+    rootNodes.forEach((node) => {
+      recalculateDepth(node, 0);
+    });
+
+    // viewNodeOrderを使用してソート（Service Workerで管理されている順序を尊重）
+    // tab.indexでソートすると、useMenuActionsでの移動直後にtabInfoMapが古い場合に順序が狂う
+    const nodeOrderArray = treeState.viewNodeOrder?.[currentViewId] ?? [];
+    const nodeOrderMap = new Map(nodeOrderArray.map((id, index) => [id, index]));
     rootNodes.sort((a, b) => {
-      const indexA = tabInfoMap[a.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
-      const indexB = tabInfoMap[b.tabId]?.index ?? Number.MAX_SAFE_INTEGER;
+      const indexA = nodeOrderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const indexB = nodeOrderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
       return indexA - indexB;
     });
 
@@ -193,6 +216,8 @@ const TreeViewContent: React.FC = () => {
   const nodes = buildTree();
 
   const handlePinnedTabClick = (tabId: number) => {
+    // ピン留めタブをクリックしたとき、通常タブの選択状態をクリアする
+    clearSelection();
     chrome.tabs.update(tabId, { active: true });
   };
 
@@ -232,7 +257,7 @@ const TreeViewContent: React.FC = () => {
         {treeState && (
           <ViewSwitcher
             views={treeState.views}
-            currentViewId={treeState.currentViewId}
+            currentViewId={currentViewId}
             tabCounts={viewTabCounts}
             onViewSwitch={switchView}
             onViewCreate={createView}
@@ -259,12 +284,15 @@ const TreeViewContent: React.FC = () => {
             currentWindowId={currentWindowId ?? undefined}
             otherWindows={otherWindows}
             onMoveToWindow={handleMoveToWindow}
+            views={treeState?.views}
+            currentViewId={currentViewId}
+            onMoveToView={moveTabsToView}
           />
         )}
         <div ref={sidePanelRef} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
           <TabTreeView
             nodes={nodes}
-            currentViewId={treeState?.currentViewId || 'default'}
+            currentViewId={currentViewId}
             onNodeClick={handleNodeClick}
             onToggleExpand={handleToggleExpand}
             onDragEnd={handleDragEnd}

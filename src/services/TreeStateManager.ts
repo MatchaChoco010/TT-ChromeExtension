@@ -11,8 +11,26 @@ export class TreeStateManager {
   private tabToNode: Map<number, string> = new Map();
   private views: Map<string, string[]> = new Map();
   private expandedNodes: Set<string> = new Set();
+  private persistQueue: Promise<void> = Promise.resolve();
+  private syncInProgress: boolean = false;
+  private syncCompleted: boolean = false;
 
   constructor(private storageService: IStorageService) {}
+
+  /**
+   * 同期が完了しているかどうかを返す
+   * ブラウザ起動時の初期同期が完了した後にtrueになる
+   */
+  isSyncCompleted(): boolean {
+    return this.syncCompleted;
+  }
+
+  /**
+   * 同期中かどうかを返す
+   */
+  isSyncInProgress(): boolean {
+    return this.syncInProgress;
+  }
 
   /**
    * 指定されたviewIdのタブツリーを取得
@@ -21,9 +39,11 @@ export class TreeStateManager {
    */
   getTree(viewId: string): TabNode[] {
     const nodeIds = this.views.get(viewId) || [];
+    console.log('[DEBUG getTree] viewId:', viewId, 'nodeIds:', nodeIds);
     const rootNodes = nodeIds
       .map((id) => this.nodes.get(id))
       .filter((node): node is TabNode => node !== undefined && node.parentId === null);
+    console.log('[DEBUG getTree] rootNodes order:', rootNodes.map(n => ({ id: n.id, tabId: n.tabId })));
 
     return rootNodes;
   }
@@ -84,16 +104,22 @@ export class TreeStateManager {
     this.expandedNodes.add(nodeId);
 
     const viewNodes = this.views.get(viewId) || [];
+    console.log('[DEBUG addTab] viewId:', viewId, 'insertAfterNodeId:', insertAfterNodeId, 'viewNodes before:', [...viewNodes]);
     if (!parentId && insertAfterNodeId) {
       const insertAfterIndex = viewNodes.indexOf(insertAfterNodeId);
+      console.log('[DEBUG addTab] insertAfterIndex:', insertAfterIndex);
       if (insertAfterIndex !== -1) {
         viewNodes.splice(insertAfterIndex + 1, 0, nodeId);
+        console.log('[DEBUG addTab] Inserted at index:', insertAfterIndex + 1);
       } else {
         viewNodes.push(nodeId);
+        console.log('[DEBUG addTab] insertAfterNodeId not found, pushed to end');
       }
     } else {
       viewNodes.push(nodeId);
+      console.log('[DEBUG addTab] No insertAfterNodeId or has parentId, pushed to end');
     }
+    console.log('[DEBUG addTab] viewNodes after:', [...viewNodes]);
     this.views.set(viewId, viewNodes);
 
     if (parentId) {
@@ -226,7 +252,8 @@ export class TreeStateManager {
       this.expandedNodes.delete(nodeId);
     }
 
-    await this.persistState();
+    // preserveExpandedStates: false で呼び出し、トグル変更を確実に保存
+    await this.persistState(false);
   }
 
   /**
@@ -244,7 +271,8 @@ export class TreeStateManager {
     node.isExpanded = true;
     this.expandedNodes.add(nodeId);
 
-    await this.persistState();
+    // preserveExpandedStates: false で呼び出し、展開変更を確実に保存
+    await this.persistState(false);
   }
 
   /**
@@ -311,8 +339,18 @@ export class TreeStateManager {
   /**
    * chrome.tabs APIと同期
    * ブラウザ再起動時はtreeStructureから親子関係を復元
+   *
+   * @param userSettings - ユーザー設定（未マッチタブの追加位置を決定するため）
    */
-  async syncWithChromeTabs(): Promise<void> {
+  async syncWithChromeTabs(userSettings?: {
+    newTabPositionManual?: 'child' | 'sibling' | 'end';
+  }): Promise<void> {
+    // 並行実行を防止
+    if (this.syncInProgress || this.syncCompleted) {
+      return;
+    }
+    this.syncInProgress = true;
+
     try {
       // 同期前にストレージから最新状態を読み込む
       // 並行操作（handleTabCreatedなど）が保存した状態を上書きしないための競合防止
@@ -327,14 +365,17 @@ export class TreeStateManager {
       const treeStructure = state?.treeStructure;
 
       if (treeStructure && treeStructure.length > 0) {
-        await this.restoreFromTreeStructure(tabs, treeStructure, defaultViewId);
+        await this.restoreFromTreeStructure(tabs, treeStructure, defaultViewId, userSettings);
       } else {
-        await this.syncWithOpenerTabId(tabs, defaultViewId);
+        await this.syncWithOpenerTabId(tabs, defaultViewId, userSettings);
       }
 
       await this.persistState();
+      this.syncCompleted = true;
     } catch {
       // Chromeタブとの同期失敗は無視
+    } finally {
+      this.syncInProgress = false;
     }
   }
 
@@ -354,61 +395,76 @@ export class TreeStateManager {
 
   /**
    * treeStructureから親子関係を復元
-   * タブのインデックスとURLを使って照合
+   * タブのURLを優先して照合（ブラウザ再起動後にタブIDとインデックスが変わるため）
    *
    * 2パス処理：
    * 1. すべてのタブをルートノードとして追加
    * 2. 親子関係を設定
+   *
+   * マッチング優先順位:
+   * 1. URL + index の両方が一致（最も信頼性が高い）
+   * 2. URL のみが一致（ブラウザ再起動後にインデックスが変わった場合）
+   * 3. index のみが一致（URLが変わった場合、フォールバック）
+   *
+   * @param userSettings - ユーザー設定（未マッチタブの追加位置を決定するため）
    */
   private async restoreFromTreeStructure(
     tabs: chrome.tabs.Tab[],
     treeStructure: TreeStructureEntry[],
     defaultViewId: string,
+    userSettings?: { newTabPositionManual?: 'child' | 'sibling' | 'end' },
   ): Promise<void> {
+    // ブラウザ再起動後、古いタブIDのノードが残っている可能性があるため
+    // 新しいタブとマッチングする前に、存在しないタブIDのノードを特定する
+    const currentTabIds = new Set(tabs.filter(t => t.id).map(t => t.id!));
+    const staleNodeIds: string[] = [];
+    this.nodes.forEach((node, nodeId) => {
+      if (!currentTabIds.has(node.tabId)) {
+        staleNodeIds.push(nodeId);
+      }
+    });
+
+    // 古いノードを一時的にクリア（マッチングの邪魔にならないように）
+    for (const nodeId of staleNodeIds) {
+      const node = this.nodes.get(nodeId);
+      if (node) {
+        this.tabToNode.delete(node.tabId);
+        this.nodes.delete(nodeId);
+        this.expandedNodes.delete(nodeId);
+        // ビューからも削除
+        const viewNodes = this.views.get(node.viewId);
+        if (viewNodes) {
+          const index = viewNodes.indexOf(nodeId);
+          if (index !== -1) {
+            viewNodes.splice(index, 1);
+          }
+        }
+      }
+    }
+
     const sortedTabs = [...tabs].filter(t => t.id).sort((a, b) => a.index - b.index);
+
+    // indexをキーにしたtreeStructureのマップを作成
+    const indexToStructureEntry = new Map<number, { structureIndex: number; entry: TreeStructureEntry }>();
+    for (let i = 0; i < treeStructure.length; i++) {
+      const entry = treeStructure[i];
+      indexToStructureEntry.set(entry.index, { structureIndex: i, entry });
+    }
 
     const structureIndexToTabId = new Map<number, number>();
     const matchedTabIds = new Set<number>();
 
-    for (let i = 0; i < treeStructure.length; i++) {
-      const entry = treeStructure[i];
-      const matchingTab = sortedTabs.find(
-        t => t.id && !matchedTabIds.has(t.id) && t.index === entry.index && t.url === entry.url
-      );
-      if (matchingTab && matchingTab.id) {
-        structureIndexToTabId.set(i, matchingTab.id);
-        matchedTabIds.add(matchingTab.id);
+    // indexのみでマッチング（Chromeはブラウザ再起動時にタブの順序を維持する）
+    for (const tab of sortedTabs) {
+      if (!tab.id) continue;
+      const structureData = indexToStructureEntry.get(tab.index);
+      if (structureData && !matchedTabIds.has(tab.id)) {
+        structureIndexToTabId.set(structureData.structureIndex, tab.id);
+        matchedTabIds.add(tab.id);
       }
     }
 
-    for (let i = 0; i < treeStructure.length; i++) {
-      if (structureIndexToTabId.has(i)) continue;
-      const entry = treeStructure[i];
-      const matchingTab = sortedTabs.find(
-        t => t.id && !matchedTabIds.has(t.id) && t.index === entry.index
-      );
-      if (matchingTab && matchingTab.id) {
-        structureIndexToTabId.set(i, matchingTab.id);
-        matchedTabIds.add(matchingTab.id);
-      }
-    }
-
-    for (let i = 0; i < treeStructure.length; i++) {
-      if (structureIndexToTabId.has(i)) continue;
-      const entry = treeStructure[i];
-      const matchingTab = sortedTabs.find(
-        t => t.id && !matchedTabIds.has(t.id) && t.url === entry.url
-      );
-      if (matchingTab && matchingTab.id) {
-        structureIndexToTabId.set(i, matchingTab.id);
-        matchedTabIds.add(matchingTab.id);
-      }
-    }
-
-    // パス1で新規追加されたタブIDを追跡
-    // 既存ノードはloadState()で正しくparentIdが設定されているため、パス2で上書きしない
-    const newlyAddedTabIds = new Set<number>();
-
+    // マッチしたタブをノードとして追加（または既存ノードのviewIdを更新）
     for (let i = 0; i < treeStructure.length; i++) {
       const tabId = structureIndexToTabId.get(i);
       if (!tabId) continue;
@@ -416,14 +472,42 @@ export class TreeStateManager {
       const tab = tabs.find(t => t.id === tabId);
       if (!tab || !tab.id) continue;
 
-      const existingNode = this.getNodeByTabId(tab.id);
-      if (existingNode) continue;
-
       const entry = treeStructure[i];
+      const viewIdToUse = entry.viewId || defaultViewId;
 
-      await this.addTab(tab, null, entry.viewId || defaultViewId);
+      // 既存ノードがあればviewIdを更新
+      const existingNode = this.getNodeByTabId(tab.id);
+      if (existingNode) {
+        const oldViewId = existingNode.viewId;
+        if (oldViewId !== viewIdToUse) {
+          // 古いビューからノードを削除
+          const oldViewNodes = this.views.get(oldViewId);
+          if (oldViewNodes) {
+            const index = oldViewNodes.indexOf(existingNode.id);
+            if (index !== -1) {
+              oldViewNodes.splice(index, 1);
+            }
+          }
+          // 新しいビューにノードを追加
+          const newViewNodes = this.views.get(viewIdToUse) || [];
+          if (!newViewNodes.includes(existingNode.id)) {
+            newViewNodes.push(existingNode.id);
+            this.views.set(viewIdToUse, newViewNodes);
+          }
+          // ノードのviewIdを更新
+          existingNode.viewId = viewIdToUse;
+        }
+        // isExpandedも更新
+        existingNode.isExpanded = entry.isExpanded;
+        if (entry.isExpanded) {
+          this.expandedNodes.add(existingNode.id);
+        } else {
+          this.expandedNodes.delete(existingNode.id);
+        }
+        continue;
+      }
 
-      newlyAddedTabIds.add(tabId);
+      await this.addTab(tab, null, viewIdToUse);
 
       const newNode = this.getNodeByTabId(tab.id);
       if (newNode) {
@@ -436,21 +520,44 @@ export class TreeStateManager {
       }
     }
 
-    // パス2: 親子関係を設定（新規追加されたノードのみ）
-    // 既存ノードのparentIdはloadState()で正しく設定されているため、上書きしない
+    // パス5: 親子関係を設定（すべてのマッチしたノード）
+    // 深い階層（孫、ひ孫など）も正しく復元するため、depthの浅い順に処理
+    const entriesWithDepth: Array<{ index: number; entry: TreeStructureEntry; depth: number }> = [];
     for (let i = 0; i < treeStructure.length; i++) {
       const entry = treeStructure[i];
+      // depth計算: parentIndexを辿って深さを算出
+      let depth = 0;
+      let currentParentIndex = entry.parentIndex;
+      while (currentParentIndex !== null) {
+        depth++;
+        currentParentIndex = treeStructure[currentParentIndex]?.parentIndex ?? null;
+      }
+      entriesWithDepth.push({ index: i, entry, depth });
+    }
+    // depthの浅い順にソート（親から先に処理）
+    entriesWithDepth.sort((a, b) => a.depth - b.depth);
+
+    for (const { index: i, entry } of entriesWithDepth) {
       if (entry.parentIndex === null) continue;
 
       const tabId = structureIndexToTabId.get(i);
       const parentTabId = structureIndexToTabId.get(entry.parentIndex);
       if (!tabId || !parentTabId) continue;
 
-      if (!newlyAddedTabIds.has(tabId)) continue;
-
       const childNode = this.getNodeByTabId(tabId);
       const parentNode = this.getNodeByTabId(parentTabId);
       if (!childNode || !parentNode) continue;
+
+      // 既に正しい親子関係が設定されている場合はスキップ
+      if (childNode.parentId === parentNode.id) continue;
+
+      // 古い親から子を削除
+      if (childNode.parentId) {
+        const oldParent = this.nodes.get(childNode.parentId);
+        if (oldParent) {
+          oldParent.children = oldParent.children.filter(c => c.id !== childNode.id);
+        }
+      }
 
       childNode.parentId = parentNode.id;
       childNode.depth = parentNode.depth + 1;
@@ -462,30 +569,53 @@ export class TreeStateManager {
       this.updateChildrenDepth(childNode);
     }
 
+    // 未マッチのタブを追加
+    // ユーザー設定のnewTabPositionManualを考慮
+    const newTabPosition = userSettings?.newTabPositionManual ?? 'end';
+
     for (const tab of tabs) {
       if (!tab.id) continue;
       if (matchedTabIds.has(tab.id)) continue;
 
       const existingNode = this.getNodeByTabId(tab.id);
       if (!existingNode) {
-        const parentNode = tab.openerTabId
-          ? this.getNodeByTabId(tab.openerTabId)
-          : null;
-        await this.addTab(tab, parentNode?.id || null, defaultViewId);
+        let parentId: string | null = null;
+
+        // 'end'の場合は親なし（ルートレベル）に追加
+        // 'child'/'sibling'の場合はopenerTabIdを使用
+        if (newTabPosition !== 'end' && tab.openerTabId) {
+          const parentNode = this.getNodeByTabId(tab.openerTabId);
+          parentId = parentNode?.id || null;
+        }
+
+        await this.addTab(tab, parentId, defaultViewId);
+
+        // 'end'設定の場合、Chromeのタブ順序も最後に移動
+        if (newTabPosition === 'end' && tab.windowId !== undefined) {
+          try {
+            await chrome.tabs.move(tab.id, { index: -1 });
+          } catch {
+            // タブ移動失敗は無視
+          }
+        }
       }
     }
   }
 
   /**
    * openerTabIdを使って親子関係を復元（従来の方法）
+   *
+   * @param userSettings - ユーザー設定（未マッチタブの追加位置を決定するため）
    */
   private async syncWithOpenerTabId(
     tabs: chrome.tabs.Tab[],
     defaultViewId: string,
+    userSettings?: { newTabPositionManual?: 'child' | 'sibling' | 'end' },
   ): Promise<void> {
     const tabsMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
     const processedTabs = new Set<number>();
     const orderedTabs: chrome.tabs.Tab[] = [];
+    const newTabPosition = userSettings?.newTabPositionManual ?? 'end';
 
     const addTabAndChildren = (tab: chrome.tabs.Tab) => {
       if (!tab.id || processedTabs.has(tab.id)) return;
@@ -509,11 +639,25 @@ export class TreeStateManager {
 
       const existingNode = this.getNodeByTabId(tab.id);
       if (!existingNode) {
-        const parentNode = tab.openerTabId
-          ? this.getNodeByTabId(tab.openerTabId)
-          : null;
+        let parentId: string | null = null;
 
-        await this.addTab(tab, parentNode?.id || null, defaultViewId);
+        // 'end'の場合は親なし（ルートレベル）に追加
+        // 'child'/'sibling'の場合はopenerTabIdを使用
+        if (newTabPosition !== 'end' && tab.openerTabId) {
+          const parentNode = this.getNodeByTabId(tab.openerTabId);
+          parentId = parentNode?.id || null;
+        }
+
+        await this.addTab(tab, parentId, defaultViewId);
+
+        // 'end'設定の場合、Chromeのタブ順序も最後に移動
+        if (newTabPosition === 'end' && tab.windowId !== undefined) {
+          try {
+            await chrome.tabs.move(tab.id, { index: -1 });
+          } catch {
+            // タブ移動失敗は無視
+          }
+        }
       }
     }
   }
@@ -596,6 +740,35 @@ export class TreeStateManager {
   }
 
   /**
+   * タブIDを置き換える
+   * chrome.tabs.onReplacedで発火したときに使用
+   * discardなどでタブIDが変わった場合に対応
+   *
+   * @param oldTabId - 古いタブID
+   * @param newTabId - 新しいタブID
+   */
+  async replaceTabId(oldTabId: number, newTabId: number): Promise<void> {
+    const nodeId = this.tabToNode.get(oldTabId);
+    if (!nodeId) {
+      return;
+    }
+
+    const node = this.nodes.get(nodeId);
+    if (!node) {
+      return;
+    }
+
+    // tabIdを更新
+    node.tabId = newTabId;
+
+    // tabToNodeマップを更新
+    this.tabToNode.delete(oldTabId);
+    this.tabToNode.set(newTabId, nodeId);
+
+    await this.persistState();
+  }
+
+  /**
    * ノードとその子孫を再帰的に収集
    * @param node - 収集開始ノード
    * @param result - 結果配列
@@ -612,17 +785,21 @@ export class TreeStateManager {
    * ストレージに状態を永続化
    * 既存のviews, currentViewIdを保持
    * 新規タブ追加後もビューを維持
+   *
+   * @param preserveExpandedStates - trueの場合、既存ノードのisExpanded状態をストレージから保持する
+   *   デフォルトはtrue。toggleExpandやexpandNodeでは明示的にfalseを渡して、
+   *   バックグラウンドでの変更を確実に保存する。
    */
-  private async persistState(): Promise<void> {
-    const nodesRecord: Record<string, TabNode> = {};
-    this.nodes.forEach((node, id) => {
-      // 循環参照を避けるため、子ノードはIDのみ保存（children配列の順序を保持）
-      nodesRecord[id] = {
-        ...node,
-        children: node.children.map(child => ({ id: child.id })) as unknown as TabNode[],
-      };
-    });
+  private async persistState(preserveExpandedStates: boolean = true): Promise<void> {
+    this.persistQueue = this.persistQueue
+      .then(() => this.persistStateInternal(preserveExpandedStates))
+      .catch(() => {
+        // エラーは無視（次の処理に影響を与えない）
+      });
+    return this.persistQueue;
+  }
 
+  private async persistStateInternal(preserveExpandedStates: boolean): Promise<void> {
     const tabToNodeRecord: Record<number, string> = {};
     this.tabToNode.forEach((nodeId, tabId) => {
       tabToNodeRecord[tabId] = nodeId;
@@ -630,6 +807,9 @@ export class TreeStateManager {
 
     let existingViews: TreeState['views'] = [];
     let existingCurrentViewId = 'default';
+    // 既存ノードのisExpanded状態を保持するためのマップ
+    // UIで変更されたisExpanded状態がバックグラウンドのpersistStateで上書きされるのを防ぐ
+    const existingExpandedStates = new Map<string, boolean>();
 
     try {
       const existingState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
@@ -640,12 +820,39 @@ export class TreeStateManager {
         if (existingState.currentViewId) {
           existingCurrentViewId = existingState.currentViewId;
         }
+        // 既存ノードのisExpanded状態を保存（preserveExpandedStatesがtrueの場合のみ使用）
+        if (preserveExpandedStates && existingState.nodes) {
+          Object.entries(existingState.nodes).forEach(([nodeId, node]) => {
+            existingExpandedStates.set(nodeId, (node as TabNode).isExpanded);
+          });
+        }
       }
     } catch {
       // 既存状態読み込み失敗は無視
     }
 
+    const nodesRecord: Record<string, TabNode> = {};
+    this.nodes.forEach((node, id) => {
+      // 循環参照を避けるため、子ノードはIDのみ保存（children配列の順序を保持）
+      // preserveExpandedStatesがtrueで既存ノードの場合、ストレージに保存されているisExpanded状態を優先
+      // これによりUIでの変更がバックグラウンド処理で上書きされるのを防ぐ
+      const isExpanded = (preserveExpandedStates && existingExpandedStates.has(id))
+        ? existingExpandedStates.get(id)!
+        : node.isExpanded;
+      nodesRecord[id] = {
+        ...node,
+        isExpanded,
+        children: node.children.map(child => ({ id: child.id })) as unknown as TabNode[],
+      };
+    });
+
     const treeStructure = await this.buildTreeStructure();
+
+    // 各ビュー内のノード順序を保存
+    const viewNodeOrder: Record<string, string[]> = {};
+    this.views.forEach((nodeIds, viewId) => {
+      viewNodeOrder[viewId] = [...nodeIds];
+    });
 
     const treeState: TreeState = {
       views: existingViews,
@@ -653,6 +860,7 @@ export class TreeStateManager {
       nodes: nodesRecord,
       tabToNode: tabToNodeRecord,
       treeStructure,
+      viewNodeOrder,
     };
 
     await this.storageService.set(STORAGE_KEYS.TREE_STATE, treeState);
@@ -708,18 +916,48 @@ export class TreeStateManager {
       this.tabToNode.clear();
       this.views.clear();
 
+      // まずノードをマップに登録
       Object.entries(state.nodes).forEach(([id, node]) => {
         this.nodes.set(id, { ...node, children: [] });
         this.tabToNode.set(node.tabId, id);
-
-        const viewNodes = this.views.get(node.viewId) || [];
-        viewNodes.push(id);
-        this.views.set(node.viewId, viewNodes);
 
         if (node.isExpanded) {
           this.expandedNodes.add(id);
         }
       });
+
+      // viewNodeOrderが保存されている場合はそれを使用して順序を復元
+      // そうでない場合は従来の方法でビューを構築
+      console.log('[DEBUG loadState] state.viewNodeOrder exists:', !!state.viewNodeOrder);
+      if (state.viewNodeOrder) {
+        console.log('[DEBUG loadState] viewNodeOrder:', state.viewNodeOrder);
+        Object.entries(state.viewNodeOrder).forEach(([viewId, nodeIds]) => {
+          // 有効なノードIDのみフィルタリング（削除されたノードを除外）
+          const validNodeIds = nodeIds.filter(id => this.nodes.has(id));
+          console.log('[DEBUG loadState] Setting views for', viewId, ':', validNodeIds);
+          this.views.set(viewId, validNodeIds);
+        });
+        // viewNodeOrderに含まれていないノードを追加（新しく作成されたビュー等）
+        this.nodes.forEach((node, id) => {
+          if (!node.parentId) {
+            const viewNodes = this.views.get(node.viewId) || [];
+            if (!viewNodes.includes(id)) {
+              console.log('[DEBUG loadState] Adding missing root node to view:', id, 'viewId:', node.viewId);
+              viewNodes.push(id);
+              this.views.set(node.viewId, viewNodes);
+            }
+          }
+        });
+      } else {
+        console.log('[DEBUG loadState] No viewNodeOrder, using fallback method');
+        // 従来の方法：ノードのviewIdに基づいてビューを構築
+        Object.entries(state.nodes).forEach(([id, node]) => {
+          const viewNodes = this.views.get(node.viewId) || [];
+          viewNodes.push(id);
+          this.views.set(node.viewId, viewNodes);
+        });
+      }
+      console.log('[DEBUG loadState] Final views:', Object.fromEntries(this.views.entries()));
 
       // ストレージに保存されたchildren配列の順序を維持して再構築
       // 2段階処理: 1. 保存順序で追加、2. parentIdで関連付けられた未追加の子を追加

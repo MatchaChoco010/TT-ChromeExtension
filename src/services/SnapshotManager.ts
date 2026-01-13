@@ -95,6 +95,7 @@ export class SnapshotManager {
    * タブノードからタブスナップショットを作成
    *
    * 各タブにindexを割り当て、parentIdをparentIndexに変換する
+   * マルチウィンドウ対応のため、windowIdをwindowIndexに変換して保存
    *
    * @param nodes - タブノードのレコード
    * @returns タブスナップショット配列
@@ -113,6 +114,20 @@ export class SnapshotManager {
       nodeIdToIndex.set(node.id, index);
     });
 
+    // windowIdをwindowIndexに変換するためのマッピング
+    const windowIdSet = new Set<number>();
+    for (const node of nodeArray) {
+      const tab = tabMap.get(node.tabId);
+      if (tab && tab.windowId !== undefined) {
+        windowIdSet.add(tab.windowId);
+      }
+    }
+    const windowIds = Array.from(windowIdSet).sort((a, b) => a - b);
+    const windowIdToIndex = new Map<number, number>();
+    windowIds.forEach((windowId, index) => {
+      windowIdToIndex.set(windowId, index);
+    });
+
     for (let index = 0; index < nodeArray.length; index++) {
       const node = nodeArray[index];
       const tab = tabMap.get(node.tabId);
@@ -121,6 +136,9 @@ export class SnapshotManager {
         const parentIndex = node.parentId
           ? nodeIdToIndex.get(node.parentId) ?? null
           : null;
+        const windowIndex = tab.windowId !== undefined
+          ? windowIdToIndex.get(tab.windowId) ?? 0
+          : 0;
 
         tabSnapshots.push({
           index,
@@ -130,6 +148,7 @@ export class SnapshotManager {
           viewId: node.viewId,
           isExpanded: node.isExpanded,
           pinned: tab.pinned || false,
+          windowIndex,
         });
       }
     }
@@ -140,10 +159,11 @@ export class SnapshotManager {
   /**
    * スナップショットからタブを復元
    *
-   * 親子関係を維持するため、以下のアルゴリズムで復元:
-   * 1. 親を持たないタブ（ルートタブ）を先に作成
-   * 2. 子タブを親の順に作成
-   * 3. 全タブ作成後、ツリー状態を更新して親子関係と展開状態を反映
+   * マルチウィンドウ対応の復元アルゴリズム:
+   * 1. windowIndexごとに新しいウィンドウを作成
+   * 2. 各ウィンドウ内で親を持たないタブ（ルートタブ）を先に作成
+   * 3. 子タブを親の順に作成
+   * 4. 全タブ作成後、ツリー状態を更新して親子関係と展開状態を反映
    *
    * @param tabs - タブスナップショット配列
    * @param views - ビュー配列
@@ -167,12 +187,48 @@ export class SnapshotManager {
       indexToSnapshot.set(tabSnapshot.index, tabSnapshot);
     }
 
+    // windowIndexのセットを取得
+    const windowIndexSet = new Set<number>();
+    for (const tabSnapshot of sortedTabs) {
+      windowIndexSet.add(tabSnapshot.windowIndex ?? 0);
+    }
+    const windowIndices = Array.from(windowIndexSet).sort((a, b) => a - b);
+
+    // 各windowIndexに対して新しいウィンドウを作成
+    const windowIndexToNewWindowId = new Map<number, number>();
+    for (const windowIndex of windowIndices) {
+      try {
+        const newWindow = await chrome.windows.create({});
+        if (newWindow.id !== undefined) {
+          windowIndexToNewWindowId.set(windowIndex, newWindow.id);
+          // 新しいウィンドウに自動で作成される空白タブを後で削除するため、タブIDを記録
+          if (newWindow.tabs && newWindow.tabs.length > 0) {
+            const blankTabId = newWindow.tabs[0].id;
+            if (blankTabId !== undefined) {
+              // 後で削除できるようにマークしておく
+              setTimeout(() => {
+                chrome.tabs.remove(blankTabId).catch(() => {
+                  // 既に閉じられている場合は無視
+                });
+              }, 1000);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to create window for windowIndex:', windowIndex, error);
+      }
+    }
+
     for (const tabSnapshot of sortedTabs) {
       try {
+        const windowIndex = tabSnapshot.windowIndex ?? 0;
+        const targetWindowId = windowIndexToNewWindowId.get(windowIndex);
+
         const newTab = await chrome.tabs.create({
           url: tabSnapshot.url,
           active: false,
           pinned: tabSnapshot.pinned,
+          windowId: targetWindowId,
         });
 
         if (newTab.id !== undefined) {

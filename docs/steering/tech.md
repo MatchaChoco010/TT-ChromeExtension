@@ -374,6 +374,8 @@ npm run test:e2e   # Playwright E2Eテスト
 - **複数ウィンドウ対応**: TreeStateProviderでwindowIdを取得し各ウィンドウで自身のタブのみをフィルタリング表示
 - **ウィンドウ間タブ移動**: コンテキストメニューから「別のウィンドウに移動」「新しいウィンドウに移動」で実現
 - **リンククリック検出**: `chrome.webNavigation.onCreatedNavigationTarget` APIを使用。このAPIはリンククリックまたは`window.open()`の場合のみ発火し、`chrome.tabs.create()`・ブックマーク・アドレスバー・Ctrl+Tでは発火しない。これにより「リンクから開いたタブ」と「手動で開いたタブ」を正確に区別し、それぞれの設定（`newTabPositionFromLink` / `newTabPositionManual`）を適用する
+- **ストレージ設計**: `chrome.storage.local`を使用（`unlimitedStorage`権限あり）。IndexedDBは使用しない。想定最大タブ数は2500。15秒ごとの定期永続化でブラウザクラッシュ時のデータロスを最小化。ファビコンはURL文字列（またはdata:URL）として保存
+- **タブ休止（discard）時のtabId変更**: `chrome.tabs.discard()`でタブを休止すると、ChromeはtabIdを変更する。この変更は`chrome.tabs.onReplaced`イベントで検知する。`onReplaced(addedTabId, removedTabId)`が発火したら、ツリー状態内の旧tabIdを新tabIdに置き換える。複数タブを同時に休止する場合は競合状態が発生するため、キューで直列化処理する
 
 ---
 

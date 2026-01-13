@@ -253,7 +253,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           <div className="mr-1 w-3 h-3 flex-shrink-0" />
         )}
 
-        <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+        <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0 relative">
           {tab.favIconUrl ? (
             <img
               src={tab.favIconUrl}
@@ -264,6 +264,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             <div
               data-testid="default-icon"
               className="w-full h-full bg-gray-300 rounded-sm"
+            />
+          )}
+          {isDiscarded && (
+            <div
+              data-testid="discarded-favicon-overlay"
+              className="absolute inset-0 bg-black/50 rounded-sm"
             />
           )}
         </div>

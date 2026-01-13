@@ -313,7 +313,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           >
             <option value="child">元のタブの子</option>
             <option value="sibling">元のタブの隣</option>
-            <option value="end">リストの最後</option>
+            <option value="end">ツリーの最後</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
             リンククリックから開かれたタブの挿入位置
@@ -325,7 +325,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             htmlFor="newTabPositionManual"
             className="block text-sm font-medium text-gray-300 mb-2"
           >
-            手動で開かれたタブの位置
+            新規タブの位置
           </label>
           <select
             id="newTabPositionManual"
@@ -335,10 +335,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           >
             <option value="child">現在のタブの子</option>
             <option value="sibling">現在のタブの隣</option>
-            <option value="end">リストの最後</option>
+            <option value="end">ツリーの最後</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
-            手動で開かれたタブ(アドレスバー、新規タブボタン、設定画面など)の挿入位置
+            アドレスバー、新規タブボタン、設定画面などから開かれたタブの挿入位置
           </p>
         </div>
 
@@ -356,7 +356,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
           >
             <option value="sibling">元のタブの直後</option>
-            <option value="end">リストの最後</option>
+            <option value="end">ツリーの最後</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
             タブを複製したときの挿入位置
@@ -420,23 +420,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {showRestoreOptions && (
             <div className="mb-3 p-3 bg-gray-800 rounded-md border border-gray-700">
-              <p className="text-sm text-gray-300 mb-3">スナップショットを復元します。現在のタブをどうしますか？</p>
+              <p className="text-sm text-gray-300 mb-3">スナップショットを新しいウィンドウで復元します。</p>
               <div className="flex gap-2">
                 <button
-                  data-testid="settings-restore-close-tabs"
-                  onClick={() => handleRestore(true)}
-                  disabled={isProcessing}
-                  className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded disabled:opacity-50 transition-colors"
-                >
-                  現在のタブを閉じる
-                </button>
-                <button
-                  data-testid="settings-restore-keep-tabs"
+                  data-testid="settings-restore-new-window"
                   onClick={() => handleRestore(false)}
                   disabled={isProcessing}
                   className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded disabled:opacity-50 transition-colors"
                 >
-                  タブを保持
+                  新しいウィンドウで復元
                 </button>
                 <button
                   data-testid="settings-restore-cancel"

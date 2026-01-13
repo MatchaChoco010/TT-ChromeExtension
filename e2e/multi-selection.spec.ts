@@ -140,7 +140,7 @@ test.describe('複数選択機能', () => {
     ], 0);
   });
 
-  test('複数選択時にコンテキストメニューで選択タブ数が表示される', async ({
+  test('複数選択時にコンテキストメニューで選択タブを閉じるメニューが表示される', async ({
     extensionContext,
     serviceWorker,
   }) => {
@@ -191,7 +191,8 @@ test.describe('複数選択機能', () => {
     const contextMenu = sidePanelPage.locator('[role="menu"]');
     await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
-    const closeMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブを閉じる.*2件/ });
+    // 件数表示は削除されたため、「選択されたタブを閉じる」のみを確認
+    const closeMenuItem = sidePanelPage.getByRole('menuitem', { name: '選択されたタブを閉じる' });
     await expect(closeMenuItem).toBeVisible();
 
     await sidePanelPage.keyboard.press('Escape');
@@ -283,6 +284,85 @@ test.describe('複数選択機能', () => {
     ], 0);
 
     await closeTab(serviceWorker, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+  });
+
+  test('折りたたまれた親タブと別のタブを複数選択して閉じるとサブツリーも閉じられる', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    // 親タブとその子タブを作成
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
+
+    const childTabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
+      { tabId: childTabId1, depth: 1 },
+    ], 0);
+
+    const childTabId2 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
+      { tabId: childTabId1, depth: 1 },
+      { tabId: childTabId2, depth: 1 },
+    ], 0);
+
+    // 別の単独タブを作成
+    const anotherTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
+      { tabId: childTabId1, depth: 1 },
+      { tabId: childTabId2, depth: 1 },
+      { tabId: anotherTabId, depth: 0 },
+    ], 0);
+
+    // 親タブを折りたたむ（expanded: false）
+    const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
+    const expandButton = parentNode.locator('[data-testid="expand-button"]');
+    await expandButton.click();
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: false },
+      { tabId: anotherTabId, depth: 0 },
+    ], 0);
+
+    await sidePanelPage.bringToFront();
+    await sidePanelPage.evaluate(() => window.focus());
+
+    // 折りたたまれた親タブと別のタブを複数選択
+    await parentNode.click();
+    const anotherNode = sidePanelPage.locator(`[data-testid="tree-node-${anotherTabId}"]`);
+    await anotherNode.click({ modifiers: ['Control'] });
+
+    // 複数選択状態でコンテキストメニューを開く
+    await parentNode.click({ button: 'right', force: true, noWaitAfter: true });
+    await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
+
+    // 「選択されたタブを閉じる」を選択
+    const closeItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブを閉じる/ });
+    await expect(closeItem).toBeVisible({ timeout: 3000 });
+    await closeItem.click({ force: true, noWaitAfter: true });
+
+    // 親タブとその子タブ（サブツリー）、および別のタブがすべて閉じられる
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },

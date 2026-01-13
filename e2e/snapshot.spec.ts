@@ -194,50 +194,42 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 復元されたタブが存在するまでポーリングで待機
-    await waitForCondition(
-      async () => {
-        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
-        const hasParent = tabs.some(t => t.url?.includes('/parent'));
-        const hasChild = tabs.some(t => t.url?.includes('/child'));
-        return hasParent && hasChild;
-      },
-      { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
-    );
-
-    // ツリー状態を確認
-    const treeState = await getTreeState(serviceWorker);
-    expect(treeState).not.toBeNull();
-
-    // 復元されたタブを検索
-    const nodes = Object.values(treeState.nodes) as Array<{
+    // 復元されたタブとノードが存在するまでポーリングで待機
+    interface NodeInfo {
       id: string;
       tabId: number;
       parentId: string | null;
       viewId: string;
-    }>;
-
-    // タブURLを取得
-    const tabs = await serviceWorker.evaluate(async () => {
-      return await chrome.tabs.query({});
-    });
-
-    const parentTab = tabs.find(t => t.url?.includes('/parent'));
-    const childTab = tabs.find(t => t.url?.includes('/child'));
-
-    expect(parentTab).toBeDefined();
-    expect(childTab).toBeDefined();
-
-    if (parentTab && childTab) {
-      const parentNode = nodes.find(n => n.tabId === parentTab.id);
-      const childNode = nodes.find(n => n.tabId === childTab.id);
-
-      expect(parentNode).toBeDefined();
-      expect(childNode).toBeDefined();
-
-      // 親子関係が正しく復元されていることを確認
-      expect(childNode?.parentId).toBe(parentNode?.id);
     }
+    let parentTab: chrome.tabs.Tab | undefined;
+    let childTab: chrome.tabs.Tab | undefined;
+    let parentNode: NodeInfo | undefined;
+    let childNode: NodeInfo | undefined;
+
+    await waitForCondition(
+      async () => {
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        parentTab = tabs.find(t => t.url?.includes('/parent'));
+        childTab = tabs.find(t => t.url?.includes('/child'));
+        if (!parentTab || !childTab) return false;
+
+        const treeState = await getTreeState(serviceWorker);
+        if (!treeState?.nodes) return false;
+
+        const nodes = Object.values(treeState.nodes) as NodeInfo[];
+        parentNode = nodes.find(n => n.tabId === parentTab!.id);
+        childNode = nodes.find(n => n.tabId === childTab!.id);
+
+        // 両方のノードが存在し、親子関係が設定されているか確認
+        return parentNode !== undefined && childNode !== undefined && childNode.parentId === parentNode.id;
+      },
+      { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with parent-child relationship did not appear' }
+    );
+
+    // 親子関係が正しく復元されていることを確認
+    expect(parentNode).toBeDefined();
+    expect(childNode).toBeDefined();
+    expect(childNode?.parentId).toBe(parentNode?.id);
 
     await sidePanelPage.close();
   });
@@ -291,49 +283,43 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 復元されたタブが存在するまでポーリングで待機
-    await waitForCondition(
-      async () => {
-        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
-        const hasWork = tabs.some(t => t.url?.includes('/work-tab'));
-        const hasPersonal = tabs.some(t => t.url?.includes('/personal-tab'));
-        return hasWork && hasPersonal;
-      },
-      { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
-    );
-
-    // ツリー状態を確認
-    const treeState = await getTreeState(serviceWorker);
-    expect(treeState).not.toBeNull();
-
-    const nodes = Object.values(treeState.nodes) as Array<{
+    // 復元されたタブとノードが存在するまでポーリングで待機
+    interface ViewNodeInfo {
       id: string;
       tabId: number;
       viewId: string;
-    }>;
-
-    // タブURLを取得
-    const tabs = await serviceWorker.evaluate(async () => {
-      return await chrome.tabs.query({});
-    });
-
-    const workTab = tabs.find(t => t.url?.includes('/work-tab'));
-    const personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
-
-    expect(workTab).toBeDefined();
-    expect(personalTab).toBeDefined();
-
-    if (workTab && personalTab) {
-      const workNode = nodes.find(n => n.tabId === workTab.id);
-      const personalNode = nodes.find(n => n.tabId === personalTab.id);
-
-      expect(workNode).toBeDefined();
-      expect(personalNode).toBeDefined();
-
-      // 正しいビューに配置されていることを確認
-      expect(workNode?.viewId).toBe('view-work');
-      expect(personalNode?.viewId).toBe('view-personal');
     }
+    let workTab: chrome.tabs.Tab | undefined;
+    let personalTab: chrome.tabs.Tab | undefined;
+    let workNode: ViewNodeInfo | undefined;
+    let personalNode: ViewNodeInfo | undefined;
+
+    await waitForCondition(
+      async () => {
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        workTab = tabs.find(t => t.url?.includes('/work-tab'));
+        personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
+        if (!workTab || !personalTab) return false;
+
+        const treeState = await getTreeState(serviceWorker);
+        if (!treeState?.nodes) return false;
+
+        const nodes = Object.values(treeState.nodes) as ViewNodeInfo[];
+        workNode = nodes.find(n => n.tabId === workTab!.id);
+        personalNode = nodes.find(n => n.tabId === personalTab!.id);
+
+        // 両方のノードが存在し、正しいビューに配置されているか確認
+        return workNode !== undefined && personalNode !== undefined &&
+               workNode.viewId === 'view-work' && personalNode.viewId === 'view-personal';
+      },
+      { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with correct viewId did not appear' }
+    );
+
+    // 正しいビューに配置されていることを確認
+    expect(workNode).toBeDefined();
+    expect(personalNode).toBeDefined();
+    expect(workNode?.viewId).toBe('view-work');
+    expect(personalNode?.viewId).toBe('view-personal');
 
     await sidePanelPage.close();
   });

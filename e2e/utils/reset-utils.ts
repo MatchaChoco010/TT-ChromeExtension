@@ -70,7 +70,7 @@ export async function resetExtensionState(
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: { nodes: Map<unknown, unknown>; tabToNode: Map<unknown, unknown>; views: Map<string, unknown[]>; expandedNodes: Set<unknown>; currentViewId: string } }).treeStateManager;
+      const treeStateManager = (globalThis as unknown as { treeStateManager?: { nodes: Map<unknown, unknown>; tabToNode: Map<unknown, unknown>; views: Map<string, unknown[]>; expandedNodes: Set<unknown>; currentViewId: string; syncCompleted: boolean; syncInProgress: boolean } }).treeStateManager;
       if (treeStateManager) {
         treeStateManager.nodes.clear();
         treeStateManager.tabToNode.clear();
@@ -78,6 +78,9 @@ export async function resetExtensionState(
         treeStateManager.expandedNodes.clear();
         treeStateManager.views.set('default', []);
         treeStateManager.currentViewId = 'default';
+        // syncWithChromeTabsが再度実行されるようにフラグをリセット
+        treeStateManager.syncCompleted = false;
+        treeStateManager.syncInProgress = false;
       }
 
       const g = globalThis as unknown as { pendingTabParents?: Map<unknown, unknown>; pendingDuplicateSources?: Map<unknown, unknown>; pendingGroupTabIds?: Map<unknown, unknown>; pendingLinkClicks?: Map<unknown, unknown> };
@@ -189,11 +192,15 @@ export async function resetExtensionState(
   );
 
   // Step 9: Chromeタブと同期
+  // Step 4でウィンドウ作成時にsyncWithChromeTabsが呼ばれてsyncCompletedがtrueになっている可能性があるため
+  // 再度フラグをリセットしてからsyncWithChromeTabsを呼ぶ
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: { syncWithChromeTabs: () => Promise<void> } }).treeStateManager;
+      const treeStateManager = (globalThis as unknown as { treeStateManager?: { syncWithChromeTabs: () => Promise<void>; syncCompleted: boolean; syncInProgress: boolean } }).treeStateManager;
       if (treeStateManager) {
+        treeStateManager.syncCompleted = false;
+        treeStateManager.syncInProgress = false;
         await treeStateManager.syncWithChromeTabs();
       }
     },

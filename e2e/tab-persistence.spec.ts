@@ -74,31 +74,32 @@ test.describe('Tab Persistence', () => {
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 1. タブを作成
-      const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
+      const tabUrl = getTestServerUrl('/page');
+      const tabId = await createTab(serviceWorker, tabUrl, undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. ファビコンを直接ストレージに設定（chrome.tabs.onUpdatedイベントをシミュレート）
+      // 2. ファビコンを直接ストレージに設定（URLをキーに）
       const testFaviconUrl = 'http://127.0.0.1/favicon.ico';
       await serviceWorker.evaluate(
-        async ({ id, faviconUrl }) => {
+        async ({ url, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
-          const favicons = (result.tab_favicons as Record<number, string>) || {};
-          favicons[id] = faviconUrl;
+          const favicons = (result.tab_favicons as Record<string, string>) || {};
+          favicons[url] = faviconUrl;
           await chrome.storage.local.set({ tab_favicons: favicons });
         },
-        { id: tabId, faviconUrl: testFaviconUrl }
+        { url: tabUrl, faviconUrl: testFaviconUrl }
       );
 
-      // 3. ファビコンがストレージに存在することを確認
-      const storedFavicon = await serviceWorker.evaluate(async (id) => {
+      // 3. ファビコンがストレージに存在することを確認（URLをキーに）
+      const storedFavicon = await serviceWorker.evaluate(async (url) => {
         const result = await chrome.storage.local.get('tab_favicons');
-        const favicons = result.tab_favicons as Record<number, string> | undefined;
-        return favicons?.[id];
-      }, tabId);
+        const favicons = result.tab_favicons as Record<string, string> | undefined;
+        return favicons?.[url];
+      }, tabUrl);
 
       expect(storedFavicon).toBe(testFaviconUrl);
 

@@ -141,6 +141,53 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       ], 0);
     });
 
+    test('手動で開かれたタブが「手動で開かれたタブの位置」設定に従って配置される（sibling設定）', async ({
+      extensionContext,
+      serviceWorker,
+      extensionId,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+
+      const settingsPage = await openSettingsPage(extensionContext, extensionId);
+      await changeTabPositionSetting(settingsPage, 'manual', 'sibling');
+      await settingsPage.close();
+      await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'sibling');
+
+      const firstTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: firstTabId, depth: 0 },
+      ], 0);
+
+      const secondTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: firstTabId, depth: 0 },
+        { tabId: secondTabId, depth: 0 },
+      ], 0);
+
+      await activateTab(serviceWorker, firstTabId);
+
+      const thirdTabId = await createTab(serviceWorker, getTestServerUrl('/page?third'));
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: firstTabId, depth: 0 },
+        { tabId: thirdTabId, depth: 0 },
+        { tabId: secondTabId, depth: 0 },
+      ], 0);
+    });
+
     test('設定変更後に新しいタブが変更された設定に従って配置される', async ({
       extensionContext,
       serviceWorker,

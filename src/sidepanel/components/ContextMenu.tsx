@@ -11,7 +11,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
   isPinned = false,
   isGrouped = false,
-  hasChildren = false,
+  hasChildren: _hasChildren = false,
   tabUrl,
   views,
   currentViewId,
@@ -23,6 +23,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const moveToViewButtonRef = useRef<HTMLDivElement>(null);
   const moveToWindowButtonRef = useRef<HTMLDivElement>(null);
+  // サブメニューを閉じるのを遅延させるためのタイマー
+  const viewSubMenuCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const windowSubMenuCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMultipleSelection = targetTabIds.length > 1;
 
   const [isSubMenuOpen, setIsSubMenuOpen] = useState(false);
@@ -78,6 +81,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     };
   }, [onClose]);
 
+  // サイドパネルがフォーカスを失った時（ユーザーが通常のタブなどをクリックした時）にメニューを閉じる
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      onClose();
+    };
+
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [onClose]);
+
   const handleMenuItemClick = (action: MenuAction) => {
     onAction(action);
     onClose();
@@ -103,6 +119,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [onMoveToView, targetTabIds, onClose]);
 
   const handleMoveToViewMouseEnter = useCallback(() => {
+    // 閉じるタイムアウトをキャンセル
+    if (viewSubMenuCloseTimeoutRef.current) {
+      clearTimeout(viewSubMenuCloseTimeoutRef.current);
+      viewSubMenuCloseTimeoutRef.current = null;
+    }
+    // 別のサブメニューが開いている場合は閉じる
+    setIsWindowSubMenuOpen(false);
     if (moveToViewButtonRef.current) {
       setSubMenuParentRect(moveToViewButtonRef.current.getBoundingClientRect());
     } else {
@@ -112,6 +135,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [adjustedPosition]);
 
   const handleMoveToViewMouseLeave = useCallback(() => {
+    // 少し遅延してからサブメニューを閉じる
+    if (viewSubMenuCloseTimeoutRef.current) {
+      clearTimeout(viewSubMenuCloseTimeoutRef.current);
+    }
+    viewSubMenuCloseTimeoutRef.current = setTimeout(() => {
+      setIsSubMenuOpen(false);
+    }, 100);
   }, []);
 
   const handleSubMenuClose = useCallback(() => {
@@ -136,6 +166,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [otherWindows]);
 
   const handleMoveToWindowMouseEnter = useCallback(() => {
+    // 閉じるタイムアウトをキャンセル
+    if (windowSubMenuCloseTimeoutRef.current) {
+      clearTimeout(windowSubMenuCloseTimeoutRef.current);
+      windowSubMenuCloseTimeoutRef.current = null;
+    }
+    // 別のサブメニューが開いている場合は閉じる
+    setIsSubMenuOpen(false);
     if (moveToWindowButtonRef.current) {
       setWindowSubMenuParentRect(moveToWindowButtonRef.current.getBoundingClientRect());
     } else {
@@ -145,6 +182,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [adjustedPosition]);
 
   const handleMoveToWindowMouseLeave = useCallback(() => {
+    // 少し遅延してからサブメニューを閉じる
+    if (windowSubMenuCloseTimeoutRef.current) {
+      clearTimeout(windowSubMenuCloseTimeoutRef.current);
+    }
+    windowSubMenuCloseTimeoutRef.current = setTimeout(() => {
+      setIsWindowSubMenuOpen(false);
+    }, 100);
   }, []);
 
   const handleWindowSubMenuClose = useCallback(() => {
@@ -163,6 +207,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     onClose();
   }, [onAction, onMoveToWindow, targetTabIds, onClose]);
 
+  // 通常のメニュー項目にマウスを移動した時にサブメニューを閉じる
+  const handleRegularItemMouseEnter = useCallback(() => {
+    setIsSubMenuOpen(false);
+    setIsWindowSubMenuOpen(false);
+  }, []);
+
   return (
     <div
       ref={menuRef}
@@ -178,27 +228,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         role="menuitem"
         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('close')}
+        onMouseEnter={handleRegularItemMouseEnter}
       >
         {isMultipleSelection
-          ? `選択されたタブを閉じる (${targetTabIds.length}件)`
+          ? '選択されたタブを閉じる'
           : 'タブを閉じる'}
       </button>
-
-      {hasChildren && (
-        <button
-          role="menuitem"
-          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
-          onClick={() => handleMenuItemClick('closeSubtree')}
-        >
-          サブツリーを閉じる
-        </button>
-      )}
 
       {isMultipleSelection && (
         <button
           role="menuitem"
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('closeOthers')}
+          onMouseEnter={handleRegularItemMouseEnter}
         >
           他のタブを閉じる
         </button>
@@ -210,6 +252,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         role="menuitem"
         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('duplicate')}
+        onMouseEnter={handleRegularItemMouseEnter}
       >
         タブを複製
       </button>
@@ -218,6 +261,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         role="menuitem"
         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('reload')}
+        onMouseEnter={handleRegularItemMouseEnter}
       >
         タブを再読み込み
       </button>
@@ -226,11 +270,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         role="menuitem"
         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('discard')}
+        onMouseEnter={handleRegularItemMouseEnter}
         data-testid="context-menu-discard"
       >
-        {isMultipleSelection
-          ? `タブを休止 (${targetTabIds.length}件)`
-          : 'タブを休止'}
+        タブを休止
       </button>
 
       <div className="border-t border-gray-700 my-1" />
@@ -240,6 +283,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           role="menuitem"
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('unpin')}
+          onMouseEnter={handleRegularItemMouseEnter}
         >
           ピン留めを解除
         </button>
@@ -248,6 +292,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           role="menuitem"
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('pin')}
+          onMouseEnter={handleRegularItemMouseEnter}
         >
           タブをピン留め
         </button>
@@ -282,6 +327,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           role="menuitem"
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('ungroup')}
+          onMouseEnter={handleRegularItemMouseEnter}
         >
           グループを解除
         </button>
@@ -290,6 +336,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           role="menuitem"
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('group')}
+          onMouseEnter={handleRegularItemMouseEnter}
         >
           選択されたタブをグループ化
         </button>
@@ -298,6 +345,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           role="menuitem"
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
           onClick={() => handleMenuItemClick('group')}
+          onMouseEnter={handleRegularItemMouseEnter}
         >
           タブをグループ化
         </button>
@@ -334,6 +382,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             role="menuitem"
             className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
             onClick={() => handleMenuItemClick('copyUrl')}
+            onMouseEnter={handleRegularItemMouseEnter}
           >
             URLをコピー
           </button>
@@ -345,6 +394,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         role="menuitem"
         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
         onClick={() => handleMenuItemClick('snapshot')}
+        onMouseEnter={handleRegularItemMouseEnter}
       >
         スナップショットを取得
       </button>

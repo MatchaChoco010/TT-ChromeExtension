@@ -69,6 +69,9 @@ export class ChromeMock {
     onAttached: new MockEvent<
       (tabId: number, attachInfo: chrome.tabs.TabAttachInfo) => void
     >(),
+    onReplaced: new MockEvent<
+      (addedTabId: number, removedTabId: number) => void
+    >(),
     get: vi.fn<(tabId: number) => Promise<chrome.tabs.Tab | null>>(() => Promise.resolve(null)),
     move: vi.fn<(tabIds: number | number[], moveProperties: chrome.tabs.MoveProperties) => Promise<chrome.tabs.Tab | chrome.tabs.Tab[]>>(() => Promise.resolve([] as chrome.tabs.Tab[])),
     update: vi.fn<(tabId: number, updateProperties: chrome.tabs.UpdateProperties) => Promise<chrome.tabs.Tab | null>>(() => Promise.resolve(null)),
@@ -167,6 +170,7 @@ export class ChromeMock {
     this.tabs.onActivated.clear();
     this.tabs.onDetached.clear();
     this.tabs.onAttached.clear();
+    this.tabs.onReplaced.clear();
     this.windows.onCreated.clear();
     this.windows.onRemoved.clear();
     this.windows.onFocusChanged.clear();

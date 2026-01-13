@@ -205,9 +205,11 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuTargetTabIds, setContextMenuTargetTabIds] = useState<number[]>([]);
   const [isHovered, setIsHovered] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingSubtreeCount, setPendingSubtreeCount] = useState(0);
+  const [pendingCloseAction, setPendingCloseAction] = useState<{ type: 'subtree' | 'tabs'; tabIds: number[] } | null>(null);
   const { executeAction } = useMenuActions();
   const { settings } = useTheme();
 
@@ -230,8 +232,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const handleCloseClick = () => {
     if (hasChildren && !node.isExpanded) {
       const subtreeCount = countSubtreeNodes(node);
-      if (subtreeCount >= closeWarningThreshold) {
+      if (closeWarningThreshold > 0 && subtreeCount >= closeWarningThreshold) {
         setPendingSubtreeCount(subtreeCount);
+        setPendingCloseAction({ type: 'subtree', tabIds: [node.tabId] });
         setShowConfirmDialog(true);
         return;
       }
@@ -246,14 +249,20 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
   const handleConfirmClose = () => {
     setShowConfirmDialog(false);
-    chrome.runtime.sendMessage({
-      type: 'CLOSE_SUBTREE',
-      payload: { tabId: node.tabId },
-    });
+    if (pendingCloseAction?.type === 'subtree') {
+      chrome.runtime.sendMessage({
+        type: 'CLOSE_SUBTREE',
+        payload: { tabId: pendingCloseAction.tabIds[0] },
+      });
+    } else if (pendingCloseAction?.type === 'tabs') {
+      chrome.tabs.remove(pendingCloseAction.tabIds);
+    }
+    setPendingCloseAction(null);
   };
 
   const handleCancelClose = () => {
     setShowConfirmDialog(false);
+    setPendingCloseAction(null);
   };
 
   const style: React.CSSProperties = {
@@ -264,6 +273,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // コンテキストメニューを開いた時点のtargetTabIdsを保存
+    const targetIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
+    setContextMenuTargetTabIds(targetIds);
     setContextMenuPosition({ x: e.clientX, y: e.clientY });
     setContextMenuOpen(true);
   };
@@ -271,11 +283,31 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const isCollapsedParent = hasChildren && !node.isExpanded;
 
   const handleContextMenuAction = (action: MenuAction) => {
-    const targetTabIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
+    // コンテキストメニューを開いた時点で保存したtargetTabIdsを使用
+    const targetTabIds = contextMenuTargetTabIds;
+    // expanded: falseの親タブを単独で閉じる場合はサブツリー全体を閉じる
+    // 複数タブ選択時（targetTabIds.length > 1）はサブツリー操作ではなく個別操作
+    const shouldCloseSubtree = targetTabIds.length === 1 && !isSelected && isCollapsedParent;
+
+    if (action === 'close') {
+      // サブツリーを閉じる場合はサブツリー全体のタブ数を計算
+      const tabCount = shouldCloseSubtree ? countSubtreeNodes(node) : targetTabIds.length;
+      if (closeWarningThreshold > 0 && tabCount >= closeWarningThreshold) {
+        setPendingSubtreeCount(tabCount);
+        if (shouldCloseSubtree) {
+          setPendingCloseAction({ type: 'subtree', tabIds: [node.tabId] });
+        } else {
+          setPendingCloseAction({ type: 'tabs', tabIds: targetTabIds });
+        }
+        setShowConfirmDialog(true);
+        return;
+      }
+    }
+
     executeAction(action, targetTabIds, {
       url: tabInfo?.url || 'about:blank',
       onSnapshot,
-      isCollapsedParent: !isSelected && isCollapsedParent,
+      isCollapsedParent: shouldCloseSubtree,
     });
   };
 
@@ -336,7 +368,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         )}
 
         {getTabInfo && tabInfo ? (
-          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0 relative">
             {(() => {
               const displayFavicon = getDisplayFavicon(tabInfo);
               return displayFavicon ? (
@@ -357,6 +389,12 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               className="w-full h-full bg-gray-300 rounded-sm"
               style={{ display: getDisplayFavicon(tabInfo) ? 'none' : 'block' }}
             />
+            {tabInfo.discarded && (
+              <div
+                data-testid="discarded-favicon-overlay"
+                className="absolute inset-0 bg-black/50 rounded-sm"
+              />
+            )}
           </div>
         ) : getTabInfo && !tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -395,7 +433,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
       {contextMenuOpen && (
         <ContextMenu
-          targetTabIds={isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId]}
+          targetTabIds={contextMenuTargetTabIds}
           position={contextMenuPosition}
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
@@ -413,7 +451,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       <ConfirmDialog
         isOpen={showConfirmDialog}
         title="タブを閉じる"
-        message="このタブと配下のすべてのタブを閉じますか？"
+        message={pendingCloseAction?.type === 'tabs' ? '選択されたタブを閉じますか？' : 'このタブと配下のすべてのタブを閉じますか？'}
         tabCount={pendingSubtreeCount}
         onConfirm={handleConfirmClose}
         onCancel={handleCancelClose}
@@ -479,9 +517,11 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuTargetTabIds, setContextMenuTargetTabIds] = useState<number[]>([]);
   const [isHovered, setIsHovered] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingSubtreeCount, setPendingSubtreeCount] = useState(0);
+  const [pendingCloseAction, setPendingCloseAction] = useState<{ type: 'subtree' | 'tabs'; tabIds: number[] } | null>(null);
   const { executeAction } = useMenuActions();
   const { settings } = useTheme();
 
@@ -503,8 +543,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const handleCloseClick = () => {
     if (hasChildren && !node.isExpanded) {
       const subtreeCount = countSubtreeNodes(node);
-      if (subtreeCount >= closeWarningThreshold) {
+      if (closeWarningThreshold > 0 && subtreeCount >= closeWarningThreshold) {
         setPendingSubtreeCount(subtreeCount);
+        setPendingCloseAction({ type: 'subtree', tabIds: [node.tabId] });
         setShowConfirmDialog(true);
         return;
       }
@@ -519,19 +560,28 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
   const handleConfirmClose = () => {
     setShowConfirmDialog(false);
-    chrome.runtime.sendMessage({
-      type: 'CLOSE_SUBTREE',
-      payload: { tabId: node.tabId },
-    });
+    if (pendingCloseAction?.type === 'subtree') {
+      chrome.runtime.sendMessage({
+        type: 'CLOSE_SUBTREE',
+        payload: { tabId: pendingCloseAction.tabIds[0] },
+      });
+    } else if (pendingCloseAction?.type === 'tabs') {
+      chrome.tabs.remove(pendingCloseAction.tabIds);
+    }
+    setPendingCloseAction(null);
   };
 
   const handleCancelClose = () => {
     setShowConfirmDialog(false);
+    setPendingCloseAction(null);
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // コンテキストメニューを開いた時点のtargetTabIdsを保存
+    const targetIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
+    setContextMenuTargetTabIds(targetIds);
     setContextMenuPosition({ x: e.clientX, y: e.clientY });
     setContextMenuOpen(true);
   };
@@ -539,11 +589,31 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const isCollapsedParent = hasChildren && !node.isExpanded;
 
   const handleContextMenuAction = (action: MenuAction) => {
-    const targetTabIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
+    // コンテキストメニューを開いた時点で保存したtargetTabIdsを使用
+    const targetTabIds = contextMenuTargetTabIds;
+    // expanded: falseの親タブを単独で閉じる場合はサブツリー全体を閉じる
+    // 複数タブ選択時（targetTabIds.length > 1）はサブツリー操作ではなく個別操作
+    const shouldCloseSubtree = targetTabIds.length === 1 && !isSelected && isCollapsedParent;
+
+    if (action === 'close') {
+      // サブツリーを閉じる場合はサブツリー全体のタブ数を計算
+      const tabCount = shouldCloseSubtree ? countSubtreeNodes(node) : targetTabIds.length;
+      if (closeWarningThreshold > 0 && tabCount >= closeWarningThreshold) {
+        setPendingSubtreeCount(tabCount);
+        if (shouldCloseSubtree) {
+          setPendingCloseAction({ type: 'subtree', tabIds: [node.tabId] });
+        } else {
+          setPendingCloseAction({ type: 'tabs', tabIds: targetTabIds });
+        }
+        setShowConfirmDialog(true);
+        return;
+      }
+    }
+
     executeAction(action, targetTabIds, {
       url: tabInfo?.url || 'about:blank',
       onSnapshot,
-      isCollapsedParent: !isSelected && isCollapsedParent,
+      isCollapsedParent: shouldCloseSubtree,
     });
   };
 
@@ -591,7 +661,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         )}
 
         {getTabInfo && tabInfo ? (
-          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+          <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0 relative">
             {(() => {
               const displayFavicon = getDisplayFavicon(tabInfo);
               return displayFavicon ? (
@@ -612,6 +682,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               className="w-full h-full bg-gray-300 rounded-sm"
               style={{ display: getDisplayFavicon(tabInfo) ? 'none' : 'block' }}
             />
+            {tabInfo.discarded && (
+              <div
+                data-testid="discarded-favicon-overlay"
+                className="absolute inset-0 bg-black/50 rounded-sm"
+              />
+            )}
           </div>
         ) : getTabInfo && !tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -650,7 +726,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
       {contextMenuOpen && (
         <ContextMenu
-          targetTabIds={isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId]}
+          targetTabIds={contextMenuTargetTabIds}
           position={contextMenuPosition}
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
@@ -668,7 +744,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       <ConfirmDialog
         isOpen={showConfirmDialog}
         title="タブを閉じる"
-        message="このタブと配下のすべてのタブを閉じますか？"
+        message={pendingCloseAction?.type === 'tabs' ? '選択されたタブを閉じますか？' : 'このタブと配下のすべてのタブを閉じますか？'}
         tabCount={pendingSubtreeCount}
         onConfirm={handleConfirmClose}
         onCancel={handleCancelClose}

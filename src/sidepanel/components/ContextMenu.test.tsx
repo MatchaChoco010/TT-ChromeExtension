@@ -309,7 +309,7 @@ describe('ContextMenu', () => {
   });
 
   describe('複数選択対応操作オプション', () => {
-    it('複数タブ選択時に選択されたタブ数が表示される', () => {
+    it('複数タブ選択時に「選択されたタブを閉じる」メニューが表示される', () => {
       const onAction = vi.fn();
       const onClose = vi.fn();
 
@@ -322,24 +322,7 @@ describe('ContextMenu', () => {
         />
       );
 
-      const elementsWithCount = screen.getAllByText(/3件/);
-      expect(elementsWithCount.length).toBeGreaterThan(0);
-    });
-
-    it('選択されたタブを一括で閉じるオプションが表示される', () => {
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-
-      render(
-        <ContextMenu
-          targetTabIds={[1, 2]}
-          position={{ x: 100, y: 200 }}
-          onAction={onAction}
-          onClose={onClose}
-        />
-      );
-
-      expect(screen.getByRole('menuitem', { name: /選択されたタブを閉じる \(2件\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /選択されたタブを閉じる/i })).toBeInTheDocument();
     });
 
     it('選択されたタブをグループにまとめるオプションが表示される', () => {

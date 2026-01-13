@@ -53,7 +53,7 @@ interface PinnedTabsSectionProps {
 
 interface PinnedTabItemProps {
   tabId: number;
-  tabInfo: { title: string; favIconUrl?: string; url?: string };
+  tabInfo: { title: string; favIconUrl?: string; url?: string; discarded?: boolean };
   isActive: boolean;
   isDraggable: boolean;
   isDragging: boolean;
@@ -93,29 +93,37 @@ const PinnedTabItem: React.FC<PinnedTabItemProps> = ({
       onContextMenu={(e) => onContextMenu(tabId, e)}
       onMouseDown={isDraggable ? onMouseDown : undefined}
     >
-      {(() => {
-        const displayFavicon = getDisplayFavicon(tabInfo);
-        return displayFavicon ? (
-          <img
-            src={displayFavicon}
-            alt={tabInfo.title}
-            className="w-4 h-4"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              const defaultIcon = e.currentTarget.parentElement?.querySelector('[data-default-icon]');
-              if (defaultIcon) {
-                (defaultIcon as HTMLElement).style.display = 'block';
-              }
-            }}
+      <div className="relative w-4 h-4">
+        {(() => {
+          const displayFavicon = getDisplayFavicon(tabInfo);
+          return displayFavicon ? (
+            <img
+              src={displayFavicon}
+              alt={tabInfo.title}
+              className="w-4 h-4"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const defaultIcon = e.currentTarget.parentElement?.querySelector('[data-default-icon]');
+                if (defaultIcon) {
+                  (defaultIcon as HTMLElement).style.display = 'block';
+                }
+              }}
+            />
+          ) : null;
+        })()}
+        <div
+          data-testid={`pinned-tab-${tabId}-default-icon`}
+          data-default-icon="true"
+          className="w-4 h-4 bg-gray-400 rounded"
+          style={{ display: getDisplayFavicon(tabInfo) ? 'none' : 'block' }}
+        />
+        {tabInfo.discarded && (
+          <div
+            data-testid={`pinned-tab-${tabId}-discarded-overlay`}
+            className="absolute inset-0 bg-black/50 rounded-sm"
           />
-        ) : null;
-      })()}
-      <div
-        data-testid={`pinned-tab-${tabId}-default-icon`}
-        data-default-icon="true"
-        className="w-4 h-4 bg-gray-400 rounded"
-        style={{ display: getDisplayFavicon(tabInfo) ? 'none' : 'block' }}
-      />
+        )}
+      </div>
     </div>
   );
 };

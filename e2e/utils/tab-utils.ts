@@ -267,6 +267,12 @@ export async function activateTab(
   if (!result.success) {
     throw new Error(`Timeout waiting for tab ${tabId} to become active`);
   }
+
+  // handleTabActivatedが完了してlastActiveTabByWindowが更新されるのを待機
+  await serviceWorker.evaluate(async () => {
+    const g = globalThis as unknown as { prepareForReset: () => Promise<void> };
+    await g.prepareForReset();
+  });
 }
 
 /**

@@ -77,6 +77,11 @@ export interface TreeStructureEntry {
 export interface TreeState {
   views: View[];
   currentViewId: string;
+  /**
+   * ウィンドウごとの現在のビューID
+   * 各ウィンドウが独立したビューを表示できるようにする
+   */
+  currentViewByWindowId?: Record<number, string>;
   nodes: Record<string, TabNode>;
   tabToNode: Record<number, string>;
   /**
@@ -84,13 +89,18 @@ export interface TreeState {
    * ブラウザ再起動時にタブIDが変わっても親子関係を復元するために使用
    */
   treeStructure?: TreeStructureEntry[];
+  /**
+   * 各ビュー内のノードID順序
+   * loadState時にノードの順序を復元するために使用
+   */
+  viewNodeOrder?: Record<string, string[]>;
 }
 
 /** タブタイトルマップ (tabId -> title) */
 export type TabTitlesMap = Record<number, string>;
 
-/** ファビコンマップ (tabId -> favIconUrl) */
-export type TabFaviconsMap = Record<number, string>;
+/** ファビコンマップ (url -> favIconUrl) URLベースで保存しブラウザ再起動後も復元可能 */
+export type TabFaviconsMap = Record<string, string>;
 
 export interface StorageSchema {
   tree_state: TreeState;
@@ -118,6 +128,7 @@ export interface TabSnapshot {
   viewId: string;
   isExpanded: boolean;
   pinned: boolean;
+  windowIndex: number;
 }
 
 export interface SnapshotData {
@@ -176,6 +187,7 @@ export type MessageType =
     }
   | { type: 'CLOSE_TAB'; payload: { tabId: number } }
   | { type: 'CLOSE_SUBTREE'; payload: { tabId: number } }
+  | { type: 'CLOSE_TABS_WITH_COLLAPSED_SUBTREES'; payload: { tabIds: number[] } }
   | { type: 'ACTIVATE_TAB'; payload: { tabId: number } }
   | {
       type: 'SET_DRAG_STATE';

@@ -284,11 +284,14 @@ test.describe('ビューへの新規タブ追加', () => {
       ], 1);
 
       // ビューAのIDを取得
-      const viewAId = await serviceWorker.evaluate(async () => {
+      const viewAId = await serviceWorker.evaluate(async (winId: number) => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { currentViewId: string };
-        return treeState.currentViewId;
-      });
+        const treeState = result.tree_state as {
+          currentViewByWindowId?: Record<number, string>;
+          currentViewId: string;
+        };
+        return treeState.currentViewByWindowId?.[winId] ?? treeState.currentViewId;
+      }, windowId);
 
       // ビューBに切り替え
       const viewBButton = viewButtons.nth(1);
@@ -302,11 +305,14 @@ test.describe('ビューへの新規タブ追加', () => {
       ], 2);
 
       // ビューBのIDを取得
-      const viewBId = await serviceWorker.evaluate(async () => {
+      const viewBId = await serviceWorker.evaluate(async (winId: number) => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { currentViewId: string };
-        return treeState.currentViewId;
-      });
+        const treeState = result.tree_state as {
+          currentViewByWindowId?: Record<number, string>;
+          currentViewId: string;
+        };
+        return treeState.currentViewByWindowId?.[winId] ?? treeState.currentViewId;
+      }, windowId);
 
       // ビューAとビューBが異なることを確認（ビジネスロジックの検証）
       expect(viewAId).not.toBe(viewBId);
@@ -374,11 +380,14 @@ test.describe('ビューへの新規タブ追加', () => {
       ], 1);
 
       // 現在のビューIDを取得
-      const currentViewId = await serviceWorker.evaluate(async () => {
+      const currentViewId = await serviceWorker.evaluate(async (winId: number) => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { currentViewId: string };
-        return treeState.currentViewId;
-      });
+        const treeState = result.tree_state as {
+          currentViewByWindowId?: Record<number, string>;
+          currentViewId: string;
+        };
+        return treeState.currentViewByWindowId?.[winId] ?? treeState.currentViewId;
+      }, windowId);
 
       // 新規タブ追加ボタンの可視性確認（UI操作前確認）
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');

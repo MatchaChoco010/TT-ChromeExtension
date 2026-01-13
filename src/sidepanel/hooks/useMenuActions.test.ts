@@ -30,8 +30,20 @@ describe('useMenuActions', () => {
   });
 
   describe('メニュー項目の実装', () => {
-    it('closeアクション: 指定されたタブを閉じる', async () => {
+    it('closeアクション: 単一タブを閉じる', async () => {
       chromeMock.tabs.remove.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useMenuActions());
+
+      await act(async () => {
+        await result.current.executeAction('close', [1]);
+      });
+
+      expect(chromeMock.tabs.remove).toHaveBeenCalledWith([1]);
+    });
+
+    it('closeアクション: 複数タブを閉じる場合はサブツリーも含めて閉じる', async () => {
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const { result } = renderHook(() => useMenuActions());
 
@@ -39,7 +51,10 @@ describe('useMenuActions', () => {
         await result.current.executeAction('close', [1, 2, 3]);
       });
 
-      expect(chromeMock.tabs.remove).toHaveBeenCalledWith([1, 2, 3]);
+      expect(chromeMock.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'CLOSE_TABS_WITH_COLLAPSED_SUBTREES',
+        payload: { tabIds: [1, 2, 3] },
+      });
     });
 
     it('duplicateアクション: タブを複製する', async () => {

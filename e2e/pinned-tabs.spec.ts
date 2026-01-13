@@ -1,8 +1,9 @@
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, pinTab, unpinTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
-import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
-import { waitForTabActive } from './utils/polling-utils';
-import { setupWindow } from './utils/setup-utils';
+import { assertTabStructure, assertPinnedTabStructure, assertWindowExists } from './utils/assertion-utils';
+import { waitForTabActive, waitForSidePanelReady } from './utils/polling-utils';
+import { setupWindow, createAndSetupWindow } from './utils/setup-utils';
+import { closeWindow } from './utils/window-utils';
 
 test.describe('ピン留めタブセクション', () => {
   test.describe('基本的な表示', () => {
@@ -460,6 +461,73 @@ test.describe('ピン留めタブセクション', () => {
         { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
+    });
+  });
+
+  test.describe('ウィンドウを閉じたときのピン留めタブの動作', () => {
+    test('ウィンドウを閉じたとき、そのウィンドウのピン留めタブは他のウィンドウに移動しない', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      // ウィンドウ1のセットアップ
+      const windowId1 = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId: initialBrowserTabId1, sidePanelPage: sidePanelPage1, pseudoSidePanelTabId: pseudoSidePanelTabId1 } =
+        await setupWindow(extensionContext, serviceWorker, windowId1);
+
+      const sidePanelRoot1 = sidePanelPage1.locator('[data-testid="side-panel-root"]');
+      await expect(sidePanelRoot1).toBeVisible();
+
+      // ウィンドウ2を作成
+      const { windowId: windowId2, initialBrowserTabId: initialBrowserTabId2, sidePanelPage: sidePanelPage2, pseudoSidePanelTabId: pseudoSidePanelTabId2 } =
+        await createAndSetupWindow(extensionContext, serviceWorker);
+      await assertWindowExists(extensionContext, windowId2);
+
+      // ウィンドウ2にピン留めタブを作成
+      const pinnedTabId = await createTab(serviceWorker, getTestServerUrl('/pinned'), { windowId: windowId2 });
+      await sidePanelPage2.reload();
+      await waitForSidePanelReady(sidePanelPage2, serviceWorker);
+
+      await assertTabStructure(sidePanelPage2, windowId2, [
+        { tabId: initialBrowserTabId2, depth: 0 },
+        { tabId: pseudoSidePanelTabId2, depth: 0 },
+        { tabId: pinnedTabId, depth: 0 },
+      ], 0);
+
+      await pinTab(serviceWorker, pinnedTabId);
+      await sidePanelPage2.reload();
+      await waitForSidePanelReady(sidePanelPage2, serviceWorker);
+
+      await assertTabStructure(sidePanelPage2, windowId2, [
+        { tabId: initialBrowserTabId2, depth: 0 },
+        { tabId: pseudoSidePanelTabId2, depth: 0 },
+      ], 0);
+      await assertPinnedTabStructure(sidePanelPage2, windowId2, [{ tabId: pinnedTabId }], 0);
+
+      // ウィンドウ1のピン留めタブ数を確認（0のはず）
+      await sidePanelPage1.reload();
+      await waitForSidePanelReady(sidePanelPage1, serviceWorker);
+      await assertPinnedTabStructure(sidePanelPage1, windowId1, [], 0);
+
+      // ウィンドウ2を閉じる
+      await sidePanelPage2.close();
+      await closeWindow(extensionContext, windowId2);
+
+      // 少し待機
+      await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 500)));
+
+      // ウィンドウ1をリロードしてピン留めタブがないことを確認
+      await sidePanelPage1.reload();
+      await waitForSidePanelReady(sidePanelPage1, serviceWorker);
+
+      // ウィンドウ1にピン留めタブが移動していないことを確認
+      // (Chromeの動作でピン留めタブが自動的に他のウィンドウに移動した場合、拡張機能がそれを閉じる)
+      await assertPinnedTabStructure(sidePanelPage1, windowId1, [], 0);
+
+      // 元のウィンドウ1のタブ構造が変わっていないことを確認
+      await assertTabStructure(sidePanelPage1, windowId1, [
+        { tabId: initialBrowserTabId1, depth: 0 },
+        { tabId: pseudoSidePanelTabId1, depth: 0 },
+      ], 0);
     });
   });
 });

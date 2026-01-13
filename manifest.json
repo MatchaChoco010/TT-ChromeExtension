@@ -10,7 +10,8 @@
     "unlimitedStorage",
     "alarms",
     "webNavigation",
-    "downloads"
+    "downloads",
+    "favicon"
   ],
   "options_page": "settings.html",
   "side_panel": {

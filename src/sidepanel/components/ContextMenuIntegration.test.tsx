@@ -18,7 +18,7 @@ describe('ContextMenu Integration with MenuActions', () => {
   describe('メニューから操作を選択すると対応するアクションが実行される', () => {
     it('「タブを閉じる」をクリックするとタブが閉じられる', async () => {
       const user = userEvent.setup();
-      chromeMock.tabs.remove.mockResolvedValue(undefined);
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();
@@ -44,7 +44,10 @@ describe('ContextMenu Integration with MenuActions', () => {
       });
       await user.click(closeButton);
 
-      expect(chromeMock.tabs.remove).toHaveBeenCalledWith([1, 2]);
+      expect(chromeMock.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'CLOSE_TABS_WITH_COLLAPSED_SUBTREES',
+        payload: { tabIds: [1, 2] },
+      });
     });
 
     it('「タブを複製」をクリックするとタブが複製される', async () => {

@@ -410,96 +410,6 @@ describe('TreeStateProvider TabInfoMap管理', () => {
     });
   });
 
-  it('chrome.tabs.onUpdatedでタイトル変更時にtabInfoMapを更新する', async () => {
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <TabInfoTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-title')).toHaveTextContent('Test Page');
-    });
-
-    // タブ更新イベントを発火
-    await act(async () => {
-      mockTabsUpdatedListeners.forEach((listener) => {
-        listener(
-          1,
-          { title: 'Updated Title' },
-          {
-            id: 1,
-            title: 'Updated Title',
-            url: 'https://example.com',
-            favIconUrl: 'https://example.com/favicon.ico',
-            status: 'complete',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1,
-          }
-        );
-      });
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-title')).toHaveTextContent('Updated Title');
-    });
-  });
-
-  it('chrome.tabs.onUpdatedでファビコン変更時にtabInfoMapを更新する', async () => {
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <TabInfoTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-favicon')).toHaveTextContent('https://example.com/favicon.ico');
-    });
-
-    // ファビコン更新イベントを発火
-    await act(async () => {
-      mockTabsUpdatedListeners.forEach((listener) => {
-        listener(
-          1,
-          { favIconUrl: 'https://example.com/new-favicon.ico' },
-          {
-            id: 1,
-            title: 'Test Page',
-            url: 'https://example.com',
-            favIconUrl: 'https://example.com/new-favicon.ico',
-            status: 'complete',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1,
-          }
-        );
-      });
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-favicon')).toHaveTextContent('https://example.com/new-favicon.ico');
-    });
-  });
-
   it('存在しないタブIDでgetTabInfoを呼ぶとundefinedを返す', async () => {
     // 存在しないタブIDをテストするコンポーネント
     function NonExistentTabTestComponent() {
@@ -692,101 +602,6 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
     expect(pinnedTabIds).not.toContain(1);
   });
 
-  it('ピン留め状態の変更時（onUpdated）にpinnedTabIdsを自動更新する', async () => {
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <PinnedTabsTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    // 初期状態: 2つのピン留めタブ
-    await waitFor(() => {
-      expect(screen.getByTestId('pinned-count')).toHaveTextContent('2');
-    });
-
-    // タブ1をピン留めに変更
-    await act(async () => {
-      mockTabsUpdatedListeners.forEach((listener) => {
-        listener(
-          1,
-          { pinned: true },
-          {
-            id: 1,
-            title: 'Normal Page',
-            url: 'https://example.com',
-            favIconUrl: 'https://example.com/favicon.ico',
-            status: 'complete',
-            pinned: true,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1,
-          }
-        );
-      });
-    });
-
-    // ピン留めタブが3つになることを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('pinned-count')).toHaveTextContent('3');
-    });
-  });
-
-  it('ピン留め解除時にpinnedTabIdsから削除される', async () => {
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <PinnedTabsTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    // 初期状態: 2つのピン留めタブ
-    await waitFor(() => {
-      expect(screen.getByTestId('pinned-count')).toHaveTextContent('2');
-    });
-
-    // タブ2のピン留めを解除
-    await act(async () => {
-      mockTabsUpdatedListeners.forEach((listener) => {
-        listener(
-          2,
-          { pinned: false },
-          {
-            id: 2,
-            title: 'Pinned Page',
-            url: 'https://pinned.com',
-            favIconUrl: 'https://pinned.com/favicon.ico',
-            status: 'complete',
-            pinned: false,
-            active: false,
-            index: 1,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1,
-          }
-        );
-      });
-    });
-
-    // ピン留めタブが1つになることを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('pinned-count')).toHaveTextContent('1');
-      expect(screen.getByTestId('tab-2-pinned')).toHaveTextContent('false');
-    });
-  });
-
   it('ピン留めタブが0件の場合は空配列を返す', async () => {
     // ピン留めタブなしの状態をモック
     mockChrome.tabs.query = vi.fn().mockResolvedValue([
@@ -957,9 +772,9 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       tabs: {
         get: vi.fn(),
         query: vi.fn().mockResolvedValue([
-          { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true },
-          { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false },
-          { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false },
+          { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true, index: 0, windowId: 1 },
+          { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false, index: 1, windowId: 1 },
+          { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false, index: 2, windowId: 1 },
         ]),
         update: vi.fn(),
         move: vi.fn(),
@@ -1347,9 +1162,9 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       tabs: {
         get: vi.fn(),
         query: vi.fn().mockResolvedValue([
-          { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true },
-          { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false },
-          { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false },
+          { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, active: true, index: 0, windowId: 1 },
+          { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, active: false, index: 1, windowId: 1 },
+          { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, active: false, index: 2, windowId: 1 },
         ]),
         update: vi.fn(),
         move: vi.fn(),
@@ -2491,128 +2306,6 @@ describe('TreeStateProvider ファビコン永続化', () => {
     vi.clearAllMocks();
   });
 
-  it('ブラウザ起動時に永続化されたファビコンを復元する', async () => {
-    // 永続化されたファビコンをモック
-    mockChrome.storage.local.get = vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockImplementation((keys) => {
-      if (keys === 'tab_favicons') {
-        return Promise.resolve({
-          tab_favicons: {
-            2: 'https://another.com/persisted-favicon.ico',
-          },
-        });
-      }
-      if (keys === 'tab_titles') {
-        return Promise.resolve({ tab_titles: {} });
-      }
-      return Promise.resolve({
-        tree_state: {
-          views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-          currentViewId: 'default',
-          nodes: {},
-          tabToNode: {},
-        },
-      });
-    });
-
-    // タブ2のファビコンがundefined（ローディング中など）
-    mockChrome.tabs.query = vi.fn().mockResolvedValue([
-      {
-        id: 1,
-        title: 'Test Page',
-        url: 'https://example.com',
-        favIconUrl: 'https://example.com/favicon.ico',
-        status: 'complete',
-        pinned: false,
-        active: true,
-        windowId: 1,
-      },
-      {
-        id: 2,
-        title: 'Another Page',
-        url: 'https://another.com',
-        favIconUrl: undefined, // ブラウザからはファビコンが取れない状態
-        status: 'loading',
-        pinned: false,
-        active: false,
-        windowId: 1,
-      },
-    ]);
-
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <FaviconTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    // タブ2のファビコンが永続化されたものから復元されることを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-2-favicon')).toHaveTextContent('https://another.com/persisted-favicon.ico');
-    });
-  });
-
-  it('ファビコンが変更されたときに永続化データを更新する', async () => {
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <FaviconTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    // 初期状態のファビコンを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-favicon')).toHaveTextContent('https://example.com/favicon.ico');
-    });
-
-    // ファビコン変更イベントを発火
-    await act(async () => {
-      mockTabsUpdatedListeners.forEach((listener) => {
-        listener(
-          1,
-          { favIconUrl: 'https://example.com/new-favicon.ico' },
-          {
-            id: 1,
-            title: 'Test Page',
-            url: 'https://example.com',
-            favIconUrl: 'https://example.com/new-favicon.ico',
-            status: 'complete',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1,
-          }
-        );
-      });
-    });
-
-    // UIが更新されることを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-favicon')).toHaveTextContent('https://example.com/new-favicon.ico');
-    });
-
-    // chrome.storage.local.setが呼び出されることを確認（ファビコンの永続化）
-    await waitFor(() => {
-      const setCalls = mockChrome.storage.local.set.mock.calls;
-      const faviconSetCall = setCalls.find(
-        (call) => call[0] && 'tab_favicons' in call[0]
-      );
-      expect(faviconSetCall).toBeDefined();
-      expect(faviconSetCall?.[0]).toMatchObject({
-        tab_favicons: expect.objectContaining({
-          1: 'https://example.com/new-favicon.ico',
-        }),
-      });
-    });
-  });
-
   it('ファビコンがundefinedに変わった場合は永続化しない', async () => {
     await act(async () => {
       render(
@@ -3067,67 +2760,6 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
     vi.clearAllMocks();
   });
 
-  it('タイトルが変更されたときに永続化データを更新する', async () => {
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <TitleTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    // 初期状態のタイトルを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-title')).toHaveTextContent('Test Page');
-    });
-
-    // タイトル変更イベントを発火（ページ遷移をシミュレート）
-    await act(async () => {
-      mockTabsUpdatedListeners.forEach((listener) => {
-        listener(
-          1,
-          { title: 'Navigated Page' },
-          {
-            id: 1,
-            title: 'Navigated Page',
-            url: 'https://example.com/new-page',
-            favIconUrl: 'https://example.com/favicon.ico',
-            status: 'complete',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1,
-          }
-        );
-      });
-    });
-
-    // UIが更新されることを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-title')).toHaveTextContent('Navigated Page');
-    });
-
-    // chrome.storage.local.setが呼び出されることを確認（タイトルの永続化）
-    await waitFor(() => {
-      const setCalls = mockChrome.storage.local.set.mock.calls;
-      const titleSetCall = setCalls.find(
-        (call) => call[0] && 'tab_titles' in call[0]
-      );
-      expect(titleSetCall).toBeDefined();
-      expect(titleSetCall?.[0]).toMatchObject({
-        tab_titles: expect.objectContaining({
-          1: 'Navigated Page',
-        }),
-      });
-    });
-  });
-
   it('タイトルがundefinedに変わった場合は永続化しない', async () => {
     await act(async () => {
       render(
@@ -3239,69 +2871,6 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
     });
   });
 
-  it('ページ遷移時にURLとタイトルが同時に変更された場合も永続化する', async () => {
-    await act(async () => {
-      render(
-        <TreeStateProvider>
-          <TitleTestComponent />
-        </TreeStateProvider>
-      );
-    });
-
-    // 初期状態のタイトルを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-title')).toHaveTextContent('Test Page');
-    });
-
-    // setの呼び出し回数をリセット
-    mockChrome.storage.local.set.mockClear();
-
-    // URLとタイトルが同時に変更されるイベントを発火（ページ遷移）
-    await act(async () => {
-      mockTabsUpdatedListeners.forEach((listener) => {
-        listener(
-          1,
-          { title: 'New Page After Navigation', url: 'https://example.com/new-page' },
-          {
-            id: 1,
-            title: 'New Page After Navigation',
-            url: 'https://example.com/new-page',
-            favIconUrl: 'https://example.com/favicon.ico',
-            status: 'complete',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1,
-          }
-        );
-      });
-    });
-
-    // UIが更新されることを確認
-    await waitFor(() => {
-      expect(screen.getByTestId('tab-1-title')).toHaveTextContent('New Page After Navigation');
-    });
-
-    // タイトルが永続化されることを確認
-    await waitFor(() => {
-      const setCalls = mockChrome.storage.local.set.mock.calls;
-      const titleSetCall = setCalls.find(
-        (call) => call[0] && 'tab_titles' in call[0]
-      );
-      expect(titleSetCall).toBeDefined();
-      expect(titleSetCall?.[0]).toMatchObject({
-        tab_titles: expect.objectContaining({
-          1: 'New Page After Navigation',
-        }),
-      });
-    });
-  });
 });
 
 /**
