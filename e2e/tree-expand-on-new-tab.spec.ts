@@ -35,11 +35,11 @@ test.describe('新規タブ作成時のツリー展開', () => {
     ], 0);
 
     await serviceWorker.evaluate(async (parentTabId) => {
-      const manager = (globalThis as { treeStateManager?: { toggleExpand: (nodeId: string) => Promise<void>; getNodeByTabId: (tabId: number) => { id: string } | null } }).treeStateManager;
+      const manager = (globalThis as { treeStateManager?: { toggleExpand: (nodeId: string) => Promise<void>; getNodeByTabId: (tabId: number) => { viewId: string; node: { id: string } } | null } }).treeStateManager;
       if (manager) {
-        const node = manager.getNodeByTabId(parentTabId);
-        if (node) {
-          await manager.toggleExpand(node.id);
+        const result = manager.getNodeByTabId(parentTabId);
+        if (result) {
+          await manager.toggleExpand(result.node.id);
         }
       }
     }, parentTabId);

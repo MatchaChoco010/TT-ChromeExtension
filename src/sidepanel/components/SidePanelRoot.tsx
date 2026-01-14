@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { ThemeProvider } from '../providers/ThemeProvider';
 import ErrorBoundary from './ErrorBoundary';
@@ -11,7 +11,7 @@ import { useMenuActions } from '../hooks/useMenuActions';
 import { downloadService } from '@/storage/DownloadService';
 import { storageService } from '@/storage/StorageService';
 import { SnapshotManager } from '@/services/SnapshotManager';
-import type { TabNode, MenuAction, WindowInfo } from '@/types';
+import type { TabNode, MenuAction, WindowInfo, View } from '@/types';
 
 interface SidePanelRootProps {
   children?: React.ReactNode;
@@ -126,16 +126,34 @@ const TreeViewContent: React.FC = () => {
   const handleToggleExpand = (nodeId: string) => {
     if (!treeState) return;
 
-    const updatedNodes = { ...treeState.nodes };
+    const viewState = treeState.views[currentViewId];
+    if (!viewState) return;
+
+    const updatedNodes = { ...viewState.nodes };
     const node = updatedNodes[nodeId];
     if (node) {
       updatedNodes[nodeId] = { ...node, isExpanded: !node.isExpanded };
-      updateTreeState({ ...treeState, nodes: updatedNodes });
+      updateTreeState({
+        ...treeState,
+        views: {
+          ...treeState.views,
+          [currentViewId]: {
+            ...viewState,
+            nodes: updatedNodes,
+          },
+        },
+      });
     }
   };
 
+  // 現在のビューのViewStateを取得（buildTreeの前に定義する必要がある）
+  const currentViewState = useMemo(() => {
+    if (!treeState) return null;
+    return treeState.views[currentViewId] || null;
+  }, [treeState, currentViewId]);
+
   const buildTree = (): TabNode[] => {
-    if (!treeState) return [];
+    if (!treeState || !currentViewState) return [];
 
     const pinnedTabIdSet = new Set(pinnedTabIds);
 
@@ -151,15 +169,12 @@ const TreeViewContent: React.FC = () => {
 
     const nodesWithChildren: Record<string, TabNode> = {};
 
-    Object.entries(treeState.nodes).forEach(([id, node]) => {
+    // 現在のビューのノードのみを処理（ビュー内のノードは必ずそのビューに属する）
+    Object.entries(currentViewState.nodes).forEach(([id, node]) => {
       if (pinnedTabIdSet.has(node.tabId)) {
         return;
       }
       if (shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId)) {
-        return;
-      }
-      // 現在のビュー以外のノードはスキップ
-      if (node.viewId !== currentViewId) {
         return;
       }
       nodesWithChildren[id] = {
@@ -168,7 +183,7 @@ const TreeViewContent: React.FC = () => {
       };
     });
 
-    Object.entries(treeState.nodes).forEach(([parentId, parentNode]) => {
+    Object.entries(currentViewState.nodes).forEach(([parentId, parentNode]) => {
       if (!nodesWithChildren[parentId]) {
         return;
       }
@@ -200,10 +215,9 @@ const TreeViewContent: React.FC = () => {
       recalculateDepth(node, 0);
     });
 
-    // viewNodeOrderを使用してソート（Service Workerで管理されている順序を尊重）
-    // tab.indexでソートすると、useMenuActionsでの移動直後にtabInfoMapが古い場合に順序が狂う
-    const nodeOrderArray = treeState.viewNodeOrder?.[currentViewId] ?? [];
-    const nodeOrderMap = new Map(nodeOrderArray.map((id, index) => [id, index]));
+    // rootNodeIdsを使用してソート（ViewStateで管理されている順序を尊重）
+    const rootNodeIdsArray = currentViewState.rootNodeIds ?? [];
+    const nodeOrderMap = new Map(rootNodeIdsArray.map((id, index) => [id, index]));
     rootNodes.sort((a, b) => {
       const indexA = nodeOrderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
       const indexB = nodeOrderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
@@ -252,11 +266,42 @@ const TreeViewContent: React.FC = () => {
     });
   }, [currentWindowId]);
 
+  // treeState.views (Record<string, ViewState>) から View[] に変換
+  // viewOrderの順序を尊重する
+  const viewsArray = useMemo((): View[] => {
+    if (!treeState) return [];
+    const orderedViews: View[] = [];
+    // viewOrderの順序でビューを追加
+    for (const viewId of treeState.viewOrder) {
+      const viewState = treeState.views[viewId];
+      if (viewState) {
+        orderedViews.push(viewState.info);
+      }
+    }
+    // viewOrderに含まれていないビューがあれば末尾に追加
+    for (const [viewId, viewState] of Object.entries(treeState.views)) {
+      if (!treeState.viewOrder.includes(viewId)) {
+        orderedViews.push(viewState.info);
+      }
+    }
+    return orderedViews;
+  }, [treeState]);
+
   return (
-    <div className="flex flex-col h-full bg-gray-900">
+    <div
+      className="flex flex-col h-full bg-gray-900"
+      onClick={(e) => {
+        // タブノードやボタンのクリックでない場合は選択解除
+        // ViewSwitcher、PinnedTabsSection、ツリービュー領域の空白など全てで機能する
+        const target = e.target as HTMLElement;
+        if (!target.closest('[data-node-id]') && !target.closest('button')) {
+          clearSelection();
+        }
+      }}
+    >
         {treeState && (
           <ViewSwitcher
-            views={treeState.views}
+            views={viewsArray}
             currentViewId={currentViewId}
             tabCounts={viewTabCounts}
             onViewSwitch={switchView}
@@ -284,12 +329,16 @@ const TreeViewContent: React.FC = () => {
             currentWindowId={currentWindowId ?? undefined}
             otherWindows={otherWindows}
             onMoveToWindow={handleMoveToWindow}
-            views={treeState?.views}
+            views={viewsArray}
             currentViewId={currentViewId}
             onMoveToView={moveTabsToView}
           />
         )}
-        <div ref={sidePanelRef} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar" data-testid="tab-tree-root">
+        <div
+          ref={sidePanelRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar"
+          data-testid="tab-tree-root"
+        >
           <TabTreeView
             nodes={nodes}
             currentViewId={currentViewId}
@@ -304,10 +353,11 @@ const TreeViewContent: React.FC = () => {
             isNodeSelected={isNodeSelected}
             onSelect={selectNode}
             getSelectedTabIds={getSelectedTabIds}
+            clearSelection={clearSelection}
             onSnapshot={handleSnapshot}
             groups={groups}
             onGroupToggle={toggleGroupExpanded}
-            views={treeState?.views}
+            views={viewsArray}
             onMoveToView={moveTabsToView}
             currentWindowId={currentWindowId ?? undefined}
             otherWindows={otherWindows}

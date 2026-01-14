@@ -107,14 +107,20 @@ describe('エラーハンドリングとエッジケース', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.storage.local.set).mockRejectedValue(quotaError);
 
+      const largeViews: Record<string, { info: { id: string; name: string; color: string }; rootNodeIds: string[]; nodes: Record<string, never> }> = {};
+      const viewOrder: string[] = [];
+      for (let i = 0; i < 1000; i++) {
+        largeViews[`view-${i}`] = {
+          info: { id: `view-${i}`, name: 'Test View', color: '#ff0000' },
+          rootNodeIds: [],
+          nodes: {},
+        };
+        viewOrder.push(`view-${i}`);
+      }
       const largeData = {
-        views: Array(1000).fill({
-          id: 'view-1',
-          name: 'Test View',
-          color: '#ff0000',
-        }),
+        views: largeViews,
+        viewOrder,
         currentViewId: 'view-1',
-        nodes: {},
         tabToNode: {},
       };
 
@@ -189,18 +195,18 @@ describe('エラーハンドリングとエッジケース', () => {
       const nodeB = treeStateManager.getNodeByTabId(2);
       const nodeC = treeStateManager.getNodeByTabId(3);
 
-      expect(nodeA?.parentId).toBeNull();
-      expect(nodeB?.parentId).toBe('node-1');
-      expect(nodeC?.parentId).toBe('node-2');
+      expect(nodeA?.node.parentId).toBeNull();
+      expect(nodeB?.node.parentId).toBe('node-1');
+      expect(nodeC?.node.parentId).toBe('node-2');
 
       await treeStateManager.moveNode('node-1', 'node-3', 0);
 
       const nodeAAfter = treeStateManager.getNodeByTabId(1);
-      expect(nodeAAfter?.parentId).toBeNull();
+      expect(nodeAAfter?.node.parentId).toBeNull();
       const nodeBAfter = treeStateManager.getNodeByTabId(2);
-      expect(nodeBAfter?.parentId).toBe('node-1');
+      expect(nodeBAfter?.node.parentId).toBe('node-1');
       const nodeCAfter = treeStateManager.getNodeByTabId(3);
-      expect(nodeCAfter?.parentId).toBe('node-2');
+      expect(nodeCAfter?.node.parentId).toBe('node-2');
     });
 
     it('ノードを自分自身の親にしようとした場合、操作をキャンセル', async () => {
@@ -223,7 +229,7 @@ describe('エラーハンドリングとエッジケース', () => {
       await treeStateManager.moveNode('node-1', 'node-1', 0);
 
       const node = treeStateManager.getNodeByTabId(1);
-      expect(node?.parentId).toBeNull();
+      expect(node?.node.parentId).toBeNull();
     });
 
     it('TreeStateManagerに循環参照検出機能が実装されていることを確認', () => {

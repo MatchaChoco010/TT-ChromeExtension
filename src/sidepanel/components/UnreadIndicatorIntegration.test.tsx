@@ -31,7 +31,6 @@ describe('UnreadIndicator 統合テスト', () => {
     children: [],
     isExpanded: true,
     depth,
-    viewId: 'default',
   });
 
   const createMockTab = (id: number, title: string = 'Test Tab'): TabInfo => ({

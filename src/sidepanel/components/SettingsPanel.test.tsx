@@ -147,7 +147,7 @@ describe('SettingsPanel', () => {
       );
 
       // 手動で開かれたタブの位置設定ラベルが表示される
-      expect(screen.getByLabelText(/手動で開かれたタブの位置/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/新規タブの位置/i)).toBeInTheDocument();
     });
 
     it('should display current newTabPositionFromLink value as selected option', () => {
@@ -192,7 +192,7 @@ describe('SettingsPanel', () => {
       );
 
       const select = screen.getByLabelText(
-        /手動で開かれたタブの位置/i
+        /新規タブの位置/i
       ) as HTMLSelectElement;
       expect(select.value).toBe('end');
     });
@@ -222,7 +222,7 @@ describe('SettingsPanel', () => {
         />
       );
 
-      const select = screen.getByLabelText(/手動で開かれたタブの位置/i);
+      const select = screen.getByLabelText(/新規タブの位置/i);
       fireEvent.change(select, { target: { value: 'child' } });
 
       expect(onSettingsChange).toHaveBeenCalledWith({
@@ -241,7 +241,7 @@ describe('SettingsPanel', () => {
 
       expect(screen.getAllByText(/現在のタブの子/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/現在のタブの隣/i).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/リストの最後/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/ツリーの最後/i).length).toBeGreaterThan(0);
     });
 
     it('should display description for manual tab position setting', () => {
@@ -253,7 +253,7 @@ describe('SettingsPanel', () => {
       );
 
       expect(
-        screen.getByText(/手動で開かれたタブ\(アドレスバー、新規タブボタン、設定画面など\)の挿入位置/i)
+        screen.getByText(/アドレスバー、新規タブボタン、設定画面などから開かれたタブの挿入位置/i)
       ).toBeInTheDocument();
     });
   });

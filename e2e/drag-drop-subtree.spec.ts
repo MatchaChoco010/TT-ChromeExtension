@@ -103,8 +103,11 @@ test.describe('ドラッグ&ドロップによるサブツリー移動', () => {
     await waitForCondition(async () => {
       const result = await serviceWorker.evaluate(async (tabIds: number[]) => {
         const storageResult = await chrome.storage.local.get('tree_state');
-        const treeState = storageResult.tree_state as { nodes?: Record<string, unknown>; tabToNode?: Record<number, string> } | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
+        const treeState = storageResult.tree_state as {
+          views?: Record<string, unknown>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (treeState?.views && treeState?.tabToNode) {
           return tabIds.every(id => treeState.tabToNode![id]);
         }
         return false;
@@ -192,8 +195,11 @@ test.describe('ドラッグ&ドロップによるサブツリー移動', () => {
     await waitForCondition(async () => {
       const result = await serviceWorker.evaluate(async (tabIds: number[]) => {
         const storageResult = await chrome.storage.local.get('tree_state');
-        const treeState = storageResult.tree_state as { nodes?: Record<string, unknown>; tabToNode?: Record<number, string> } | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
+        const treeState = storageResult.tree_state as {
+          views?: Record<string, unknown>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (treeState?.views && treeState?.tabToNode) {
           return tabIds.every(id => treeState.tabToNode![id]);
         }
         return false;
@@ -309,8 +315,11 @@ test.describe('ドラッグ&ドロップによるサブツリー移動', () => {
     await waitForCondition(async () => {
       const result = await serviceWorker.evaluate(async (tabIds: number[]) => {
         const storageResult = await chrome.storage.local.get('tree_state');
-        const treeState = storageResult.tree_state as { nodes?: Record<string, unknown>; tabToNode?: Record<number, string> } | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
+        const treeState = storageResult.tree_state as {
+          views?: Record<string, unknown>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (treeState?.views && treeState?.tabToNode) {
           return tabIds.every(id => treeState.tabToNode![id]);
         }
         return false;
@@ -401,8 +410,11 @@ test.describe('ドラッグ&ドロップによるサブツリー移動', () => {
     await waitForCondition(async () => {
       const result = await serviceWorker.evaluate(async (tabIds: number[]) => {
         const storageResult = await chrome.storage.local.get('tree_state');
-        const treeState = storageResult.tree_state as { nodes?: Record<string, unknown>; tabToNode?: Record<number, string> } | undefined;
-        if (treeState?.nodes && treeState?.tabToNode) {
+        const treeState = storageResult.tree_state as {
+          views?: Record<string, unknown>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (treeState?.views && treeState?.tabToNode) {
           return tabIds.every(id => treeState.tabToNode![id]);
         }
         return false;

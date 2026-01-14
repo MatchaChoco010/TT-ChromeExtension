@@ -501,23 +501,30 @@ test.describe('Tab Persistence', () => {
       const ghostNodeId = `node-${ghostTabId}`;
       await serviceWorker.evaluate(
         async ({ ghostTabId, ghostNodeId }) => {
+          interface ViewState {
+            info: { id: string; name: string; color: string };
+            rootNodeIds: string[];
+            nodes: Record<string, unknown>;
+          }
           // tree_state にゴーストノードを追加
           const treeResult = await chrome.storage.local.get('tree_state');
           const treeState = treeResult.tree_state as {
-            nodes: Record<string, unknown>;
-            tabToNode: Record<number, string>;
+            views: Record<string, ViewState>;
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
           };
 
-          treeState.nodes[ghostNodeId] = {
-            id: ghostNodeId,
-            tabId: ghostTabId,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
-            viewId: 'default',
-          };
-          treeState.tabToNode[ghostTabId] = ghostNodeId;
+          const viewId = 'default';
+          if (treeState.views[viewId]) {
+            treeState.views[viewId].nodes[ghostNodeId] = {
+              id: ghostNodeId,
+              tabId: ghostTabId,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            };
+            treeState.tabToNode[ghostTabId] = { viewId, nodeId: ghostNodeId };
+          }
           await chrome.storage.local.set({ tree_state: treeState });
 
           // tab_titles にゴーストエントリを追加
@@ -539,7 +546,9 @@ test.describe('Tab Persistence', () => {
       const hasGhostBefore = await serviceWorker.evaluate(
         async ({ ghostTabId }) => {
           const treeResult = await chrome.storage.local.get('tree_state');
-          const treeState = treeResult.tree_state as { tabToNode: Record<number, string> };
+          const treeState = treeResult.tree_state as {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          };
           return treeState.tabToNode[ghostTabId] !== undefined;
         },
         { ghostTabId }
@@ -548,6 +557,9 @@ test.describe('Tab Persistence', () => {
 
       // 4. クリーンアップをトリガー（実際の起動時のロジックをシミュレート）
       await serviceWorker.evaluate(async () => {
+        interface ViewState {
+          nodes: Record<string, { tabId: number }>;
+        }
         const tabs = await chrome.tabs.query({});
         const existingTabIds = tabs.filter(t => t.id).map(t => t.id!);
         const existingTabIdSet = new Set(existingTabIds);
@@ -555,14 +567,17 @@ test.describe('Tab Persistence', () => {
         // tree_state のクリーンアップ
         const treeResult = await chrome.storage.local.get('tree_state');
         const treeState = treeResult.tree_state as {
-          nodes: Record<string, { tabId: number }>;
-          tabToNode: Record<number, string>;
+          views: Record<string, ViewState>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
 
-        for (const [tabIdStr, nodeId] of Object.entries(treeState.tabToNode)) {
+        for (const [tabIdStr] of Object.entries(treeState.tabToNode)) {
           const tabId = parseInt(tabIdStr);
           if (!existingTabIdSet.has(tabId)) {
-            delete treeState.nodes[nodeId];
+            const nodeInfo = treeState.tabToNode[tabId];
+            if (nodeInfo && treeState.views[nodeInfo.viewId]) {
+              delete treeState.views[nodeInfo.viewId].nodes[nodeInfo.nodeId];
+            }
             delete treeState.tabToNode[tabId];
           }
         }
@@ -597,7 +612,9 @@ test.describe('Tab Persistence', () => {
           const hasGhost = await serviceWorker.evaluate(
             async ({ ghostTabId }) => {
               const treeResult = await chrome.storage.local.get('tree_state');
-              const treeState = treeResult.tree_state as { tabToNode: Record<number, string> };
+              const treeState = treeResult.tree_state as {
+                tabToNode: Record<number, { viewId: string; nodeId: string }>;
+              };
               return treeState.tabToNode[ghostTabId] !== undefined;
             },
             { ghostTabId }
@@ -631,7 +648,9 @@ test.describe('Tab Persistence', () => {
       // 7. 正常なタブは残っていることを確認
       const hasNormalTab = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode: Record<number, string> };
+        const treeState = result.tree_state as {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+        };
         return treeState.tabToNode[id] !== undefined;
       }, tabId);
       expect(hasNormalTab).toBe(true);

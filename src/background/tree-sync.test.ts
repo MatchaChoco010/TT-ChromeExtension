@@ -54,21 +54,22 @@ describe('ツリー同期とリアルタイム更新', () => {
       const { TreeStateManager } = await import('@/services/TreeStateManager');
       const manager = new TreeStateManager(mockStorageService);
 
-      await manager.syncWithChromeTabs();
+      // openerTabIdを使用して親子関係を設定するには、newTabPositionManualを'child'に設定
+      await manager.syncWithChromeTabs({ newTabPositionManual: 'child' });
 
-      const node1 = manager.getNodeByTabId(1);
-      const node2 = manager.getNodeByTabId(2);
-      const node3 = manager.getNodeByTabId(3);
+      const result1 = manager.getNodeByTabId(1);
+      const result2 = manager.getNodeByTabId(2);
+      const result3 = manager.getNodeByTabId(3);
 
-      expect(node1).not.toBeNull();
-      expect(node2).not.toBeNull();
-      expect(node3).not.toBeNull();
+      expect(result1).not.toBeNull();
+      expect(result2).not.toBeNull();
+      expect(result3).not.toBeNull();
 
-      expect(node2?.parentId).toBe(node1?.id);
-      expect(node2?.depth).toBe(1);
+      expect(result2?.node.parentId).toBe(result1?.node.id);
+      expect(result2?.node.depth).toBe(1);
 
-      expect(node1?.parentId).toBeNull();
-      expect(node3?.parentId).toBeNull();
+      expect(result1?.node.parentId).toBeNull();
+      expect(result3?.node.parentId).toBeNull();
     });
 
     it('syncWithChromeTabs: 既にツリーに存在するタブは重複追加されない', async () => {
@@ -83,13 +84,13 @@ describe('ツリー同期とリアルタイム更新', () => {
       const manager = new TreeStateManager(mockStorageService);
 
       await manager.syncWithChromeTabs();
-      const node1 = manager.getNodeByTabId(1);
-      const firstNodeId = node1?.id;
+      const result1 = manager.getNodeByTabId(1);
+      const firstNodeId = result1?.node.id;
 
       await manager.syncWithChromeTabs();
-      const node1Again = manager.getNodeByTabId(1);
+      const result1Again = manager.getNodeByTabId(1);
 
-      expect(node1Again?.id).toBe(firstNodeId);
+      expect(result1Again?.node.id).toBe(firstNodeId);
     });
   });
 
@@ -176,8 +177,8 @@ describe('ツリー同期とリアルタイム更新', () => {
 
       await manager.removeTab(1);
 
-      const node = manager.getNodeByTabId(1);
-      expect(node).toBeNull();
+      const result = manager.getNodeByTabId(1);
+      expect(result).toBeNull();
     });
   });
 

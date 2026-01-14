@@ -8,7 +8,6 @@ export const testPathAlias = (): void => {
     children: [],
     isExpanded: true,
     depth: 0,
-    viewId: 'default',
   };
 
   const testView: View = {

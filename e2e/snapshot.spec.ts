@@ -109,12 +109,15 @@ test.describe('スナップショット機能', () => {
     // タブがツリー状態に追加されるまでポーリングで待機
     await waitForCondition(
       async () => {
-        const treeState = await getTreeState(serviceWorker);
-        if (!treeState?.nodes) return false;
+        const treeState = await getTreeState(serviceWorker) as {
+          views?: Record<string, { nodes: Record<string, { tabId: number }> }>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (!treeState?.views || !treeState?.tabToNode) return false;
         const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
         const testTab = tabs.find(t => t.url?.includes('/page'));
         if (!testTab) return false;
-        return Object.values(treeState.nodes).some((n: { tabId: number }) => n.tabId === testTab.id);
+        return treeState.tabToNode[testTab.id] !== undefined;
       },
       { timeout: 5000, timeoutMessage: 'Test tab did not appear in tree state' }
     );
@@ -199,7 +202,6 @@ test.describe('スナップショット復元機能', () => {
       id: string;
       tabId: number;
       parentId: string | null;
-      viewId: string;
     }
     let parentTab: chrome.tabs.Tab | undefined;
     let childTab: chrome.tabs.Tab | undefined;
@@ -213,12 +215,22 @@ test.describe('スナップショット復元機能', () => {
         childTab = tabs.find(t => t.url?.includes('/child'));
         if (!parentTab || !childTab) return false;
 
-        const treeState = await getTreeState(serviceWorker);
-        if (!treeState?.nodes) return false;
+        const treeState = await getTreeState(serviceWorker) as {
+          views?: Record<string, { nodes: Record<string, NodeInfo> }>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (!treeState?.views || !treeState?.tabToNode) return false;
 
-        const nodes = Object.values(treeState.nodes) as NodeInfo[];
-        parentNode = nodes.find(n => n.tabId === parentTab!.id);
-        childNode = nodes.find(n => n.tabId === childTab!.id);
+        const parentNodeInfo = treeState.tabToNode[parentTab!.id];
+        const childNodeInfo = treeState.tabToNode[childTab!.id];
+        if (!parentNodeInfo || !childNodeInfo) return false;
+
+        const parentViewState = treeState.views[parentNodeInfo.viewId];
+        const childViewState = treeState.views[childNodeInfo.viewId];
+        if (!parentViewState || !childViewState) return false;
+
+        parentNode = parentViewState.nodes[parentNodeInfo.nodeId];
+        childNode = childViewState.nodes[childNodeInfo.nodeId];
 
         // 両方のノードが存在し、親子関係が設定されているか確認
         return parentNode !== undefined && childNode !== undefined && childNode.parentId === parentNode.id;
@@ -287,12 +299,11 @@ test.describe('スナップショット復元機能', () => {
     interface ViewNodeInfo {
       id: string;
       tabId: number;
-      viewId: string;
     }
     let workTab: chrome.tabs.Tab | undefined;
     let personalTab: chrome.tabs.Tab | undefined;
-    let workNode: ViewNodeInfo | undefined;
-    let personalNode: ViewNodeInfo | undefined;
+    let workNodeInfo: { viewId: string; nodeId: string } | undefined;
+    let personalNodeInfo: { viewId: string; nodeId: string } | undefined;
 
     await waitForCondition(
       async () => {
@@ -301,25 +312,27 @@ test.describe('スナップショット復元機能', () => {
         personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
         if (!workTab || !personalTab) return false;
 
-        const treeState = await getTreeState(serviceWorker);
-        if (!treeState?.nodes) return false;
+        const treeState = await getTreeState(serviceWorker) as {
+          views?: Record<string, { nodes: Record<string, ViewNodeInfo> }>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (!treeState?.views || !treeState?.tabToNode) return false;
 
-        const nodes = Object.values(treeState.nodes) as ViewNodeInfo[];
-        workNode = nodes.find(n => n.tabId === workTab!.id);
-        personalNode = nodes.find(n => n.tabId === personalTab!.id);
+        workNodeInfo = treeState.tabToNode[workTab!.id];
+        personalNodeInfo = treeState.tabToNode[personalTab!.id];
 
         // 両方のノードが存在し、正しいビューに配置されているか確認
-        return workNode !== undefined && personalNode !== undefined &&
-               workNode.viewId === 'view-work' && personalNode.viewId === 'view-personal';
+        return workNodeInfo !== undefined && personalNodeInfo !== undefined &&
+               workNodeInfo.viewId === 'view-work' && personalNodeInfo.viewId === 'view-personal';
       },
       { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with correct viewId did not appear' }
     );
 
     // 正しいビューに配置されていることを確認
-    expect(workNode).toBeDefined();
-    expect(personalNode).toBeDefined();
-    expect(workNode?.viewId).toBe('view-work');
-    expect(personalNode?.viewId).toBe('view-personal');
+    expect(workNodeInfo).toBeDefined();
+    expect(personalNodeInfo).toBeDefined();
+    expect(workNodeInfo?.viewId).toBe('view-work');
+    expect(personalNodeInfo?.viewId).toBe('view-personal');
 
     await sidePanelPage.close();
   });
@@ -339,12 +352,15 @@ test.describe('スナップショット復元機能', () => {
     // タブがツリー状態に追加されるまでポーリングで待機
     await waitForCondition(
       async () => {
-        const treeState = await getTreeState(serviceWorker);
-        if (!treeState?.nodes) return false;
+        const treeState = await getTreeState(serviceWorker) as {
+          views?: Record<string, { nodes: Record<string, { tabId: number }> }>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (!treeState?.views || !treeState?.tabToNode) return false;
         const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
         const existingTab = tabs.find(t => t.url?.includes('/existing'));
         if (!existingTab) return false;
-        return Object.values(treeState.nodes).some((n: { tabId: number }) => n.tabId === existingTab.id);
+        return treeState.tabToNode[existingTab.id] !== undefined;
       },
       { timeout: 5000, timeoutMessage: 'Existing tab did not appear in tree state' }
     );

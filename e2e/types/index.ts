@@ -18,6 +18,7 @@ export type {
 /**
  * TabNode 型を再定義（evaluate 内で使用するため）
  * src/types/index.ts と同じ構造
+ * Note: 新構造ではviewIdはノードに含まれない（ビューで管理）
  */
 export interface E2ETabNode {
   id: string;
@@ -26,7 +27,6 @@ export interface E2ETabNode {
   children: E2ETabNode[];
   isExpanded: boolean;
   depth: number;
-  viewId: string;
   groupId?: string;
 }
 
@@ -38,19 +38,36 @@ export interface E2EGroup {
 }
 
 /**
+ * View情報の型定義
+ */
+export interface E2EViewInfo {
+  id: string;
+  name: string;
+  color: string;
+  icon?: string;
+}
+
+/**
+ * ViewState 型を再定義（evaluate 内で使用するため）
+ * 各ビューの状態を保持
+ */
+export interface E2EViewState {
+  info: E2EViewInfo;
+  rootNodeIds: string[];
+  nodes: Record<string, E2ETabNode>;
+}
+
+/**
  * TreeState 型を再定義（evaluate 内で使用するため）
  * src/types/index.ts と同じ構造
  */
 export interface E2ETreeState {
-  views: Array<{
-    id: string;
-    name: string;
-    color: string;
-    icon?: string;
-  }>;
+  views: Record<string, E2EViewState>;
+  viewOrder: string[];
   currentViewId: string;
-  nodes: Record<string, E2ETabNode>;
-  tabToNode: Record<number, string>;
+  currentViewByWindowId?: Record<number, string>;
+  tabToNode: Record<number, { viewId: string; nodeId: string }>;
+  treeStructure?: Array<{ tabId: number; depth: number }>;
 }
 
 /**
@@ -89,9 +106,9 @@ export function isTreeState(value: unknown): value is TreeState {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
   return (
-    'nodes' in obj &&
-    'tabToNode' in obj &&
     'views' in obj &&
+    'viewOrder' in obj &&
+    'tabToNode' in obj &&
     'currentViewId' in obj
   );
 }

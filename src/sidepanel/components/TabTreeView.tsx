@@ -149,6 +149,7 @@ interface TreeNodeItemProps {
   isNodeSelected?: (nodeId: string) => boolean;
   onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
   getSelectedTabIds?: () => number[];
+  clearSelection?: () => void;
   isDragHighlighted?: boolean;
   globalIsDragging?: boolean;
   activeNodeId?: string | null;
@@ -186,6 +187,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   isNodeSelected,
   onSelect,
   getSelectedTabIds,
+  clearSelection,
   isDragHighlighted,
   globalIsDragging,
   activeNodeId,
@@ -309,9 +311,16 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       onSnapshot,
       isCollapsedParent: shouldCloseSubtree,
     });
+
+    // アクション実行後に選択状態を解除
+    if (clearSelection) {
+      clearSelection();
+    }
   };
 
   const handleNodeClick = (e: React.MouseEvent) => {
+    // 注: stopPropagationは不要。SidePanelRootのonClickは
+    // data-node-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
     if (onSelect) {
       onSelect(node.id, {
         shift: e.shiftKey,
@@ -473,6 +482,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               isNodeSelected={isNodeSelected}
               onSelect={onSelect}
               getSelectedTabIds={getSelectedTabIds}
+              clearSelection={clearSelection}
               globalIsDragging={globalIsDragging}
               activeNodeId={activeNodeId}
               onSnapshot={onSnapshot}
@@ -505,6 +515,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   isNodeSelected,
   onSelect,
   getSelectedTabIds,
+  clearSelection,
   onSnapshot,
   views,
   currentViewId,
@@ -615,9 +626,16 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       onSnapshot,
       isCollapsedParent: shouldCloseSubtree,
     });
+
+    // アクション実行後に選択状態を解除
+    if (clearSelection) {
+      clearSelection();
+    }
   };
 
   const handleNodeClick = (e: React.MouseEvent) => {
+    // 注: stopPropagationは不要。SidePanelRootのonClickは
+    // data-node-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
     if (onSelect) {
       onSelect(node.id, {
         shift: e.shiftKey,
@@ -766,6 +784,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               isNodeSelected={isNodeSelected}
               onSelect={onSelect}
               getSelectedTabIds={getSelectedTabIds}
+              clearSelection={clearSelection}
               onSnapshot={onSnapshot}
               views={views}
               currentViewId={currentViewId}
@@ -797,6 +816,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   isNodeSelected,
   onSelect,
   getSelectedTabIds,
+  clearSelection,
   onSnapshot,
   groups,
   views,
@@ -817,10 +837,9 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastHoverNodeIdRef = useRef<string | null>(null);
 
-  const filteredNodes = useMemo(
-    () => nodes.filter((node) => node.viewId === currentViewId),
-    [nodes, currentViewId]
-  );
+  // SidePanelRoot.buildTree() で既に現在のビューのノードのみがフィルタされているため、
+  // ここでの追加フィルタリングは不要
+  const filteredNodes = nodes;
 
   const isDraggable = !!onDragEnd;
 
@@ -1168,6 +1187,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           isNodeSelected={isNodeSelected}
           onSelect={onSelect}
           getSelectedTabIds={getSelectedTabIds}
+          clearSelection={clearSelection}
           isDragHighlighted={
             dropTarget?.type === DropTargetType.Tab &&
             dropTarget.targetNodeId === node.id
@@ -1202,6 +1222,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         isNodeSelected={isNodeSelected}
         onSelect={onSelect}
         getSelectedTabIds={getSelectedTabIds}
+        clearSelection={clearSelection}
         onSnapshot={onSnapshot}
         views={views}
         currentViewId={currentViewId}

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ViewManager } from './ViewManager';
-import type { IStorageService, View } from '@/types';
+import type { IStorageService } from '@/types';
 import type { TreeStateManager } from './TreeStateManager';
 
 /**
@@ -233,17 +233,25 @@ describe('ViewManager', () => {
 
   describe('loadState', () => {
     it('ストレージから状態を復元できる', async () => {
-      const mockViews: View[] = [
-        { id: 'view-1', name: 'Work', color: '#ff0000' },
-        { id: 'view-2', name: 'Personal', color: '#00ff00' },
-      ];
-
-      mockStorageService.get = vi.fn().mockResolvedValue({
-        views: mockViews,
+      // 新しいデータ構造: views: Record<string, ViewState>
+      const mockTreeState = {
+        views: {
+          'view-1': {
+            info: { id: 'view-1', name: 'Work', color: '#ff0000' },
+            rootNodeIds: [],
+            nodes: {},
+          },
+          'view-2': {
+            info: { id: 'view-2', name: 'Personal', color: '#00ff00' },
+            rootNodeIds: [],
+            nodes: {},
+          },
+        },
         currentViewId: 'view-1',
-        nodes: {},
         tabToNode: {},
-      });
+      };
+
+      mockStorageService.get = vi.fn().mockResolvedValue(mockTreeState);
 
       await viewManager.loadState();
 

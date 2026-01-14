@@ -105,7 +105,9 @@ export async function createTab(
     async (tabId) => {
       for (let i = 0; i < 100; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as {
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
         if (treeState?.tabToNode?.[tabId!]) {
           return;
         }
@@ -124,43 +126,59 @@ export async function createTab(
           depth: number;
           isExpanded?: boolean;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
+          info: { id: string; name: string; color: string };
+          rootNodeIds: string[];
           nodes: Record<string, TreeNode>;
-          expandedNodes?: string[];
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
+          viewOrder: string[];
+          currentViewId: string;
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
         if (!treeState) return;
 
-        const childNodeId = treeState.tabToNode[tabId];
-        const parentNodeId = treeState.tabToNode[parentTabId];
+        const childNodeInfo = treeState.tabToNode[tabId];
+        const parentNodeInfo = treeState.tabToNode[parentTabId];
 
-        if (childNodeId && parentNodeId && treeState.nodes[childNodeId] && treeState.nodes[parentNodeId]) {
-          treeState.nodes[childNodeId].parentId = parentNodeId;
-          const parentDepth = treeState.nodes[parentNodeId].depth || 0;
-          treeState.nodes[childNodeId].depth = parentDepth + 1;
+        if (!childNodeInfo || !parentNodeInfo) return;
+
+        const childViewId = childNodeInfo.viewId;
+        const childNodeId = childNodeInfo.nodeId;
+        const parentViewId = parentNodeInfo.viewId;
+        const parentNodeId = parentNodeInfo.nodeId;
+
+        // 親と子が同じビューにいるか確認
+        if (childViewId !== parentViewId) return;
+
+        const viewState = treeState.views[childViewId];
+        if (!viewState) return;
+
+        const childNode = viewState.nodes[childNodeId];
+        const parentNode = viewState.nodes[parentNodeId];
+
+        if (childNode && parentNode) {
+          childNode.parentId = parentNodeId;
+          const parentDepth = parentNode.depth || 0;
+          childNode.depth = parentDepth + 1;
 
           // 子タブ作成時に親ノードを展開（handleTabCreatedの動作を模倣）
-          treeState.nodes[parentNodeId].isExpanded = true;
-          if (!treeState.expandedNodes) {
-            treeState.expandedNodes = [];
-          }
-          if (!treeState.expandedNodes.includes(parentNodeId)) {
-            treeState.expandedNodes.push(parentNodeId);
-          }
+          parentNode.isExpanded = true;
 
           await chrome.storage.local.set({ tree_state: treeState });
 
           // ストレージからtreeStateManagerを再読み込みしてメモリ内状態を同期し、
-          // syncWithChromeTabsを呼び出してtreeStructureを再構築する
+          // refreshTreeStructureを呼び出してtreeStructureを再構築して保存する
           // @ts-expect-error accessing global treeStateManager
           if (globalThis.treeStateManager) {
             // @ts-expect-error accessing global treeStateManager
             await globalThis.treeStateManager.loadState();
             // @ts-expect-error accessing global treeStateManager
-            await globalThis.treeStateManager.syncWithChromeTabs();
+            await globalThis.treeStateManager.refreshTreeStructure();
           }
 
           try {
@@ -178,20 +196,28 @@ export async function createTab(
         interface TreeNode {
           parentId: string | null;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
+          info: { id: string; name: string; color: string };
+          rootNodeIds: string[];
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
         }
         for (let i = 0; i < 50; i++) {
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
-          if (treeState?.nodes && treeState?.tabToNode) {
-            const parentNodeId = treeState.tabToNode[parentTabId];
-            const childNodeId = treeState.tabToNode[childTabId];
-            if (parentNodeId && childNodeId) {
-              const childNode = treeState.nodes[childNodeId];
-              if (childNode && childNode.parentId === parentNodeId) {
-                return;
+          if (treeState?.views && treeState?.tabToNode) {
+            const parentNodeInfo = treeState.tabToNode[parentTabId];
+            const childNodeInfo = treeState.tabToNode[childTabId];
+            if (parentNodeInfo && childNodeInfo && parentNodeInfo.viewId === childNodeInfo.viewId) {
+              const viewState = treeState.views[childNodeInfo.viewId];
+              if (viewState) {
+                const childNode = viewState.nodes[childNodeInfo.nodeId];
+                if (childNode && childNode.parentId === parentNodeInfo.nodeId) {
+                  return;
+                }
               }
             }
           }
@@ -220,7 +246,9 @@ export async function closeTab(serviceWorker: Worker, tabId: number): Promise<vo
     async (tabId) => {
       for (let i = 0; i < 100; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as {
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
         if (!treeState?.tabToNode?.[tabId]) {
           return { success: true };
         }

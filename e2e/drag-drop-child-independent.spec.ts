@@ -497,18 +497,22 @@ async function waitForStorageParentNull(serviceWorker: Worker, childTabId: numbe
         tabId: number;
         parentId: string | null;
       }
-      interface LocalTreeState {
-        tabToNode: Record<number, string>;
+      interface ViewState {
         nodes: Record<string, TreeNode>;
+      }
+      interface LocalTreeState {
+        tabToNode: Record<number, { viewId: string; nodeId: string }>;
+        views: Record<string, ViewState>;
       }
       const treeState = await serviceWorker.evaluate(async (_childId) => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state as LocalTreeState | undefined;
       }, childTabId);
-      if (treeState?.nodes && treeState?.tabToNode) {
-        const childNodeId = treeState.tabToNode[childTabId];
-        if (childNodeId) {
-          const childNode = treeState.nodes[childNodeId];
+      if (treeState?.views && treeState?.tabToNode) {
+        const childNodeInfo = treeState.tabToNode[childTabId];
+        if (childNodeInfo) {
+          const viewState = treeState.views[childNodeInfo.viewId];
+          const childNode = viewState?.nodes[childNodeInfo.nodeId];
           if (childNode && childNode.parentId === null) {
             return true;
           }

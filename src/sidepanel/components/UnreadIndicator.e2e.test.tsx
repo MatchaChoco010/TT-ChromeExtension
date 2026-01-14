@@ -60,7 +60,6 @@ describe('未読インジケータ E2Eテスト', () => {
     children: [],
     isExpanded: true,
     depth,
-    viewId: 'default',
   });
 
   const createMockTab = (id: number, title: string = 'Test Tab'): TabInfo => ({

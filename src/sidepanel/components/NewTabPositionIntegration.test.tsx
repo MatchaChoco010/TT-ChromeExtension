@@ -16,9 +16,15 @@ describe('新規タブ位置の統合テスト', () => {
     testTreeStateManager = new TreeStateManager(testStorageService);
 
     await testStorageService.set(STORAGE_KEYS.TREE_STATE, {
-      views: [{ id: 'default-view', name: 'デフォルト', color: '#3b82f6' }],
+      views: {
+        'default-view': {
+          info: { id: 'default-view', name: 'デフォルト', color: '#3b82f6' },
+          rootNodeIds: [],
+          nodes: {},
+        },
+      },
+      viewOrder: ['default-view'],
       currentViewId: 'default-view',
-      nodes: {},
       tabToNode: {},
     });
 
@@ -89,21 +95,21 @@ describe('新規タブ位置の統合テスト', () => {
         openerTabId: 1,
       } as chrome.tabs.Tab;
 
-      const parentNode = testTreeStateManager.getNodeByTabId(1);
+      const parentNodeResult = testTreeStateManager.getNodeByTabId(1);
       await testTreeStateManager.addTab(
         childTab,
-        parentNode?.id || null,
+        parentNodeResult?.node.id || null,
         'default-view',
       );
 
-      const parent = testTreeStateManager.getNodeByTabId(1);
-      const child = testTreeStateManager.getNodeByTabId(2);
+      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const childResult = testTreeStateManager.getNodeByTabId(2);
 
-      expect(parent).toBeDefined();
-      expect(child).toBeDefined();
-      expect(child?.parentId).toBe(parent?.id);
-      expect(parent?.children).toHaveLength(1);
-      expect(parent?.children[0].id).toBe(child?.id);
+      expect(parentResult).toBeDefined();
+      expect(childResult).toBeDefined();
+      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
+      expect(parentResult?.node.children).toHaveLength(1);
+      expect(parentResult?.node.children[0].id).toBe(childResult?.node.id);
     });
 
     it('newTabPosition設定が「child」の場合、openerTabIdを持つタブが子として配置される', async () => {
@@ -147,17 +153,17 @@ describe('新規タブ位置の統合テスト', () => {
         openerTabId: 1,
       } as chrome.tabs.Tab;
 
-      const parentNode = testTreeStateManager.getNodeByTabId(1);
+      const parentNodeResult = testTreeStateManager.getNodeByTabId(1);
       await testTreeStateManager.addTab(
         childTab,
-        parentNode?.id || null,
+        parentNodeResult?.node.id || null,
         'default-view',
       );
 
-      const parent = testTreeStateManager.getNodeByTabId(1);
-      const child = testTreeStateManager.getNodeByTabId(2);
+      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const childResult = testTreeStateManager.getNodeByTabId(2);
 
-      expect(child?.parentId).toBe(parent?.id);
+      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
     });
   });
 
@@ -206,14 +212,14 @@ describe('新規タブ位置の統合テスト', () => {
 
       await testTreeStateManager.addTab(manualTab, null, 'default-view');
 
-      const manual = testTreeStateManager.getNodeByTabId(2);
+      const manualResult = testTreeStateManager.getNodeByTabId(2);
 
-      expect(manual).toBeDefined();
-      expect(manual?.parentId).toBeNull();
+      expect(manualResult).toBeDefined();
+      expect(manualResult?.node.parentId).toBeNull();
 
       const tree = testTreeStateManager.getTree('default-view');
       expect(tree).toHaveLength(2);
-      expect(tree[1].id).toBe(manual?.id);
+      expect(tree[1].id).toBe(manualResult?.node.id);
     });
 
     it('newTabPosition設定が「end」の場合、新しいタブがルートレベルの最後に配置される', async () => {
@@ -327,8 +333,8 @@ describe('新規タブ位置の統合テスト', () => {
 
       await testTreeStateManager.addTab(siblingTab, null, 'default-view');
 
-      const sibling = testTreeStateManager.getNodeByTabId(2);
-      expect(sibling?.parentId).toBeNull();
+      const siblingResult = testTreeStateManager.getNodeByTabId(2);
+      expect(siblingResult?.node.parentId).toBeNull();
     });
   });
 });

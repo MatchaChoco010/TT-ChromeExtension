@@ -19,20 +19,25 @@ describe('SnapshotManager', () => {
   let snapshotManager: SnapshotManager;
 
   const mockTreeState: TreeState = {
-    views: [{ id: 'default', name: 'Default', color: '#3B82F6' }],
-    currentViewId: 'default',
-    nodes: {
-      'node-1': {
-        id: 'node-1',
-        tabId: 1,
-        parentId: null,
-        children: [],
-        isExpanded: true,
-        depth: 0,
-        viewId: 'default',
+    views: {
+      'default': {
+        info: { id: 'default', name: 'Default', color: '#3B82F6' },
+        rootNodeIds: ['node-1'],
+        nodes: {
+          'node-1': {
+            id: 'node-1',
+            tabId: 1,
+            parentId: null,
+            children: [],
+            isExpanded: true,
+            depth: 0,
+          },
+        },
       },
     },
-    tabToNode: { 1: 'node-1' },
+    viewOrder: ['default'],
+    currentViewId: 'default',
+    tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
   };
 
   const mockSettings: UserSettings = {

@@ -233,28 +233,33 @@ test.describe('ビューのタブカウント正確性', () => {
 
       await serviceWorker.evaluate(
         async ({ ghostTabId, ghostNodeId }) => {
+          interface ViewState {
+            info: { id: string; name: string; color: string };
+            rootNodeIds: string[];
+            nodes: Record<string, unknown>;
+          }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as {
-            nodes: Record<string, unknown>;
-            tabToNode: Record<number, string>;
+            views: Record<string, ViewState>;
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
             currentViewId: string;
-            views: { id: string }[];
           };
 
           // デフォルトビューIDを取得
-          const defaultViewId = treeState.views?.[0]?.id || 'default';
+          const defaultViewId = 'default';
 
           // ゴーストノードを追加
-          treeState.nodes[ghostNodeId] = {
-            id: ghostNodeId,
-            tabId: ghostTabId,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
-            viewId: defaultViewId,
-          };
-          treeState.tabToNode[ghostTabId] = ghostNodeId;
+          if (treeState.views[defaultViewId]) {
+            treeState.views[defaultViewId].nodes[ghostNodeId] = {
+              id: ghostNodeId,
+              tabId: ghostTabId,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            };
+            treeState.tabToNode[ghostTabId] = { viewId: defaultViewId, nodeId: ghostNodeId };
+          }
 
           await chrome.storage.local.set({ tree_state: treeState });
         },
@@ -267,7 +272,9 @@ test.describe('ビューのタブカウント正確性', () => {
           const hasGhost = await serviceWorker.evaluate(
             async ({ ghostTabId }) => {
               const result = await chrome.storage.local.get('tree_state');
-              const treeState = result.tree_state as { tabToNode: Record<number, string> };
+              const treeState = result.tree_state as {
+                tabToNode: Record<number, { viewId: string; nodeId: string }>;
+              };
               return treeState.tabToNode[ghostTabId] !== undefined;
             },
             { ghostTabId }
@@ -320,16 +327,18 @@ test.describe('ビューのタブカウント正確性', () => {
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes: Record<string, unknown>;
-          tabToNode: Record<number, string>;
+          views: Record<string, { nodes: Record<string, unknown> }>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
 
         // 存在しないタブを削除
         for (const tabIdStr of Object.keys(treeState.tabToNode)) {
           const tabId = parseInt(tabIdStr);
           if (!existingTabIds.includes(tabId)) {
-            const nodeId = treeState.tabToNode[tabId];
-            delete treeState.nodes[nodeId];
+            const nodeInfo = treeState.tabToNode[tabId];
+            if (nodeInfo && treeState.views[nodeInfo.viewId]) {
+              delete treeState.views[nodeInfo.viewId].nodes[nodeInfo.nodeId];
+            }
             delete treeState.tabToNode[tabId];
           }
         }
@@ -343,7 +352,9 @@ test.describe('ビューのタブカウント正確性', () => {
           const hasGhost = await serviceWorker.evaluate(
             async ({ ghostTabId }) => {
               const result = await chrome.storage.local.get('tree_state');
-              const treeState = result.tree_state as { tabToNode: Record<number, string> };
+              const treeState = result.tree_state as {
+                tabToNode: Record<number, { viewId: string; nodeId: string }>;
+              };
               return treeState.tabToNode[ghostTabId] !== undefined;
             },
             { ghostTabId }

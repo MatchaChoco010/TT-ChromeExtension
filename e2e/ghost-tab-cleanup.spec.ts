@@ -39,24 +39,30 @@ test.describe('Ghost Tab Cleanup', () => {
       const ghostNodeId = `node-${ghostTabId}`;
       await serviceWorker.evaluate(
         async ({ ghostTabId, ghostNodeId }) => {
+          interface ViewState {
+            info: { id: string; name: string; color: string };
+            rootNodeIds: string[];
+            nodes: Record<string, unknown>;
+          }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as {
-            nodes: Record<string, unknown>;
-            tabToNode: Record<number, string>;
+            views: Record<string, ViewState>;
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
             currentViewId: string;
-            views: unknown[];
           };
 
-          treeState.nodes[ghostNodeId] = {
-            id: ghostNodeId,
-            tabId: ghostTabId,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
-            viewId: 'default',
-          };
-          treeState.tabToNode[ghostTabId] = ghostNodeId;
+          const viewId = 'default';
+          if (treeState.views[viewId]) {
+            treeState.views[viewId].nodes[ghostNodeId] = {
+              id: ghostNodeId,
+              tabId: ghostTabId,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            };
+            treeState.tabToNode[ghostTabId] = { viewId, nodeId: ghostNodeId };
+          }
 
           await chrome.storage.local.set({ tree_state: treeState });
         },
@@ -68,7 +74,9 @@ test.describe('Ghost Tab Cleanup', () => {
           const hasGhost = await serviceWorker.evaluate(
             async ({ ghostTabId }) => {
               const result = await chrome.storage.local.get('tree_state');
-              const treeState = result.tree_state as { tabToNode: Record<number, string> };
+              const treeState = result.tree_state as {
+                tabToNode: Record<number, { viewId: string; nodeId: string }>;
+              };
               return treeState.tabToNode[ghostTabId] !== undefined;
             },
             { ghostTabId }
@@ -79,17 +87,20 @@ test.describe('Ghost Tab Cleanup', () => {
       );
 
       await serviceWorker.evaluate(async () => {
+        interface ViewState {
+          nodes: Record<string, { tabId: number; id: string }>;
+        }
         const tabs = await chrome.tabs.query({});
         const existingTabIds = tabs.filter((t) => t.id).map((t) => t.id!);
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes: Record<string, { tabId: number; id: string }>;
-          tabToNode: Record<number, string>;
+          views: Record<string, ViewState>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
 
         const staleTabIds: number[] = [];
-        for (const [tabIdStr, _nodeId] of Object.entries(treeState.tabToNode)) {
+        for (const [tabIdStr] of Object.entries(treeState.tabToNode)) {
           const tabId = parseInt(tabIdStr);
           if (!existingTabIds.includes(tabId)) {
             staleTabIds.push(tabId);
@@ -97,9 +108,12 @@ test.describe('Ghost Tab Cleanup', () => {
         }
 
         for (const tabId of staleTabIds) {
-          const nodeId = treeState.tabToNode[tabId];
-          if (nodeId) {
-            delete treeState.nodes[nodeId];
+          const nodeInfo = treeState.tabToNode[tabId];
+          if (nodeInfo) {
+            const viewState = treeState.views[nodeInfo.viewId];
+            if (viewState) {
+              delete viewState.nodes[nodeInfo.nodeId];
+            }
             delete treeState.tabToNode[tabId];
           }
         }
@@ -112,7 +126,9 @@ test.describe('Ghost Tab Cleanup', () => {
           const hasGhost = await serviceWorker.evaluate(
             async ({ ghostTabId }) => {
               const result = await chrome.storage.local.get('tree_state');
-              const treeState = result.tree_state as { tabToNode: Record<number, string> };
+              const treeState = result.tree_state as {
+                tabToNode: Record<number, { viewId: string; nodeId: string }>;
+              };
               return treeState.tabToNode[ghostTabId] !== undefined;
             },
             { ghostTabId }
@@ -158,7 +174,7 @@ test.describe('Ghost Tab Cleanup', () => {
 
             const storageResult = await chrome.storage.local.get('tree_state');
             const treeState = storageResult.tree_state as {
-              tabToNode: Record<number, string>;
+              tabToNode: Record<number, { viewId: string; nodeId: string }>;
             } | null;
 
             if (!treeState) {
@@ -295,24 +311,31 @@ test.describe('Ghost Tab Cleanup', () => {
       const ghostTabIds = [88881, 88882, 88883];
       await serviceWorker.evaluate(
         async (ghostIds) => {
+          interface ViewState {
+            info: { id: string; name: string; color: string };
+            rootNodeIds: string[];
+            nodes: Record<string, unknown>;
+          }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as {
-            nodes: Record<string, unknown>;
-            tabToNode: Record<number, string>;
+            views: Record<string, ViewState>;
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
           };
 
-          for (const ghostTabId of ghostIds) {
-            const ghostNodeId = `node-${ghostTabId}`;
-            treeState.nodes[ghostNodeId] = {
-              id: ghostNodeId,
-              tabId: ghostTabId,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-              viewId: 'default',
-            };
-            treeState.tabToNode[ghostTabId] = ghostNodeId;
+          const viewId = 'default';
+          if (treeState.views[viewId]) {
+            for (const ghostTabId of ghostIds) {
+              const ghostNodeId = `node-${ghostTabId}`;
+              treeState.views[viewId].nodes[ghostNodeId] = {
+                id: ghostNodeId,
+                tabId: ghostTabId,
+                parentId: null,
+                children: [],
+                isExpanded: true,
+                depth: 0,
+              };
+              treeState.tabToNode[ghostTabId] = { viewId, nodeId: ghostNodeId };
+            }
           }
 
           await chrome.storage.local.set({ tree_state: treeState });
@@ -324,7 +347,9 @@ test.describe('Ghost Tab Cleanup', () => {
         async () => {
           const ghostCount = await serviceWorker.evaluate(async (ghostIds) => {
             const result = await chrome.storage.local.get('tree_state');
-            const treeState = result.tree_state as { tabToNode: Record<number, string> };
+            const treeState = result.tree_state as {
+              tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            };
             return ghostIds.filter((id) => treeState.tabToNode[id] !== undefined).length;
           }, ghostTabIds);
           return ghostCount === 3;
@@ -333,21 +358,29 @@ test.describe('Ghost Tab Cleanup', () => {
       );
 
       await serviceWorker.evaluate(async () => {
+        interface ViewState {
+          nodes: Record<string, unknown>;
+        }
         const tabs = await chrome.tabs.query({});
         const existingTabIds = tabs.filter((t) => t.id).map((t) => t.id!);
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes: Record<string, unknown>;
-          tabToNode: Record<number, string>;
+          views: Record<string, ViewState>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
 
         for (const tabIdStr of Object.keys(treeState.tabToNode)) {
           const tabId = parseInt(tabIdStr);
           if (!existingTabIds.includes(tabId)) {
-            const nodeId = treeState.tabToNode[tabId];
-            delete treeState.nodes[nodeId];
-            delete treeState.tabToNode[tabId];
+            const nodeInfo = treeState.tabToNode[tabId];
+            if (nodeInfo) {
+              const viewState = treeState.views[nodeInfo.viewId];
+              if (viewState) {
+                delete viewState.nodes[nodeInfo.nodeId];
+              }
+              delete treeState.tabToNode[tabId];
+            }
           }
         }
 
@@ -358,7 +391,9 @@ test.describe('Ghost Tab Cleanup', () => {
         async () => {
           const count = await serviceWorker.evaluate(async (ghostIds) => {
             const result = await chrome.storage.local.get('tree_state');
-            const treeState = result.tree_state as { tabToNode: Record<number, string> };
+            const treeState = result.tree_state as {
+              tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            };
             return ghostIds.filter((id) => treeState.tabToNode[id] !== undefined).length;
           }, ghostTabIds);
           return count === 0;

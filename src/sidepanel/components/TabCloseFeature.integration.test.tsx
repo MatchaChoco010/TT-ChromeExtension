@@ -32,7 +32,6 @@ describe('タブ閉じる機能の統合テスト', () => {
     children,
     isExpanded,
     depth,
-    viewId: 'default',
   });
 
   const createMockTab = (id: number, title: string = 'Test Tab'): TabInfo => ({

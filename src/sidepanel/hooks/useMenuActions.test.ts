@@ -20,6 +20,11 @@ const chromeMock = {
   runtime: {
     sendMessage: vi.fn(),
   },
+  storage: {
+    local: {
+      get: vi.fn().mockResolvedValue({}),
+    },
+  },
 };
 
 vi.stubGlobal('chrome', chromeMock);
@@ -70,7 +75,12 @@ describe('useMenuActions', () => {
     });
 
     it('複数タブ選択時: 各タブを順に複製する', async () => {
-      chromeMock.tabs.duplicate.mockResolvedValue({ id: 4 });
+      chromeMock.tabs.duplicate
+        .mockResolvedValueOnce({ id: 4 })
+        .mockResolvedValueOnce({ id: 5 })
+        .mockResolvedValueOnce({ id: 6 });
+      chromeMock.tabs.get.mockResolvedValue({ id: 1, index: 0 });
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const { result } = renderHook(() => useMenuActions());
 

@@ -15,11 +15,22 @@ describe('タブ開き方別の位置ルール', () => {
     vi.clearAllMocks();
 
     await testStorageService.set(STORAGE_KEYS.TREE_STATE, {
-      views: [{ id: 'default-view', name: 'デフォルト', color: '#3b82f6' }],
+      views: {
+        'default-view': {
+          info: { id: 'default-view', name: 'デフォルト', color: '#3b82f6' },
+          rootNodeIds: [],
+          nodes: {},
+        },
+      },
+      viewOrder: ['default-view'],
       currentViewId: 'default-view',
-      nodes: {},
       tabToNode: {},
     });
+
+    // テスト用に内部状態をリセットし、syncCompletedをtrueに設定
+    testTreeStateManager.resetForTesting();
+    // ストレージの状態をTreeStateManagerに読み込む
+    await testTreeStateManager.loadState();
 
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
   });
@@ -77,12 +88,12 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentNode = testTreeStateManager.getNodeByTabId(1);
-      const childNode = testTreeStateManager.getNodeByTabId(2);
+      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const childResult = testTreeStateManager.getNodeByTabId(2);
 
-      expect(parentNode).toBeDefined();
-      expect(childNode).toBeDefined();
-      expect(childNode?.parentId).toBe(parentNode?.id);
+      expect(parentResult).toBeDefined();
+      expect(childResult).toBeDefined();
+      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
     });
 
     it('newTabPositionFromLink が「end」の場合、ツリーの最後に配置される', async () => {
@@ -137,9 +148,9 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const childNode = testTreeStateManager.getNodeByTabId(2);
-      expect(childNode).toBeDefined();
-      expect(childNode?.parentId).toBeNull();
+      const childResult = testTreeStateManager.getNodeByTabId(2);
+      expect(childResult).toBeDefined();
+      expect(childResult?.node.parentId).toBeNull();
     });
   });
 
@@ -170,9 +181,9 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(manualTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const node = testTreeStateManager.getNodeByTabId(1);
-      expect(node).toBeDefined();
-      expect(node?.parentId).toBeNull();
+      const result = testTreeStateManager.getNodeByTabId(1);
+      expect(result).toBeDefined();
+      expect(result?.node.parentId).toBeNull();
     });
   });
 
@@ -227,10 +238,10 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentNode = testTreeStateManager.getNodeByTabId(1);
-      const childNode = testTreeStateManager.getNodeByTabId(2);
+      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const childResult = testTreeStateManager.getNodeByTabId(2);
 
-      expect(childNode?.parentId).toBe(parentNode?.id);
+      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
     });
   });
 });
@@ -241,11 +252,22 @@ describe('システムページ判定と新規タブ位置設定', () => {
     vi.clearAllMocks();
 
     await testStorageService.set(STORAGE_KEYS.TREE_STATE, {
-      views: [{ id: 'default-view', name: 'デフォルト', color: '#3b82f6' }],
+      views: {
+        'default-view': {
+          info: { id: 'default-view', name: 'デフォルト', color: '#3b82f6' },
+          rootNodeIds: [],
+          nodes: {},
+        },
+      },
+      viewOrder: ['default-view'],
       currentViewId: 'default-view',
-      nodes: {},
       tabToNode: {},
     });
+
+    // テスト用に内部状態をリセットし、syncCompletedをtrueに設定
+    testTreeStateManager.resetForTesting();
+    // ストレージの状態をTreeStateManagerに読み込む
+    await testTreeStateManager.loadState();
 
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
   });
@@ -303,10 +325,10 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentNode = testTreeStateManager.getNodeByTabId(1);
-      const childNode = testTreeStateManager.getNodeByTabId(2);
-      expect(childNode).toBeDefined();
-      expect(childNode?.parentId).toBe(parentNode?.id);
+      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const childResult = testTreeStateManager.getNodeByTabId(2);
+      expect(childResult).toBeDefined();
+      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
     });
   });
 
@@ -350,9 +372,9 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentNode = testTreeStateManager.getNodeByTabId(1);
-      const childNode = testTreeStateManager.getNodeByTabId(2);
-      expect(childNode?.parentId).toBe(parentNode?.id);
+      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const childResult = testTreeStateManager.getNodeByTabId(2);
+      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
     });
 
     it('設定が存在しない場合、手動タブはデフォルトでリストの最後に配置', async () => {
@@ -369,9 +391,9 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(manualTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const node = testTreeStateManager.getNodeByTabId(1);
-      expect(node).toBeDefined();
-      expect(node?.parentId).toBeNull();
+      const result = testTreeStateManager.getNodeByTabId(1);
+      expect(result).toBeDefined();
+      expect(result?.node.parentId).toBeNull();
     });
   });
 });

@@ -189,25 +189,32 @@ describe('SidePanelRoot', () => {
 
   describe('ビュー情報のTabTreeViewへの受け渡し', () => {
     it('treeStateにビューがある場合、TabTreeViewにviewsとonMoveToViewが渡されること', async () => {
-      // ビューを含むtreeStateを設定
+      // ビューを含むtreeStateを設定（新しいViewState構造を使用）
       const mockTreeState = {
-        views: [
-          { id: 'default', name: 'Default', color: '#3b82f6' },
-          { id: 'view-2', name: 'View 2', color: '#10b981' },
-        ],
-        currentViewId: 'default',
-        nodes: {
-          'node-1': {
-            id: 'node-1',
-            tabId: 1,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
-            viewId: 'default',
+        views: {
+          'default': {
+            info: { id: 'default', name: 'Default', color: '#3b82f6' },
+            rootNodeIds: ['node-1'],
+            nodes: {
+              'node-1': {
+                id: 'node-1',
+                tabId: 1,
+                parentId: null,
+                children: [],
+                isExpanded: true,
+                depth: 0,
+              },
+            },
+          },
+          'view-2': {
+            info: { id: 'view-2', name: 'View 2', color: '#10b981' },
+            rootNodeIds: [],
+            nodes: {},
           },
         },
-        tabToNode: { 1: 'node-1' },
+        viewOrder: ['default', 'view-2'],
+        currentViewId: 'default',
+        tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
       };
 
       mockStorageGet.mockImplementation((keys: string | string[]) => {

@@ -217,11 +217,16 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     }, { timeout: 5000, timeoutMessage: 'treeStructure was not saved to storage' });
 
     await serviceWorker.evaluate(async () => {
+      interface ViewState {
+        info: { id: string; name: string; color: string };
+        rootNodeIds: string[];
+        nodes: Record<string, unknown>;
+      }
       interface TreeState {
-        views?: unknown[];
+        views?: Record<string, ViewState>;
+        viewOrder?: string[];
         currentViewId?: string;
-        nodes?: Record<string, unknown>;
-        tabToNode?: Record<number, string>;
+        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
         treeStructure?: unknown[];
       }
 
@@ -229,16 +234,28 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       const treeState = result.tree_state as TreeState | undefined;
 
       if (treeState) {
-        // タブIDが変わった状態をシミュレート: nodesとtabToNodeをクリア
+        // タブIDが変わった状態をシミュレート: 各ビューのnodesとrootNodeIdsをクリア、tabToNodeもクリア
+        const clearedViews: Record<string, ViewState> = {};
+        if (treeState.views) {
+          for (const [viewId, viewState] of Object.entries(treeState.views)) {
+            clearedViews[viewId] = {
+              ...viewState,
+              nodes: {},
+              rootNodeIds: [],
+            };
+          }
+        }
         const clearedState = {
           ...treeState,
-          nodes: {},
+          views: clearedViews,
           tabToNode: {},
         };
         await chrome.storage.local.set({ tree_state: clearedState });
 
         // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager) {
+          // @ts-expect-error accessing global treeStateManager
+          globalThis.treeStateManager.syncCompleted = false;
           // @ts-expect-error accessing global treeStateManager
           await globalThis.treeStateManager.loadState();
           // @ts-expect-error accessing global treeStateManager
@@ -266,53 +283,57 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
             parentId: string | null;
             depth: number;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
 
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
 
-          if (!treeState?.nodes || !treeState?.tabToNode) {
+          if (!treeState?.views || !treeState?.tabToNode) {
             return { valid: false, reason: 'No tree state' };
           }
 
-          const parentNodeId = treeState.tabToNode[parentTabId];
-          const childNodeId = treeState.tabToNode[childTabId];
-          const grandchildNodeId = treeState.tabToNode[grandchildTabId];
+          const parentNodeInfo = treeState.tabToNode[parentTabId];
+          const childNodeInfo = treeState.tabToNode[childTabId];
+          const grandchildNodeInfo = treeState.tabToNode[grandchildTabId];
 
-          if (!parentNodeId || !childNodeId || !grandchildNodeId) {
+          if (!parentNodeInfo || !childNodeInfo || !grandchildNodeInfo) {
             return {
               valid: false,
               reason: 'Missing node IDs',
-              parentNodeId,
-              childNodeId,
-              grandchildNodeId,
+              parentNodeId: parentNodeInfo?.nodeId,
+              childNodeId: childNodeInfo?.nodeId,
+              grandchildNodeId: grandchildNodeInfo?.nodeId,
             };
           }
 
-          const parentNode = treeState.nodes[parentNodeId];
-          const childNode = treeState.nodes[childNodeId];
-          const grandchildNode = treeState.nodes[grandchildNodeId];
+          const viewState = treeState.views[parentNodeInfo.viewId];
+          const parentNode = viewState?.nodes[parentNodeInfo.nodeId];
+          const childNode = viewState?.nodes[childNodeInfo.nodeId];
+          const grandchildNode = viewState?.nodes[grandchildNodeInfo.nodeId];
 
           if (parentNode.parentId !== null) {
             return { valid: false, reason: 'Parent should be root' };
           }
-          if (childNode.parentId !== parentNodeId) {
+          if (childNode.parentId !== parentNodeInfo.nodeId) {
             return {
               valid: false,
               reason: 'Child should be child of parent',
               childParentId: childNode.parentId,
-              expectedParentId: parentNodeId,
+              expectedParentId: parentNodeInfo.nodeId,
             };
           }
-          if (grandchildNode.parentId !== childNodeId) {
+          if (grandchildNode.parentId !== childNodeInfo.nodeId) {
             return {
               valid: false,
               reason: 'Grandchild should be child of child',
               grandchildParentId: grandchildNode.parentId,
-              expectedParentId: childNodeId,
+              expectedParentId: childNodeInfo.nodeId,
             };
           }
 
@@ -401,11 +422,16 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     }, { timeout: 5000, timeoutMessage: 'D&D parent-child relation was not saved to treeStructure' });
 
     await serviceWorker.evaluate(async () => {
+      interface ViewState {
+        info: { id: string; name: string; color: string };
+        rootNodeIds: string[];
+        nodes: Record<string, unknown>;
+      }
       interface TreeState {
-        views?: unknown[];
+        views?: Record<string, ViewState>;
+        viewOrder?: string[];
         currentViewId?: string;
-        nodes?: Record<string, unknown>;
-        tabToNode?: Record<number, string>;
+        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
         treeStructure?: unknown[];
       }
 
@@ -413,15 +439,28 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       const treeState = result.tree_state as TreeState | undefined;
 
       if (treeState) {
+        // 各ビューのnodesとrootNodeIdsをクリア、tabToNodeもクリア
+        const clearedViews: Record<string, ViewState> = {};
+        if (treeState.views) {
+          for (const [viewId, viewState] of Object.entries(treeState.views)) {
+            clearedViews[viewId] = {
+              ...viewState,
+              nodes: {},
+              rootNodeIds: [],
+            };
+          }
+        }
         const clearedState = {
           ...treeState,
-          nodes: {},
+          views: clearedViews,
           tabToNode: {},
         };
         await chrome.storage.local.set({ tree_state: clearedState });
 
         // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager) {
+          // @ts-expect-error accessing global treeStateManager
+          globalThis.treeStateManager.syncCompleted = false;
           // @ts-expect-error accessing global treeStateManager
           await globalThis.treeStateManager.loadState();
           // @ts-expect-error accessing global treeStateManager
@@ -447,32 +486,36 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
             parentId: string | null;
             depth: number;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
 
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
 
-          if (!treeState?.nodes || !treeState?.tabToNode) {
+          if (!treeState?.views || !treeState?.tabToNode) {
             return { valid: false, reason: 'No tree state' };
           }
 
-          const parentNodeId = treeState.tabToNode[parentTabId];
-          const childNodeId = treeState.tabToNode[childTabId];
+          const parentNodeInfo = treeState.tabToNode[parentTabId];
+          const childNodeInfo = treeState.tabToNode[childTabId];
 
-          if (!parentNodeId || !childNodeId) {
+          if (!parentNodeInfo || !childNodeInfo) {
             return {
               valid: false,
               reason: 'Missing node IDs',
-              parentNodeId,
-              childNodeId,
+              parentNodeId: parentNodeInfo?.nodeId,
+              childNodeId: childNodeInfo?.nodeId,
             };
           }
 
-          const parentNode = treeState.nodes[parentNodeId];
-          const childNode = treeState.nodes[childNodeId];
+          const viewState = treeState.views[parentNodeInfo.viewId];
+          const parentNode = viewState?.nodes[parentNodeInfo.nodeId];
+          const childNode = viewState?.nodes[childNodeInfo.nodeId];
 
           if (!parentNode || !childNode) {
             return { valid: false, reason: 'Missing nodes' };
@@ -481,12 +524,12 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
           if (parentNode.parentId !== null) {
             return { valid: false, reason: 'Parent should be root' };
           }
-          if (childNode.parentId !== parentNodeId) {
+          if (childNode.parentId !== parentNodeInfo.nodeId) {
             return {
               valid: false,
               reason: 'Child should be child of parent',
               childParentId: childNode.parentId,
-              expectedParentId: parentNodeId,
+              expectedParentId: parentNodeInfo.nodeId,
             };
           }
 
@@ -548,13 +591,17 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       return ts !== undefined && ts.length >= 2;
     }, { timeout: 5000, timeoutMessage: 'Tab not in treeStructure' });
 
-    await serviceWorker.evaluate(async ({ tabAId }) => {
-      const result = await chrome.storage.local.get('tree_state');
+    await serviceWorker.evaluate(async ({ tabAId: _tabAId }) => {
+      interface ViewState {
+        info: { id: string; name: string; color: string };
+        rootNodeIds: string[];
+        nodes: Record<string, unknown>;
+      }
       interface StoredTreeState {
-        views?: Array<{ id: string; name: string; color: string }>;
+        views?: Record<string, ViewState>;
+        viewOrder?: string[];
         currentViewId?: string;
-        nodes?: Record<string, { tabId: number; viewId: string }>;
-        tabToNode?: Record<number, string>;
+        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
         treeStructure?: Array<{
           url: string;
           parentIndex: number | null;
@@ -563,18 +610,24 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
           isExpanded: boolean;
         }>;
       }
+
+      const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as StoredTreeState | undefined;
       if (!treeState?.treeStructure || !treeState?.tabToNode) return;
 
-      const newViews = [
-        { id: 'default', name: 'Default', color: '#3b82f6' },
-        { id: 'custom-view', name: 'Custom View', color: '#10b981' },
-      ];
-
-      const nodeId = treeState.tabToNode[tabAId];
-      const _tabIndex = nodeId
-        ? Object.entries(treeState.nodes || {}).find(([id]) => id === nodeId)?.[1]
-        : null;
+      // views を正しい Record<string, ViewState> 形式で設定
+      const newViews: Record<string, ViewState> = {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: [],
+          nodes: {},
+        },
+        'custom-view': {
+          info: { id: 'custom-view', name: 'Custom View', color: '#10b981' },
+          rootNodeIds: [],
+          nodes: {},
+        },
+      };
 
       const lastIndex = treeState.treeStructure.length - 1;
       const updatedTreeStructure = treeState.treeStructure.map((entry, idx) => {
@@ -587,17 +640,23 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       const updatedState = {
         ...treeState,
         views: newViews,
+        viewOrder: ['default', 'custom-view'],
         treeStructure: updatedTreeStructure,
       };
       await chrome.storage.local.set({ tree_state: updatedState });
     }, { tabAId });
 
     await serviceWorker.evaluate(async () => {
+      interface ViewState {
+        info: unknown;
+        rootNodeIds: string[];
+        nodes: Record<string, unknown>;
+      }
       interface StoredTreeState {
-        views?: unknown[];
+        views?: Record<string, ViewState>;
+        viewOrder?: string[];
         currentViewId?: string;
-        nodes?: Record<string, unknown>;
-        tabToNode?: Record<number, string>;
+        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
         treeStructure?: unknown[];
       }
 
@@ -605,15 +664,24 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       const treeState = result.tree_state as StoredTreeState | undefined;
 
       if (treeState) {
+        // Clear nodes and rootNodeIds in all views and tabToNode
+        const clearedViews: Record<string, ViewState> = {};
+        if (treeState.views) {
+          for (const [viewId, view] of Object.entries(treeState.views)) {
+            clearedViews[viewId] = { ...view, nodes: {}, rootNodeIds: [] };
+          }
+        }
         const clearedState = {
           ...treeState,
-          nodes: {},
+          views: clearedViews,
           tabToNode: {},
         };
         await chrome.storage.local.set({ tree_state: clearedState });
 
         // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager) {
+          // @ts-expect-error accessing global treeStateManager
+          globalThis.treeStateManager.syncCompleted = false;
           // @ts-expect-error accessing global treeStateManager
           await globalThis.treeStateManager.loadState();
           // @ts-expect-error accessing global treeStateManager
@@ -633,36 +701,28 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForCondition(async () => {
       viewIdValid = await serviceWorker.evaluate(
         async ({ tabAId }) => {
-          interface TreeNode {
-            viewId: string;
-          }
           interface LocalTreeState {
-            tabToNode: Record<number, string>;
-            nodes: Record<string, TreeNode>;
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, unknown>;
           }
 
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
 
-          if (!treeState?.nodes || !treeState?.tabToNode) {
+          if (!treeState?.views || !treeState?.tabToNode) {
             return { valid: false, reason: 'No tree state' };
           }
 
-          const nodeId = treeState.tabToNode[tabAId];
-          if (!nodeId) {
+          const nodeInfo = treeState.tabToNode[tabAId];
+          if (!nodeInfo) {
             return { valid: false, reason: 'Node not found for tabAId' };
           }
 
-          const node = treeState.nodes[nodeId];
-          if (!node) {
-            return { valid: false, reason: 'Node object not found' };
-          }
-
-          if (node.viewId !== 'custom-view') {
+          if (nodeInfo.viewId !== 'custom-view') {
             return {
               valid: false,
               reason: 'ViewId mismatch',
-              viewId: node.viewId,
+              viewId: nodeInfo.viewId,
               expectedViewId: 'custom-view',
             };
           }

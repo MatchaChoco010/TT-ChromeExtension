@@ -32,12 +32,12 @@ describe('TreeStateManager - Subtree Operations', () => {
       const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
 
       await treeStateManager.addTab(tab1, null, 'view1');
-      const node1 = treeStateManager.getNodeByTabId(1);
-      await treeStateManager.addTab(tab2, node1!.id, 'view1');
-      const node2 = treeStateManager.getNodeByTabId(2);
-      await treeStateManager.addTab(tab3, node1!.id, 'view1');
-      await treeStateManager.addTab(tab4, node2!.id, 'view1');
-      await treeStateManager.addTab(tab5, node2!.id, 'view1');
+      const node1Result = treeStateManager.getNodeByTabId(1);
+      await treeStateManager.addTab(tab2, node1Result!.node.id, 'view1');
+      const node2Result = treeStateManager.getNodeByTabId(2);
+      await treeStateManager.addTab(tab3, node1Result!.node.id, 'view1');
+      await treeStateManager.addTab(tab4, node2Result!.node.id, 'view1');
+      await treeStateManager.addTab(tab5, node2Result!.node.id, 'view1');
 
       // Act: Get subtree starting from tab2
       const subtree = treeStateManager.getSubtree(2);
@@ -82,10 +82,10 @@ describe('TreeStateManager - Subtree Operations', () => {
       const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
 
       await treeStateManager.addTab(tab1, null, 'view1');
-      const node1 = treeStateManager.getNodeByTabId(1);
-      await treeStateManager.addTab(tab2, node1!.id, 'view1');
-      const node2 = treeStateManager.getNodeByTabId(2);
-      await treeStateManager.addTab(tab3, node2!.id, 'view1');
+      const node1Result = treeStateManager.getNodeByTabId(1);
+      await treeStateManager.addTab(tab2, node1Result!.node.id, 'view1');
+      const node2Result = treeStateManager.getNodeByTabId(2);
+      await treeStateManager.addTab(tab3, node2Result!.node.id, 'view1');
 
       // Act: Get subtree starting from tab1
       const subtree = treeStateManager.getSubtree(1);
@@ -122,12 +122,12 @@ describe('TreeStateManager - Subtree Operations', () => {
       const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
 
       await treeStateManager.addTab(tab1, null, 'view1');
-      const node1 = treeStateManager.getNodeByTabId(1);
-      await treeStateManager.addTab(tab2, node1!.id, 'view1');
-      const node2 = treeStateManager.getNodeByTabId(2);
-      await treeStateManager.addTab(tab3, node1!.id, 'view1');
-      await treeStateManager.addTab(tab4, node2!.id, 'view1');
-      await treeStateManager.addTab(tab5, node2!.id, 'view1');
+      const node1Result = treeStateManager.getNodeByTabId(1);
+      await treeStateManager.addTab(tab2, node1Result!.node.id, 'view1');
+      const node2Result = treeStateManager.getNodeByTabId(2);
+      await treeStateManager.addTab(tab3, node1Result!.node.id, 'view1');
+      await treeStateManager.addTab(tab4, node2Result!.node.id, 'view1');
+      await treeStateManager.addTab(tab5, node2Result!.node.id, 'view1');
 
       // Act & Assert: Check subtree sizes
       expect(treeStateManager.getSubtreeSize(1)).toBe(5);  // tab1 + tab2 + tab3 + tab4 + tab5
@@ -162,12 +162,12 @@ describe('TreeStateManager - Subtree Operations', () => {
       const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 3 };
 
       await treeStateManager.addTab(tab1, null, 'view1');
-      const node1 = treeStateManager.getNodeByTabId(1);
-      await treeStateManager.addTab(tab2, node1!.id, 'view1');
-      const node2 = treeStateManager.getNodeByTabId(2);
-      await treeStateManager.addTab(tab3, node2!.id, 'view1');
-      const node3 = treeStateManager.getNodeByTabId(3);
-      await treeStateManager.addTab(tab4, node3!.id, 'view1');
+      const node1Result = treeStateManager.getNodeByTabId(1);
+      await treeStateManager.addTab(tab2, node1Result!.node.id, 'view1');
+      const node2Result = treeStateManager.getNodeByTabId(2);
+      await treeStateManager.addTab(tab3, node2Result!.node.id, 'view1');
+      const node3Result = treeStateManager.getNodeByTabId(3);
+      await treeStateManager.addTab(tab4, node3Result!.node.id, 'view1');
 
       // Act & Assert: Check subtree sizes at each level
       expect(treeStateManager.getSubtreeSize(1)).toBe(4);  // tab1 + tab2 + tab3 + tab4
@@ -188,9 +188,9 @@ describe('TreeStateManager - Subtree Operations', () => {
       const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
 
       await treeStateManager.addTab(tab1, null, 'view1');
-      const node1 = treeStateManager.getNodeByTabId(1);
-      await treeStateManager.addTab(tab2, node1!.id, 'view1');
-      await treeStateManager.addTab(tab3, node1!.id, 'view1');
+      const node1Result = treeStateManager.getNodeByTabId(1);
+      await treeStateManager.addTab(tab2, node1Result!.node.id, 'view1');
+      await treeStateManager.addTab(tab3, node1Result!.node.id, 'view1');
 
       // Act: Move subtree to view2
       await treeStateManager.moveSubtreeToView(1, 'view2');
@@ -205,8 +205,8 @@ describe('TreeStateManager - Subtree Operations', () => {
       expect(node3After!.viewId).toBe('view2');
 
       // Tree structure should be preserved
-      expect(node2After!.parentId).toBe(node1After!.id);
-      expect(node3After!.parentId).toBe(node1After!.id);
+      expect(node2After!.node.parentId).toBe(node1After!.node.id);
+      expect(node3After!.node.parentId).toBe(node1After!.node.id);
     });
 
     it('should handle moving a single node without children', async () => {

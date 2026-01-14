@@ -13,37 +13,39 @@ describe('基本UI表示の統合テスト', () => {
   describe('Acceptance Criteria 1.1-1.2: サイドパネル表示とタブツリー表示', () => {
     it('サイドパネルが正しくレンダリングされ、ツリー構造でタブを表示できること', async () => {
       const mockTreeState = {
-        views: [
-          {
-            id: 'default',
-            name: 'Default',
-            color: '#3b82f6',
+        views: {
+          default: {
+            info: {
+              id: 'default',
+              name: 'Default',
+              color: '#3b82f6',
+            },
+            rootNodeIds: ['node-1', 'node-2'],
+            nodes: {
+              'node-1': {
+                id: 'node-1',
+                tabId: 1,
+                parentId: null,
+                children: [],
+                isExpanded: true,
+                depth: 0,
+              } as TabNode,
+              'node-2': {
+                id: 'node-2',
+                tabId: 2,
+                parentId: null,
+                children: [],
+                isExpanded: true,
+                depth: 0,
+              } as TabNode,
+            },
           },
-        ],
-        currentViewId: 'default',
-        nodes: {
-          'node-1': {
-            id: 'node-1',
-            tabId: 1,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
-            viewId: 'default',
-          } as TabNode,
-          'node-2': {
-            id: 'node-2',
-            tabId: 2,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
-            viewId: 'default',
-          } as TabNode,
         },
+        viewOrder: ['default'],
+        currentViewId: 'default',
         tabToNode: {
-          1: 'node-1',
-          2: 'node-2',
+          1: { viewId: 'default', nodeId: 'node-1' },
+          2: { viewId: 'default', nodeId: 'node-2' },
         },
       };
 
@@ -87,12 +89,10 @@ describe('基本UI表示の統合テスト', () => {
               children: [],
               isExpanded: true,
               depth: 1,
-              viewId: 'default',
             },
           ],
           isExpanded: true,
           depth: 0,
-          viewId: 'default',
         },
         {
           id: 'node-3',
@@ -101,7 +101,6 @@ describe('基本UI表示の統合テスト', () => {
           children: [],
           isExpanded: true,
           depth: 0,
-          viewId: 'default',
         },
       ];
 
@@ -139,12 +138,10 @@ describe('基本UI表示の統合テスト', () => {
               children: [],
               isExpanded: true,
               depth: 1,
-              viewId: 'default',
             },
           ],
           isExpanded: true,
           depth: 0,
-          viewId: 'default',
         },
       ];
 
@@ -181,7 +178,6 @@ describe('基本UI表示の統合テスト', () => {
           children: [],
           isExpanded: true,
           depth: 0,
-          viewId: 'default',
         },
       ];
 
@@ -206,7 +202,6 @@ describe('基本UI表示の統合テスト', () => {
           children: [],
           isExpanded: true,
           depth: 0,
-          viewId: 'default',
         },
       ];
 
@@ -240,7 +235,6 @@ describe('基本UI表示の統合テスト', () => {
           children: [],
           isExpanded: true,
           depth: 0,
-          viewId: 'default',
         },
         {
           id: 'node-2',
@@ -249,7 +243,6 @@ describe('基本UI表示の統合テスト', () => {
           children: [],
           isExpanded: true,
           depth: 0,
-          viewId: 'default',
         },
       ];
 
@@ -279,27 +272,30 @@ describe('基本UI表示の統合テスト', () => {
   describe('ExternalDropZone削除の確認', () => {
     it('ツリービュー表示後もExternalDropZone（新規ウィンドウドロップエリア）が存在しないこと', async () => {
       const mockTreeState = {
-        views: [
-          {
-            id: 'default',
-            name: 'Default',
-            color: '#3b82f6',
+        views: {
+          default: {
+            info: {
+              id: 'default',
+              name: 'Default',
+              color: '#3b82f6',
+            },
+            rootNodeIds: ['node-1'],
+            nodes: {
+              'node-1': {
+                id: 'node-1',
+                tabId: 1,
+                parentId: null,
+                children: [],
+                isExpanded: true,
+                depth: 0,
+              } as TabNode,
+            },
           },
-        ],
-        currentViewId: 'default',
-        nodes: {
-          'node-1': {
-            id: 'node-1',
-            tabId: 1,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
-            viewId: 'default',
-          } as TabNode,
         },
+        viewOrder: ['default'],
+        currentViewId: 'default',
         tabToNode: {
-          1: 'node-1',
+          1: { viewId: 'default', nodeId: 'node-1' },
         },
       };
 
@@ -324,15 +320,19 @@ describe('基本UI表示の統合テスト', () => {
   describe('統合シナリオ: サイドパネルからタブツリー表示まで', () => {
     it('サイドパネルが開いてからタブをツリー表示し、クリックでアクティブ化できること', async () => {
       const mockTreeState = {
-        views: [
-          {
-            id: 'default',
-            name: 'Default',
-            color: '#3b82f6',
+        views: {
+          default: {
+            info: {
+              id: 'default',
+              name: 'Default',
+              color: '#3b82f6',
+            },
+            rootNodeIds: [],
+            nodes: {},
           },
-        ],
+        },
+        viewOrder: ['default'],
         currentViewId: 'default',
-        nodes: {},
         tabToNode: {},
       };
 

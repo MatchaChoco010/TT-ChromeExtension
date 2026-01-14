@@ -433,7 +433,7 @@ test.describe('ビュー切り替え機能', () => {
       const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
-      const tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      const _tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page?id=tabB'));
 
       await activateTab(serviceWorker, tabB);
@@ -448,7 +448,7 @@ test.describe('ビュー切り替え機能', () => {
       await workViewButton.click({ force: true });
       await expect(workViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
-      const tabC = await createTab(serviceWorker, getTestServerUrl('/page?id=tabC'));
+      const _tabC = await createTab(serviceWorker, getTestServerUrl('/page?id=tabC'));
       const tabD = await createTab(serviceWorker, getTestServerUrl('/page?id=tabD'));
       await activateTab(serviceWorker, tabD);
       await assertActiveTab(extensionContext, tabD, windowId);

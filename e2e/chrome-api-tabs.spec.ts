@@ -607,17 +607,26 @@ test.describe('chrome.tabs API統合', () => {
         { tabId, depth: 0 },
       ], 0);
 
+      interface ViewState {
+        nodes: Record<string, { tabId: number }>;
+      }
+      interface TreeState {
+        views: Record<string, ViewState>;
+        tabToNode: Record<number, { viewId: string; nodeId: string }>;
+      }
       const treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
-      });
+      }) as TreeState;
 
       expect(treeState).toBeDefined();
       expect(treeState.tabToNode).toBeDefined();
-      const nodeId = treeState.tabToNode[tabId];
-      expect(nodeId).toBeDefined();
+      const nodeInfo = treeState.tabToNode[tabId];
+      expect(nodeInfo).toBeDefined();
 
-      const node = treeState.nodes[nodeId];
+      const viewState = treeState.views[nodeInfo.viewId];
+      expect(viewState).toBeDefined();
+      const node = viewState.nodes[nodeInfo.nodeId];
       expect(node).toBeDefined();
       expect(node.tabId).toBe(tabId);
     });
@@ -652,19 +661,27 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: childTabId, depth: 1 },
       ], 0);
 
+      interface ViewState {
+        nodes: Record<string, { parentId: string | null }>;
+      }
+      interface TreeState {
+        views: Record<string, ViewState>;
+        tabToNode: Record<number, { viewId: string; nodeId: string }>;
+      }
       const treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
-      });
+      }) as TreeState;
 
-      const parentNodeId = treeState.tabToNode[parentTabId];
-      const childNodeId = treeState.tabToNode[childTabId];
+      const parentNodeInfo = treeState.tabToNode[parentTabId];
+      const childNodeInfo = treeState.tabToNode[childTabId];
 
-      expect(parentNodeId).toBeDefined();
-      expect(childNodeId).toBeDefined();
+      expect(parentNodeInfo).toBeDefined();
+      expect(childNodeInfo).toBeDefined();
 
-      const childNode = treeState.nodes[childNodeId];
-      expect(childNode.parentId).toBe(parentNodeId);
+      const viewState = treeState.views[childNodeInfo.viewId];
+      const childNode = viewState.nodes[childNodeInfo.nodeId];
+      expect(childNode.parentId).toBe(parentNodeInfo.nodeId);
     });
 
     test('タブ削除時にツリーからノードが削除される', async ({
@@ -685,12 +702,20 @@ test.describe('chrome.tabs API統合', () => {
         { tabId, depth: 0 },
       ], 0);
 
+      interface ViewState {
+        nodes: Record<string, unknown>;
+      }
+      interface TreeState {
+        views: Record<string, ViewState>;
+        tabToNode: Record<number, { viewId: string; nodeId: string }>;
+      }
       let treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
-      });
-      const nodeId = treeState.tabToNode[tabId];
-      expect(nodeId).toBeDefined();
+      }) as TreeState;
+      const nodeInfo = treeState.tabToNode[tabId];
+      expect(nodeInfo).toBeDefined();
+      const { viewId, nodeId } = nodeInfo;
 
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
@@ -703,10 +728,10 @@ test.describe('chrome.tabs API統合', () => {
       treeState = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         return result.tree_state;
-      });
+      }) as TreeState;
 
       expect(treeState.tabToNode[tabId]).toBeUndefined();
-      expect(treeState.nodes[nodeId]).toBeUndefined();
+      expect(treeState.views[viewId]?.nodes[nodeId]).toBeUndefined();
     });
   });
 });

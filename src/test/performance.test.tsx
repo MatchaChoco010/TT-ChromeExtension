@@ -32,7 +32,6 @@ function generateMockTabs(count: number): TabNode[] {
       children: [],
       isExpanded: true,
       depth: i % 5 === 0 ? 1 : 0,
-      viewId: 'default-view',
     });
   }
   return tabs;

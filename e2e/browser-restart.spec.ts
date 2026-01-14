@@ -59,7 +59,9 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await waitForCondition(async () => {
       const hasTab = await serviceWorker.evaluate(async (tabId) => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as {
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
         return treeState?.tabToNode && tabId in treeState.tabToNode;
       }, parentTabId);
       return hasTab;
@@ -81,7 +83,9 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await waitForCondition(async () => {
       const hasTab = await serviceWorker.evaluate(async (tabId) => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as {
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
         return treeState?.tabToNode && tabId in treeState.tabToNode;
       }, childTabId);
       return hasTab;
@@ -129,15 +133,25 @@ test.describe('ブラウザ再起動時の状態復元', () => {
 
     // 検証：タブがツリーに存在することを確認
     const tabsExist = await newServiceWorker.evaluate(async ({ parentUrl, childUrl }) => {
+      interface ViewState {
+        nodes: Record<string, { tabId: number }>;
+      }
       const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as {
         treeStructure?: { url: string }[];
-        nodes?: Record<string, { tabId: number }>;
+        views?: Record<string, ViewState>;
       } | undefined;
 
       const hasParent = treeState?.treeStructure?.some(e => e.url === parentUrl);
       const hasChild = treeState?.treeStructure?.some(e => e.url === childUrl);
-      const nodesCount = treeState?.nodes ? Object.keys(treeState.nodes).length : 0;
+
+      // 全ビューのノード数を集計
+      let nodesCount = 0;
+      if (treeState?.views) {
+        for (const viewState of Object.values(treeState.views)) {
+          nodesCount += Object.keys(viewState.nodes || {}).length;
+        }
+      }
 
       return { hasParent, hasChild, nodesCount };
     }, { parentUrl: getTestServerUrl('/parent'), childUrl: getTestServerUrl('/child') });
@@ -166,8 +180,8 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await waitForCondition(async () => {
       const viewCount = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { views?: unknown[] } | undefined;
-        return treeState?.views?.length ?? 0;
+        const treeState = result.tree_state as { viewOrder?: string[] } | undefined;
+        return treeState?.viewOrder?.length ?? 0;
       });
       return viewCount >= 2;
     }, { timeout: 5000, timeoutMessage: 'New view not created' });
@@ -188,7 +202,9 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await waitForCondition(async () => {
       const hasTab = await serviceWorker.evaluate(async (tabId) => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as {
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
         return treeState?.tabToNode && tabId in treeState.tabToNode;
       }, testTabId);
       return hasTab;
@@ -233,30 +249,24 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       const viewId = await serviceWorker.evaluate(async (tabId) => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          tabToNode?: Record<number, string>;
-          nodes?: Record<string, { viewId: string }>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
         } | undefined;
 
-        if (!treeState?.tabToNode || !treeState?.nodes) return null;
-        const nodeId = treeState.tabToNode[tabId];
-        if (!nodeId) return null;
-        return treeState.nodes[nodeId]?.viewId;
+        if (!treeState?.tabToNode) return null;
+        return treeState.tabToNode[tabId]?.viewId;
       }, testTabId);
-      return viewId !== 'default';
+      return viewId !== 'default' && viewId !== null;
     }, { timeout: 10000, timeoutMessage: 'ViewId not updated from default' });
 
     // 現在のviewIdを取得
     const currentViewId = await serviceWorker.evaluate(async (tabId) => {
       const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as {
-        tabToNode?: Record<number, string>;
-        nodes?: Record<string, { viewId: string }>;
+        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
       } | undefined;
 
-      if (!treeState?.tabToNode || !treeState?.nodes) return null;
-      const nodeId = treeState.tabToNode[tabId];
-      if (!nodeId) return null;
-      return treeState.nodes[nodeId]?.viewId;
+      if (!treeState?.tabToNode) return null;
+      return treeState.tabToNode[tabId]?.viewId;
     }, testTabId);
 
     expect(currentViewId).not.toBe('default');
@@ -290,12 +300,24 @@ test.describe('ブラウザ再起動時の状態復元', () => {
 
     // タブが復元されるのを待つ
     await waitForCondition(async () => {
+      interface ViewState {
+        nodes: Record<string, unknown>;
+      }
       const nodesExist = await newServiceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes?: Record<string, unknown>;
+          views?: Record<string, ViewState>;
         } | undefined;
-        return treeState?.nodes && Object.keys(treeState.nodes).length > 0;
+
+        if (!treeState?.views) return false;
+
+        // いずれかのビューにノードが存在するか確認
+        for (const viewState of Object.values(treeState.views)) {
+          if (viewState.nodes && Object.keys(viewState.nodes).length > 0) {
+            return true;
+          }
+        }
+        return false;
       });
       return nodesExist;
     }, { timeout: 10000, timeoutMessage: 'Nodes not restored after browser restart' });
@@ -304,11 +326,10 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const restoredViewId = await newServiceWorker.evaluate(async ({ url, expectedViewId }) => {
       const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as {
-        nodes?: Record<string, { viewId: string; tabId: number }>;
-        tabToNode?: Record<number, string>;
+        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
       } | undefined;
 
-      if (!treeState?.nodes) return null;
+      if (!treeState?.tabToNode) return null;
 
       // URLでタブを検索（再起動後はtabIdが変わるため）
       const tabs = await chrome.tabs.query({ url });
@@ -317,14 +338,13 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       const tabId = tabs[0].id;
       if (!tabId) return null;
 
-      // tabToNodeは再起動後に再構築されるので、nodeIdの命名規則から探す
-      const nodeId = `node-${tabId}`;
-      const node = treeState.nodes[nodeId];
+      // 新構造ではtabToNodeから直接viewIdを取得
+      const nodeInfo = treeState.tabToNode[tabId];
 
       return {
-        actual: node?.viewId,
+        actual: nodeInfo?.viewId,
         expected: expectedViewId,
-        match: node?.viewId === expectedViewId,
+        match: nodeInfo?.viewId === expectedViewId,
       };
     }, { url: testUrl, expectedViewId: currentViewId });
 

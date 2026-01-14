@@ -16,9 +16,10 @@ function IntegrationTestComponent() {
     return <div>Loading...</div>;
   }
 
-  const rootNodes = Object.values(treeState.nodes).filter(
-    (node) => node.parentId === null
-  );
+  const currentView = treeState.views[treeState.currentViewId];
+  const rootNodes = currentView
+    ? Object.values(currentView.nodes).filter((node) => node.parentId === null)
+    : [];
 
   return (
     <TabTreeView
@@ -44,61 +45,61 @@ describe('パネル内D&Dの統合テスト', () => {
         local: {
           get: vi.fn().mockResolvedValue({
             tree_state: {
-              views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-              currentViewId: 'default',
-              nodes: {
-                'node-1': {
-                  id: 'node-1',
-                  tabId: 1,
-                  parentId: null,
-                  children: [],
-                  isExpanded: true,
-                  depth: 0,
-                  viewId: 'default',
-                },
-                'node-2': {
-                  id: 'node-2',
-                  tabId: 2,
-                  parentId: null,
-                  children: [],
-                  isExpanded: true,
-                  depth: 0,
-                  viewId: 'default',
-                },
-                'node-3': {
-                  id: 'node-3',
-                  tabId: 3,
-                  parentId: null,
-                  children: [
-                    {
+              views: {
+                default: {
+                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                  rootNodeIds: ['node-1', 'node-2', 'node-3'],
+                  nodes: {
+                    'node-1': {
+                      id: 'node-1',
+                      tabId: 1,
+                      parentId: null,
+                      children: [],
+                      isExpanded: true,
+                      depth: 0,
+                    },
+                    'node-2': {
+                      id: 'node-2',
+                      tabId: 2,
+                      parentId: null,
+                      children: [],
+                      isExpanded: true,
+                      depth: 0,
+                    },
+                    'node-3': {
+                      id: 'node-3',
+                      tabId: 3,
+                      parentId: null,
+                      children: [
+                        {
+                          id: 'node-4',
+                          tabId: 4,
+                          parentId: 'node-3',
+                          children: [],
+                          isExpanded: true,
+                          depth: 1,
+                        },
+                      ],
+                      isExpanded: false,
+                      depth: 0,
+                    },
+                    'node-4': {
                       id: 'node-4',
                       tabId: 4,
                       parentId: 'node-3',
                       children: [],
                       isExpanded: true,
                       depth: 1,
-                      viewId: 'default',
                     },
-                  ],
-                  isExpanded: false,
-                  depth: 0,
-                  viewId: 'default',
-                },
-                'node-4': {
-                  id: 'node-4',
-                  tabId: 4,
-                  parentId: 'node-3',
-                  children: [],
-                  isExpanded: true,
-                  depth: 1,
-                  viewId: 'default',
+                  },
                 },
               },
+              currentViewId: 'default',
               tabToNode: {
-                '1': 'node-1',
-                '2': 'node-2',
-                '3': 'node-3',
-                '4': 'node-4',
+                '1': { viewId: 'default', nodeId: 'node-1' },
+                '2': { viewId: 'default', nodeId: 'node-2' },
+                '3': { viewId: 'default', nodeId: 'node-3' },
+                '4': { viewId: 'default', nodeId: 'node-4' },
               },
             },
           }),
@@ -211,7 +212,7 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(chrome.storage.local.set).toHaveBeenCalled();
         const lastCall = mockChrome.storage.local.set.mock.calls.slice(-1)[0];
         if (lastCall && lastCall[0]?.tree_state) {
-          const updatedNodes = (lastCall[0].tree_state as TreeState).nodes;
+          const updatedNodes = (lastCall[0].tree_state as TreeState).views['default'].nodes;
           expect(updatedNodes['node-2'].parentId).toBe('node-1');
         }
       });
@@ -291,7 +292,7 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(chrome.storage.local.set).toHaveBeenCalled();
         const lastCall = mockChrome.storage.local.set.mock.calls.slice(-1)[0];
         if (lastCall && lastCall[0]?.tree_state) {
-          const updatedNodes = (lastCall[0].tree_state as TreeState).nodes;
+          const updatedNodes = (lastCall[0].tree_state as TreeState).views['default'].nodes;
           expect(updatedNodes['node-2'].parentId).toBe('node-1');
         }
       });
@@ -372,41 +373,43 @@ describe('パネル内D&Dの統合テスト', () => {
       const mockChrome = getMockChrome();
       mockChrome.storage.local.get.mockResolvedValue({
         tree_state: {
-          views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-          currentViewId: 'default',
-          nodes: {
-            'node-1': {
-              id: 'node-1',
-              tabId: 1,
-              parentId: null,
-              children: [
-                {
+          views: {
+            default: {
+              info: { id: 'default', name: 'Default', color: '#3b82f6' },
+              rootNodeIds: ['node-1'],
+              nodes: {
+                'node-1': {
+                  id: 'node-1',
+                  tabId: 1,
+                  parentId: null,
+                  children: [
+                    {
+                      id: 'node-2',
+                      tabId: 2,
+                      parentId: 'node-1',
+                      children: [],
+                      isExpanded: true,
+                      depth: 1,
+                    },
+                  ],
+                  isExpanded: true,
+                  depth: 0,
+                },
+                'node-2': {
                   id: 'node-2',
                   tabId: 2,
                   parentId: 'node-1',
                   children: [],
                   isExpanded: true,
                   depth: 1,
-                  viewId: 'default',
                 },
-              ],
-              isExpanded: true,
-              depth: 0,
-              viewId: 'default',
-            },
-            'node-2': {
-              id: 'node-2',
-              tabId: 2,
-              parentId: 'node-1',
-              children: [],
-              isExpanded: true,
-              depth: 1,
-              viewId: 'default',
+              },
             },
           },
+          currentViewId: 'default',
           tabToNode: {
-            '1': 'node-1',
-            '2': 'node-2',
+            '1': { viewId: 'default', nodeId: 'node-1' },
+            '2': { viewId: 'default', nodeId: 'node-2' },
           },
         },
       });

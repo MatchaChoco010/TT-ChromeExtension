@@ -12,10 +12,14 @@ function TestComponent() {
   if (error) return <div>Error: {error.message}</div>;
   if (!treeState) return <div>No state</div>;
 
+  // Get nodes from the current view
+  const currentViewState = treeState.views[treeState.currentViewId];
+  const nodeCount = currentViewState ? Object.keys(currentViewState.nodes).length : 0;
+
   return (
     <div>
       <div data-testid="current-view">{treeState.currentViewId}</div>
-      <div data-testid="node-count">{Object.keys(treeState.nodes).length}</div>
+      <div data-testid="node-count">{nodeCount}</div>
     </div>
   );
 }
@@ -34,9 +38,15 @@ describe('TreeStateProvider リアルタイム更新', () => {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
             tree_state: {
-              views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+              views: {
+                'default': {
+                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                  rootNodeIds: [],
+                  nodes: {},
+                },
+              },
+              viewOrder: ['default'],
               currentViewId: 'default',
-              nodes: {},
               tabToNode: {},
             },
           }),
@@ -127,27 +137,38 @@ describe('TreeStateProvider リアルタイム更新', () => {
 
   it('STATE_UPDATED メッセージを受信したときにストレージから状態を再読み込みする', async () => {
     const initialState: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: [],
+          nodes: {},
+        },
+      },
+      viewOrder: ['default'],
       currentViewId: 'default',
-      nodes: {},
       tabToNode: {},
     };
 
     const updatedState: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
     };
 
     // 最初の読み込みは初期状態
@@ -188,9 +209,15 @@ describe('TreeStateProvider リアルタイム更新', () => {
 
   it('storage.onChanged イベントを受信したときに状態を更新する', async () => {
     const initialState: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: [],
+          nodes: {},
+        },
+      },
+      viewOrder: ['default'],
       currentViewId: 'default',
-      nodes: {},
       tabToNode: {},
     };
 
@@ -213,19 +240,25 @@ describe('TreeStateProvider リアルタイム更新', () => {
 
     // ストレージ変更イベントを発火
     const updatedState: TreeState = {
-      ...initialState,
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
     };
 
     await act(async () => {
@@ -282,9 +315,15 @@ describe('TreeStateProvider TabInfoMap管理', () => {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
             tree_state: {
-              views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+              views: {
+                'default': {
+                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                  rootNodeIds: [],
+                  nodes: {},
+                },
+              },
+              viewOrder: ['default'],
               currentViewId: 'default',
-              nodes: {},
               tabToNode: {},
             },
           }),
@@ -474,9 +513,15 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
             tree_state: {
-              views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+              views: {
+                'default': {
+                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                  rootNodeIds: [],
+                  nodes: {},
+                },
+              },
+              viewOrder: ['default'],
               currentViewId: 'default',
-              nodes: {},
               tabToNode: {},
             },
           }),
@@ -704,38 +749,45 @@ describe('TreeStateProvider 複数選択状態管理', () => {
     mockStorageListeners = [];
 
     const treeStateWithNodes: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-2', 'node-3'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+      },
     };
 
     mockChrome = {
@@ -1057,8 +1109,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     if (isLoading) return <div>Loading...</div>;
     if (!treeState) return <div>No state</div>;
 
+    // Get nodes from the current view
+    const currentViewState = treeState.views[treeState.currentViewId];
+    const nodes = currentViewState ? currentViewState.nodes : {};
+
     // ノードの親子関係を表示
-    const nodeInfos = Object.values(treeState.nodes).map((node) => ({
+    const nodeInfos = Object.values(nodes).map((node) => ({
       id: node.id,
       parentId: node.parentId,
       depth: node.depth,
@@ -1066,7 +1122,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     // parentId -> [childNodeId1, childNodeId2, ...] の形式でグループ化
     const siblingGroups: Record<string, string[]> = {};
-    Object.values(treeState.nodes).forEach((node) => {
+    Object.values(nodes).forEach((node) => {
       const parentKey = node.parentId || 'root';
       if (!siblingGroups[parentKey]) {
         siblingGroups[parentKey] = [];
@@ -1076,9 +1132,9 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     return (
       <div>
-        <div data-testid="node-count">{Object.keys(treeState.nodes).length}</div>
+        <div data-testid="node-count">{Object.keys(nodes).length}</div>
         <div data-testid="node-infos">{JSON.stringify(nodeInfos)}</div>
-        {Object.values(treeState.nodes).map((node) => (
+        {Object.values(nodes).map((node) => (
           <div key={node.id} data-testid={`node-${node.id}-parent`}>{node.parentId || 'null'}</div>
         ))}
         <div data-testid="sibling-groups">{JSON.stringify(siblingGroups)}</div>
@@ -1094,38 +1150,45 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     // 3つのノードを持つツリー状態
     const treeStateWithNodes: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: 'node-1', // node-1の子
-          children: [],
-          isExpanded: true,
-          depth: 1,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-3'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: 'node-1', // node-1の子
+              children: [],
+              isExpanded: true,
+              depth: 1,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+      },
     };
 
     mockChrome = {
@@ -1305,38 +1368,45 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     // node-1 → node-2 (子) → node-4 (孫) の構造を持つツリー状態
     const treeStateWithGrandchild: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: 'node-1',
-          children: [],
-          isExpanded: true,
-          depth: 1,
-          viewId: 'default',
-        },
-        'node-4': {
-          id: 'node-4',
-          tabId: 4,
-          parentId: 'node-2',
-          children: [],
-          isExpanded: true,
-          depth: 2,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: 'node-1',
+              children: [],
+              isExpanded: true,
+              depth: 1,
+            },
+            'node-4': {
+              id: 'node-4',
+              tabId: 4,
+              parentId: 'node-2',
+              children: [],
+              isExpanded: true,
+              depth: 2,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '4': 'node-4' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        4: { viewId: 'default', nodeId: 'node-4' },
+      },
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
@@ -1394,47 +1464,54 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     // 4つのルートノードを持つツリー状態
     const treeStateWithMultipleRoots: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-4': {
-          id: 'node-4',
-          tabId: 4,
-          parentId: 'node-1', // node-1の子
-          children: [],
-          isExpanded: true,
-          depth: 1,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-2', 'node-3'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-4': {
+              id: 'node-4',
+              tabId: 4,
+              parentId: 'node-1', // node-1の子
+              children: [],
+              isExpanded: true,
+              depth: 1,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3', '4': 'node-4' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+        4: { viewId: 'default', nodeId: 'node-4' },
+      },
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
@@ -1500,47 +1577,54 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     //   └── node-2
     // node-3
     const treeStateWithMixedDepths: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: 'node-1', // node-1の子
-          children: [],
-          isExpanded: true,
-          depth: 1,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-4': {
-          id: 'node-4',
-          tabId: 4,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-3', 'node-4'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: 'node-1', // node-1の子
+              children: [],
+              isExpanded: true,
+              depth: 1,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-4': {
+              id: 'node-4',
+              tabId: 4,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3', '4': 'node-4' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+        4: { viewId: 'default', nodeId: 'node-4' },
+      },
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
@@ -1599,47 +1683,54 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     // 構造: node-1 → node-2 (子), node-3 → node-4 (子)
     const treeStateWithChildren: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: 'node-1',
-          children: [],
-          isExpanded: true,
-          depth: 1,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-5': {
-          id: 'node-5',
-          tabId: 5,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-3', 'node-5'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: 'node-1',
+              children: [],
+              isExpanded: true,
+              depth: 1,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-5': {
+              id: 'node-5',
+              tabId: 5,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3', '5': 'node-5' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+        5: { viewId: 'default', nodeId: 'node-5' },
+      },
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
@@ -1699,38 +1790,45 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     // 3つのルートノードを持つツリー状態
     // 実際のブラウザタブには2つのピン留めタブが含まれる
     const treeStateWithMultipleRoots: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 3, // ブラウザタブインデックス2（ピン留め2つの後）
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 4, // ブラウザタブインデックス3
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 5, // ブラウザタブインデックス4
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-2', 'node-3'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 3, // ブラウザタブインデックス2（ピン留め2つの後）
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 4, // ブラウザタブインデックス3
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 5, // ブラウザタブインデックス4
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '3': 'node-1', '4': 'node-2', '5': 'node-3' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        3: { viewId: 'default', nodeId: 'node-1' },
+        4: { viewId: 'default', nodeId: 'node-2' },
+        5: { viewId: 'default', nodeId: 'node-3' },
+      },
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
@@ -1792,38 +1890,45 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     // 3つのルートノードを持つツリー状態
     const treeStateWithMultipleRoots: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-2', 'node-3'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+      },
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
@@ -1882,38 +1987,45 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
     // 3つのルートノードを持つツリー状態
     const treeStateWithMultipleRoots: TreeState = {
-      views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-2', 'node-3'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
-      tabToNode: { '1': 'node-1', '2': 'node-2', '3': 'node-3' },
+      viewOrder: ['default'],
+      currentViewId: 'default',
+      tabToNode: {
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+      },
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
@@ -1995,9 +2107,15 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
             tree_state: {
-              views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+              views: {
+                'default': {
+                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                  rootNodeIds: [],
+                  nodes: {},
+                },
+              },
+              viewOrder: ['default'],
               currentViewId: 'default',
-              nodes: {},
               tabToNode: {},
             },
           }),
@@ -2207,9 +2325,15 @@ describe('TreeStateProvider ファビコン永続化', () => {
             // tree_stateキーのリクエスト
             return Promise.resolve({
               tree_state: {
-                views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+                views: {
+                  'default': {
+                    info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                    rootNodeIds: [],
+                    nodes: {},
+                  },
+                },
+                viewOrder: ['default'],
                 currentViewId: 'default',
-                nodes: {},
                 tabToNode: {},
               },
             });
@@ -2383,10 +2507,13 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
 
     if (isLoading) return <div>Loading...</div>;
 
+    const currentViewState = treeState?.views[treeState.currentViewId];
+    const nodeCount = currentViewState ? Object.keys(currentViewState.nodes).length : 0;
+
     return (
       <div>
         <div data-testid="tab-info-map-size">{Object.keys(tabInfoMap).length}</div>
-        <div data-testid="tree-node-count">{treeState ? Object.keys(treeState.nodes).length : 0}</div>
+        <div data-testid="tree-node-count">{nodeCount}</div>
       </div>
     );
   }
@@ -2409,9 +2536,15 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
             }
             return Promise.resolve({
               tree_state: {
-                views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+                views: {
+                  'default': {
+                    info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                    rootNodeIds: [],
+                    nodes: {},
+                  },
+                },
+                viewOrder: ['default'],
                 currentViewId: 'default',
-                nodes: {},
                 tabToNode: {},
               },
             });
@@ -2661,9 +2794,15 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
             }
             return Promise.resolve({
               tree_state: {
-                views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
+                views: {
+                  'default': {
+                    info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                    rootNodeIds: [],
+                    nodes: {},
+                  },
+                },
+                viewOrder: ['default'],
                 currentViewId: 'default',
-                nodes: {},
                 tabToNode: {},
               },
             });
@@ -2889,11 +3028,17 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
     if (isLoading) return <div>Loading...</div>;
     if (!treeState) return <div>No state</div>;
 
+    // Count nodes across all views
+    const totalNodes = Object.values(treeState.views).reduce(
+      (sum, view) => sum + Object.keys(view.nodes).length,
+      0
+    );
+
     return (
       <div>
         <div data-testid="view-tab-counts">{JSON.stringify(viewTabCounts)}</div>
         <div data-testid="tab-info-map-keys">{JSON.stringify(Object.keys(tabInfoMap).map(Number))}</div>
-        <div data-testid="node-count">{Object.keys(treeState.nodes).length}</div>
+        <div data-testid="node-count">{totalNodes}</div>
       </div>
     );
   }
@@ -2904,54 +3049,59 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
 
     // ツリー状態: タブ1, 2, 3がnodes内にあるが、タブ3は実際には存在しない（不整合タブ）
     const treeStateWithInconsistentTabs: TreeState = {
-      views: [
-        { id: 'default', name: 'Default', color: '#3b82f6' },
-        { id: 'view-2', name: 'View 2', color: '#10b981' },
-      ],
-      currentViewId: 'default',
-      nodes: {
-        'node-1': {
-          id: 'node-1',
-          tabId: 1,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
+      views: {
+        'default': {
+          info: { id: 'default', name: 'Default', color: '#3b82f6' },
+          rootNodeIds: ['node-1', 'node-2', 'node-3'],
+          nodes: {
+            'node-1': {
+              id: 'node-1',
+              tabId: 1,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-2': {
+              id: 'node-2',
+              tabId: 2,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+            'node-3': {
+              id: 'node-3',
+              tabId: 3, // このタブは実際には存在しない（不整合）
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
-        'node-2': {
-          id: 'node-2',
-          tabId: 2,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-3': {
-          id: 'node-3',
-          tabId: 3, // このタブは実際には存在しない（不整合）
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'default',
-        },
-        'node-4': {
-          id: 'node-4',
-          tabId: 4,
-          parentId: null,
-          children: [],
-          isExpanded: true,
-          depth: 0,
-          viewId: 'view-2',
+        'view-2': {
+          info: { id: 'view-2', name: 'View 2', color: '#10b981' },
+          rootNodeIds: ['node-4'],
+          nodes: {
+            'node-4': {
+              id: 'node-4',
+              tabId: 4,
+              parentId: null,
+              children: [],
+              isExpanded: true,
+              depth: 0,
+            },
+          },
         },
       },
+      viewOrder: ['default', 'view-2'],
+      currentViewId: 'default',
       tabToNode: {
-        1: 'node-1',
-        2: 'node-2',
-        3: 'node-3',
-        4: 'node-4',
+        1: { viewId: 'default', nodeId: 'node-1' },
+        2: { viewId: 'default', nodeId: 'node-2' },
+        3: { viewId: 'default', nodeId: 'node-3' },
+        4: { viewId: 'view-2', nodeId: 'node-4' },
       },
     };
 

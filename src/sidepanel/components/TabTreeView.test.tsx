@@ -11,7 +11,7 @@ describe('TabTreeView', () => {
   const createMockNode = (
     id: string,
     tabId: number,
-    viewId: string,
+    _viewId: string,
     parentId: string | null = null,
     children: TabNode[] = []
   ): TabNode => ({
@@ -21,7 +21,6 @@ describe('TabTreeView', () => {
     children,
     isExpanded: true,
     depth: 0,
-    viewId,
   });
 
   beforeEach(() => {
@@ -57,10 +56,13 @@ describe('TabTreeView', () => {
     expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
   });
 
-  it('currentViewIdに一致するノードのみを表示すること', () => {
+  it('渡されたすべてのノードを表示すること（viewIdフィルタリングはSidePanelRootで行われる）', () => {
+    // 新しいアーキテクチャでは、TabNodeにviewIdがなく、
+    // ビューによるフィルタリングはSidePanelRoot.buildTree()で行われる
+    // TabTreeViewは渡されたすべてのノードを表示する
     const nodes = [
       createMockNode('node-1', 1, 'default'),
-      createMockNode('node-2', 2, 'other-view'),
+      createMockNode('node-2', 2, 'default'),
       createMockNode('node-3', 3, 'default'),
     ];
 
@@ -74,7 +76,7 @@ describe('TabTreeView', () => {
     );
 
     expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
-    expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
   });
 
@@ -1298,7 +1300,7 @@ describe('TabTreeView', () => {
     const createMockGroupNode = (
       id: string,
       tabId: number,
-      viewId: string,
+      _viewId: string,
       children: TabNode[] = []
     ): TabNode => ({
       id,
@@ -1307,7 +1309,6 @@ describe('TabTreeView', () => {
       children,
       isExpanded: true,
       depth: 0,
-      viewId,
       groupId: id,
     });
 

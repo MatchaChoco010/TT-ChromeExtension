@@ -16,41 +16,43 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
         local: {
           get: vi.fn().mockResolvedValue({
             tree_state: {
-              views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-              currentViewId: 'default',
-              nodes: {
-                'node-1': {
-                  id: 'node-1',
-                  tabId: 1,
-                  parentId: null,
-                  children: [],
-                  isExpanded: true,
-                  depth: 0,
-                  viewId: 'default',
-                },
-                'node-2': {
-                  id: 'node-2',
-                  tabId: 2,
-                  parentId: null,
-                  children: [],
-                  isExpanded: true,
-                  depth: 0,
-                  viewId: 'default',
-                },
-                'node-3': {
-                  id: 'node-3',
-                  tabId: 3,
-                  parentId: null,
-                  children: [],
-                  isExpanded: true,
-                  depth: 0,
-                  viewId: 'default',
+              views: {
+                default: {
+                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
+                  rootNodeIds: ['node-1', 'node-2', 'node-3'],
+                  nodes: {
+                    'node-1': {
+                      id: 'node-1',
+                      tabId: 1,
+                      parentId: null,
+                      children: [],
+                      isExpanded: true,
+                      depth: 0,
+                    },
+                    'node-2': {
+                      id: 'node-2',
+                      tabId: 2,
+                      parentId: null,
+                      children: [],
+                      isExpanded: true,
+                      depth: 0,
+                    },
+                    'node-3': {
+                      id: 'node-3',
+                      tabId: 3,
+                      parentId: null,
+                      children: [],
+                      isExpanded: true,
+                      depth: 0,
+                    },
+                  },
                 },
               },
+              currentViewId: 'default',
               tabToNode: {
-                '1': 'node-1',
-                '2': 'node-2',
-                '3': 'node-3',
+                '1': { viewId: 'default', nodeId: 'node-1' },
+                '2': { viewId: 'default', nodeId: 'node-2' },
+                '3': { viewId: 'default', nodeId: 'node-3' },
               },
             },
           }),
@@ -162,8 +164,8 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
     expect(setCall).toBeDefined();
     const savedState = setCall[0].tree_state as TreeState;
     expect(savedState).toBeDefined();
-    expect(savedState.nodes['node-2'].parentId).toBe('node-1');
-    expect(savedState.nodes['node-2'].depth).toBe(1);
+    expect(savedState.views['default'].nodes['node-2'].parentId).toBe('node-1');
+    expect(savedState.views['default'].nodes['node-2'].depth).toBe(1);
   });
 
   it('タブを同階層で順序変更できる', async () => {
@@ -219,49 +221,51 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
     expect(setCall).toBeDefined();
     const savedState = setCall[0].tree_state as TreeState;
     expect(savedState).toBeDefined();
-    expect(savedState.nodes['node-3'].parentId).toBe('node-2');
-    expect(savedState.nodes['node-3'].depth).toBe(1);
+    expect(savedState.views['default'].nodes['node-3'].parentId).toBe('node-2');
+    expect(savedState.views['default'].nodes['node-3'].depth).toBe(1);
   });
 
   it('循環参照を防ぐ', async () => {
     const mockChrome = getMockChrome();
     mockChrome.storage.local.get.mockResolvedValue({
       tree_state: {
-        views: [{ id: 'default', name: 'Default', color: '#3b82f6' }],
-        currentViewId: 'default',
-        nodes: {
-          'node-1': {
-            id: 'node-1',
-            tabId: 1,
-            parentId: null,
-            children: [
-              {
+        views: {
+          default: {
+            info: { id: 'default', name: 'Default', color: '#3b82f6' },
+            rootNodeIds: ['node-1'],
+            nodes: {
+              'node-1': {
+                id: 'node-1',
+                tabId: 1,
+                parentId: null,
+                children: [
+                  {
+                    id: 'node-2',
+                    tabId: 2,
+                    parentId: 'node-1',
+                    children: [],
+                    isExpanded: true,
+                    depth: 1,
+                  },
+                ],
+                isExpanded: true,
+                depth: 0,
+              },
+              'node-2': {
                 id: 'node-2',
                 tabId: 2,
                 parentId: 'node-1',
                 children: [],
                 isExpanded: true,
                 depth: 1,
-                viewId: 'default',
               },
-            ],
-            isExpanded: true,
-            depth: 0,
-            viewId: 'default',
-          },
-          'node-2': {
-            id: 'node-2',
-            tabId: 2,
-            parentId: 'node-1',
-            children: [],
-            isExpanded: true,
-            depth: 1,
-            viewId: 'default',
+            },
           },
         },
+        currentViewId: 'default',
         tabToNode: {
-          '1': 'node-1',
-          '2': 'node-2',
+          '1': { viewId: 'default', nodeId: 'node-1' },
+          '2': { viewId: 'default', nodeId: 'node-2' },
         },
       },
     });

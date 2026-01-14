@@ -73,30 +73,40 @@ export async function moveTabToWindow(
         tabId: number;
         parentId: string | null;
       }
-      interface TreeState {
+      interface ViewState {
+        info: { id: string; name: string; color: string };
+        rootNodeIds: string[];
         nodes: Record<string, TabNode>;
-        tabToNode: Record<number, string>;
+      }
+      interface TreeState {
+        views: Record<string, ViewState>;
+        tabToNode: Record<number, { viewId: string; nodeId: string }>;
       }
 
       const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as TreeState | undefined;
 
-      if (!treeState?.nodes || !treeState?.tabToNode) {
+      if (!treeState?.views || !treeState?.tabToNode) {
         return [tabId];
       }
 
-      const nodeId = treeState.tabToNode[tabId];
-      if (!nodeId) {
+      const nodeInfo = treeState.tabToNode[tabId];
+      if (!nodeInfo) {
+        return [tabId];
+      }
+
+      const viewState = treeState.views[nodeInfo.viewId];
+      if (!viewState) {
         return [tabId];
       }
 
       const collectDescendants = (parentNodeId: string): number[] => {
-        const parentNode = treeState.nodes[parentNodeId];
+        const parentNode = viewState.nodes[parentNodeId];
         if (!parentNode) return [];
 
         const tabIds: number[] = [parentNode.tabId];
 
-        for (const [childNodeId, childNode] of Object.entries(treeState.nodes)) {
+        for (const [childNodeId, childNode] of Object.entries(viewState.nodes)) {
           if (childNode.parentId === parentNodeId) {
             tabIds.push(...collectDescendants(childNodeId));
           }
@@ -105,7 +115,7 @@ export async function moveTabToWindow(
         return tabIds;
       };
 
-      return collectDescendants(nodeId);
+      return collectDescendants(nodeInfo.nodeId);
     },
     { tabId }
   );
@@ -164,7 +174,9 @@ export async function assertWindowTreeSync(
       try {
         const tabs = await chrome.tabs.query({ windowId });
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
+        const treeState = result.tree_state as {
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
 
         const tabToNode = treeState?.tabToNode;
         if (tabToNode && tabs.length > 0) {

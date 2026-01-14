@@ -49,20 +49,25 @@ test.describe('ツリー状態永続化', () => {
           tabId: number;
           parentId: string | null;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
         }
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) return { found: false, parentNodeId: null };
+        if (!treeState?.views || !treeState?.tabToNode) return { found: false, parentNodeId: null };
 
-        const childNodeId = treeState.tabToNode[childId];
-        const parentNodeId = treeState.tabToNode[parentId];
-        if (!childNodeId || !parentNodeId) return { found: false, parentNodeId: null };
+        const childNodeInfo = treeState.tabToNode[childId];
+        const parentNodeInfo = treeState.tabToNode[parentId];
+        if (!childNodeInfo || !parentNodeInfo) return { found: false, parentNodeId: null };
 
-        const childNode = treeState.nodes[childNodeId];
-        return { found: true, parentNodeId: childNode?.parentId, expectedParentNodeId: parentNodeId };
+        const viewState = treeState.views[childNodeInfo.viewId];
+        if (!viewState) return { found: false, parentNodeId: null };
+        const childNode = viewState.nodes[childNodeInfo.nodeId];
+        return { found: true, parentNodeId: childNode?.parentId, expectedParentNodeId: parentNodeInfo.nodeId };
       }, { childId: childTab, parentId: parentTab });
 
       expect(parentIdInStorage.found).toBe(true);
@@ -236,18 +241,23 @@ test.describe('ツリー状態永続化', () => {
             tabId: number;
             isExpanded: boolean;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.nodes || !treeState?.tabToNode) return null;
+          if (!treeState?.views || !treeState?.tabToNode) return null;
 
-          const nodeId = treeState.tabToNode[parentId];
-          if (!nodeId) return null;
+          const nodeInfo = treeState.tabToNode[parentId];
+          if (!nodeInfo) return null;
 
-          const node = treeState.nodes[nodeId];
+          const viewState = treeState.views[nodeInfo.viewId];
+          if (!viewState) return null;
+          const node = viewState.nodes[nodeInfo.nodeId];
           return node?.isExpanded ?? null;
         }, parentTab);
         return isExpandedInStorage === true;
@@ -270,18 +280,23 @@ test.describe('ツリー状態永続化', () => {
             tabId: number;
             isExpanded: boolean;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.nodes || !treeState?.tabToNode) return null;
+          if (!treeState?.views || !treeState?.tabToNode) return null;
 
-          const nodeId = treeState.tabToNode[parentId];
-          if (!nodeId) return null;
+          const nodeInfo = treeState.tabToNode[parentId];
+          if (!nodeInfo) return null;
 
-          const node = treeState.nodes[nodeId];
+          const viewState = treeState.views[nodeInfo.viewId];
+          if (!viewState) return null;
+          const node = viewState.nodes[nodeInfo.nodeId];
           return node?.isExpanded ?? null;
         }, parentTab);
         return isExpandedInStorage === false;
@@ -340,18 +355,23 @@ test.describe('ツリー状態永続化', () => {
             tabId: number;
             isExpanded: boolean;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.nodes || !treeState?.tabToNode) return null;
+          if (!treeState?.views || !treeState?.tabToNode) return null;
 
-          const nodeId = treeState.tabToNode[parentId];
-          if (!nodeId) return null;
+          const nodeInfo = treeState.tabToNode[parentId];
+          if (!nodeInfo) return null;
 
-          const node = treeState.nodes[nodeId];
+          const viewState = treeState.views[nodeInfo.viewId];
+          if (!viewState) return null;
+          const node = viewState.nodes[nodeInfo.nodeId];
           return node?.isExpanded ?? null;
         }, parentTab);
         return isExpandedInStorage === false;
@@ -415,18 +435,23 @@ test.describe('ツリー状態永続化', () => {
             tabId: number;
             isExpanded: boolean;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.nodes || !treeState?.tabToNode) return null;
+          if (!treeState?.views || !treeState?.tabToNode) return null;
 
-          const nodeId = treeState.tabToNode[parentId];
-          if (!nodeId) return null;
+          const nodeInfo = treeState.tabToNode[parentId];
+          if (!nodeInfo) return null;
 
-          const node = treeState.nodes[nodeId];
+          const viewState = treeState.views[nodeInfo.viewId];
+          if (!viewState) return null;
+          const node = viewState.nodes[nodeInfo.nodeId];
           return node?.isExpanded ?? null;
         }, parentTab);
         return isExpandedInStorage === true;
@@ -536,20 +561,27 @@ test.describe('ツリー状態永続化', () => {
             tabId: number;
             isExpanded: boolean;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.nodes || !treeState?.tabToNode) return null;
+          if (!treeState?.views || !treeState?.tabToNode) return null;
 
-          const node1Id = treeState.tabToNode[parent1Id];
-          const node2Id = treeState.tabToNode[parent2Id];
-          if (!node1Id || !node2Id) return null;
+          const node1Info = treeState.tabToNode[parent1Id];
+          const node2Info = treeState.tabToNode[parent2Id];
+          if (!node1Info || !node2Info) return null;
 
-          const node1 = treeState.nodes[node1Id];
-          const node2 = treeState.nodes[node2Id];
+          const viewState1 = treeState.views[node1Info.viewId];
+          const viewState2 = treeState.views[node2Info.viewId];
+          if (!viewState1 || !viewState2) return null;
+
+          const node1 = viewState1.nodes[node1Info.nodeId];
+          const node2 = viewState2.nodes[node2Info.nodeId];
           return {
             parent1Expanded: node1?.isExpanded,
             parent2Expanded: node2?.isExpanded,
@@ -634,18 +666,23 @@ test.describe('ツリー状態永続化', () => {
             tabId: number;
             isExpanded: boolean;
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, string>;
+          interface ViewState {
             nodes: Record<string, TreeNode>;
+          }
+          interface LocalTreeState {
+            tabToNode: Record<number, { viewId: string; nodeId: string }>;
+            views: Record<string, ViewState>;
           }
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.nodes || !treeState?.tabToNode) return null;
+          if (!treeState?.views || !treeState?.tabToNode) return null;
 
-          const nodeId = treeState.tabToNode[parentId];
-          if (!nodeId) return null;
+          const nodeInfo = treeState.tabToNode[parentId];
+          if (!nodeInfo) return null;
 
-          const node = treeState.nodes[nodeId];
+          const viewState = treeState.views[nodeInfo.viewId];
+          if (!viewState) return null;
+          const node = viewState.nodes[nodeInfo.nodeId];
           return node?.isExpanded ?? null;
         }, parentTab);
       };

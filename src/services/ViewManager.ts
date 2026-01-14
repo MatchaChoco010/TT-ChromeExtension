@@ -203,10 +203,38 @@ export class ViewManager {
       const currentTreeState =
         await this.storageService.get(STORAGE_KEYS.TREE_STATE);
 
+      // 新しいデータ構造: views: Record<string, ViewState>
+      // ビュー情報だけを更新し、ノードは保持する
+      const updatedViews: Record<string, { info: View; rootNodeIds: string[]; nodes: Record<string, import('@/types').TabNode> }> = {};
+
+      // 既存のビューの構造を保持
+      if (currentTreeState?.views) {
+        for (const [viewId, viewState] of Object.entries(currentTreeState.views)) {
+          updatedViews[viewId] = {
+            info: viewState.info,
+            rootNodeIds: viewState.rootNodeIds,
+            nodes: viewState.nodes,
+          };
+        }
+      }
+
+      // ViewManagerで管理しているビュー情報で更新
+      for (const view of this.getAllViews()) {
+        if (updatedViews[view.id]) {
+          updatedViews[view.id].info = view;
+        } else {
+          updatedViews[view.id] = {
+            info: view,
+            rootNodeIds: [],
+            nodes: {},
+          };
+        }
+      }
+
       const updatedTreeState: TreeState = {
-        views: this.getAllViews(),
+        views: updatedViews,
+        viewOrder: currentTreeState?.viewOrder || Object.keys(updatedViews),
         currentViewId: this.currentViewId,
-        nodes: currentTreeState?.nodes || {},
         tabToNode: currentTreeState?.tabToNode || {},
       };
 
@@ -230,9 +258,10 @@ export class ViewManager {
       this.views.clear();
       this.views.set(this.defaultView.id, this.defaultView);
 
-      if (treeState.views && Array.isArray(treeState.views)) {
-        for (const view of treeState.views) {
-          this.views.set(view.id, view);
+      // 新しいデータ構造: views: Record<string, ViewState>
+      if (treeState.views && typeof treeState.views === 'object') {
+        for (const viewState of Object.values(treeState.views)) {
+          this.views.set(viewState.info.id, viewState.info);
         }
       }
 

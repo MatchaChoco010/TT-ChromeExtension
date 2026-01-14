@@ -76,8 +76,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-4',
         tabId: 4,
         parentId: 'node-2',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 2,
         isExpanded: true,
       };
@@ -85,8 +84,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-2',
         tabId: 2,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [node4],
+                children: [node4],
         depth: 1,
         isExpanded: true,
       };
@@ -94,8 +92,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-3',
         tabId: 3,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 1,
         isExpanded: true,
       };
@@ -103,8 +100,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [node2, node3],
+                children: [node2, node3],
         depth: 0,
         isExpanded: false, // 折りたたまれている
       };
@@ -132,8 +128,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-4',
         tabId: 4,
         parentId: 'node-2',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 2,
         isExpanded: true,
       };
@@ -141,8 +136,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-2',
         tabId: 2,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [node4],
+                children: [node4],
         depth: 1,
         isExpanded: true,
       };
@@ -150,8 +144,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-3',
         tabId: 3,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 1,
         isExpanded: true,
       };
@@ -159,8 +152,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [node2, node3],
+                children: [node2, node3],
         depth: 0,
         isExpanded: true, // 展開されている
       };
@@ -189,8 +181,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-4',
         tabId: 4,
         parentId: 'node-2',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 2,
         isExpanded: true,
       };
@@ -198,8 +189,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-5',
         tabId: 5,
         parentId: 'node-2',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 2,
         isExpanded: true,
       };
@@ -207,8 +197,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-2',
         tabId: 2,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [node4, node5],
+                children: [node4, node5],
         depth: 1,
         isExpanded: false, // 折りたたまれている
       };
@@ -216,8 +205,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-3',
         tabId: 3,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 1,
         isExpanded: true,
       };
@@ -225,8 +213,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [node2, node3],
+                children: [node2, node3],
         depth: 0,
         isExpanded: true,
       };
@@ -256,8 +243,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-4',
         tabId: 4,
         parentId: 'node-3',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 3,
         isExpanded: true,
       };
@@ -265,8 +251,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-3',
         tabId: 3,
         parentId: 'node-2',
-        viewId: 'default',
-        children: [node4],
+                children: [node4],
         depth: 2,
         isExpanded: false, // 折りたたまれている
       };
@@ -274,8 +259,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-2',
         tabId: 2,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [node3],
+                children: [node3],
         depth: 1,
         isExpanded: false, // 折りたたまれている
       };
@@ -283,8 +267,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [node2],
+                children: [node2],
         depth: 0,
         isExpanded: false, // 折りたたまれている
       };
@@ -308,8 +291,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 0,
         isExpanded: false,
       };
@@ -330,8 +312,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 0,
         isExpanded: true,
       };
@@ -362,8 +343,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-2',
         tabId: 2,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 1,
         isExpanded: true,
       };
@@ -371,8 +351,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [node2],
+                children: [node2],
         depth: 0,
         isExpanded: false, // 折りたたまれている
       };
@@ -406,8 +385,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-2',
         tabId: 2,
         parentId: 'node-1',
-        viewId: 'default',
-        children: [],
+                children: [],
         depth: 1,
         isExpanded: true,
       };
@@ -415,8 +393,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         id: 'node-1',
         tabId: 1,
         parentId: null,
-        viewId: 'default',
-        children: [node2],
+                children: [node2],
         depth: 0,
         isExpanded: true, // 展開されている
       };

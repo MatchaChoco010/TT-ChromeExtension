@@ -91,7 +91,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
               children: [],
               isExpanded: true,
               depth: 0,
-              viewId: 'default',
             },
             tab: {
               id: 1,
@@ -109,7 +108,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
               children: [],
               isExpanded: true,
               depth: 0,
-              viewId: 'default',
             },
             tab: {
               id: 2,
@@ -127,7 +125,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
               children: [],
               isExpanded: true,
               depth: 0,
-              viewId: 'default',
             },
             tab: {
               id: 3,

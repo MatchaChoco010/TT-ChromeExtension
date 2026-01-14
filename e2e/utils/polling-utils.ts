@@ -538,10 +538,11 @@ export async function waitForTreeStateInitialized(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
+        // 新しいTreeState構造: views は Record<string, ViewState>
         const treeState = result.tree_state as
-          | { nodes?: Record<string, unknown> }
+          | { views?: Record<string, unknown> }
           | undefined;
-        if (treeState?.nodes && Object.keys(treeState.nodes).length > 0) {
+        if (treeState?.views && Object.keys(treeState.views).length > 0) {
           return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
@@ -634,10 +635,11 @@ export async function waitForSidePanelReady(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
+        // 新しいTreeState構造: views は Record<string, ViewState>
         const treeState = result.tree_state as
-          | { nodes?: Record<string, unknown> }
+          | { views?: Record<string, unknown> }
           | undefined;
-        if (treeState?.nodes) {
+        if (treeState?.views && Object.keys(treeState.views).length > 0) {
           return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));

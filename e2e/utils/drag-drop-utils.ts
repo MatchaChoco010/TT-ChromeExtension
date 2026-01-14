@@ -433,18 +433,23 @@ export async function moveTabToRoot(
       tabId: number;
       parentId: string | null;
     }
-    interface LocalTreeState {
+    interface ViewState {
       nodes: Record<string, TreeNode>;
+    }
+    interface LocalTreeState {
+      views: Record<string, ViewState>;
     }
     for (let i = 0; i < 20; i++) {
       const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as LocalTreeState | undefined;
-      if (treeState?.nodes) {
-        const childNode = Object.values(treeState.nodes).find(
-          (n: TreeNode) => n.tabId === childId
-        );
-        if (childNode && childNode.parentId === null) {
-          return;
+      if (treeState?.views) {
+        for (const view of Object.values(treeState.views)) {
+          const childNode = Object.values(view.nodes).find(
+            (n: TreeNode) => n.tabId === childId
+          );
+          if (childNode && childNode.parentId === null) {
+            return;
+          }
         }
       }
       await new Promise(resolve => setTimeout(resolve, 50));

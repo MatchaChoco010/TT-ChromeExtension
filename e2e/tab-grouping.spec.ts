@@ -66,24 +66,34 @@ test.describe('タブグループ化機能', () => {
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+            return result.tree_state as {
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+            } | undefined;
           });
-          if (!treeState?.nodes) return false;
-          return Object.values(treeState.nodes).some(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
-          );
+          if (!treeState?.views) return false;
+          for (const view of Object.values(treeState.views)) {
+            if (Object.values(view.nodes).some(
+              (node) => node.id.startsWith('group-') && node.tabId > 0
+            )) return true;
+          }
+          return false;
         },
         { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
       );
 
       const groupTabId = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
-        if (!treeState?.nodes) return null;
-        const groupNode = Object.values(treeState.nodes).find(
-          (node) => node.id.startsWith('group-') && node.tabId > 0
-        );
-        return groupNode?.tabId ?? null;
+        const treeState = result.tree_state as {
+          views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+        } | undefined;
+        if (!treeState?.views) return null;
+        for (const view of Object.values(treeState.views)) {
+          const groupNode = Object.values(view.nodes).find(
+            (node) => node.id.startsWith('group-') && node.tabId > 0
+          );
+          if (groupNode) return groupNode.tabId;
+        }
+        return null;
       });
 
       await assertTabStructure(sidePanelPage, windowId, [
@@ -173,15 +183,19 @@ test.describe('タブグループ化機能', () => {
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+            return result.tree_state as {
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+            } | undefined;
           });
-          if (!treeState?.nodes) return false;
-          const groupNode = Object.values(treeState.nodes).find(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
-          );
-          if (groupNode) {
-            groupTabId = groupNode.tabId;
-            return true;
+          if (!treeState?.views) return false;
+          for (const view of Object.values(treeState.views)) {
+            const groupNode = Object.values(view.nodes).find(
+              (node) => node.id.startsWith('group-') && node.tabId > 0
+            );
+            if (groupNode) {
+              groupTabId = groupNode.tabId;
+              return true;
+            }
           }
           return false;
         },
@@ -201,16 +215,17 @@ test.describe('タブグループ化機能', () => {
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
             return result.tree_state as {
-              nodes?: Record<string, { id: string; tabId: number; parentId: string | null; groupId?: string }>;
-              tabToNode?: Record<number, string>;
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; groupId?: string }> }>;
+              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
             } | undefined;
           });
-          if (!treeState?.nodes || !treeState?.tabToNode) return false;
+          if (!treeState?.views || !treeState?.tabToNode) return false;
 
-          const tabNodeId = treeState.tabToNode[tabId1];
-          if (!tabNodeId) return false;
+          const tabNodeInfo = treeState.tabToNode[tabId1];
+          if (!tabNodeInfo) return false;
 
-          const tabNodeState = treeState.nodes[tabNodeId];
+          const viewState = treeState.views[tabNodeInfo.viewId];
+          const tabNodeState = viewState?.nodes[tabNodeInfo.nodeId];
           if (!tabNodeState) return false;
 
           return (tabNodeState.parentId !== null && tabNodeState.parentId.startsWith('group-')) ||
@@ -303,12 +318,17 @@ test.describe('タブグループ化機能', () => {
 
       const groupTabId = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
-        if (!treeState?.nodes) return null;
-        const groupNode = Object.values(treeState.nodes).find(
-          (node) => node.id.startsWith('group-') && node.tabId > 0
-        );
-        return groupNode?.tabId ?? null;
+        const treeState = result.tree_state as {
+          views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+        } | undefined;
+        if (!treeState?.views) return null;
+        for (const view of Object.values(treeState.views)) {
+          const groupNode = Object.values(view.nodes).find(
+            (node) => node.id.startsWith('group-') && node.tabId > 0
+          );
+          if (groupNode) return groupNode.tabId;
+        }
+        return null;
       });
 
       await closeTab(serviceWorker, tabId1);
@@ -395,12 +415,18 @@ test.describe('タブグループ化機能', () => {
         async () => {
           const result = await serviceWorker.evaluate(async () => {
             const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
-            if (!treeState?.nodes) return { found: false };
+            const treeState = storage.tree_state as {
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+            } | undefined;
+            if (!treeState?.views) return { found: false };
 
-            const groupNode = Object.values(treeState.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
-            );
+            let groupNode: { id: string; tabId: number } | undefined;
+            for (const view of Object.values(treeState.views)) {
+              groupNode = Object.values(view.nodes).find(
+                (node) => node.id.startsWith('group-') && node.tabId > 0
+              );
+              if (groupNode) break;
+            }
             if (!groupNode) return { found: false };
 
             try {
@@ -509,16 +535,20 @@ test.describe('タブグループ化機能', () => {
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+            return result.tree_state as {
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+            } | undefined;
           });
-          if (!treeState?.nodes) return false;
+          if (!treeState?.views) return false;
 
-          const groupNode = Object.values(treeState.nodes).find(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
-          );
-          if (groupNode) {
-            groupTabId = groupNode.tabId;
-            return true;
+          for (const view of Object.values(treeState.views)) {
+            const groupNode = Object.values(view.nodes).find(
+              (node) => node.id.startsWith('group-') && node.tabId > 0
+            );
+            if (groupNode) {
+              groupTabId = groupNode.tabId;
+              return true;
+            }
           }
           return false;
         },
@@ -625,22 +655,31 @@ test.describe('タブグループ化機能', () => {
           const result = await serviceWorker.evaluate(async (targetTabId) => {
             const storage = await chrome.storage.local.get('tree_state');
             const treeState = storage.tree_state as {
-              nodes?: Record<string, { id: string; tabId: number; parentId: string | null }>;
-              tabToNode?: Record<number, string>;
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null }> }>;
+              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
             } | undefined;
-            if (!treeState?.nodes || !treeState?.tabToNode) {
+            if (!treeState?.views || !treeState?.tabToNode) {
               return { found: false };
             }
 
-            const groupNode = Object.values(treeState.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
-            );
-            if (!groupNode) return { found: false };
+            let groupNode: { id: string; tabId: number } | undefined;
+            let groupViewId: string | undefined;
+            for (const [viewId, view] of Object.entries(treeState.views)) {
+              groupNode = Object.values(view.nodes).find(
+                (node) => node.id.startsWith('group-') && node.tabId > 0
+              );
+              if (groupNode) {
+                groupViewId = viewId;
+                break;
+              }
+            }
+            if (!groupNode || !groupViewId) return { found: false };
 
-            const tabNodeId = treeState.tabToNode[targetTabId];
-            if (!tabNodeId) return { found: false, reason: 'tabNodeId not found' };
+            const tabNodeInfo = treeState.tabToNode[targetTabId];
+            if (!tabNodeInfo) return { found: false, reason: 'tabNodeInfo not found' };
 
-            const tabNodeState = treeState.nodes[tabNodeId];
+            const viewState = treeState.views[tabNodeInfo.viewId];
+            const tabNodeState = viewState?.nodes[tabNodeInfo.nodeId];
             if (!tabNodeState) return { found: false, reason: 'tabNodeState not found' };
 
             const isChild = tabNodeState.parentId === groupNode.id;
@@ -748,16 +787,20 @@ test.describe('タブグループ化機能', () => {
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+            return result.tree_state as {
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+            } | undefined;
           });
-          if (!treeState?.nodes) return false;
+          if (!treeState?.views) return false;
 
-          const groupNode = Object.values(treeState.nodes).find(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
-          );
-          if (groupNode) {
-            groupTabId = groupNode.tabId;
-            return true;
+          for (const view of Object.values(treeState.views)) {
+            const groupNode = Object.values(view.nodes).find(
+              (node) => node.id.startsWith('group-') && node.tabId > 0
+            );
+            if (groupNode) {
+              groupTabId = groupNode.tabId;
+              return true;
+            }
           }
           return false;
         },
@@ -862,20 +905,23 @@ test.describe('タブグループ化機能', () => {
           const result = await serviceWorker.evaluate(async () => {
             const storage = await chrome.storage.local.get('tree_state');
             const treeState = storage.tree_state as {
-              nodes?: Record<string, { id: string; tabId: number; groupId?: string }>
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; groupId?: string }> }>
             } | undefined;
-            if (!treeState?.nodes) return { found: false };
+            if (!treeState?.views) return { found: false };
 
-            const groupNode = Object.values(treeState.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
-            );
-            if (!groupNode) return { found: false };
-
-            return {
-              found: true,
-              groupTabId: groupNode.tabId,
-              hasGroupId: !!groupNode.groupId
-            };
+            for (const view of Object.values(treeState.views)) {
+              const groupNode = Object.values(view.nodes).find(
+                (node) => node.id.startsWith('group-') && node.tabId > 0
+              );
+              if (groupNode) {
+                return {
+                  found: true,
+                  groupTabId: groupNode.tabId,
+                  hasGroupId: !!groupNode.groupId
+                };
+              }
+            }
+            return { found: false };
           });
           if (result.found && result.groupTabId) {
             groupTabId = result.groupTabId;
@@ -972,24 +1018,34 @@ test.describe('タブグループ化機能', () => {
         async () => {
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
+            return result.tree_state as {
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+            } | undefined;
           });
-          if (!treeState?.nodes) return false;
-          return Object.values(treeState.nodes).some(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
-          );
+          if (!treeState?.views) return false;
+          for (const view of Object.values(treeState.views)) {
+            if (Object.values(view.nodes).some(
+              (node) => node.id.startsWith('group-') && node.tabId > 0
+            )) return true;
+          }
+          return false;
         },
         { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
       );
 
       const groupTabId = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { nodes?: Record<string, { id: string; tabId: number }> } | undefined;
-        if (!treeState?.nodes) return null;
-        const groupNode = Object.values(treeState.nodes).find(
-          (node) => node.id.startsWith('group-') && node.tabId > 0
-        );
-        return groupNode?.tabId ?? null;
+        const treeState = result.tree_state as {
+          views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+        } | undefined;
+        if (!treeState?.views) return null;
+        for (const view of Object.values(treeState.views)) {
+          const groupNode = Object.values(view.nodes).find(
+            (node) => node.id.startsWith('group-') && node.tabId > 0
+          );
+          if (groupNode) return groupNode.tabId;
+        }
+        return null;
       });
 
       await assertTabStructure(sidePanelPage, windowId, [
@@ -1062,20 +1118,23 @@ test.describe('タブグループ化機能', () => {
           const result = await serviceWorker.evaluate(async () => {
             const storage = await chrome.storage.local.get('tree_state');
             const treeState = storage.tree_state as {
-              nodes?: Record<string, { id: string; tabId: number; isExpanded: boolean }>
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; isExpanded: boolean }> }>
             } | undefined;
-            if (!treeState?.nodes) return { found: false };
+            if (!treeState?.views) return { found: false };
 
-            const groupNode = Object.values(treeState.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
-            );
-            if (!groupNode) return { found: false };
-
-            return {
-              found: true,
-              groupTabId: groupNode.tabId,
-              isExpanded: groupNode.isExpanded
-            };
+            for (const view of Object.values(treeState.views)) {
+              const groupNode = Object.values(view.nodes).find(
+                (node) => node.id.startsWith('group-') && node.tabId > 0
+              );
+              if (groupNode) {
+                return {
+                  found: true,
+                  groupTabId: groupNode.tabId,
+                  isExpanded: groupNode.isExpanded
+                };
+              }
+            }
+            return { found: false };
           });
           if (result.found && result.groupTabId) {
             groupTabId = result.groupTabId;
@@ -1188,24 +1247,33 @@ test.describe('タブグループ化機能', () => {
           const result = await serviceWorker.evaluate(async (tabIds) => {
             const storage = await chrome.storage.local.get('tree_state');
             const treeState = storage.tree_state as {
-              nodes?: Record<string, { id: string; tabId: number; parentId: string | null; children?: string[] }>;
-              tabToNode?: Record<number, string>;
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; children?: string[] }> }>;
+              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
             } | undefined;
-            if (!treeState?.nodes || !treeState?.tabToNode) return { found: false };
+            if (!treeState?.views || !treeState?.tabToNode) return { found: false };
 
-            const groupNode = Object.values(treeState.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
-            );
-            if (!groupNode) return { found: false };
+            let groupNode: { id: string; tabId: number } | undefined;
+            let groupViewId: string | undefined;
+            for (const [viewId, view] of Object.entries(treeState.views)) {
+              groupNode = Object.values(view.nodes).find(
+                (node) => node.id.startsWith('group-') && node.tabId > 0
+              );
+              if (groupNode) {
+                groupViewId = viewId;
+                break;
+              }
+            }
+            if (!groupNode || !groupViewId) return { found: false };
 
+            const viewState = treeState.views[groupViewId];
             const childrenParentIds = tabIds.map(tabId => {
-              const nodeId = treeState.tabToNode![tabId];
-              if (!nodeId) return null;
-              const node = treeState.nodes![nodeId];
+              const nodeInfo = treeState.tabToNode![tabId];
+              if (!nodeInfo) return null;
+              const node = viewState?.nodes[nodeInfo.nodeId];
               return node?.parentId;
             });
 
-            const allAreChildren = childrenParentIds.every(parentId => parentId === groupNode.id);
+            const allAreChildren = childrenParentIds.every(parentId => parentId === groupNode!.id);
             if (!allAreChildren) return { found: false };
 
             const tabs = await chrome.tabs.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
@@ -1326,22 +1394,31 @@ test.describe('タブグループ化機能', () => {
           const result = await serviceWorker.evaluate(async (tabIds) => {
             const storage = await chrome.storage.local.get('tree_state');
             const treeState = storage.tree_state as {
-              nodes?: Record<string, { id: string; tabId: number; parentId: string | null }>;
-              tabToNode?: Record<number, string>;
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null }> }>;
+              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
             } | undefined;
-            if (!treeState?.nodes || !treeState?.tabToNode) return { found: false };
+            if (!treeState?.views || !treeState?.tabToNode) return { found: false };
 
-            const groupNode = Object.values(treeState.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
-            );
-            if (!groupNode) return { found: false };
+            let groupNode: { id: string; tabId: number } | undefined;
+            let groupViewId: string | undefined;
+            for (const [viewId, view] of Object.entries(treeState.views)) {
+              groupNode = Object.values(view.nodes).find(
+                (node) => node.id.startsWith('group-') && node.tabId > 0
+              );
+              if (groupNode) {
+                groupViewId = viewId;
+                break;
+              }
+            }
+            if (!groupNode || !groupViewId) return { found: false };
 
-            const tab1NodeId = treeState.tabToNode[tabIds[0]];
-            const tab2NodeId = treeState.tabToNode[tabIds[1]];
-            if (!tab1NodeId || !tab2NodeId) return { found: false };
+            const viewState = treeState.views[groupViewId];
+            const tab1NodeInfo = treeState.tabToNode[tabIds[0]];
+            const tab2NodeInfo = treeState.tabToNode[tabIds[1]];
+            if (!tab1NodeInfo || !tab2NodeInfo) return { found: false };
 
-            const tab1Node = treeState.nodes[tab1NodeId];
-            const tab2Node = treeState.nodes[tab2NodeId];
+            const tab1Node = viewState?.nodes[tab1NodeInfo.nodeId];
+            const tab2Node = viewState?.nodes[tab2NodeInfo.nodeId];
             if (!tab1Node || !tab2Node) return { found: false };
 
             const isTab1Child = tab1Node.parentId === groupNode.id;

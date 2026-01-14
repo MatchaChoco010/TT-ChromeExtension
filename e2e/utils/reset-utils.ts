@@ -70,15 +70,21 @@ export async function resetExtensionState(
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: { nodes: Map<unknown, unknown>; tabToNode: Map<unknown, unknown>; views: Map<string, unknown[]>; expandedNodes: Set<unknown>; currentViewId: string; syncCompleted: boolean; syncInProgress: boolean } }).treeStateManager;
+      // TreeStateManagerの新構造に対応
+      // views: Map<string, ViewState>（内部はMap）、viewOrder: string[]
+      const treeStateManager = (globalThis as unknown as { treeStateManager?: {
+        tabToNode: Map<unknown, unknown>;
+        views: Map<string, unknown>;
+        viewOrder: string[];
+        currentViewId: string;
+        syncCompleted: boolean;
+        syncInProgress: boolean;
+      } }).treeStateManager;
       if (treeStateManager) {
-        treeStateManager.nodes.clear();
         treeStateManager.tabToNode.clear();
         treeStateManager.views.clear();
-        treeStateManager.expandedNodes.clear();
-        treeStateManager.views.set('default', []);
+        treeStateManager.viewOrder = [];
         treeStateManager.currentViewId = 'default';
-        // syncWithChromeTabsが再度実行されるようにフラグをリセット
         treeStateManager.syncCompleted = false;
         treeStateManager.syncInProgress = false;
       }
@@ -169,19 +175,26 @@ export async function resetExtensionState(
   );
 
   // Step 8: tree_stateにデフォルトのviewsを明示的に設定
+  // 新しいTreeState構造: views は Record<string, ViewState>
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const defaultView = {
+      const defaultViewInfo = {
         id: 'default',
         name: 'Default',
         color: '#3B82F6',
       };
       await chrome.storage.local.set({
         tree_state: {
-          views: [defaultView],
+          views: {
+            'default': {
+              info: defaultViewInfo,
+              rootNodeIds: [],
+              nodes: {},
+            },
+          },
+          viewOrder: ['default'],
           currentViewId: 'default',
-          nodes: {},
           tabToNode: {},
           treeStructure: [],
         },

@@ -35,7 +35,6 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
     children,
     isExpanded,
     depth,
-    viewId: 'default',
   });
 
   const createMockTabInfo = (id: number, title: string = 'Test Tab'): ExtendedTabInfo => ({

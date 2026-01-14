@@ -49,7 +49,7 @@ describe('ViewManager と TreeStateManager の統合テスト', () => {
       const view1Tabs = treeStateManager.getTree(view1.id);
       expect(view1Tabs).toHaveLength(1);
       expect(view1Tabs[0].tabId).toBe(1);
-      expect(view1Tabs[0].viewId).toBe(view1.id);
+      // viewId is no longer on TabNode; tabs are associated with views via tabToNode map
 
       // view2には存在しないことを確認
       const view2TabsBefore = treeStateManager.getTree(view2.id);
@@ -62,7 +62,7 @@ describe('ViewManager と TreeStateManager の統合テスト', () => {
       const view2TabsAfter = treeStateManager.getTree(view2.id);
       expect(view2TabsAfter).toHaveLength(1);
       expect(view2TabsAfter[0].tabId).toBe(1);
-      expect(view2TabsAfter[0].viewId).toBe(view2.id);
+      // viewId is no longer on TabNode; tabs are associated with views via tabToNode map
 
       // view1からは削除されたことを確認
       const view1TabsAfter = treeStateManager.getTree(view1.id);
@@ -100,10 +100,10 @@ describe('ViewManager と TreeStateManager の統合テスト', () => {
       const view2TabsAfter = treeStateManager.getTree(view2.id);
       expect(view2TabsAfter).toHaveLength(1);
       expect(view2TabsAfter[0].tabId).toBe(1);
-      expect(view2TabsAfter[0].viewId).toBe(view2.id);
+      // viewId is no longer on TabNode; tabs are associated with views via tabToNode map
       expect(view2TabsAfter[0].children).toHaveLength(1);
       expect(view2TabsAfter[0].children[0].tabId).toBe(2);
-      expect(view2TabsAfter[0].children[0].viewId).toBe(view2.id);
+      // viewId is no longer on TabNode; tabs are associated with views via tabToNode map
 
       // view1からは削除されたことを確認
       const view1TabsAfter = treeStateManager.getTree(view1.id);

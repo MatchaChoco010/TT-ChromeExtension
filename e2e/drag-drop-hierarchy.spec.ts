@@ -360,26 +360,35 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           parentId: string | null;
           depth: number;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
           treeStructure?: unknown[];
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) {
+        if (!treeState?.views || !treeState?.tabToNode) {
           return { error: 'No tree state' };
         }
 
-        const parentNodeId = treeState.tabToNode[parentTabId];
-        const childNodeId = treeState.tabToNode[childTabId];
+        const parentNodeInfo = treeState.tabToNode[parentTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
+
+        let childNode: TreeNode | undefined;
+        if (childNodeInfo) {
+          const viewState = treeState.views[childNodeInfo.viewId];
+          childNode = viewState?.nodes[childNodeInfo.nodeId];
+        }
 
         return {
-          parentNodeId,
-          childNodeId,
-          childParentId: childNodeId ? treeState.nodes[childNodeId]?.parentId : null,
-          childDepth: childNodeId ? treeState.nodes[childNodeId]?.depth : null,
+          parentNodeId: parentNodeInfo?.nodeId,
+          childNodeId: childNodeInfo?.nodeId,
+          childParentId: childNode?.parentId ?? null,
+          childDepth: childNode?.depth ?? null,
           treeStructureLength: treeState.treeStructure?.length ?? 0,
         };
       },
@@ -402,26 +411,35 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           parentId: string | null;
           depth: number;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
           treeStructure?: unknown[];
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) {
+        if (!treeState?.views || !treeState?.tabToNode) {
           return { error: 'No tree state' };
         }
 
-        const parentNodeId = treeState.tabToNode[parentTabId];
-        const childNodeId = treeState.tabToNode[childTabId];
+        const parentNodeInfo = treeState.tabToNode[parentTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
+
+        let childNode: TreeNode | undefined;
+        if (childNodeInfo) {
+          const viewState = treeState.views[childNodeInfo.viewId];
+          childNode = viewState?.nodes[childNodeInfo.nodeId];
+        }
 
         return {
-          parentNodeId,
-          childNodeId,
-          childParentId: childNodeId ? treeState.nodes[childNodeId]?.parentId : null,
-          childDepth: childNodeId ? treeState.nodes[childNodeId]?.depth : null,
+          parentNodeId: parentNodeInfo?.nodeId,
+          childNodeId: childNodeInfo?.nodeId,
+          childParentId: childNode?.parentId ?? null,
+          childDepth: childNode?.depth ?? null,
           treeStructureLength: treeState.treeStructure?.length ?? 0,
         };
       },
@@ -439,42 +457,46 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           parentId: string | null;
           depth: number;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) {
+        if (!treeState?.views || !treeState?.tabToNode) {
           return { valid: false, reason: 'No tree state' };
         }
 
-        const parentNodeId = treeState.tabToNode[parentTabId];
-        const childNodeId = treeState.tabToNode[childTabId];
+        const parentNodeInfo = treeState.tabToNode[parentTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
 
-        if (!parentNodeId || !childNodeId) {
+        if (!parentNodeInfo || !childNodeInfo) {
           return {
             valid: false,
             reason: 'Missing node IDs',
-            parentNodeId,
-            childNodeId,
+            parentNodeId: parentNodeInfo?.nodeId,
+            childNodeId: childNodeInfo?.nodeId,
           };
         }
 
-        const parentNode = treeState.nodes[parentNodeId];
-        const childNode = treeState.nodes[childNodeId];
+        const viewState = treeState.views[parentNodeInfo.viewId];
+        const parentNode = viewState?.nodes[parentNodeInfo.nodeId];
+        const childNode = viewState?.nodes[childNodeInfo.nodeId];
 
         if (!parentNode || !childNode) {
           return { valid: false, reason: 'Missing nodes' };
         }
 
-        if (childNode.parentId !== parentNodeId) {
+        if (childNode.parentId !== parentNodeInfo.nodeId) {
           return {
             valid: false,
             reason: 'Child should be child of parent',
             actualParentId: childNode.parentId,
-            expectedParentId: parentNodeId,
+            expectedParentId: parentNodeInfo.nodeId,
           };
         }
 
@@ -577,44 +599,48 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           parentId: string | null;
           depth: number;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) {
+        if (!treeState?.views || !treeState?.tabToNode) {
           return { valid: false, reason: 'No tree state' };
         }
 
-        const parent1NodeId = treeState.tabToNode[parent1Id];
-        const child1NodeId = treeState.tabToNode[child1Id];
-        if (!parent1NodeId || !child1NodeId) {
+        const parent1NodeInfo = treeState.tabToNode[parent1Id];
+        const child1NodeInfo = treeState.tabToNode[child1Id];
+        if (!parent1NodeInfo || !child1NodeInfo) {
           return { valid: false, reason: 'Missing node IDs for relation 1' };
         }
-        const child1Node = treeState.nodes[child1NodeId];
-        if (!child1Node || child1Node.parentId !== parent1NodeId) {
+        const viewState = treeState.views[parent1NodeInfo.viewId];
+        const child1Node = viewState?.nodes[child1NodeInfo.nodeId];
+        if (!child1Node || child1Node.parentId !== parent1NodeInfo.nodeId) {
           return {
             valid: false,
             reason: 'Relation 1 broken',
             actualParentId: child1Node?.parentId,
-            expectedParentId: parent1NodeId,
+            expectedParentId: parent1NodeInfo.nodeId,
           };
         }
 
-        const parent2NodeId = treeState.tabToNode[parent2Id];
-        const child2NodeId = treeState.tabToNode[child2Id];
-        if (!parent2NodeId || !child2NodeId) {
+        const parent2NodeInfo = treeState.tabToNode[parent2Id];
+        const child2NodeInfo = treeState.tabToNode[child2Id];
+        if (!parent2NodeInfo || !child2NodeInfo) {
           return { valid: false, reason: 'Missing node IDs for relation 2' };
         }
-        const child2Node = treeState.nodes[child2NodeId];
-        if (!child2Node || child2Node.parentId !== parent2NodeId) {
+        const child2Node = viewState?.nodes[child2NodeInfo.nodeId];
+        if (!child2Node || child2Node.parentId !== parent2NodeInfo.nodeId) {
           return {
             valid: false,
             reason: 'Relation 2 broken',
             actualParentId: child2Node?.parentId,
-            expectedParentId: parent2NodeId,
+            expectedParentId: parent2NodeInfo.nodeId,
           };
         }
 
@@ -686,42 +712,46 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           parentId: string | null;
           depth: number;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) {
+        if (!treeState?.views || !treeState?.tabToNode) {
           return { valid: false, reason: 'No tree state' };
         }
 
-        const parentNodeId = treeState.tabToNode[parentTabId];
-        const childNodeId = treeState.tabToNode[childTabId];
+        const parentNodeInfo = treeState.tabToNode[parentTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
 
-        if (!parentNodeId || !childNodeId) {
+        if (!parentNodeInfo || !childNodeInfo) {
           return {
             valid: false,
             reason: 'Missing node IDs',
-            parentNodeId,
-            childNodeId,
+            parentNodeId: parentNodeInfo?.nodeId,
+            childNodeId: childNodeInfo?.nodeId,
           };
         }
 
-        const parentNode = treeState.nodes[parentNodeId];
-        const childNode = treeState.nodes[childNodeId];
+        const viewState = treeState.views[parentNodeInfo.viewId];
+        const parentNode = viewState?.nodes[parentNodeInfo.nodeId];
+        const childNode = viewState?.nodes[childNodeInfo.nodeId];
 
         if (!parentNode || !childNode) {
           return { valid: false, reason: 'Missing nodes' };
         }
 
-        if (childNode.parentId !== parentNodeId) {
+        if (childNode.parentId !== parentNodeInfo.nodeId) {
           return {
             valid: false,
             reason: 'Child should be child of parent',
             actualParentId: childNode.parentId,
-            expectedParentId: parentNodeId,
+            expectedParentId: parentNodeInfo.nodeId,
           };
         }
 
@@ -783,24 +813,32 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           parentId: string | null;
           depth: number;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
           treeStructure?: unknown[];
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) {
+        if (!treeState?.views || !treeState?.tabToNode) {
           return { error: 'No tree state' };
         }
 
-        const childNodeId = treeState.tabToNode[childTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
+        let childNode: TreeNode | undefined;
+        if (childNodeInfo) {
+          const viewState = treeState.views[childNodeInfo.viewId];
+          childNode = viewState?.nodes[childNodeInfo.nodeId];
+        }
 
         return {
-          childNodeId,
-          childParentId: childNodeId ? treeState.nodes[childNodeId]?.parentId : null,
-          childDepth: childNodeId ? treeState.nodes[childNodeId]?.depth : null,
+          childNodeId: childNodeInfo?.nodeId,
+          childParentId: childNode?.parentId ?? null,
+          childDepth: childNode?.depth ?? null,
           treeStructureLength: treeState.treeStructure?.length ?? 0,
         };
       },
@@ -818,24 +856,32 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           parentId: string | null;
           depth: number;
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, string>;
+        interface ViewState {
           nodes: Record<string, TreeNode>;
+        }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
           treeStructure?: unknown[];
         }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) {
+        if (!treeState?.views || !treeState?.tabToNode) {
           return { error: 'No tree state' };
         }
 
-        const childNodeId = treeState.tabToNode[childTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
+        let childNode: TreeNode | undefined;
+        if (childNodeInfo) {
+          const viewState = treeState.views[childNodeInfo.viewId];
+          childNode = viewState?.nodes[childNodeInfo.nodeId];
+        }
 
         return {
-          childNodeId,
-          childParentId: childNodeId ? treeState.nodes[childNodeId]?.parentId : null,
-          childDepth: childNodeId ? treeState.nodes[childNodeId]?.depth : null,
+          childNodeId: childNodeInfo?.nodeId,
+          childParentId: childNode?.parentId ?? null,
+          childDepth: childNode?.depth ?? null,
           treeStructureLength: treeState.treeStructure?.length ?? 0,
         };
       },
@@ -895,16 +941,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     const storageBeforeSync = await serviceWorker.evaluate(
       async ({ childTabId }) => {
         interface TreeNode { parentId: string | null; depth: number; }
-        interface LocalTreeState { tabToNode: Record<number, string>; nodes: Record<string, TreeNode>; }
+        interface ViewState { nodes: Record<string, TreeNode>; }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
+        }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) return { error: 'No tree state' };
+        if (!treeState?.views || !treeState?.tabToNode) return { error: 'No tree state' };
 
-        const childNodeId = treeState.tabToNode[childTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
+        let childNode: TreeNode | undefined;
+        if (childNodeInfo) {
+          const viewState = treeState.views[childNodeInfo.viewId];
+          childNode = viewState?.nodes[childNodeInfo.nodeId];
+        }
         return {
-          childParentId: childNodeId ? treeState.nodes[childNodeId]?.parentId : null,
-          childDepth: childNodeId ? treeState.nodes[childNodeId]?.depth : null,
+          childParentId: childNode?.parentId ?? null,
+          childDepth: childNode?.depth ?? null,
         };
       },
       { childTabId: childTab }
@@ -919,16 +974,25 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     const storageAfterSync = await serviceWorker.evaluate(
       async ({ childTabId }) => {
         interface TreeNode { parentId: string | null; depth: number; }
-        interface LocalTreeState { tabToNode: Record<number, string>; nodes: Record<string, TreeNode>; }
+        interface ViewState { nodes: Record<string, TreeNode>; }
+        interface LocalTreeState {
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+          views: Record<string, ViewState>;
+        }
 
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.nodes || !treeState?.tabToNode) return { error: 'No tree state' };
+        if (!treeState?.views || !treeState?.tabToNode) return { error: 'No tree state' };
 
-        const childNodeId = treeState.tabToNode[childTabId];
+        const childNodeInfo = treeState.tabToNode[childTabId];
+        let childNode: TreeNode | undefined;
+        if (childNodeInfo) {
+          const viewState = treeState.views[childNodeInfo.viewId];
+          childNode = viewState?.nodes[childNodeInfo.nodeId];
+        }
         return {
-          childParentId: childNodeId ? treeState.nodes[childNodeId]?.parentId : null,
-          childDepth: childNodeId ? treeState.nodes[childNodeId]?.depth : null,
+          childParentId: childNode?.parentId ?? null,
+          childDepth: childNode?.depth ?? null,
         };
       },
       { childTabId: childTab }

@@ -43,7 +43,9 @@ describe('TreeStateManager', () => {
       const tree = manager.getTree(viewId);
       expect(tree).toBeDefined();
       expect(tree.length).toBeGreaterThan(0);
-      expect(tree[0].viewId).toBe(viewId);
+      // viewIdはgetNodeByTabIdから取得するようになった
+      const result = manager.getNodeByTabId(1);
+      expect(result?.viewId).toBe(viewId);
     });
 
     it('存在しないviewIdに対して空配列を返す', () => {
@@ -63,14 +65,15 @@ describe('TreeStateManager', () => {
         viewId,
       );
 
-      const node = manager.getNodeByTabId(tabId);
-      expect(node).toBeDefined();
-      expect(node?.tabId).toBe(tabId);
+      const result = manager.getNodeByTabId(tabId);
+      expect(result).toBeDefined();
+      expect(result?.node.tabId).toBe(tabId);
+      expect(result?.viewId).toBe(viewId);
     });
 
     it('存在しないtabIdに対してnullを返す', () => {
-      const node = manager.getNodeByTabId(999);
-      expect(node).toBeNull();
+      const result = manager.getNodeByTabId(999);
+      expect(result).toBeNull();
     });
   });
 
@@ -85,11 +88,11 @@ describe('TreeStateManager', () => {
 
       await manager.addTab(tab, null, viewId);
 
-      const node = manager.getNodeByTabId(tab.id!);
-      expect(node).toBeDefined();
-      expect(node?.tabId).toBe(tab.id);
-      expect(node?.parentId).toBeNull();
-      expect(node?.viewId).toBe(viewId);
+      const result = manager.getNodeByTabId(tab.id!);
+      expect(result).toBeDefined();
+      expect(result?.node.tabId).toBe(tab.id);
+      expect(result?.node.parentId).toBeNull();
+      expect(result?.viewId).toBe(viewId);
     });
 
     it('親ノードを指定して子タブとして追加できる', async () => {
@@ -106,15 +109,15 @@ describe('TreeStateManager', () => {
       } as chrome.tabs.Tab;
 
       await manager.addTab(parentTab, null, viewId);
-      const parentNode = manager.getNodeByTabId(parentTab.id!);
-      expect(parentNode).toBeDefined();
+      const parentResult = manager.getNodeByTabId(parentTab.id!);
+      expect(parentResult).toBeDefined();
 
-      await manager.addTab(childTab, parentNode!.id, viewId);
-      const childNode = manager.getNodeByTabId(childTab.id!);
+      await manager.addTab(childTab, parentResult!.node.id, viewId);
+      const childResult = manager.getNodeByTabId(childTab.id!);
 
-      expect(childNode).toBeDefined();
-      expect(childNode?.parentId).toBe(parentNode!.id);
-      expect(parentNode!.children).toContainEqual(childNode);
+      expect(childResult).toBeDefined();
+      expect(childResult?.node.parentId).toBe(parentResult!.node.id);
+      expect(parentResult!.node.children).toContainEqual(childResult?.node);
     });
 
     it('タブ追加後にストレージに永続化される', async () => {
@@ -130,7 +133,7 @@ describe('TreeStateManager', () => {
       expect(mockStorageService.set).toHaveBeenCalledWith(
         'tree_state',
         expect.objectContaining({
-          nodes: expect.any(Object),
+          views: expect.any(Object),
           tabToNode: expect.any(Object),
         }),
       );
@@ -177,15 +180,15 @@ describe('TreeStateManager', () => {
       await manager.addTab(tab1, null, viewId);
       await manager.addTab(tab2, null, viewId);
 
-      const node1 = manager.getNodeByTabId(tab1.id!);
-      const node2 = manager.getNodeByTabId(tab2.id!);
+      const result1 = manager.getNodeByTabId(tab1.id!);
+      const result2 = manager.getNodeByTabId(tab2.id!);
 
-      expect(node2?.parentId).toBeNull();
+      expect(result2?.node.parentId).toBeNull();
 
-      await manager.moveNode(node2!.id, node1!.id, 0);
+      await manager.moveNode(result2!.node.id, result1!.node.id, 0);
 
-      const updatedNode2 = manager.getNodeByTabId(tab2.id!);
-      expect(updatedNode2?.parentId).toBe(node1!.id);
+      const updatedResult2 = manager.getNodeByTabId(tab2.id!);
+      expect(updatedResult2?.node.parentId).toBe(result1!.node.id);
     });
 
     it('移動後にストレージに永続化される', async () => {
@@ -196,10 +199,10 @@ describe('TreeStateManager', () => {
       await manager.addTab(tab1, null, viewId);
       await manager.addTab(tab2, null, viewId);
 
-      const node1 = manager.getNodeByTabId(tab1.id!);
-      const node2 = manager.getNodeByTabId(tab2.id!);
+      const result1 = manager.getNodeByTabId(tab1.id!);
+      const result2 = manager.getNodeByTabId(tab2.id!);
 
-      await manager.moveNode(node2!.id, node1!.id, 0);
+      await manager.moveNode(result2!.node.id, result1!.node.id, 0);
 
       expect(mockStorageService.set).toHaveBeenCalled();
     });
@@ -214,25 +217,25 @@ describe('TreeStateManager', () => {
       await manager.addTab(tab1, null, viewId);
       const root1 = manager.getNodeByTabId(tab1.id!);
 
-      await manager.addTab(tab2, root1!.id, viewId);
+      await manager.addTab(tab2, root1!.node.id, viewId);
       const child = manager.getNodeByTabId(tab2.id!);
 
-      await manager.addTab(tab3, child!.id, viewId);
+      await manager.addTab(tab3, child!.node.id, viewId);
       const grandchild = manager.getNodeByTabId(tab3.id!);
 
       await manager.addTab(tab4, null, viewId);
       const root2 = manager.getNodeByTabId(tab4.id!);
 
-      expect(child!.depth).toBe(1);
-      expect(grandchild!.depth).toBe(2);
+      expect(child!.node.depth).toBe(1);
+      expect(grandchild!.node.depth).toBe(2);
 
-      await manager.moveNode(child!.id, root2!.id, 0);
+      await manager.moveNode(child!.node.id, root2!.node.id, 0);
 
       const updatedChild = manager.getNodeByTabId(tab2.id!);
       const updatedGrandchild = manager.getNodeByTabId(tab3.id!);
 
-      expect(updatedChild!.depth).toBe(1);
-      expect(updatedGrandchild!.depth).toBe(2);
+      expect(updatedChild!.node.depth).toBe(1);
+      expect(updatedGrandchild!.node.depth).toBe(2);
     });
   });
 
@@ -246,13 +249,13 @@ describe('TreeStateManager', () => {
       const viewId = 'view-1';
 
       await manager.addTab(tab, null, viewId);
-      const node = manager.getNodeByTabId(tab.id!);
-      const initialExpanded = node!.isExpanded;
+      const result = manager.getNodeByTabId(tab.id!);
+      const initialExpanded = result!.node.isExpanded;
 
-      await manager.toggleExpand(node!.id);
+      await manager.toggleExpand(result!.node.id);
 
-      const updatedNode = manager.getNodeByTabId(tab.id!);
-      expect(updatedNode!.isExpanded).toBe(!initialExpanded);
+      const updatedResult = manager.getNodeByTabId(tab.id!);
+      expect(updatedResult!.node.isExpanded).toBe(!initialExpanded);
     });
 
     it('展開状態切り替え後にストレージに永続化される', async () => {
@@ -264,9 +267,9 @@ describe('TreeStateManager', () => {
       const viewId = 'view-1';
 
       await manager.addTab(tab, null, viewId);
-      const node = manager.getNodeByTabId(tab.id!);
+      const result = manager.getNodeByTabId(tab.id!);
 
-      await manager.toggleExpand(node!.id);
+      await manager.toggleExpand(result!.node.id);
 
       expect(mockStorageService.set).toHaveBeenCalled();
     });
@@ -304,26 +307,26 @@ describe('TreeStateManager', () => {
         const child2Tab = { id: 3, url: 'https://example.com/child2', title: 'Child2' } as chrome.tabs.Tab;
 
         await manager.addTab(parentTab, null, viewId);
-        const parentNode = manager.getNodeByTabId(parentTab.id!);
-        await manager.addTab(child1Tab, parentNode!.id, viewId);
-        await manager.addTab(child2Tab, parentNode!.id, viewId);
+        const parentResult = manager.getNodeByTabId(parentTab.id!);
+        await manager.addTab(child1Tab, parentResult!.node.id, viewId);
+        await manager.addTab(child2Tab, parentResult!.node.id, viewId);
 
         const parentBeforeRemove = manager.getNodeByTabId(parentTab.id!);
-        expect(parentBeforeRemove?.children.length).toBe(2);
+        expect(parentBeforeRemove?.node.children.length).toBe(2);
 
         await manager.removeTab(parentTab.id!, 'promote');
 
         expect(manager.getNodeByTabId(parentTab.id!)).toBeNull();
 
-        const child1Node = manager.getNodeByTabId(child1Tab.id!);
-        const child2Node = manager.getNodeByTabId(child2Tab.id!);
+        const child1Result = manager.getNodeByTabId(child1Tab.id!);
+        const child2Result = manager.getNodeByTabId(child2Tab.id!);
 
-        expect(child1Node).toBeDefined();
-        expect(child2Node).toBeDefined();
-        expect(child1Node?.parentId).toBeNull();
-        expect(child2Node?.parentId).toBeNull();
-        expect(child1Node?.depth).toBe(0);
-        expect(child2Node?.depth).toBe(0);
+        expect(child1Result).toBeDefined();
+        expect(child2Result).toBeDefined();
+        expect(child1Result?.node.parentId).toBeNull();
+        expect(child2Result?.node.parentId).toBeNull();
+        expect(child1Result?.node.depth).toBe(0);
+        expect(child2Result?.node.depth).toBe(0);
       });
 
       it('親タブを閉じると、孫タブは子タブの子として維持される', async () => {
@@ -333,22 +336,22 @@ describe('TreeStateManager', () => {
         const grandchildTab = { id: 3, url: 'https://example.com/grandchild', title: 'Grandchild' } as chrome.tabs.Tab;
 
         await manager.addTab(parentTab, null, viewId);
-        const parentNode = manager.getNodeByTabId(parentTab.id!);
-        await manager.addTab(childTab, parentNode!.id, viewId);
-        const childNode = manager.getNodeByTabId(childTab.id!);
-        await manager.addTab(grandchildTab, childNode!.id, viewId);
+        const parentResult = manager.getNodeByTabId(parentTab.id!);
+        await manager.addTab(childTab, parentResult!.node.id, viewId);
+        const childResult = manager.getNodeByTabId(childTab.id!);
+        await manager.addTab(grandchildTab, childResult!.node.id, viewId);
 
         await manager.removeTab(parentTab.id!, 'promote');
 
         expect(manager.getNodeByTabId(parentTab.id!)).toBeNull();
 
         const promotedChild = manager.getNodeByTabId(childTab.id!);
-        expect(promotedChild?.parentId).toBeNull();
-        expect(promotedChild?.depth).toBe(0);
+        expect(promotedChild?.node.parentId).toBeNull();
+        expect(promotedChild?.node.depth).toBe(0);
 
         const grandchild = manager.getNodeByTabId(grandchildTab.id!);
-        expect(grandchild?.parentId).toBe(promotedChild?.id);
-        expect(grandchild?.depth).toBe(1);
+        expect(grandchild?.node.parentId).toBe(promotedChild?.node.id);
+        expect(grandchild?.node.depth).toBe(1);
       });
     });
 
@@ -361,11 +364,11 @@ describe('TreeStateManager', () => {
         const grandchildTab = { id: 4, url: 'https://example.com/grandchild', title: 'Grandchild' } as chrome.tabs.Tab;
 
         await manager.addTab(parentTab, null, viewId);
-        const parentNode = manager.getNodeByTabId(parentTab.id!);
-        await manager.addTab(child1Tab, parentNode!.id, viewId);
-        await manager.addTab(child2Tab, parentNode!.id, viewId);
-        const child1Node = manager.getNodeByTabId(child1Tab.id!);
-        await manager.addTab(grandchildTab, child1Node!.id, viewId);
+        const parentResult = manager.getNodeByTabId(parentTab.id!);
+        await manager.addTab(child1Tab, parentResult!.node.id, viewId);
+        await manager.addTab(child2Tab, parentResult!.node.id, viewId);
+        const child1Result = manager.getNodeByTabId(child1Tab.id!);
+        await manager.addTab(grandchildTab, child1Result!.node.id, viewId);
 
         expect(manager.getNodeByTabId(parentTab.id!)).toBeDefined();
         expect(manager.getNodeByTabId(child1Tab.id!)).toBeDefined();
@@ -394,14 +397,14 @@ describe('TreeStateManager', () => {
         const childTab = { id: 2, url: 'https://example.com/child', title: 'Child' } as chrome.tabs.Tab;
 
         await manager.addTab(parentTab, null, viewId);
-        const parentNode = manager.getNodeByTabId(parentTab.id!);
-        await manager.addTab(childTab, parentNode!.id, viewId);
+        const parentResult = manager.getNodeByTabId(parentTab.id!);
+        await manager.addTab(childTab, parentResult!.node.id, viewId);
 
         await manager.removeTab(parentTab.id!);
 
         const child = manager.getNodeByTabId(childTab.id!);
         expect(child).toBeDefined();
-        expect(child?.parentId).toBeNull();
+        expect(child?.node.parentId).toBeNull();
       });
     });
   });
@@ -419,17 +422,17 @@ describe('TreeStateManager', () => {
       const groupTabId = 100;
       const groupNodeId = await manager.createGroupWithRealTab(groupTabId, [1, 2], 'テストグループ');
 
-      const groupNode = manager.getNodeByTabId(groupTabId);
-      expect(groupNode).toBeDefined();
-      expect(groupNode?.id).toBe(groupNodeId);
-      expect(groupNode?.tabId).toBe(groupTabId);
+      const groupResult = manager.getNodeByTabId(groupTabId);
+      expect(groupResult).toBeDefined();
+      expect(groupResult?.node.id).toBe(groupNodeId);
+      expect(groupResult?.node.tabId).toBe(groupTabId);
 
       const child1 = manager.getNodeByTabId(1);
       const child2 = manager.getNodeByTabId(2);
-      expect(child1?.parentId).toBe(groupNodeId);
-      expect(child2?.parentId).toBe(groupNodeId);
-      expect(child1?.depth).toBe(1);
-      expect(child2?.depth).toBe(1);
+      expect(child1?.node.parentId).toBe(groupNodeId);
+      expect(child2?.node.parentId).toBe(groupNodeId);
+      expect(child1?.node.depth).toBe(1);
+      expect(child2?.node.depth).toBe(1);
     });
 
     it('グループノードがルートレベルに作成される', async () => {
@@ -440,9 +443,9 @@ describe('TreeStateManager', () => {
       const groupTabId = 100;
       await manager.createGroupWithRealTab(groupTabId, [1], 'グループ');
 
-      const groupNode = manager.getNodeByTabId(groupTabId);
-      expect(groupNode?.parentId).toBeNull();
-      expect(groupNode?.depth).toBe(0);
+      const groupResult = manager.getNodeByTabId(groupTabId);
+      expect(groupResult?.node.parentId).toBeNull();
+      expect(groupResult?.node.depth).toBe(0);
     });
 
     it('グループ情報がストレージに保存される', async () => {
@@ -487,21 +490,21 @@ describe('TreeStateManager', () => {
       const childTab = { id: 2, url: 'https://example.com/child', title: 'Child' } as chrome.tabs.Tab;
 
       await manager.addTab(parentTab, null, viewId);
-      const parentNode = manager.getNodeByTabId(1);
-      await manager.addTab(childTab, parentNode!.id, viewId);
+      const parentResult = manager.getNodeByTabId(1);
+      await manager.addTab(childTab, parentResult!.node.id, viewId);
 
       const childBefore = manager.getNodeByTabId(2);
-      expect(childBefore?.parentId).toBe(parentNode!.id);
+      expect(childBefore?.node.parentId).toBe(parentResult!.node.id);
 
       const groupTabId = 100;
       await manager.createGroupWithRealTab(groupTabId, [2], 'グループ');
 
       const parentAfter = manager.getNodeByTabId(1);
-      expect(parentAfter?.children.find(c => c.tabId === 2)).toBeUndefined();
+      expect(parentAfter?.node.children.find(c => c.tabId === 2)).toBeUndefined();
 
       const childAfter = manager.getNodeByTabId(2);
-      const groupNode = manager.getNodeByTabId(100);
-      expect(childAfter?.parentId).toBe(groupNode?.id);
+      const groupResult = manager.getNodeByTabId(100);
+      expect(childAfter?.node.parentId).toBe(groupResult?.node.id);
     });
 
     it('タブIDが存在しない場合はエラーをスローする', async () => {
@@ -524,29 +527,29 @@ describe('TreeStateManager', () => {
 
         const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
         await manager.addTab(parentTab, null, viewId);
-        const parentNode = manager.getNodeByTabId(1);
+        const parentResult = manager.getNodeByTabId(1);
 
         const childTab1 = { id: 2, url: 'https://example.com/child1', title: 'Child1' } as chrome.tabs.Tab;
         const childTab2 = { id: 3, url: 'https://example.com/child2', title: 'Child2' } as chrome.tabs.Tab;
-        await manager.addTab(childTab1, parentNode!.id, viewId);
-        await manager.addTab(childTab2, parentNode!.id, viewId);
+        await manager.addTab(childTab1, parentResult!.node.id, viewId);
+        await manager.addTab(childTab2, parentResult!.node.id, viewId);
 
         const groupTabId = 100;
         await manager.createGroupWithRealTab(groupTabId, [2, 3], 'グループ');
 
-        const groupNode = manager.getNodeByTabId(groupTabId);
-        expect(groupNode?.parentId).toBe(parentNode!.id);
-        expect(groupNode?.depth).toBe(1);
+        const groupResult = manager.getNodeByTabId(groupTabId);
+        expect(groupResult?.node.parentId).toBe(parentResult!.node.id);
+        expect(groupResult?.node.depth).toBe(1);
 
         const updatedParent = manager.getNodeByTabId(1);
-        expect(updatedParent?.children.some(c => c.tabId === groupTabId)).toBe(true);
+        expect(updatedParent?.node.children.some(c => c.tabId === groupTabId)).toBe(true);
 
         const child1 = manager.getNodeByTabId(2);
         const child2 = manager.getNodeByTabId(3);
-        expect(child1?.parentId).toBe(groupNode?.id);
-        expect(child2?.parentId).toBe(groupNode?.id);
-        expect(child1?.depth).toBe(2);
-        expect(child2?.depth).toBe(2);
+        expect(child1?.node.parentId).toBe(groupResult?.node.id);
+        expect(child2?.node.parentId).toBe(groupResult?.node.id);
+        expect(child1?.node.depth).toBe(2);
+        expect(child2?.node.depth).toBe(2);
       });
 
       it('タブが異なる親を持つ場合、グループタブはルートレベルに配置される', async () => {
@@ -557,27 +560,27 @@ describe('TreeStateManager', () => {
         await manager.addTab(parent1Tab, null, viewId);
         await manager.addTab(parent2Tab, null, viewId);
 
-        const parent1Node = manager.getNodeByTabId(1);
-        const parent2Node = manager.getNodeByTabId(2);
+        const parent1Result = manager.getNodeByTabId(1);
+        const parent2Result = manager.getNodeByTabId(2);
 
         const child1Tab = { id: 3, url: 'https://example.com/child1', title: 'Child1' } as chrome.tabs.Tab;
         const child2Tab = { id: 4, url: 'https://example.com/child2', title: 'Child2' } as chrome.tabs.Tab;
-        await manager.addTab(child1Tab, parent1Node!.id, viewId);
-        await manager.addTab(child2Tab, parent2Node!.id, viewId);
+        await manager.addTab(child1Tab, parent1Result!.node.id, viewId);
+        await manager.addTab(child2Tab, parent2Result!.node.id, viewId);
 
         const groupTabId = 100;
         await manager.createGroupWithRealTab(groupTabId, [3, 4], 'グループ');
 
-        const groupNode = manager.getNodeByTabId(groupTabId);
-        expect(groupNode?.parentId).toBeNull();
-        expect(groupNode?.depth).toBe(0);
+        const groupResult = manager.getNodeByTabId(groupTabId);
+        expect(groupResult?.node.parentId).toBeNull();
+        expect(groupResult?.node.depth).toBe(0);
 
         const child1 = manager.getNodeByTabId(3);
         const child2 = manager.getNodeByTabId(4);
-        expect(child1?.parentId).toBe(groupNode?.id);
-        expect(child2?.parentId).toBe(groupNode?.id);
-        expect(child1?.depth).toBe(1);
-        expect(child2?.depth).toBe(1);
+        expect(child1?.node.parentId).toBe(groupResult?.node.id);
+        expect(child2?.node.parentId).toBe(groupResult?.node.id);
+        expect(child1?.node.depth).toBe(1);
+        expect(child2?.node.depth).toBe(1);
       });
 
       it('ルートレベルのタブと子タブを混合してグループ化した場合、グループタブはルートレベルに配置される', async () => {
@@ -585,10 +588,10 @@ describe('TreeStateManager', () => {
 
         const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
         await manager.addTab(parentTab, null, viewId);
-        const parentNode = manager.getNodeByTabId(1);
+        const parentResult = manager.getNodeByTabId(1);
 
         const childTab = { id: 2, url: 'https://example.com/child', title: 'Child' } as chrome.tabs.Tab;
-        await manager.addTab(childTab, parentNode!.id, viewId);
+        await manager.addTab(childTab, parentResult!.node.id, viewId);
 
         const rootTab = { id: 3, url: 'https://example.com/root', title: 'Root' } as chrome.tabs.Tab;
         await manager.addTab(rootTab, null, viewId);
@@ -596,9 +599,9 @@ describe('TreeStateManager', () => {
         const groupTabId = 100;
         await manager.createGroupWithRealTab(groupTabId, [2, 3], 'グループ');
 
-        const groupNode = manager.getNodeByTabId(groupTabId);
-        expect(groupNode?.parentId).toBeNull();
-        expect(groupNode?.depth).toBe(0);
+        const groupResult = manager.getNodeByTabId(groupTabId);
+        expect(groupResult?.node.parentId).toBeNull();
+        expect(groupResult?.node.depth).toBe(0);
       });
 
       it('すべてのタブがルートレベルの場合、グループタブもルートレベルに配置される', async () => {
@@ -612,9 +615,9 @@ describe('TreeStateManager', () => {
         const groupTabId = 100;
         await manager.createGroupWithRealTab(groupTabId, [1, 2], 'グループ');
 
-        const groupNode = manager.getNodeByTabId(groupTabId);
-        expect(groupNode?.parentId).toBeNull();
-        expect(groupNode?.depth).toBe(0);
+        const groupResult = manager.getNodeByTabId(groupTabId);
+        expect(groupResult?.node.parentId).toBeNull();
+        expect(groupResult?.node.depth).toBe(0);
       });
     });
   });
@@ -648,8 +651,8 @@ describe('TreeStateManager', () => {
       const childTab = { id: 2, url: 'https://example.com/child', title: 'Child' } as chrome.tabs.Tab;
 
       await manager.addTab(parentTab, null, viewId);
-      const parentNode = manager.getNodeByTabId(parentTab.id!);
-      await manager.addTab(childTab, parentNode!.id, viewId);
+      const parentResult = manager.getNodeByTabId(parentTab.id!);
+      await manager.addTab(childTab, parentResult!.node.id, viewId);
 
       const existingTabIds = [1];
 
@@ -711,11 +714,11 @@ describe('TreeStateManager', () => {
       const grandchildTab = { id: 4, url: 'https://example.com/grandchild', title: 'Grandchild' } as chrome.tabs.Tab;
 
       await manager.addTab(parentTab, null, viewId);
-      const parentNode = manager.getNodeByTabId(parentTab.id!);
-      await manager.addTab(child1Tab, parentNode!.id, viewId);
-      await manager.addTab(child2Tab, parentNode!.id, viewId);
-      const child1Node = manager.getNodeByTabId(child1Tab.id!);
-      await manager.addTab(grandchildTab, child1Node!.id, viewId);
+      const parentResult = manager.getNodeByTabId(parentTab.id!);
+      await manager.addTab(child1Tab, parentResult!.node.id, viewId);
+      await manager.addTab(child2Tab, parentResult!.node.id, viewId);
+      const child1Result = manager.getNodeByTabId(child1Tab.id!);
+      await manager.addTab(grandchildTab, child1Result!.node.id, viewId);
 
       const existingTabIds = [1, 3];
 

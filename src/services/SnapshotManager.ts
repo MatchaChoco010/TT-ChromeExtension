@@ -44,8 +44,9 @@ export class SnapshotManager {
       throw new Error('Tree state not found');
     }
 
-    const views: View[] = treeState.views || [];
-    const tabs: TabSnapshot[] = await this.createTabSnapshots(treeState.nodes);
+    // 新しいデータ構造: views: Record<string, ViewState>
+    const views: View[] = Object.values(treeState.views).map(vs => vs.info);
+    const tabs: TabSnapshot[] = await this.createTabSnapshots(treeState);
 
     const snapshot: Snapshot = {
       id: this.generateSnapshotId(),
@@ -97,26 +98,33 @@ export class SnapshotManager {
    * 各タブにindexを割り当て、parentIdをparentIndexに変換する
    * マルチウィンドウ対応のため、windowIdをwindowIndexに変換して保存
    *
-   * @param nodes - タブノードのレコード
+   * @param treeState - ツリー状態
    * @returns タブスナップショット配列
    */
   private async createTabSnapshots(
-    nodes: Record<string, TabNode>,
+    treeState: TreeState,
   ): Promise<TabSnapshot[]> {
     const tabSnapshots: TabSnapshot[] = [];
     const tabs = await chrome.tabs.query({});
     const tabMap = new Map(tabs.map((tab) => [tab.id, tab]));
 
-    const nodeArray = Object.values(nodes);
-    const nodeIdToIndex = new Map<string, number>();
+    // 新しいデータ構造: views: Record<string, ViewState>からノードを収集
+    // { node, viewId } のペアを作成
+    const nodeWithViewId: Array<{ node: TabNode; viewId: string }> = [];
+    for (const [viewId, viewState] of Object.entries(treeState.views)) {
+      for (const node of Object.values(viewState.nodes)) {
+        nodeWithViewId.push({ node, viewId });
+      }
+    }
 
-    nodeArray.forEach((node, index) => {
+    const nodeIdToIndex = new Map<string, number>();
+    nodeWithViewId.forEach(({ node }, index) => {
       nodeIdToIndex.set(node.id, index);
     });
 
     // windowIdをwindowIndexに変換するためのマッピング
     const windowIdSet = new Set<number>();
-    for (const node of nodeArray) {
+    for (const { node } of nodeWithViewId) {
       const tab = tabMap.get(node.tabId);
       if (tab && tab.windowId !== undefined) {
         windowIdSet.add(tab.windowId);
@@ -128,8 +136,8 @@ export class SnapshotManager {
       windowIdToIndex.set(windowId, index);
     });
 
-    for (let index = 0; index < nodeArray.length; index++) {
-      const node = nodeArray[index];
+    for (let index = 0; index < nodeWithViewId.length; index++) {
+      const { node, viewId } = nodeWithViewId[index];
       const tab = tabMap.get(node.tabId);
 
       if (tab && tab.url) {
@@ -145,7 +153,7 @@ export class SnapshotManager {
           url: tab.url,
           title: tab.title || '',
           parentIndex,
-          viewId: node.viewId,
+          viewId,
           isExpanded: node.isExpanded,
           pinned: tab.pinned || false,
           windowIndex,
@@ -242,7 +250,41 @@ export class SnapshotManager {
     const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
     if (!treeState) return;
 
-    const updatedNodes: Record<string, TabNode> = { ...treeState.nodes };
+    // 新しいデータ構造: views: Record<string, ViewState>
+    // 既存のビューをコピー
+    const updatedViews: Record<string, { info: View; rootNodeIds: string[]; nodes: Record<string, TabNode> }> = {};
+    for (const [viewId, viewState] of Object.entries(treeState.views)) {
+      updatedViews[viewId] = {
+        info: { ...viewState.info },
+        rootNodeIds: [...viewState.rootNodeIds],
+        nodes: { ...viewState.nodes },
+      };
+    }
+
+    // スナップショットのビューを追加（存在しない場合）
+    for (const view of views) {
+      if (!updatedViews[view.id]) {
+        updatedViews[view.id] = {
+          info: { id: view.id, name: view.name, color: view.color },
+          rootNodeIds: [],
+          nodes: {},
+        };
+      }
+    }
+
+    // デフォルトビューが存在しない場合は作成
+    if (!updatedViews['default']) {
+      updatedViews['default'] = {
+        info: { id: 'default', name: 'Default', color: '#3B82F6' },
+        rootNodeIds: [],
+        nodes: {},
+      };
+    }
+
+    // 一時的にすべてのノードを保持するマップ（親子関係構築用）
+    const allNewNodes: Map<string, TabNode> = new Map();
+    const nodeIdToViewId: Map<string, string> = new Map();
+    const updatedTabToNode: Record<number, { viewId: string; nodeId: string }> = { ...treeState.tabToNode };
 
     for (const [index, newTabId] of indexToNewTabId) {
       const snapshot = indexToSnapshot.get(index);
@@ -256,7 +298,7 @@ export class SnapshotManager {
         const parentTabId = indexToNewTabId.get(snapshot.parentIndex);
         if (parentTabId !== undefined) {
           parentId = `tab-${parentTabId}`;
-          const parentNode = updatedNodes[parentId];
+          const parentNode = allNewNodes.get(parentId);
           if (parentNode) {
             depth = parentNode.depth + 1;
           }
@@ -270,28 +312,46 @@ export class SnapshotManager {
         children: [],
         isExpanded: snapshot.isExpanded,
         depth,
-        viewId: snapshot.viewId,
       };
 
-      updatedNodes[nodeId] = newNode;
+      allNewNodes.set(nodeId, newNode);
+      nodeIdToViewId.set(nodeId, snapshot.viewId);
+      updatedTabToNode[newTabId] = { viewId: snapshot.viewId, nodeId };
     }
 
-    for (const nodeId of Object.keys(updatedNodes)) {
-      const node = updatedNodes[nodeId];
-      if (node.parentId && updatedNodes[node.parentId]) {
-        const parent = updatedNodes[node.parentId];
+    // 親子関係を構築（childrenを設定）
+    for (const [nodeId, node] of allNewNodes) {
+      if (node.parentId && allNewNodes.has(node.parentId)) {
+        const parent = allNewNodes.get(node.parentId)!;
         const childExists = parent.children.some((c) => c.id === nodeId);
         if (!childExists) {
-          const childNode = updatedNodes[nodeId];
-          parent.children = [...parent.children, childNode];
+          parent.children = [...parent.children, node];
         }
+      }
+    }
+
+    // ノードを各ビューに配置
+    for (const [nodeId, node] of allNewNodes) {
+      const viewId = nodeIdToViewId.get(nodeId) || 'default';
+      if (!updatedViews[viewId]) {
+        updatedViews[viewId] = {
+          info: { id: viewId, name: viewId === 'default' ? 'Default' : 'View', color: '#3B82F6' },
+          rootNodeIds: [],
+          nodes: {},
+        };
+      }
+      updatedViews[viewId].nodes[nodeId] = node;
+
+      // ルートノードの場合、rootNodeIdsに追加
+      if (!node.parentId) {
+        updatedViews[viewId].rootNodeIds.push(nodeId);
       }
     }
 
     const updatedTreeState: TreeState = {
       ...treeState,
-      nodes: updatedNodes,
-      views: views.length > 0 ? views : treeState.views,
+      views: updatedViews,
+      tabToNode: updatedTabToNode,
     };
 
     await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);

@@ -5,8 +5,13 @@ export interface TabNode {
   children: TabNode[];
   isExpanded: boolean;
   depth: number;
-  viewId: string;
   groupId?: string;
+}
+
+export interface ViewState {
+  info: View;
+  rootNodeIds: string[];
+  nodes: Record<string, TabNode>;
 }
 
 export interface TabInfo {
@@ -75,25 +80,23 @@ export interface TreeStructureEntry {
 }
 
 export interface TreeState {
-  views: View[];
+  /** ビューID -> ViewState のマップ。ビュー毎にタブツリーを管理 */
+  views: Record<string, ViewState>;
+  /** ビューの表示順序（ビューIDの配列） */
+  viewOrder: string[];
   currentViewId: string;
   /**
    * ウィンドウごとの現在のビューID
    * 各ウィンドウが独立したビューを表示できるようにする
    */
   currentViewByWindowId?: Record<number, string>;
-  nodes: Record<string, TabNode>;
-  tabToNode: Record<number, string>;
+  /** タブID -> { viewId, nodeId } のマップ */
+  tabToNode: Record<number, { viewId: string; nodeId: string }>;
   /**
    * ツリー構造（順序付き）
    * ブラウザ再起動時にタブIDが変わっても親子関係を復元するために使用
    */
   treeStructure?: TreeStructureEntry[];
-  /**
-   * 各ビュー内のノードID順序
-   * loadState時にノードの順序を復元するために使用
-   */
-  viewNodeOrder?: Record<string, string[]>;
 }
 
 /** タブタイトルマップ (tabId -> title) */
@@ -220,7 +223,9 @@ export type MessageType =
   | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
   | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
   | { type: 'NOTIFY_DRAG_OUT' }
-  | { type: 'DRAG_SESSION_ENDED' };
+  | { type: 'DRAG_SESSION_ENDED' }
+  | { type: 'BEGIN_INTERNAL_MOVE' }
+  | { type: 'END_INTERNAL_MOVE' };
 
 export type MessageResponse<T> =
   | { success: true; data: T }
@@ -295,6 +300,7 @@ export interface TabTreeViewProps {
   isNodeSelected?: (nodeId: string) => boolean;
   onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
   getSelectedTabIds?: () => number[];
+  clearSelection?: () => void;
   onSnapshot?: () => Promise<void>;
   groups?: Record<string, Group>;
   onGroupToggle?: (groupId: string) => void;

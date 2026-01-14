@@ -21,7 +21,6 @@ describe('TreeNode', () => {
     children,
     isExpanded: true,
     depth,
-    viewId: 'default',
   });
 
   const createMockTab = (

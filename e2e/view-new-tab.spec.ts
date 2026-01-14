@@ -61,12 +61,11 @@ test.describe('ビューへの新規タブ追加', () => {
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes: Record<string, { tabId: number; viewId: string }>;
-          tabToNode: Record<number, string>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
-        const nodeId = treeState.tabToNode[tabId];
-        if (nodeId && treeState.nodes[nodeId]) {
-          return treeState.nodes[nodeId].viewId;
+        const nodeInfo = treeState.tabToNode[tabId];
+        if (nodeInfo) {
+          return nodeInfo.viewId;
         }
         return null;
       }, newTabId);
@@ -225,12 +224,11 @@ test.describe('ビューへの新規タブ追加', () => {
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes: Record<string, { tabId: number; viewId: string }>;
-          tabToNode: Record<number, string>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
-        const nodeId = treeState.tabToNode[tabId];
-        if (nodeId && treeState.nodes[nodeId]) {
-          return treeState.nodes[nodeId].viewId;
+        const nodeInfo = treeState.tabToNode[tabId];
+        if (nodeInfo) {
+          return nodeInfo.viewId;
         }
         return null;
       }, newTabId);
@@ -330,12 +328,11 @@ test.describe('ビューへの新規タブ追加', () => {
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes: Record<string, { tabId: number; viewId: string }>;
-          tabToNode: Record<number, string>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
-        const nodeId = treeState.tabToNode[tabId];
-        if (nodeId && treeState.nodes[nodeId]) {
-          return treeState.nodes[nodeId].viewId;
+        const nodeInfo = treeState.tabToNode[tabId];
+        if (nodeInfo) {
+          return nodeInfo.viewId;
         }
         return null;
       }, newTabId);
@@ -438,12 +435,11 @@ test.describe('ビューへの新規タブ追加', () => {
       const tabViewId = await serviceWorker.evaluate(async (tabId: number) => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
-          nodes: Record<string, { tabId: number; viewId: string }>;
-          tabToNode: Record<number, string>;
+          tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
-        const nodeId = treeState.tabToNode[tabId];
-        if (nodeId && treeState.nodes[nodeId]) {
-          return treeState.nodes[nodeId].viewId;
+        const nodeInfo = treeState.tabToNode[tabId];
+        if (nodeInfo) {
+          return nodeInfo.viewId;
         }
         return null;
       }, newTabId);

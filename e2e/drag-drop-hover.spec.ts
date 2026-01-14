@@ -9,14 +9,21 @@ const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 
 async function setNodeExpanded(serviceWorker: Worker, tabId: number, isExpanded: boolean): Promise<void> {
   await serviceWorker.evaluate(async ({ tabId, isExpanded }: { tabId: number; isExpanded: boolean }) => {
+    interface TreeState {
+      views: Record<string, { nodes: Record<string, { isExpanded: boolean }> }>;
+      tabToNode: Record<number, { viewId: string; nodeId: string }>;
+    }
     const result = await chrome.storage.local.get('tree_state');
     if (result.tree_state) {
-      const nodeId = `node-${tabId}`;
-      if (!result.tree_state.nodes[nodeId]) {
-        result.tree_state.nodes[nodeId] = {};
+      const treeState = result.tree_state as TreeState;
+      const nodeInfo = treeState.tabToNode[tabId];
+      if (nodeInfo) {
+        const viewState = treeState.views[nodeInfo.viewId];
+        if (viewState && viewState.nodes[nodeInfo.nodeId]) {
+          viewState.nodes[nodeInfo.nodeId].isExpanded = isExpanded;
+          await chrome.storage.local.set({ tree_state: treeState });
+        }
       }
-      result.tree_state.nodes[nodeId].isExpanded = isExpanded;
-      await chrome.storage.local.set({ tree_state: result.tree_state });
     }
   }, { tabId, isExpanded });
 }
