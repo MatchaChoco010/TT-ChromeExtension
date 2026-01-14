@@ -253,6 +253,25 @@ export class TreeStateManager {
   }
 
   /**
+   * タブの親タブIDを取得
+   * @param tabId - タブID
+   * @returns 親タブID（ルートタブの場合はnull）
+   */
+  getParentTabId(tabId: number): number | null {
+    const mapping = this.tabToNode.get(tabId);
+    if (!mapping) return null;
+
+    const viewState = this.views.get(mapping.viewId);
+    if (!viewState) return null;
+
+    const node = viewState.nodes[mapping.nodeId];
+    if (!node || !node.parentId) return null;
+
+    const parentNode = viewState.nodes[node.parentId];
+    return parentNode?.tabId ?? null;
+  }
+
+  /**
    * タブを削除
    * @param tabId - タブID
    * @param childTabBehavior - 子タブの処理方法 ('promote' | 'close_all')
@@ -352,6 +371,39 @@ export class TreeStateManager {
   }
 
   /**
+   * タブノードをルートノードの最後尾に移動
+   * ウィンドウ間移動時に使用（移動先ウィンドウの最後尾に表示するため）
+   */
+  async moveTabToRootEnd(tabId: number): Promise<void> {
+    const mapping = this.tabToNode.get(tabId);
+    if (!mapping) return;
+
+    const viewState = this.views.get(mapping.viewId);
+    if (!viewState) return;
+
+    const node = viewState.nodes[mapping.nodeId];
+    if (!node) return;
+
+    // 現在の位置から削除
+    if (node.parentId) {
+      const parent = viewState.nodes[node.parentId];
+      if (parent) {
+        parent.children = parent.children.filter((child) => child.id !== node.id);
+      }
+    } else {
+      viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== node.id);
+    }
+
+    // ルートノードの最後尾に追加
+    node.parentId = null;
+    node.depth = 0;
+    this.updateChildrenDepth(node);
+    viewState.rootNodeIds.push(node.id);
+
+    await this.persistState();
+  }
+
+  /**
    * サブツリー全体を別のビューに移動
    */
   async moveSubtreeToView(tabId: number, targetViewId: string): Promise<void> {
@@ -415,47 +467,6 @@ export class TreeStateManager {
 
     result.node.isExpanded = !result.node.isExpanded;
     await this.persistState();
-  }
-
-  /**
-   * Chrome側のタブ順序変更をツリーのルートノード順序に反映
-   * @param windowId - 対象ウィンドウID
-   */
-  async syncRootOrderFromChrome(windowId: number): Promise<void> {
-    try {
-      const tabs = await chrome.tabs.query({ windowId });
-      // ピン留めタブを除外し、tabIdとindexのマップを作成
-      const tabIndexMap = new Map<number, number>();
-      for (const tab of tabs) {
-        if (tab.id !== undefined && !tab.pinned) {
-          tabIndexMap.set(tab.id, tab.index);
-        }
-      }
-
-      // 各ビューのルートノード順序を更新
-      for (const viewState of this.views.values()) {
-        // 現在のルートノードIDを取得
-        const currentRootNodeIds = [...viewState.rootNodeIds];
-
-        // ルートノードをChrome indexでソート
-        currentRootNodeIds.sort((aId, bId) => {
-          const nodeA = viewState.nodes[aId];
-          const nodeB = viewState.nodes[bId];
-          if (!nodeA || !nodeB) return 0;
-
-          const indexA = tabIndexMap.get(nodeA.tabId) ?? Number.MAX_SAFE_INTEGER;
-          const indexB = tabIndexMap.get(nodeB.tabId) ?? Number.MAX_SAFE_INTEGER;
-
-          return indexA - indexB;
-        });
-
-        viewState.rootNodeIds = currentRootNodeIds;
-      }
-
-      await this.persistState();
-    } catch {
-      // エラーは無視
-    }
   }
 
   /**
@@ -586,11 +597,13 @@ export class TreeStateManager {
   /**
    * 内部ツリーの順序をChromeタブの順序に反映する
    * viewOrderの順序で全ビューを処理し、各ビュー内は深さ優先でフラット化
+   * @param windowId - 対象ウィンドウID（省略時は現在のウィンドウ）
    */
-  async syncTreeOrderToChromeTabs(): Promise<void> {
+  async syncTreeOrderToChromeTabs(windowId?: number): Promise<void> {
     try {
       // 現在のタブ情報を取得
-      const currentTabs = await chrome.tabs.query({ currentWindow: true });
+      const queryOptions = windowId !== undefined ? { windowId } : { currentWindow: true as const };
+      const currentTabs = await chrome.tabs.query(queryOptions);
       const pinnedSet = new Set<number>();
       const currentWindowTabIds = new Set<number>();
       for (const tab of currentTabs) {
@@ -647,7 +660,7 @@ export class TreeStateManager {
           try {
             await chrome.tabs.move(tabId, { index: expectedIndex });
             // 移動後にインデックスマップを更新
-            const updatedTabs = await chrome.tabs.query({ currentWindow: true });
+            const updatedTabs = await chrome.tabs.query(queryOptions);
             currentIndexMap.clear();
             for (const tab of updatedTabs) {
               if (tab.id !== undefined) {

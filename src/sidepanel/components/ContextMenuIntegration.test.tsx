@@ -53,6 +53,8 @@ describe('ContextMenu Integration with MenuActions', () => {
     it('「タブを複製」をクリックするとタブが複製される', async () => {
       const user = userEvent.setup();
       chromeMock.tabs.duplicate.mockResolvedValue({ id: 3 } as chrome.tabs.Tab);
+      chromeMock.tabs.get.mockResolvedValue({ id: 1, index: 0 } as chrome.tabs.Tab);
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const ContextMenuWrapper = () => {
         const { executeAction } = useMenuActions();

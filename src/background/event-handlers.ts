@@ -68,26 +68,6 @@ let pendingHandlerCount = 0;
 let pendingHandlerResolvers: (() => void)[] = [];
 
 /**
- * 内部でのタブ移動中にsyncRootOrderFromChromeをスキップするためのカウンター
- * D&Dやツリーから直接chrome.tabs.moveを呼び出す際に競合を防ぐ
- */
-let internalMoveInProgress = 0;
-
-/**
- * 内部でのタブ移動を開始する（syncをスキップ）
- */
-export function beginInternalMove(): void {
-  internalMoveInProgress++;
-}
-
-/**
- * 内部でのタブ移動を終了する
- */
-export function endInternalMove(): void {
-  internalMoveInProgress = Math.max(0, internalMoveInProgress - 1);
-}
-
-/**
  * 非同期イベントハンドラーをラップして完了を追跡する
  *
  * 【使用方法】
@@ -493,20 +473,17 @@ async function handleTabCreatedInternal(
     // 複製タブの検出: chrome.tabs.duplicate()はopenerTabIdが呼び出し元タブ（サイドパネル等）を
     // 指すことがあるため、URLとwindowIdで照合する
     const tabUrl = tab.url || tab.pendingUrl || '';
-    console.log('[DEBUG handleTabCreated] Checking duplicate - tabUrl:', tabUrl, 'windowId:', tab.windowId, 'pendingDuplicateSources:', Array.from(pendingDuplicateSources.entries()));
     for (const [sourceTabId, sourceInfo] of pendingDuplicateSources.entries()) {
       if (sourceInfo.url === tabUrl && sourceInfo.windowId === tab.windowId) {
         isDuplicatedTab = true;
         duplicateSourceTabId = sourceTabId;
         isSubtreeDuplicate = sourceInfo.isSubtreeDuplicate;
         pendingDuplicateSources.delete(sourceTabId);
-        console.log('[DEBUG handleTabCreated] Matched duplicate source:', sourceTabId, 'isSubtreeDuplicate:', isSubtreeDuplicate);
         break;
       }
     }
 
     const duplicateTabPosition = effectiveSettings.duplicateTabPosition;
-    console.log('[DEBUG handleTabCreated] isDuplicatedTab:', isDuplicatedTab, 'duplicateSourceTabId:', duplicateSourceTabId, 'duplicateTabPosition:', duplicateTabPosition);
 
     let insertAfterNodeId: string | undefined;
     if (isDuplicatedTab && duplicateSourceTabId !== null) {
@@ -515,7 +492,6 @@ async function handleTabCreatedInternal(
         if (openerResult) {
           parentId = openerResult.node.parentId;
           insertAfterNodeId = openerResult.node.id;
-          console.log('[DEBUG handleTabCreated] Duplicate sibling - parentId:', parentId, 'insertAfterNodeId:', insertAfterNodeId);
         }
       }
       // 'end'の場合はparentIdとinsertAfterNodeIdを設定しない（ツリーの最後に追加される）
@@ -577,7 +553,6 @@ async function handleTabCreatedInternal(
       (newTabPosition === 'end' && !isDuplicatedTab) ||
       (isDuplicatedTab && duplicateTabPosition === 'end')
     );
-    console.log('[DEBUG handleTabCreated] shouldMoveToEnd:', shouldMoveToEnd, 'insertAfterNodeId:', insertAfterNodeId, 'isDuplicatedTab:', isDuplicatedTab, 'isSubtreeDuplicate:', isSubtreeDuplicate, 'isNormalDuplicate:', isNormalDuplicate);
 
     // insertAfterNodeIdが指定されている場合、Chromeのタブも対応する位置に移動
     // これによりサイドパネルの表示順序（tab.indexでソート）が正しくなる
@@ -589,22 +564,15 @@ async function handleTabCreatedInternal(
         if (insertAfterResult) {
           const insertAfterTab = await chrome.tabs.get(insertAfterResult.node.tabId);
           if (insertAfterTab && insertAfterTab.index !== undefined) {
-            console.log('[DEBUG handleTabCreated] Moving tab (insertAfterNodeId) - tabId:', tab.id, 'current index:', tab.index, 'target:', insertAfterTab.index + 1);
             await chrome.tabs.move(tab.id, { index: insertAfterTab.index + 1 });
-            const afterMove = await chrome.tabs.get(tab.id);
-            console.log('[DEBUG handleTabCreated] After move (insertAfterNodeId) - index:', afterMove.index);
           }
         }
       } catch {
         // タブ移動失敗は無視
       }
-    } else if (isNormalDuplicate) {
-      console.log('[DEBUG handleTabCreated] Skipping move for normal duplicated tab - already moved by useMenuActions');
     }
 
-    console.log('[DEBUG handleTabCreated] Before addTab - tabId:', tab.id, 'parentId:', parentId, 'viewId:', viewId, 'insertAfterNodeId:', insertAfterNodeId);
     await treeStateManager.addTab(tab, parentId, viewId, insertAfterNodeId);
-    console.log('[DEBUG handleTabCreated] After addTab - tabId:', tab.id);
 
     // 親ノードを自動展開（新しい子タブを見えるようにするため）
     // ただし複製タブの場合はスキップ:
@@ -624,22 +592,18 @@ async function handleTabCreatedInternal(
     // タブを移動しても、最終的に正しい位置に配置される
     // NOTE: 複製タブの場合はuseMenuActionsで既に移動済みなのでスキップ
     if (shouldMoveToEnd && tab.windowId !== undefined) {
-      console.log('[DEBUG handleTabCreated] Moving tab to end - tabId:', tab.id);
       try {
         await chrome.tabs.move(tab.id, { index: -1 });
-        const afterMove = await chrome.tabs.get(tab.id);
-        console.log('[DEBUG handleTabCreated] After move to end - index:', afterMove.index);
       } catch {
         // タブ移動失敗は無視
       }
     }
 
     // 内部ツリーの順序をChromeタブに反映
-    beginInternalMove();
-    try {
+    // NOTE: 通常複製の場合はuseMenuActionsで既に正しい位置に移動済みなので、
+    // syncTreeOrderToChromeTabs での再配置と競合する可能性があるためスキップ
+    if (!isNormalDuplicate) {
       await treeStateManager.syncTreeOrderToChromeTabs();
-    } finally {
-      endInternalMove();
     }
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
@@ -711,12 +675,7 @@ export async function handleTabRemoved(
     // また、ブラウザ再起動後の復元にも使用されるため、キャッシュとして保持する
 
     // 内部ツリーの順序をChromeタブに反映
-    beginInternalMove();
-    try {
-      await treeStateManager.syncTreeOrderToChromeTabs();
-    } finally {
-      endInternalMove();
-    }
+    await treeStateManager.syncTreeOrderToChromeTabs();
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
 
@@ -732,16 +691,14 @@ export async function handleTabMoved(
 ): Promise<void> {
   void tabId;
 
+  // ツリービューが常に正。Chromeのタブ順序変更はツリーに反映せず、
+  // ツリー状態をChromeに再同期して元に戻す
   try {
-    // 内部移動中（D&D等）でなければChromeのタブ順序をツリーに反映
-    if (internalMoveInProgress === 0) {
-      await treeStateManager.syncRootOrderFromChrome(moveInfo.windowId);
-    }
-
-    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+    await treeStateManager.syncTreeOrderToChromeTabs(moveInfo.windowId);
   } catch {
-    // タブ移動処理失敗は無視
+    // 同期失敗は無視
   }
+  chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
 }
 
 export async function handleTabUpdated(
@@ -764,12 +721,6 @@ export async function handleTabUpdated(
       } catch {
         // ファビコン保存失敗は無視
       }
-    }
-
-    // ピン留め状態が変更された場合、Chromeのタブ順序をツリーに反映
-    // （ピン留め/解除でChromeがタブを移動するため）
-    if (changeInfo.pinned !== undefined && tab.windowId !== undefined) {
-      await treeStateManager.syncRootOrderFromChrome(tab.windowId);
     }
 
     // タイトル、URL、ステータス、ファビコン、discarded、pinnedの変更時にUI通知
@@ -844,6 +795,27 @@ async function handleTabAttached(
   attachInfo: chrome.tabs.TabAttachInfo,
 ): Promise<void> {
   try {
+    // 親タブが同じウィンドウに存在するか確認
+    const parentTabId = await treeStateManager.getParentTabId(tabId);
+    let parentInSameWindow = false;
+
+    if (parentTabId !== null) {
+      try {
+        const parentTab = await chrome.tabs.get(parentTabId);
+        parentInSameWindow = parentTab.windowId === attachInfo.newWindowId;
+      } catch {
+        // 親タブが存在しない場合は無視
+      }
+    }
+
+    // 親タブが同じウィンドウにない場合のみ、ルートノードの最後尾に移動
+    if (!parentInSameWindow) {
+      await treeStateManager.moveTabToRootEnd(tabId);
+    }
+
+    // ツリービューが常に正。ツリー状態をChromeに再同期
+    await treeStateManager.syncTreeOrderToChromeTabs(attachInfo.newWindowId);
+
     // タブがattachされた場合、通常のタブ移動（ウィンドウが閉じられない場合）は
     // 追跡リストからクリアしない。
     // ウィンドウが閉じられる場合のみ、handleWindowRemovedでタブを閉じる。
@@ -870,9 +842,7 @@ async function handleTabAttached(
       }
     }
 
-    // 新しいウィンドウのタブ順序でルートノード順序を同期
-    await treeStateManager.syncRootOrderFromChrome(attachInfo.newWindowId);
-
+    // ツリービューが常に正。Chromeのタブ順序変更はツリーに反映しない
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
     // メッセージ送信失敗は無視
@@ -922,13 +892,7 @@ async function handleWindowCreated(window: chrome.windows.Window): Promise<void>
       const syncSettings = {
         newTabPositionManual: rawSettings?.newTabPositionManual ?? 'end' as const,
       };
-      // syncWithChromeTabsは内部でsyncTreeOrderToChromeTabsを呼び出すため、フラグでラップ
-      beginInternalMove();
-      try {
-        await treeStateManager.syncWithChromeTabs(syncSettings);
-      } finally {
-        endInternalMove();
-      }
+      await treeStateManager.syncWithChromeTabs(syncSettings);
     }
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
@@ -1084,16 +1048,6 @@ function handleMessage(
           message.payload.closeCurrentTabs,
           sendResponse
         ));
-        break;
-
-      case 'BEGIN_INTERNAL_MOVE':
-        beginInternalMove();
-        sendResponse({ success: true, data: null });
-        break;
-
-      case 'END_INTERNAL_MOVE':
-        endInternalMove();
-        sendResponse({ success: true, data: null });
         break;
 
       default:
@@ -1260,37 +1214,53 @@ async function handleCloseTabsWithCollapsedSubtrees(
   }
 }
 
-function handleMoveTabToWindow(
+async function handleMoveTabToWindow(
   tabId: number,
   windowId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
-): void {
-  chrome.tabs.move(tabId, { windowId, index: -1 }, () => {
-    if (chrome.runtime.lastError) {
-      sendResponse({
-        success: false,
-        error: chrome.runtime.lastError.message || 'Unknown error',
-      });
-    } else {
-      sendResponse({ success: true, data: null });
-    }
-  });
+): Promise<void> {
+  try {
+    // 1. ツリー状態を先に更新（ルートノードの最後尾に移動）
+    await treeStateManager.moveTabToRootEnd(tabId);
+
+    // 2. Chromeタブを移動
+    await chrome.tabs.move(tabId, { windowId, index: -1 });
+
+    // 3. ツリー状態をChromeに同期（正しい順序になる）
+    await treeStateManager.syncTreeOrderToChromeTabs();
+
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }
 
-function handleCreateWindowWithTab(
+async function handleCreateWindowWithTab(
   tabId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
-): void {
-  chrome.windows.create({ tabId }, () => {
-    if (chrome.runtime.lastError) {
-      sendResponse({
-        success: false,
-        error: chrome.runtime.lastError.message || 'Unknown error',
-      });
-    } else {
-      sendResponse({ success: true, data: null });
-    }
-  });
+): Promise<void> {
+  try {
+    // 1. ツリー状態を先に更新（ルートノードの最後尾に移動）
+    await treeStateManager.moveTabToRootEnd(tabId);
+
+    // 2. 新しいウィンドウを作成
+    await chrome.windows.create({ tabId });
+
+    // 3. ツリー状態をChromeに同期
+    await treeStateManager.syncTreeOrderToChromeTabs();
+
+    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }
 
 /**
@@ -1459,13 +1429,7 @@ async function handleSyncTabs(
     const syncSettings = {
       newTabPositionManual: rawSettings?.newTabPositionManual ?? 'end' as const,
     };
-    // syncWithChromeTabsは内部でsyncTreeOrderToChromeTabsを呼び出すため、フラグでラップ
-    beginInternalMove();
-    try {
-      await treeStateManager.syncWithChromeTabs(syncSettings);
-    } finally {
-      endInternalMove();
-    }
+    await treeStateManager.syncWithChromeTabs(syncSettings);
     sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({
@@ -1488,12 +1452,7 @@ async function handleRefreshTreeStructure(
     await treeStateManager.refreshTreeStructure();
 
     // 内部ツリーの順序をChromeタブに反映
-    beginInternalMove();
-    try {
-      await treeStateManager.syncTreeOrderToChromeTabs();
-    } finally {
-      endInternalMove();
-    }
+    await treeStateManager.syncTreeOrderToChromeTabs();
 
     sendResponse({ success: true, data: null });
   } catch (error) {

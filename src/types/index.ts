@@ -223,9 +223,7 @@ export type MessageType =
   | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
   | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
   | { type: 'NOTIFY_DRAG_OUT' }
-  | { type: 'DRAG_SESSION_ENDED' }
-  | { type: 'BEGIN_INTERNAL_MOVE' }
-  | { type: 'END_INTERNAL_MOVE' };
+  | { type: 'DRAG_SESSION_ENDED' };
 
 export type MessageResponse<T> =
   | { success: true; data: T }

@@ -244,17 +244,16 @@ test.describe('chrome.tabs API統合', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // Chromeはピン留め解除時にタブを最初の非ピン留め位置（index 0）に配置するため、
-      // tabIdがinitialBrowserTabIdより前に表示される
+      // ツリービューが常に正であり、ピン留め解除時はタブが最後尾に配置される
       await serviceWorker.evaluate(async (id) => {
         return await chrome.tabs.update(id, { pinned: false });
       }, tabId);
 
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: tabId, depth: 0 },
         { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
       ], 0);
     });
   });

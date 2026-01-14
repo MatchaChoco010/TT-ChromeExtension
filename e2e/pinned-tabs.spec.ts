@@ -142,9 +142,9 @@ test.describe('ピン留めタブセクション', () => {
 
       await unpinTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: tabId, depth: 0 },
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 
@@ -440,9 +440,9 @@ test.describe('ピン留めタブセクション', () => {
       const unpinMenuItem = sidePanelPage.locator('[role="menuitem"]').filter({ hasText: 'ピン留めを解除' });
       await unpinMenuItem.click();
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: tabId, depth: 0 },
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId, depth: 0 },
       ], 0);
       await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
 

@@ -235,33 +235,25 @@ async function syncTreeToChromeTabs(
     }
   }
 
-  // 内部移動開始を通知（handleTabMovedでの自動sync抑制）
-  await chrome.runtime.sendMessage({ type: 'BEGIN_INTERNAL_MOVE' }).catch(() => {});
+  for (let i = 0; i < orderedTabIds.length; i++) {
+    const tabId = orderedTabIds[i];
+    const expectedIndex = pinnedCount + i;
+    const currentIndex = currentIndexMap.get(tabId);
 
-  try {
-    for (let i = 0; i < orderedTabIds.length; i++) {
-      const tabId = orderedTabIds[i];
-      const expectedIndex = pinnedCount + i;
-      const currentIndex = currentIndexMap.get(tabId);
-
-      if (currentIndex !== undefined && currentIndex !== expectedIndex) {
-        try {
-          await chrome.tabs.move(tabId, { index: expectedIndex });
-          const updatedTabs = await chrome.tabs.query({ currentWindow: true });
-          currentIndexMap.clear();
-          for (const tab of updatedTabs) {
-            if (tab.id !== undefined) {
-              currentIndexMap.set(tab.id, tab.index);
-            }
+    if (currentIndex !== undefined && currentIndex !== expectedIndex) {
+      try {
+        await chrome.tabs.move(tabId, { index: expectedIndex });
+        const updatedTabs = await chrome.tabs.query({ currentWindow: true });
+        currentIndexMap.clear();
+        for (const tab of updatedTabs) {
+          if (tab.id !== undefined) {
+            currentIndexMap.set(tab.id, tab.index);
           }
-        } catch {
-          // タブが存在しない場合などのエラーは無視
         }
+      } catch {
+        // タブが存在しない場合などのエラーは無視
       }
     }
-  } finally {
-    // 内部移動終了を通知
-    await chrome.runtime.sendMessage({ type: 'END_INTERNAL_MOVE' }).catch(() => {});
   }
 }
 
@@ -1059,7 +1051,18 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         };
       });
 
+      // 選択内でルートになるノード（親が選択に含まれていないノード）を特定
+      const topLevelNodesToMove: string[] = [];
       for (const nodeId of nodesToMove) {
+        const node = currentViewState.nodes[nodeId];
+        if (!node) continue;
+        if (!node.parentId || !nodesToMoveSet.has(node.parentId)) {
+          topLevelNodesToMove.push(nodeId);
+        }
+      }
+
+      // 選択内のルートノードのみparentIdを変更（選択内の親子関係を維持）
+      for (const nodeId of topLevelNodesToMove) {
         const node = updatedNodes[nodeId];
         if (node) {
           node.parentId = targetParentId;
@@ -1072,7 +1075,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
         for (const originalChild of originalNode.children) {
           const childId = originalChild.id;
-          if (nodesToMoveSet.has(childId)) continue;
+          // 子が選択されていて、かつ親が選択されていない場合はスキップ（選択内ルートになるため）
+          if (nodesToMoveSet.has(childId) && !nodesToMoveSet.has(parentId)) continue;
           const child = updatedNodes[childId];
           if (child && child.parentId === parentId) {
             parent.children.push(child);
@@ -1080,13 +1084,14 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         }
       });
 
-      const sortedNodesToMove = [...nodesToMove].sort((a, b) => {
+      // 選択内のルートノードのみをソート（親子関係を維持するため）
+      const sortedTopLevelNodesToMove = [...topLevelNodesToMove].sort((a, b) => {
         const tabInfoA = tabInfoMap[currentViewState.nodes[a]?.tabId];
         const tabInfoB = tabInfoMap[currentViewState.nodes[b]?.tabId];
         return (tabInfoA?.index ?? 0) - (tabInfoB?.index ?? 0);
       });
 
-      const nodesToInsert = sortedNodesToMove.map(id => updatedNodes[id]).filter(Boolean);
+      const nodesToInsert = sortedTopLevelNodesToMove.map(id => updatedNodes[id]).filter(Boolean);
 
       if (targetParentId) {
         const targetParent = updatedNodes[targetParentId];
@@ -1150,21 +1155,21 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           // belowNodeIdの前に挿入
           const insertIndex = updatedRootNodeIds.indexOf(belowNodeId);
           if (insertIndex !== -1) {
-            updatedRootNodeIds.splice(insertIndex, 0, ...sortedNodesToMove);
+            updatedRootNodeIds.splice(insertIndex, 0, ...sortedTopLevelNodesToMove);
           } else {
-            updatedRootNodeIds.push(...sortedNodesToMove);
+            updatedRootNodeIds.push(...sortedTopLevelNodesToMove);
           }
         } else if (aboveNodeId) {
           // aboveNodeIdの後に挿入
           const insertIndex = updatedRootNodeIds.indexOf(aboveNodeId);
           if (insertIndex !== -1) {
-            updatedRootNodeIds.splice(insertIndex + 1, 0, ...sortedNodesToMove);
+            updatedRootNodeIds.splice(insertIndex + 1, 0, ...sortedTopLevelNodesToMove);
           } else {
-            updatedRootNodeIds.push(...sortedNodesToMove);
+            updatedRootNodeIds.push(...sortedTopLevelNodesToMove);
           }
         } else {
           // 末尾に追加
-          updatedRootNodeIds.push(...sortedNodesToMove);
+          updatedRootNodeIds.push(...sortedTopLevelNodesToMove);
         }
       }
 
@@ -1195,7 +1200,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         };
 
         const allSubtreeTabIds: number[] = [];
-        for (const nodeId of sortedNodesToMove) {
+        for (const nodeId of sortedTopLevelNodesToMove) {
           const node = updatedNodes[nodeId];
           if (node) {
             allSubtreeTabIds.push(...collectSubtreeTabIds(node));
@@ -1228,30 +1233,23 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
         const tabsToMove = allSubtreeTabIds.filter(tabId => !tabInfoMap[tabId]?.isPinned);
         if (tabsToMove.length > 0) {
-          // 内部移動開始を通知（handleTabMovedでの自動sync抑制）
-          await chrome.runtime.sendMessage({ type: 'BEGIN_INTERNAL_MOVE' }).catch(() => {});
-          try {
-            if (!belowNodeId) {
-              for (const tabId of tabsToMove) {
-                try {
-                  await chrome.tabs.move(tabId, { index: -1 });
-                } catch {
-                  // タブが存在しない場合などのエラーは無視
-                }
-              }
-            } else {
-              for (let i = tabsToMove.length - 1; i >= 0; i--) {
-                const tabId = tabsToMove[i];
-                try {
-                  await chrome.tabs.move(tabId, { index: targetChromeIndex });
-                } catch {
-                  // タブが存在しない場合などのエラーは無視
-                }
+          if (!belowNodeId) {
+            for (const tabId of tabsToMove) {
+              try {
+                await chrome.tabs.move(tabId, { index: -1 });
+              } catch {
+                // タブが存在しない場合などのエラーは無視
               }
             }
-          } finally {
-            // 内部移動終了を通知
-            await chrome.runtime.sendMessage({ type: 'END_INTERNAL_MOVE' }).catch(() => {});
+          } else {
+            for (let i = tabsToMove.length - 1; i >= 0; i--) {
+              const tabId = tabsToMove[i];
+              try {
+                await chrome.tabs.move(tabId, { index: targetChromeIndex });
+              } catch {
+                // タブが存在しない場合などのエラーは無視
+              }
+            }
           }
         }
       } catch {
@@ -1615,8 +1613,18 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const moveTabsToView = useCallback(async (viewId: string, tabIds: number[]) => {
     if (!treeState) return;
 
+    // 全ビューをディープコピー（不変性を保つため）
+    const updatedViews: Record<string, ViewState> = {};
+    for (const [vId, viewState] of Object.entries(treeState.views)) {
+      updatedViews[vId] = {
+        ...viewState,
+        rootNodeIds: [...viewState.rootNodeIds],
+        nodes: { ...viewState.nodes },
+      };
+    }
+
     // ターゲットビューが存在しない場合は作成
-    let targetViewState = treeState.views[viewId];
+    let targetViewState = updatedViews[viewId];
     if (!targetViewState) {
       const viewCount = Object.keys(treeState.views).length;
       const colorIndex = viewCount % VIEW_COLOR_PALETTE.length;
@@ -1629,9 +1637,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         rootNodeIds: [],
         nodes: {},
       };
+      updatedViews[viewId] = targetViewState;
     }
 
-    const updatedViews = { ...treeState.views };
     const updatedTabToNode = { ...treeState.tabToNode };
 
     // サブツリー全体を収集する関数
@@ -1646,23 +1654,51 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       return result;
     };
 
-    // 移動対象のタブとそのサブツリー全体を収集
-    const allNodeIdsToMove = new Set<string>();
-    const rootTabIds = new Set(tabIds);
-
+    // 選択内でルートになるタブID（親が選択に含まれていないタブ）を特定
+    const tabIdsSet = new Set(tabIds);
+    const topLevelTabIds: number[] = [];
     for (const tabId of tabIds) {
       const mapping = treeState.tabToNode[tabId];
       if (!mapping) continue;
-
-      const sourceViewState = updatedViews[mapping.viewId];
+      const sourceViewState = treeState.views[mapping.viewId];
       if (!sourceViewState) continue;
-
-      const subtreeNodeIds = collectSubtreeNodeIds(sourceViewState.nodes, mapping.nodeId);
-      subtreeNodeIds.forEach(id => allNodeIdsToMove.add(id));
+      const node = sourceViewState.nodes[mapping.nodeId];
+      if (!node) continue;
+      if (!node.parentId) {
+        topLevelTabIds.push(tabId);
+      } else {
+        const parentNode = sourceViewState.nodes[node.parentId];
+        if (!parentNode || !tabIdsSet.has(parentNode.tabId)) {
+          topLevelTabIds.push(tabId);
+        }
+      }
     }
 
-    // 各ソースビューから移動対象のノードを削除し、ターゲットビューに追加
-    for (const tabId of tabIds) {
+    // ソースビューでの表示順序でソート（rootNodeIdsのインデックス順）
+    topLevelTabIds.sort((a, b) => {
+      const mappingA = treeState.tabToNode[a];
+      const mappingB = treeState.tabToNode[b];
+      if (!mappingA || !mappingB) return 0;
+
+      const sourceViewStateA = treeState.views[mappingA.viewId];
+      const sourceViewStateB = treeState.views[mappingB.viewId];
+      if (!sourceViewStateA || !sourceViewStateB) return 0;
+
+      // 異なるソースビューの場合はビューID順
+      if (mappingA.viewId !== mappingB.viewId) {
+        return mappingA.viewId.localeCompare(mappingB.viewId);
+      }
+
+      // 同じソースビューの場合はrootNodeIdsのインデックス順
+      const indexA = sourceViewStateA.rootNodeIds.indexOf(mappingA.nodeId);
+      const indexB = sourceViewStateB.rootNodeIds.indexOf(mappingB.nodeId);
+      return indexA - indexB;
+    });
+
+    const topLevelTabIdSet = new Set(topLevelTabIds);
+
+    // topLevelTabIdsのみをループし、各タブとそのサブツリーを移動
+    for (const tabId of topLevelTabIds) {
       const mapping = treeState.tabToNode[tabId];
       if (!mapping) continue;
 
@@ -1695,8 +1731,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
         delete sourceViewState.nodes[nodeId];
 
-        // ルートノードのみparentIdをnullに、それ以外は親子関係を維持
-        if (rootTabIds.has(node.tabId)) {
+        // topLevelタブのみparentIdをnullに、それ以外は親子関係を維持
+        if (topLevelTabIdSet.has(node.tabId)) {
           node.parentId = null;
           node.depth = 0;
         }
@@ -1705,7 +1741,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         updatedTabToNode[node.tabId] = { viewId, nodeId: node.id };
       }
 
-      // ターゲットビューのrootNodeIdsに追加
+      // rootNodeIdsに追加（末尾に）
       targetViewState.rootNodeIds.push(rootNode.id);
     }
 

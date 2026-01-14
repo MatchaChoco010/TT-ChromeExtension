@@ -355,15 +355,7 @@ describe('Service Worker - Messaging', () => {
   it('MOVE_TAB_TO_WINDOW メッセージでタブを別ウィンドウに移動する', async () => {
     registerMessageListener();
 
-    (chromeMock.tabs.move as ReturnType<typeof vi.fn>).mockImplementation(
-      (
-        _tabIds: number | number[],
-        _moveProperties: chrome.tabs.MoveProperties,
-        callback?: () => void,
-      ) => {
-        if (callback) callback();
-      },
-    );
+    (chromeMock.tabs.move as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     const message: MessageType = {
       type: 'MOVE_TAB_TO_WINDOW',
@@ -373,21 +365,18 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
 
-    expect(chromeMock.tabs.move).toHaveBeenCalledWith(
-      789,
-      { windowId: 10, index: -1 },
-      expect.any(Function),
-    );
+    await vi.waitFor(() => {
+      expect(chromeMock.tabs.move).toHaveBeenCalledWith(
+        789,
+        { windowId: 10, index: -1 },
+      );
+    });
   });
 
   it('CREATE_WINDOW_WITH_TAB メッセージで新しいウィンドウを作成する', async () => {
     registerMessageListener();
 
-    (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockImplementation(
-      (_createData?: chrome.windows.CreateData, callback?: () => void) => {
-        if (callback) callback();
-      },
-    );
+    (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 100 });
 
     const message: MessageType = {
       type: 'CREATE_WINDOW_WITH_TAB',
@@ -397,10 +386,11 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
 
-    expect(chromeMock.windows.create).toHaveBeenCalledWith(
-      { tabId: 999 },
-      expect.any(Function),
-    );
+    await vi.waitFor(() => {
+      expect(chromeMock.windows.create).toHaveBeenCalledWith(
+        { tabId: 999 },
+      );
+    });
   });
 
   it('SET_DRAG_STATE メッセージでドラッグ状態を保存する', async () => {

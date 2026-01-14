@@ -64,6 +64,8 @@ describe('useMenuActions', () => {
 
     it('duplicateアクション: タブを複製する', async () => {
       chromeMock.tabs.duplicate.mockResolvedValue({ id: 4 });
+      chromeMock.tabs.get.mockResolvedValue({ id: 1, index: 0 });
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const { result } = renderHook(() => useMenuActions());
 
@@ -74,12 +76,20 @@ describe('useMenuActions', () => {
       expect(chromeMock.tabs.duplicate).toHaveBeenCalledWith(1);
     });
 
-    it('複数タブ選択時: 各タブを順に複製する', async () => {
+    it('複数タブ選択時: sibling設定の場合はインデックス降順で複製する', async () => {
       chromeMock.tabs.duplicate
         .mockResolvedValueOnce({ id: 4 })
         .mockResolvedValueOnce({ id: 5 })
         .mockResolvedValueOnce({ id: 6 });
-      chromeMock.tabs.get.mockResolvedValue({ id: 1, index: 0 });
+      // タブIDに応じて正しいインデックスを返すモック
+      chromeMock.tabs.get.mockImplementation(async (tabId: number) => {
+        const tabData: Record<number, { id: number; index: number }> = {
+          1: { id: 1, index: 0 },
+          2: { id: 2, index: 1 },
+          3: { id: 3, index: 2 },
+        };
+        return tabData[tabId] ?? { id: tabId, index: 0 };
+      });
       chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
 
       const { result } = renderHook(() => useMenuActions());
@@ -89,9 +99,40 @@ describe('useMenuActions', () => {
       });
 
       expect(chromeMock.tabs.duplicate).toHaveBeenCalledTimes(3);
-      expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(1, 1);
+      // sibling設定（デフォルト）の場合はインデックス降順で処理される
+      expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(1, 3);
       expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(2, 2);
-      expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(3, 3);
+      expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(3, 1);
+    });
+
+    it('複数タブ選択時（逆順で選択）: sibling設定でも選択順序に関係なくインデックス降順で処理される', async () => {
+      chromeMock.tabs.duplicate
+        .mockResolvedValueOnce({ id: 4 })
+        .mockResolvedValueOnce({ id: 5 })
+        .mockResolvedValueOnce({ id: 6 });
+      // タブIDに応じて正しいインデックスを返すモック
+      chromeMock.tabs.get.mockImplementation(async (tabId: number) => {
+        const tabData: Record<number, { id: number; index: number }> = {
+          1: { id: 1, index: 0 },
+          2: { id: 2, index: 1 },
+          3: { id: 3, index: 2 },
+        };
+        return tabData[tabId] ?? { id: tabId, index: 0 };
+      });
+      chromeMock.runtime.sendMessage.mockResolvedValue({ success: true });
+
+      const { result } = renderHook(() => useMenuActions());
+
+      // 逆順で選択された場合でも
+      await act(async () => {
+        await result.current.executeAction('duplicate', [3, 2, 1]);
+      });
+
+      expect(chromeMock.tabs.duplicate).toHaveBeenCalledTimes(3);
+      // 選択順序に関係なく、インデックス降順で処理されるべき
+      expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(1, 3);
+      expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(2, 2);
+      expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(3, 1);
     });
 
     it('pinアクション: タブをピン留めする', async () => {
