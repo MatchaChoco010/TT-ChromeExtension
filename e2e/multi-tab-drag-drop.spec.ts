@@ -318,4 +318,210 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await closeTab(serviceWorker, tabId3);
     await closeTab(serviceWorker, parentTabId);
   });
+
+  test('親タブと子タブを同時に選択してドラッグするとサブツリー構造が保持される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
+
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    // 親タブと子タブを作成
+    const parentA = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentA, depth: 0 },
+    ], 0);
+
+    const childA1 = await createTab(serviceWorker, getTestServerUrl('/page'), parentA);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentA, depth: 0, expanded: true },
+      { tabId: childA1, depth: 1 },
+    ], 0);
+
+    const childA2 = await createTab(serviceWorker, getTestServerUrl('/page'), parentA);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentA, depth: 0, expanded: true },
+      { tabId: childA1, depth: 1 },
+      { tabId: childA2, depth: 1 },
+    ], 0);
+
+    // ドロップターゲットとなるタブを作成
+    const targetTab = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentA, depth: 0, expanded: true },
+      { tabId: childA1, depth: 1 },
+      { tabId: childA2, depth: 1 },
+      { tabId: targetTab, depth: 0 },
+    ], 0);
+
+    // バックグラウンドスロットリングを回避
+    await sidePanelPage.bringToFront();
+    await sidePanelPage.evaluate(() => window.focus());
+
+    // 親タブと子タブを複数選択（親Aとその子A1, A2）
+    const parentNodeA = sidePanelPage.locator(`[data-testid="tree-node-${parentA}"]`);
+    await parentNodeA.click();
+    await expect(parentNodeA).toHaveClass(/bg-gray-500/);
+
+    // Shift+クリックで子タブA2まで選択（親A, 子A1, 子A2が選択される）
+    const childNodeA2 = sidePanelPage.locator(`[data-testid="tree-node-${childA2}"]`);
+    await childNodeA2.click({ modifiers: ['Shift'] });
+
+    // 全ての選択状態を確認
+    const childNodeA1 = sidePanelPage.locator(`[data-testid="tree-node-${childA1}"]`);
+    await expect(parentNodeA).toHaveClass(/bg-gray-500/);
+    await expect(childNodeA1).toHaveClass(/bg-gray-500/);
+    await expect(childNodeA2).toHaveClass(/bg-gray-500/);
+
+    // 親タブをドラッグして、targetTabの子としてドロップ
+    await startDrag(sidePanelPage, parentA);
+
+    const targetNode = sidePanelPage.locator(`[data-testid="tree-node-${targetTab}"]`);
+    const boxTarget = await targetNode.boundingBox();
+    if (!boxTarget) throw new Error('targetNode not found');
+
+    // targetTabの中央にドロップ（子として追加）
+    await sidePanelPage.mouse.move(boxTarget.x + boxTarget.width / 2, boxTarget.y + boxTarget.height / 2, { steps: 1 });
+
+    await dropTab(sidePanelPage);
+    await waitForDragEnd(sidePanelPage, 2000);
+
+    // サブツリー構造が保持されていることを確認
+    // 親AとそのchildA1, childA2がtargetTabの子として移動し、
+    // 親子関係（A -> A1, A2）が維持される
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: targetTab, depth: 0, expanded: true },
+      { tabId: parentA, depth: 1, expanded: true },
+      { tabId: childA1, depth: 2 },
+      { tabId: childA2, depth: 2 },
+    ], 0);
+
+    // クリーンアップ
+    await closeTab(serviceWorker, childA1);
+    await closeTab(serviceWorker, childA2);
+    await closeTab(serviceWorker, parentA);
+    await closeTab(serviceWorker, targetTab);
+  });
+
+  test('深いネストのサブツリーを複数選択してドラッグしても構造が保持される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
+
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    // 深いネスト構造を作成: grandparent -> parent -> child -> grandchild
+    const grandparent = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: grandparent, depth: 0 },
+    ], 0);
+
+    const parent = await createTab(serviceWorker, getTestServerUrl('/page'), grandparent);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: grandparent, depth: 0, expanded: true },
+      { tabId: parent, depth: 1 },
+    ], 0);
+
+    const child = await createTab(serviceWorker, getTestServerUrl('/page'), parent);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: grandparent, depth: 0, expanded: true },
+      { tabId: parent, depth: 1, expanded: true },
+      { tabId: child, depth: 2 },
+    ], 0);
+
+    const grandchild = await createTab(serviceWorker, getTestServerUrl('/page'), child);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: grandparent, depth: 0, expanded: true },
+      { tabId: parent, depth: 1, expanded: true },
+      { tabId: child, depth: 2, expanded: true },
+      { tabId: grandchild, depth: 3 },
+    ], 0);
+
+    // ドロップターゲットとなるタブを作成
+    const targetTab = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: grandparent, depth: 0, expanded: true },
+      { tabId: parent, depth: 1, expanded: true },
+      { tabId: child, depth: 2, expanded: true },
+      { tabId: grandchild, depth: 3 },
+      { tabId: targetTab, depth: 0 },
+    ], 0);
+
+    // バックグラウンドスロットリングを回避
+    await sidePanelPage.bringToFront();
+    await sidePanelPage.evaluate(() => window.focus());
+
+    // サブツリー全体を選択（parent以下: parent, child, grandchild）
+    const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parent}"]`);
+    await parentNode.click();
+    await expect(parentNode).toHaveClass(/bg-gray-500/);
+
+    // Shift+クリックでgrandchildまで選択
+    const grandchildNode = sidePanelPage.locator(`[data-testid="tree-node-${grandchild}"]`);
+    await grandchildNode.click({ modifiers: ['Shift'] });
+
+    // 選択状態を確認
+    const childNode = sidePanelPage.locator(`[data-testid="tree-node-${child}"]`);
+    await expect(parentNode).toHaveClass(/bg-gray-500/);
+    await expect(childNode).toHaveClass(/bg-gray-500/);
+    await expect(grandchildNode).toHaveClass(/bg-gray-500/);
+
+    // parentをドラッグして、targetTabの後に兄弟として配置
+    await startDrag(sidePanelPage, parent);
+
+    const targetNode = sidePanelPage.locator(`[data-testid="tree-node-${targetTab}"]`);
+    const boxTarget = await targetNode.boundingBox();
+    if (!boxTarget) throw new Error('targetNode not found');
+
+    // targetTabの下部にドロップ（afterの位置）
+    await sidePanelPage.mouse.move(boxTarget.x + boxTarget.width / 2, boxTarget.y + boxTarget.height * 0.85, { steps: 1 });
+
+    await dropTab(sidePanelPage);
+    await waitForDragEnd(sidePanelPage, 2000);
+
+    // サブツリー構造が保持されていることを確認
+    // parent -> child -> grandchildの階層構造が維持される
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: grandparent, depth: 0 },
+      { tabId: targetTab, depth: 0 },
+      { tabId: parent, depth: 0, expanded: true },
+      { tabId: child, depth: 1, expanded: true },
+      { tabId: grandchild, depth: 2 },
+    ], 0);
+
+    // クリーンアップ
+    await closeTab(serviceWorker, grandchild);
+    await closeTab(serviceWorker, child);
+    await closeTab(serviceWorker, parent);
+    await closeTab(serviceWorker, grandparent);
+    await closeTab(serviceWorker, targetTab);
+  });
 });

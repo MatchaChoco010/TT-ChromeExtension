@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/extension';
+import type { Worker } from '@playwright/test';
 import { createTab, closeTab, activateTab, pinTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
 import { waitForCondition, waitForTabRemovedFromTreeState, waitForTabUrlLoaded, waitForTabActive } from './utils/polling-utils';
@@ -731,6 +732,180 @@ test.describe('chrome.tabs API統合', () => {
 
       expect(treeState.tabToNode[tabId]).toBeUndefined();
       expect(treeState.views[viewId]?.nodes[nodeId]).toBeUndefined();
+    });
+  });
+
+  test.describe('chrome.tabs.move() - ツリー→Chrome一方通行同期', () => {
+    async function getChromeTabOrder(serviceWorker: Worker): Promise<number[]> {
+      const tabs = await serviceWorker.evaluate(async () => {
+        const allTabs = await chrome.tabs.query({ currentWindow: true });
+        return allTabs
+          .filter(t => !t.pinned)
+          .sort((a, b) => a.index - b.index)
+          .map(t => t.id!)
+          .filter((id): id is number => id !== undefined);
+      });
+      return tabs;
+    }
+
+    test('Chrome API経由でタブを移動してもツリービューの状態がChromeに再同期される', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
+
+      const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
+
+      const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
+
+      // Chrome API経由でタブCをタブAの前に移動しようとする
+      await serviceWorker.evaluate(async ({ tabId, targetIndex }) => {
+        await chrome.tabs.move(tabId, { index: targetIndex });
+      }, { tabId: tabC, targetIndex: 0 });
+
+      // ツリービューの状態は変わらないはず（ツリーが正なので）
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
+
+      // Chromeタブの順序もツリービューの順序に再同期されているはず
+      await waitForCondition(
+        async () => {
+          const order = await getChromeTabOrder(serviceWorker);
+          const indexA = order.indexOf(tabA);
+          const indexB = order.indexOf(tabB);
+          const indexC = order.indexOf(tabC);
+          return indexA < indexB && indexB < indexC;
+        },
+        { timeout: 10000, interval: 200, timeoutMessage: 'Chrome tab order was not re-synchronized from tree state' }
+      );
+
+      await closeTab(serviceWorker, tabA);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabB, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabB);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabC, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabC);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+    });
+
+    test('子タブがある場合、Chrome API経由での移動後も親子関係が維持される', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      const parentTab = await createTab(serviceWorker, getTestServerUrl('/parent'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
+
+      const childTab = await createTab(serviceWorker, getTestServerUrl('/child'), parentTab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+      ], 0);
+
+      const otherTab = await createTab(serviceWorker, getTestServerUrl('/other'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+        { tabId: otherTab, depth: 0 },
+      ], 0);
+
+      // Chrome API経由で子タブを親から引き離そうとしても、ツリーの状態が維持される
+      await serviceWorker.evaluate(async ({ tabId, targetIndex }) => {
+        await chrome.tabs.move(tabId, { index: targetIndex });
+      }, { tabId: childTab, targetIndex: 0 });
+
+      // ツリービューの親子関係は維持される
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+        { tabId: otherTab, depth: 0 },
+      ], 0);
+
+      // Chromeタブの順序もツリービューの深さ優先順に再同期される
+      await waitForCondition(
+        async () => {
+          const order = await getChromeTabOrder(serviceWorker);
+          const indexParent = order.indexOf(parentTab);
+          const indexChild = order.indexOf(childTab);
+          const indexOther = order.indexOf(otherTab);
+          return indexParent < indexChild && indexChild < indexOther;
+        },
+        { timeout: 10000, interval: 200, timeoutMessage: 'Chrome tab order was not re-synchronized to maintain tree hierarchy' }
+      );
+
+      await closeTab(serviceWorker, childTab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+        { tabId: otherTab, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, parentTab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: otherTab, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, otherTab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 });

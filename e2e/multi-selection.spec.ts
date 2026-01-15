@@ -511,4 +511,307 @@ test.describe('複数選択機能', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
+
+  test('階層を跨いでShift+クリックで範囲選択ができる', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    // 親タブと子タブを作成
+    const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+    ], 0);
+
+    const childTab1 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: childTab1, depth: 1 },
+    ], 0);
+
+    const childTab2 = await createTab(serviceWorker, getTestServerUrl('/page'), parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: childTab1, depth: 1 },
+      { tabId: childTab2, depth: 1 },
+    ], 0);
+
+    // 別のルートタブを作成
+    const otherTab = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: childTab1, depth: 1 },
+      { tabId: childTab2, depth: 1 },
+      { tabId: otherTab, depth: 0 },
+    ], 0);
+
+    await sidePanelPage.bringToFront();
+    await sidePanelPage.evaluate(() => window.focus());
+
+    // 子タブ1をクリックして選択
+    const childNode1 = sidePanelPage.locator(`[data-testid="tree-node-${childTab1}"]`);
+    await childNode1.click();
+    await expect(childNode1).toHaveClass(/bg-gray-500/);
+
+    // otherTabをShift+クリック（子タブ1、子タブ2、otherTabが選択される）
+    const otherNode = sidePanelPage.locator(`[data-testid="tree-node-${otherTab}"]`);
+    await otherNode.click({ modifiers: ['Shift'] });
+
+    // 選択状態を確認
+    const childNode2 = sidePanelPage.locator(`[data-testid="tree-node-${childTab2}"]`);
+    await expect(childNode1).toHaveClass(/bg-gray-500/);
+    await expect(childNode2).toHaveClass(/bg-gray-500/);
+    await expect(otherNode).toHaveClass(/bg-gray-500/);
+
+    // 親タブは選択されていないことを確認
+    const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
+    await expect(parentNode).not.toHaveClass(/bg-gray-500/);
+
+    // クリーンアップ
+    await closeTab(serviceWorker, childTab1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: childTab2, depth: 1 },
+      { tabId: otherTab, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, childTab2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+      { tabId: otherTab, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: otherTab, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, otherTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+  });
+
+  test('折りたたまれたサブツリーでShift+クリックすると非表示の子タブは選択されない', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    // タブを作成
+    const tabA = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+    ], 0);
+
+    // 親タブと子タブを作成
+    const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+    ], 0);
+
+    const childTab = await createTab(serviceWorker, getTestServerUrl('/page'), parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: childTab, depth: 1 },
+    ], 0);
+
+    // 別のタブを作成
+    const tabC = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: childTab, depth: 1 },
+      { tabId: tabC, depth: 0 },
+    ], 0);
+
+    // 親タブを折りたたむ
+    const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
+    const expandButton = parentNode.locator('[data-testid="expand-button"]');
+    await expandButton.click();
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: false },
+      { tabId: tabC, depth: 0 },
+    ], 0);
+
+    await sidePanelPage.bringToFront();
+    await sidePanelPage.evaluate(() => window.focus());
+
+    // tabAをクリックして選択
+    const tabNodeA = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`);
+    await tabNodeA.click();
+    await expect(tabNodeA).toHaveClass(/bg-gray-500/);
+
+    // tabCをShift+クリック（tabA、parentTab、tabCが選択される）
+    // 折りたたまれた子タブ（childTab）は選択されない
+    const tabNodeC = sidePanelPage.locator(`[data-testid="tree-node-${tabC}"]`);
+    await tabNodeC.click({ modifiers: ['Shift'] });
+
+    // 選択状態を確認
+    await expect(tabNodeA).toHaveClass(/bg-gray-500/);
+    await expect(parentNode).toHaveClass(/bg-gray-500/);
+    await expect(tabNodeC).toHaveClass(/bg-gray-500/);
+
+    // 子タブは折りたたまれているので表示されていないことを確認
+    const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTab}"]`);
+    await expect(childNode).not.toBeVisible();
+
+    // クリーンアップ
+    await closeTab(serviceWorker, tabA);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: false },
+      { tabId: tabC, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, childTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+      { tabId: tabC, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabC, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, tabC);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+  });
+
+  test('深いネストでShift+クリックすると表示順序で範囲選択される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    // 深いネスト構造を作成
+    const tabA = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+    ], 0);
+
+    const tabB = await createTab(serviceWorker, getTestServerUrl('/page'), tabA);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0, expanded: true },
+      { tabId: tabB, depth: 1 },
+    ], 0);
+
+    const tabC = await createTab(serviceWorker, getTestServerUrl('/page'), tabB);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0, expanded: true },
+      { tabId: tabB, depth: 1, expanded: true },
+      { tabId: tabC, depth: 2 },
+    ], 0);
+
+    const tabD = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0, expanded: true },
+      { tabId: tabB, depth: 1, expanded: true },
+      { tabId: tabC, depth: 2 },
+      { tabId: tabD, depth: 0 },
+    ], 0);
+
+    await sidePanelPage.bringToFront();
+    await sidePanelPage.evaluate(() => window.focus());
+
+    // tabBをクリックして選択
+    const tabNodeB = sidePanelPage.locator(`[data-testid="tree-node-${tabB}"]`);
+    await tabNodeB.click();
+    await expect(tabNodeB).toHaveClass(/bg-gray-500/);
+
+    // tabDをShift+クリック（tabB、tabC、tabDが選択される）
+    const tabNodeD = sidePanelPage.locator(`[data-testid="tree-node-${tabD}"]`);
+    await tabNodeD.click({ modifiers: ['Shift'] });
+
+    // 選択状態を確認（表示順序: A -> B -> C -> D なので B, C, D が選択される）
+    const tabNodeA = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`);
+    const tabNodeC = sidePanelPage.locator(`[data-testid="tree-node-${tabC}"]`);
+    await expect(tabNodeA).not.toHaveClass(/bg-gray-500/);
+    await expect(tabNodeB).toHaveClass(/bg-gray-500/);
+    await expect(tabNodeC).toHaveClass(/bg-gray-500/);
+    await expect(tabNodeD).toHaveClass(/bg-gray-500/);
+
+    // クリーンアップ
+    await closeTab(serviceWorker, tabC);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0, expanded: true },
+      { tabId: tabB, depth: 1 },
+      { tabId: tabD, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, tabB);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabA, depth: 0 },
+      { tabId: tabD, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, tabA);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabD, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, tabD);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: pseudoSidePanelTabId, depth: 0 },
+    ], 0);
+  });
 });
