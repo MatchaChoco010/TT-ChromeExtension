@@ -37,7 +37,6 @@ describe('IconPicker', () => {
         />
       );
 
-      // カテゴリタブが存在することを確認
       expect(screen.getByRole('tab', { name: /work/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /hobby/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /social/i })).toBeInTheDocument();
@@ -82,15 +81,12 @@ describe('IconPicker', () => {
         />
       );
 
-      // 初期状態ではworkカテゴリが選択されている
       const workTab = screen.getByRole('tab', { name: /work/i });
       expect(workTab).toHaveAttribute('aria-selected', 'true');
 
-      // hobbyカテゴリをクリック
       const hobbyTab = screen.getByRole('tab', { name: /hobby/i });
       await user.click(hobbyTab);
 
-      // hobbyカテゴリが選択される
       expect(hobbyTab).toHaveAttribute('aria-selected', 'true');
       expect(workTab).toHaveAttribute('aria-selected', 'false');
     });
@@ -105,16 +101,13 @@ describe('IconPicker', () => {
         />
       );
 
-      // workカテゴリのアイコンが表示される
       const iconGrid = screen.getByTestId('icon-grid');
       const iconButtons = iconGrid.querySelectorAll('[data-testid^="icon-button-"]');
       expect(iconButtons.length).toBeGreaterThan(0);
 
-      // devカテゴリに切り替え
       const devTab = screen.getByRole('tab', { name: /dev/i });
       await user.click(devTab);
 
-      // devカテゴリのアイコンが表示される（異なるアイコンセット）
       const newIconButtons = iconGrid.querySelectorAll('[data-testid^="icon-button-"]');
       expect(newIconButtons.length).toBeGreaterThan(0);
     });
@@ -137,7 +130,6 @@ describe('IconPicker', () => {
 
       await user.click(firstIconButton!);
 
-      // 選択状態になる
       expect(firstIconButton).toHaveAttribute('aria-selected', 'true');
     });
 
@@ -155,11 +147,9 @@ describe('IconPicker', () => {
       const iconButtons = iconGrid.querySelectorAll('[data-testid^="icon-button-"]');
       expect(iconButtons.length).toBeGreaterThan(1);
 
-      // 最初のアイコンを選択
       await user.click(iconButtons[0]);
       expect(iconButtons[0]).toHaveAttribute('aria-selected', 'true');
 
-      // 2番目のアイコンを選択
       await user.click(iconButtons[1]);
       expect(iconButtons[1]).toHaveAttribute('aria-selected', 'true');
       expect(iconButtons[0]).toHaveAttribute('aria-selected', 'false');
@@ -194,7 +184,6 @@ describe('IconPicker', () => {
       const firstIconButton = iconGrid.querySelector('[data-testid^="icon-button-"]');
       await user.click(firstIconButton!);
 
-      // プレビューエリアにアイコンが表示される
       expect(screen.getByTestId('icon-preview')).toBeInTheDocument();
     });
 
@@ -209,7 +198,6 @@ describe('IconPicker', () => {
 
       const preview = screen.getByTestId('icon-preview');
       expect(preview).toBeInTheDocument();
-      // 空のプレビュー状態を示すテキストまたはプレースホルダー
       expect(screen.getByText(/select an icon/i)).toBeInTheDocument();
     });
   });
@@ -225,12 +213,10 @@ describe('IconPicker', () => {
         />
       );
 
-      // アイコンを選択 - 即座にonSelectが呼ばれる
       const iconGrid = screen.getByTestId('icon-grid');
       const firstIconButton = iconGrid.querySelector('[data-testid^="icon-button-"]');
       await user.click(firstIconButton!);
 
-      // onSelectが即座に呼ばれる（Selectボタン不要）
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
       expect(mockOnSelect).toHaveBeenCalledWith(expect.any(String));
     });
@@ -245,17 +231,14 @@ describe('IconPicker', () => {
         />
       );
 
-      // アイコンを選択（1回目のonSelect呼び出し）
       const iconGrid = screen.getByTestId('icon-grid');
       const firstIconButton = iconGrid.querySelector('[data-testid^="icon-button-"]');
       await user.click(firstIconButton!);
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
 
-      // Selectボタンをクリック（2回目のonSelect呼び出し）
       const selectButton = screen.getByRole('button', { name: /select/i });
       await user.click(selectButton);
 
-      // 合計2回呼ばれる
       expect(mockOnSelect).toHaveBeenCalledTimes(2);
     });
 
@@ -272,7 +255,6 @@ describe('IconPicker', () => {
       const selectButton = screen.getByRole('button', { name: /select/i });
       await user.click(selectButton);
 
-      // onSelectは呼ばれない
       expect(mockOnSelect).not.toHaveBeenCalled();
     });
   });
@@ -321,7 +303,6 @@ describe('IconPicker', () => {
       const urlInput = screen.getByPlaceholderText(/enter icon url/i);
       await user.type(urlInput, 'https://example.com/icon.png');
 
-      // プレビューにURLが反映される
       const previewImage = screen.getByTestId('icon-preview-image');
       expect(previewImage).toHaveAttribute('src', 'https://example.com/icon.png');
     });
@@ -357,15 +338,12 @@ describe('IconPicker', () => {
         />
       );
 
-      // タブリストが存在することを確認
       expect(screen.getByRole('tablist')).toBeInTheDocument();
       const tabs = screen.getAllByRole('tab');
 
-      // 最初のタブにフォーカス
       tabs[0].focus();
       expect(document.activeElement).toBe(tabs[0]);
 
-      // 右矢印キーで次のタブに移動
       await user.keyboard('{ArrowRight}');
       expect(document.activeElement).toBe(tabs[1]);
     });

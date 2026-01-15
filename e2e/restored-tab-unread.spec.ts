@@ -16,11 +16,9 @@ extensionTest.describe('復元タブの未読状態', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // ツリーが表示されるまで待機
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
       // 起動時の既存タブは未読インジケーターが付かないことを確認
-      // タブノードが表示されるまで待機
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${initialBrowserTabId}"]`);
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
@@ -147,7 +145,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
-      // リロード後のツリー構造を検証
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },

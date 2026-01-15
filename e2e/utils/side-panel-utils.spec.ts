@@ -1,9 +1,3 @@
-/**
- * SidePanelUtils Test
- *
- * SidePanelUtilsの機能をテストします。
- * このテストは、ユーティリティ関数が正しく動作することを確認するためのものです。
- */
 import { test, expect } from '../fixtures/extension';
 import {
   openSidePanel,

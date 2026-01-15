@@ -26,7 +26,6 @@ describe('Service Worker - Tab Events', () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
 
-    // ストレージに初期状態を設定
     await testStorageService.set(STORAGE_KEYS.TREE_STATE, {
       views: {
         'default': {
@@ -40,9 +39,7 @@ describe('Service Worker - Tab Events', () => {
       tabToNode: {},
     });
 
-    // テスト用に内部状態をリセットし、syncCompletedをtrueに設定
     testTreeStateManager.resetForTesting();
-    // ストレージの状態をTreeStateManagerに読み込む
     await testTreeStateManager.loadState();
   });
 
@@ -249,7 +246,6 @@ describe('ビュー切り替え動作の修正', () => {
       const nodeIds = Object.keys(viewNodes);
       if (nodeIds.length > 0) {
         const newNodeId = `node-${mockTab.id}`;
-        // Node should exist in the current view's nodes
         if (viewNodes[newNodeId]) {
           expect(viewNodes[newNodeId]).toBeDefined();
         }

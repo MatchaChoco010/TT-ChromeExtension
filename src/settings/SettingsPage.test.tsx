@@ -1,6 +1,3 @@
-/**
- * 設定ページのテスト
- */
 import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
@@ -40,7 +37,6 @@ describe('SettingsPage', () => {
   it('設定ページがレンダリングされる', async () => {
     render(<SettingsPage />);
 
-    // 設定見出しが表示されることを確認
     await waitFor(() => {
       expect(screen.getByText('設定')).toBeInTheDocument();
     });
@@ -49,7 +45,6 @@ describe('SettingsPage', () => {
   it('設定パネルコンポーネントが含まれる', async () => {
     render(<SettingsPage />);
 
-    // SettingsPanelの要素が含まれていることを確認
     await waitFor(() => {
       expect(screen.getByText('外観のカスタマイズ')).toBeInTheDocument();
       expect(screen.getByText('タブの動作')).toBeInTheDocument();
@@ -60,7 +55,6 @@ describe('SettingsPage', () => {
     const { container } = render(<SettingsPage />);
 
     await waitFor(() => {
-      // レイアウト用のコンテナが存在することを確認
       const layoutContainer = container.querySelector('.settings-page-container');
       expect(layoutContainer).toBeInTheDocument();
     });
@@ -75,7 +69,6 @@ describe('SettingsPage', () => {
   });
 
   it('読み込み中に読み込み中表示を行う', async () => {
-    // 遅延をシミュレート
     mockStorageService.get.mockImplementation(() => new Promise(() => {}));
 
     render(<SettingsPage />);
@@ -89,7 +82,6 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
 
     await waitFor(() => {
-      // デフォルト設定で設定パネルが表示されることを確認
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('設定');
     });
   });

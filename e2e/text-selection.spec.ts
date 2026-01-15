@@ -46,7 +46,6 @@ test.describe('テキスト選択禁止機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // Act: 最初のタブをクリック
     const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
     await tabNode1.click();
 
@@ -110,8 +109,6 @@ test.describe('テキスト選択禁止機能', () => {
     expect(boundingBox).not.toBeNull();
 
     if (boundingBox) {
-      // Act: タブノード上でテキスト選択のドラッグ操作を試みる
-      // 左端から右端へドラッグ
       const startX = boundingBox.x + 10;
       const startY = boundingBox.y + boundingBox.height / 2;
       const endX = boundingBox.x + boundingBox.width - 10;
@@ -154,7 +151,6 @@ test.describe('テキスト選択禁止機能', () => {
       { tabId: tabId, depth: 0 },
     ], 0);
 
-    // Act & Assert: ツリービュー全体に select-none クラスが適用されていることを確認
     const treeView = sidePanelPage.locator('[data-testid="tab-tree-view"]');
     await expect(treeView).toHaveClass(/select-none/);
 

@@ -896,7 +896,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-2" // Personal が現在アクティブ
+            currentViewId="view-2"
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -918,7 +918,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-2" // Personal が現在アクティブ
+            currentViewId="view-2"
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -940,7 +940,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-1" // Work が現在アクティブ (最初のビュー)
+            currentViewId="view-1"
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -959,7 +959,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-3" // Research が現在アクティブ (最後のビュー)
+            currentViewId="view-3"
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}

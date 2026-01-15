@@ -41,11 +41,11 @@ test.describe('新規タブ追加ボタン', () => {
       const buttonBox = await newTabButton.boundingBox();
       const parentBox = await tabTreeRoot.boundingBox();
 
-      // 許容誤差20pxはスクロールバーやパディングの影響を考慮した値
+      const BUTTON_WIDTH_TOLERANCE_PX = 20;
       expect(buttonBox).not.toBeNull();
       expect(parentBox).not.toBeNull();
       if (buttonBox && parentBox) {
-        expect(Math.abs(buttonBox.width - parentBox.width)).toBeLessThanOrEqual(20);
+        expect(Math.abs(buttonBox.width - parentBox.width)).toBeLessThanOrEqual(BUTTON_WIDTH_TOLERANCE_PX);
       }
     });
   });

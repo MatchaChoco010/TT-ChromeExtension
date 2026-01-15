@@ -1,7 +1,3 @@
-/**
- * 選択状態の自動解除機能の E2E テスト
- */
-
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -32,7 +28,7 @@ test.describe('選択状態の自動解除', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      // バックグラウンドスロットリングを回避
+      // Chrome background throttling can cause timing issues; ensure the page is active
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
@@ -118,7 +114,7 @@ test.describe('選択状態の自動解除', () => {
         { tabId: tabId3, depth: 0 },
       ], 0);
 
-      // バックグラウンドスロットリングを回避
+      // Chrome background throttling can cause timing issues; ensure the page is active
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
@@ -188,7 +184,7 @@ test.describe('選択状態の自動解除', () => {
         { tabId: tabId2, depth: 0 },
       ], 0);
 
-      // バックグラウンドスロットリングを回避
+      // Chrome background throttling can cause timing issues; ensure the page is active
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 

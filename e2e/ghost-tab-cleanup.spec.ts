@@ -1,6 +1,3 @@
-/**
- * ゴーストタブの自動削除 E2E テスト
- */
 import { test } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
 import {

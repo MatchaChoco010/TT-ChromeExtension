@@ -32,7 +32,6 @@ export class DownloadService implements IDownloadService {
       conflictAction: 'uniquify',
     });
 
-    // ダウンロード完了を待機
     await this.waitForDownloadComplete(downloadId);
 
     return downloadId;

@@ -44,7 +44,6 @@ export class SnapshotManager {
       throw new Error('Tree state not found');
     }
 
-    // 新しいデータ構造: views: Record<string, ViewState>
     const views: View[] = Object.values(treeState.views).map(vs => vs.info);
     const tabs: TabSnapshot[] = await this.createTabSnapshots(treeState);
 
@@ -108,8 +107,6 @@ export class SnapshotManager {
     const tabs = await chrome.tabs.query({});
     const tabMap = new Map(tabs.map((tab) => [tab.id, tab]));
 
-    // 新しいデータ構造: views: Record<string, ViewState>からノードを収集
-    // { node, viewId } のペアを作成
     const nodeWithViewId: Array<{ node: TabNode; viewId: string }> = [];
     for (const [viewId, viewState] of Object.entries(treeState.views)) {
       for (const node of Object.values(viewState.nodes)) {
@@ -122,7 +119,6 @@ export class SnapshotManager {
       nodeIdToIndex.set(node.id, index);
     });
 
-    // windowIdをwindowIndexに変換するためのマッピング
     const windowIdSet = new Set<number>();
     for (const { node } of nodeWithViewId) {
       const tab = tabMap.get(node.tabId);
@@ -209,11 +205,9 @@ export class SnapshotManager {
         const newWindow = await chrome.windows.create({});
         if (newWindow.id !== undefined) {
           windowIndexToNewWindowId.set(windowIndex, newWindow.id);
-          // 新しいウィンドウに自動で作成される空白タブを後で削除するため、タブIDを記録
           if (newWindow.tabs && newWindow.tabs.length > 0) {
             const blankTabId = newWindow.tabs[0].id;
             if (blankTabId !== undefined) {
-              // 後で削除できるようにマークしておく
               setTimeout(() => {
                 chrome.tabs.remove(blankTabId).catch(() => {
                   // 既に閉じられている場合は無視
@@ -250,7 +244,6 @@ export class SnapshotManager {
     const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
     if (!treeState) return;
 
-    // 新しいデータ構造: views: Record<string, ViewState>
     // 既存のビューをコピー
     const updatedViews: Record<string, { info: View; rootNodeIds: string[]; nodes: Record<string, TabNode> }> = {};
     for (const [viewId, viewState] of Object.entries(treeState.views)) {
@@ -281,7 +274,6 @@ export class SnapshotManager {
       };
     }
 
-    // 一時的にすべてのノードを保持するマップ（親子関係構築用）
     const allNewNodes: Map<string, TabNode> = new Map();
     const nodeIdToViewId: Map<string, string> = new Map();
     const updatedTabToNode: Record<number, { viewId: string; nodeId: string }> = { ...treeState.tabToNode };

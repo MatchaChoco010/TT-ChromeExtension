@@ -43,7 +43,6 @@ describe('TreeStateManager', () => {
       const tree = manager.getTree(viewId);
       expect(tree).toBeDefined();
       expect(tree.length).toBeGreaterThan(0);
-      // viewIdはgetNodeByTabIdから取得するようになった
       const result = manager.getNodeByTabId(1);
       expect(result?.viewId).toBe(viewId);
     });
@@ -743,14 +742,11 @@ describe('TreeStateManager', () => {
 
       await manager.addTab(tab, null, viewId);
 
-      // 旧IDでノードが取得できることを確認
       expect(manager.getNodeByTabId(oldTabId)).toBeDefined();
       expect(manager.getNodeByTabId(newTabId)).toBeNull();
 
-      // tabIdを置き換え
       await manager.replaceTabId(oldTabId, newTabId);
 
-      // 新IDでノードが取得でき、旧IDでは取得できないことを確認
       expect(manager.getNodeByTabId(oldTabId)).toBeNull();
       const newResult = manager.getNodeByTabId(newTabId);
       expect(newResult).toBeDefined();

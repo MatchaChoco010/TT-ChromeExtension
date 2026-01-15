@@ -15,7 +15,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. タブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -23,7 +22,6 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. タブのタイトルが更新されるまで待機
       await waitForCondition(
         async () => {
           const tabInfo = await serviceWorker.evaluate(async (id) => {
@@ -35,7 +33,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 10000, interval: 100, timeoutMessage: 'Tab title did not update' }
       );
 
-      // 3. タイトルがストレージに永続化されるまで待機（デバウンス考慮）
       await waitForCondition(
         async () => {
           const storedTitles = await serviceWorker.evaluate(async (id) => {
@@ -48,7 +45,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'Title was not persisted to storage' }
       );
 
-      // 4. ストレージのタイトルを確認
       const storedTitle = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_titles');
         const titles = result.tab_titles as Record<number, string> | undefined;
@@ -57,7 +53,6 @@ test.describe('Tab Persistence', () => {
 
       expect(storedTitle).toBeTruthy();
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -73,7 +68,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. タブを作成
       const tabUrl = getTestServerUrl('/page');
       const tabId = await createTab(serviceWorker, tabUrl, undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
@@ -82,7 +76,6 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. ファビコンを直接ストレージに設定（URLをキーに）
       const testFaviconUrl = 'http://127.0.0.1/favicon.ico';
       await serviceWorker.evaluate(
         async ({ url, faviconUrl }) => {
@@ -94,7 +87,6 @@ test.describe('Tab Persistence', () => {
         { url: tabUrl, faviconUrl: testFaviconUrl }
       );
 
-      // 3. ファビコンがストレージに存在することを確認（URLをキーに）
       const storedFavicon = await serviceWorker.evaluate(async (url) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = result.tab_favicons as Record<string, string> | undefined;
@@ -103,7 +95,6 @@ test.describe('Tab Persistence', () => {
 
       expect(storedFavicon).toBe(testFaviconUrl);
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -121,7 +112,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 複数のタブを作成
       const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -137,13 +127,11 @@ test.describe('Tab Persistence', () => {
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
-      // 2. 現在のウィンドウのタブ数を取得
       const browserTabCount = await serviceWorker.evaluate(async (windowId) => {
         const tabs = await chrome.tabs.query({ windowId });
         return tabs.length;
       }, windowId);
 
-      // 3. ストレージ内のタブ数を取得（現在のウィンドウのみ）
       const treeTabCount = await serviceWorker.evaluate(async (windowId) => {
         const tabs = await chrome.tabs.query({ windowId });
         const tabIds = tabs.filter(t => t.id).map(t => t.id!);
@@ -164,10 +152,8 @@ test.describe('Tab Persistence', () => {
         return count;
       }, windowId);
 
-      // 4. タブ数が一致することを確認
       expect(treeTabCount).toBe(browserTabCount);
 
-      // クリーンアップ
       await closeTab(serviceWorker, tab1Id);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -190,7 +176,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 正常なタブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -198,13 +183,11 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. Chrome APIに存在するタブIDを取得
       const existingTabIds = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({});
         return tabs.filter(t => t.id).map(t => t.id!);
       });
 
-      // 3. ストレージ内のタブIDを取得
       const storageTabIds = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { tabToNode?: Record<number, string> } | undefined;
@@ -212,12 +195,10 @@ test.describe('Tab Persistence', () => {
         return Object.keys(treeState.tabToNode).map(Number);
       });
 
-      // 4. ストレージのすべてのタブがChrome APIに存在することを確認
       for (const storageTabId of storageTabIds) {
         expect(existingTabIds).toContain(storageTabId);
       }
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -235,7 +216,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. about:blankタブを作成（タイトルは空）
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -243,13 +223,11 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. 別のページに遷移
       const navigateUrl = getTestServerUrl('/page2');
       await serviceWorker.evaluate(async ({ id, url }) => {
         await chrome.tabs.update(id, { url });
       }, { id: tabId, url: navigateUrl });
 
-      // 3. ページ読み込みとタイトル取得を待機
       await waitForCondition(
         async () => {
           const tabInfo = await serviceWorker.evaluate(async (id) => {
@@ -266,7 +244,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 10000, interval: 200 }
       );
 
-      // 4. 新しいタイトルが永続化されるまで待機
       await waitForCondition(
         async () => {
           const storedTitle = await serviceWorker.evaluate(async (id) => {
@@ -279,7 +256,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'Title was not persisted after navigation' }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -297,7 +273,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. タブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: true });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -305,7 +280,6 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. 初期ファビコンを設定
       const initialFaviconUrl = 'http://127.0.0.1/initial-favicon.ico';
       await serviceWorker.evaluate(
         async ({ id, faviconUrl }) => {
@@ -317,7 +291,6 @@ test.describe('Tab Persistence', () => {
         { id: tabId, faviconUrl: initialFaviconUrl }
       );
 
-      // 3. 初期ファビコンが設定されていることを確認
       const initialStored = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = result.tab_favicons as Record<number, string> | undefined;
@@ -325,7 +298,6 @@ test.describe('Tab Persistence', () => {
       }, tabId);
       expect(initialStored).toBe(initialFaviconUrl);
 
-      // 4. ファビコンを更新
       const updatedFaviconUrl = 'http://127.0.0.1/updated-favicon.ico';
       await serviceWorker.evaluate(
         async ({ id, faviconUrl }) => {
@@ -337,7 +309,6 @@ test.describe('Tab Persistence', () => {
         { id: tabId, faviconUrl: updatedFaviconUrl }
       );
 
-      // 5. 更新されたファビコンを確認
       const updatedStored = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = result.tab_favicons as Record<number, string> | undefined;
@@ -347,7 +318,6 @@ test.describe('Tab Persistence', () => {
       expect(updatedStored).toBe(updatedFaviconUrl);
       expect(updatedStored).not.toBe(initialFaviconUrl);
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -365,7 +335,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. タブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -373,7 +342,6 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. タイトルが永続化されるまで待機
       await waitForCondition(
         async () => {
           const storedTitle = await serviceWorker.evaluate(async (id) => {
@@ -386,7 +354,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 10000, interval: 100 }
       );
 
-      // 3. タブを閉じる
       const closedTabId = tabId;
       await closeTab(serviceWorker, closedTabId);
       await assertTabStructure(sidePanelPage, windowId, [
@@ -394,7 +361,6 @@ test.describe('Tab Persistence', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 4. タイトルがストレージから削除されるまで待機
       await waitForCondition(
         async () => {
           const storedTitle = await serviceWorker.evaluate(async (id) => {
@@ -407,7 +373,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'Title was not removed after tab close' }
       );
 
-      // 5. ストレージにタイトルが存在しないことを確認
       const remainingTitle = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_titles');
         const titles = result.tab_titles as Record<number, string> | undefined;
@@ -425,7 +390,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. タブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -433,7 +397,6 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. ファビコンを直接設定
       const testFaviconUrl = 'http://127.0.0.1/test-favicon.ico';
       await serviceWorker.evaluate(
         async ({ id, faviconUrl }) => {
@@ -445,7 +408,6 @@ test.describe('Tab Persistence', () => {
         { id: tabId, faviconUrl: testFaviconUrl }
       );
 
-      // 3. ファビコンが設定されていることを確認
       const storedBefore = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = result.tab_favicons as Record<number, string> | undefined;
@@ -453,7 +415,6 @@ test.describe('Tab Persistence', () => {
       }, tabId);
       expect(storedBefore).toBe(testFaviconUrl);
 
-      // 4. タブを閉じる
       const closedTabId = tabId;
       await closeTab(serviceWorker, closedTabId);
       await assertTabStructure(sidePanelPage, windowId, [
@@ -461,7 +422,6 @@ test.describe('Tab Persistence', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 5. ファビコンをクリーンアップ（実際の実装ではonRemovedイベントで自動的に行われる）
       // テスト用に手動でクリーンアップをシミュレート
       await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_favicons');
@@ -470,7 +430,6 @@ test.describe('Tab Persistence', () => {
         await chrome.storage.local.set({ tab_favicons: favicons });
       }, closedTabId);
 
-      // 6. ストレージにファビコンが存在しないことを確認
       const remainingFavicon = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = result.tab_favicons as Record<number, string> | undefined;
@@ -488,7 +447,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 正常なタブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -496,7 +454,6 @@ test.describe('Tab Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. ゴーストタブ（存在しないタブID）をストレージに直接追加
       const ghostTabId = 99999;
       const ghostNodeId = `node-${ghostTabId}`;
       await serviceWorker.evaluate(
@@ -542,7 +499,6 @@ test.describe('Tab Persistence', () => {
         { ghostTabId, ghostNodeId }
       );
 
-      // 3. ゴーストタブがストレージに存在することを確認
       const hasGhostBefore = await serviceWorker.evaluate(
         async ({ ghostTabId }) => {
           const treeResult = await chrome.storage.local.get('tree_state');
@@ -555,7 +511,6 @@ test.describe('Tab Persistence', () => {
       );
       expect(hasGhostBefore).toBe(true);
 
-      // 4. クリーンアップをトリガー（実際の起動時のロジックをシミュレート）
       await serviceWorker.evaluate(async () => {
         interface ViewState {
           nodes: Record<string, { tabId: number }>;
@@ -606,7 +561,6 @@ test.describe('Tab Persistence', () => {
         await chrome.storage.local.set({ tab_favicons: favicons });
       });
 
-      // 5. ゴーストタブがクリーンアップされたことを確認
       await waitForCondition(
         async () => {
           const hasGhost = await serviceWorker.evaluate(
@@ -624,7 +578,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 5000, interval: 100 }
       );
 
-      // 6. ゴーストのタイトルとファビコンも削除されていることを確認
       const remainingGhostTitle = await serviceWorker.evaluate(
         async ({ ghostTabId }) => {
           const result = await chrome.storage.local.get('tab_titles');
@@ -645,7 +598,6 @@ test.describe('Tab Persistence', () => {
       );
       expect(remainingGhostFavicon).toBeUndefined();
 
-      // 7. 正常なタブは残っていることを確認
       const hasNormalTab = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as {
@@ -655,7 +607,6 @@ test.describe('Tab Persistence', () => {
       }, tabId);
       expect(hasNormalTab).toBe(true);
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -673,7 +624,6 @@ test.describe('Tab Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 複数タブを作成
       const tab1Id = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -689,7 +639,6 @@ test.describe('Tab Persistence', () => {
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
-      // 2. 両方のタブのタイトルが永続化されるまで待機
       await waitForCondition(
         async () => {
           const titles = await serviceWorker.evaluate(async (tabIds) => {
@@ -706,7 +655,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 15000, interval: 200 }
       );
 
-      // 3. 1つのタブを閉じる
       await closeTab(serviceWorker, tab1Id);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -714,7 +662,6 @@ test.describe('Tab Persistence', () => {
         { tabId: tab2Id, depth: 0 },
       ], 0);
 
-      // 4. 閉じたタブのタイトルが削除されることを確認
       await waitForCondition(
         async () => {
           const title = await serviceWorker.evaluate(async (id) => {
@@ -727,7 +674,6 @@ test.describe('Tab Persistence', () => {
         { timeout: 5000, interval: 100 }
       );
 
-      // 5. 残っているタブのタイトルは保持されていることを確認
       const remainingTitle = await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_titles');
         const titles = result.tab_titles as Record<number, string> | undefined;
@@ -735,7 +681,6 @@ test.describe('Tab Persistence', () => {
       }, tab2Id);
       expect(remainingTitle).toBeTruthy();
 
-      // クリーンアップ
       await closeTab(serviceWorker, tab2Id);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },

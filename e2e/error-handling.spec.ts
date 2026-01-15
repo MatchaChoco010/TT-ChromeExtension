@@ -1,6 +1,3 @@
-/**
- * エラーハンドリングとエッジケースのE2Eテスト
- */
 import { test as extensionTest } from './fixtures/extension';
 import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';

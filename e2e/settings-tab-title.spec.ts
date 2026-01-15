@@ -1,7 +1,3 @@
-/**
- * 設定タブと内部ページのタイトル表示に関するE2Eテスト
- */
-
 import { test, expect } from './fixtures/extension';
 import { COMMON_SELECTORS, COMMON_TIMEOUTS } from './test-data/common-constants';
 import {

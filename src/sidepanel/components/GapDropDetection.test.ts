@@ -94,9 +94,9 @@ describe('calculateHorizontalDropTarget', () => {
 
 describe('calculateHorizontalIndicatorX', () => {
   const tabs: HorizontalTabPosition[] = [
-    { nodeId: 'tab-1', left: 0, right: 40, index: 0 },
-    { nodeId: 'tab-2', left: 40, right: 80, index: 1 },
-    { nodeId: 'tab-3', left: 80, right: 120, index: 2 },
+    { nodeId: 'tab-1', left: 0, right: 40, index: 0 },  // center=20
+    { nodeId: 'tab-2', left: 40, right: 80, index: 1 }, // center=60
+    { nodeId: 'tab-3', left: 80, right: 120, index: 2 }, // center=100
   ];
 
   describe('空のタブリストの場合', () => {

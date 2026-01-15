@@ -2,8 +2,6 @@
   "permissions": {
     "allow": [
       "Bash(test:*)",
-      "Skill(kiro:spec-impl)",
-      "Skill(kiro:spec-impl:*)",
       "Bash(npm run test:e2e:*)",
       "Bash(cat:*)",
       "Bash(node:*)",

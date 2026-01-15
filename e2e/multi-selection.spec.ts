@@ -298,7 +298,6 @@ test.describe('複数選択機能', () => {
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 親タブとその子タブを作成
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -323,7 +322,6 @@ test.describe('複数選択機能', () => {
       { tabId: childTabId2, depth: 1 },
     ], 0);
 
-    // 別の単独タブを作成
     const anotherTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -334,7 +332,6 @@ test.describe('複数選択機能', () => {
       { tabId: anotherTabId, depth: 0 },
     ], 0);
 
-    // 親タブを折りたたむ（expanded: false）
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
     await expandButton.click();
@@ -348,21 +345,17 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // 折りたたまれた親タブと別のタブを複数選択
     await parentNode.click();
     const anotherNode = sidePanelPage.locator(`[data-testid="tree-node-${anotherTabId}"]`);
     await anotherNode.click({ modifiers: ['Control'] });
 
-    // 複数選択状態でコンテキストメニューを開く
     await parentNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
-    // 「選択されたタブを閉じる」を選択
     const closeItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブを閉じる/ });
     await expect(closeItem).toBeVisible({ timeout: 3000 });
     await closeItem.click({ force: true, noWaitAfter: true });
 
-    // 親タブとその子タブ（サブツリー）、および別のタブがすべて閉じられる
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -520,7 +513,6 @@ test.describe('複数選択機能', () => {
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 親タブと子タブを作成
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -545,7 +537,6 @@ test.describe('複数選択機能', () => {
       { tabId: childTab2, depth: 1 },
     ], 0);
 
-    // 別のルートタブを作成
     const otherTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -559,26 +550,21 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // 子タブ1をクリックして選択
     const childNode1 = sidePanelPage.locator(`[data-testid="tree-node-${childTab1}"]`);
     await childNode1.click();
     await expect(childNode1).toHaveClass(/bg-gray-500/);
 
-    // otherTabをShift+クリック（子タブ1、子タブ2、otherTabが選択される）
     const otherNode = sidePanelPage.locator(`[data-testid="tree-node-${otherTab}"]`);
     await otherNode.click({ modifiers: ['Shift'] });
 
-    // 選択状態を確認
     const childNode2 = sidePanelPage.locator(`[data-testid="tree-node-${childTab2}"]`);
     await expect(childNode1).toHaveClass(/bg-gray-500/);
     await expect(childNode2).toHaveClass(/bg-gray-500/);
     await expect(otherNode).toHaveClass(/bg-gray-500/);
 
-    // 親タブは選択されていないことを確認
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
     await expect(parentNode).not.toHaveClass(/bg-gray-500/);
 
-    // クリーンアップ
     await closeTab(serviceWorker, childTab1);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -618,7 +604,6 @@ test.describe('複数選択機能', () => {
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // タブを作成
     const tabA = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -626,7 +611,6 @@ test.describe('複数選択機能', () => {
       { tabId: tabA, depth: 0 },
     ], 0);
 
-    // 親タブと子タブを作成
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -644,7 +628,6 @@ test.describe('複数選択機能', () => {
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // 別のタブを作成
     const tabC = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -655,7 +638,6 @@ test.describe('複数選択機能', () => {
       { tabId: tabC, depth: 0 },
     ], 0);
 
-    // 親タブを折りたたむ
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
     await expandButton.click();
@@ -670,26 +652,20 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // tabAをクリックして選択
     const tabNodeA = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`);
     await tabNodeA.click();
     await expect(tabNodeA).toHaveClass(/bg-gray-500/);
 
-    // tabCをShift+クリック（tabA、parentTab、tabCが選択される）
-    // 折りたたまれた子タブ（childTab）は選択されない
     const tabNodeC = sidePanelPage.locator(`[data-testid="tree-node-${tabC}"]`);
     await tabNodeC.click({ modifiers: ['Shift'] });
 
-    // 選択状態を確認
     await expect(tabNodeA).toHaveClass(/bg-gray-500/);
     await expect(parentNode).toHaveClass(/bg-gray-500/);
     await expect(tabNodeC).toHaveClass(/bg-gray-500/);
 
-    // 子タブは折りたたまれているので表示されていないことを確認
     const childNode = sidePanelPage.locator(`[data-testid="tree-node-${childTab}"]`);
     await expect(childNode).not.toBeVisible();
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabA);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -728,7 +704,6 @@ test.describe('複数選択機能', () => {
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 深いネスト構造を作成
     const tabA = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -766,16 +741,13 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // tabBをクリックして選択
     const tabNodeB = sidePanelPage.locator(`[data-testid="tree-node-${tabB}"]`);
     await tabNodeB.click();
     await expect(tabNodeB).toHaveClass(/bg-gray-500/);
 
-    // tabDをShift+クリック（tabB、tabC、tabDが選択される）
     const tabNodeD = sidePanelPage.locator(`[data-testid="tree-node-${tabD}"]`);
     await tabNodeD.click({ modifiers: ['Shift'] });
 
-    // 選択状態を確認（表示順序: A -> B -> C -> D なので B, C, D が選択される）
     const tabNodeA = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`);
     const tabNodeC = sidePanelPage.locator(`[data-testid="tree-node-${tabC}"]`);
     await expect(tabNodeA).not.toHaveClass(/bg-gray-500/);
@@ -783,7 +755,6 @@ test.describe('複数選択機能', () => {
     await expect(tabNodeC).toHaveClass(/bg-gray-500/);
     await expect(tabNodeD).toHaveClass(/bg-gray-500/);
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabC);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },

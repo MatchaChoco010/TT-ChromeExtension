@@ -1,9 +1,3 @@
-/**
- * スナップショット機能のE2Eテスト
- *
- * chrome.downloads APIを使用したスナップショット保存・復元機能をテスト
- */
-
 import { test, expect } from './fixtures/extension';
 import { setupWindow } from './utils/setup-utils';
 import { getCurrentWindowId, getTestServerUrl } from './utils/tab-utils';
@@ -15,9 +9,6 @@ import {
 import { waitForCondition } from './utils/polling-utils';
 import type { Worker } from '@playwright/test';
 
-/**
- * ツリー状態を取得するヘルパー関数
- */
 async function getTreeState(serviceWorker: Worker) {
   return await serviceWorker.evaluate(async () => {
     const result = await chrome.storage.local.get('tree_state');
@@ -31,22 +22,18 @@ test.describe('スナップショット機能', () => {
     serviceWorker,
     downloadDir,
   }) => {
-    // サイドパネルをセットアップ
     const windowId = await getCurrentWindowId(serviceWorker);
     const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // サイドパネルからメッセージを送信
     await sidePanelPage.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
     });
 
-    // ダウンロードファイルが作成されるのを待機（waitForSnapshotFileが内部でポーリング）
     const snapshotFile = await waitForSnapshotFile(downloadDir, 10000);
 
     expect(snapshotFile).not.toBeNull();
 
     if (snapshotFile) {
-      // ファイル内容を検証
       const snapshotData = readSnapshotFile(snapshotFile);
       expect(snapshotData.id).toMatch(/^snapshot-/);
       expect(snapshotData.name).toBeTruthy();
@@ -56,7 +43,6 @@ test.describe('スナップショット機能', () => {
       expect(snapshotData.data.tabs).toBeInstanceOf(Array);
     }
 
-    // クリーンアップ
     cleanupDownloadDir(downloadDir);
     await sidePanelPage.close();
   });
@@ -66,21 +52,16 @@ test.describe('スナップショット機能', () => {
     serviceWorker,
     downloadDir,
   }) => {
-    // このテストは、chrome.downloads.download()に渡されるfilenameパラメータを検証する
-    // 注意: Chrome for Testingではdata URLのfilenameパラメータが適用されない場合がある
     const windowId = await getCurrentWindowId(serviceWorker);
     const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // サイドパネルからスナップショット作成をトリガー
     await sidePanelPage.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
     });
 
-    // ダウンロードファイルが作成されていることを確認（waitForSnapshotFileが内部でポーリング）
     const snapshotFile = await waitForSnapshotFile(downloadDir, 10000);
     expect(snapshotFile).not.toBeNull();
 
-    // ファイル内容がスナップショットデータであることを確認
     if (snapshotFile) {
       const snapshotData = readSnapshotFile(snapshotFile);
       expect(snapshotData.id).toMatch(/^snapshot-/);
@@ -100,13 +81,11 @@ test.describe('スナップショット機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 追加のタブを作成（テストサーバーURLを使用）
     const testUrl = getTestServerUrl('/page');
     const newPage = await extensionContext.newPage();
     await newPage.goto(testUrl);
     await newPage.waitForLoadState('domcontentloaded');
 
-    // タブがツリー状態に追加されるまでポーリングで待機
     await waitForCondition(
       async () => {
         const treeState = await getTreeState(serviceWorker) as {
@@ -122,22 +101,18 @@ test.describe('スナップショット機能', () => {
       { timeout: 5000, timeoutMessage: 'Test tab did not appear in tree state' }
     );
 
-    // サイドパネルからスナップショット作成をトリガー
     await sidePanelPage.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
     });
 
-    // ダウンロードファイルを確認（waitForSnapshotFileが内部でポーリング）
     const snapshotFile = await waitForSnapshotFile(downloadDir, 10000);
     expect(snapshotFile).not.toBeNull();
 
     if (snapshotFile) {
       const snapshotData = readSnapshotFile(snapshotFile);
 
-      // タブ情報が含まれていることを確認
       expect(snapshotData.data.tabs.length).toBeGreaterThanOrEqual(1);
 
-      // テストサーバーのタブが含まれていることを確認
       const hasTestTab = snapshotData.data.tabs.some(
         (tab) => tab.url.includes('127.0.0.1') || tab.url.includes('/page')
       );
@@ -158,7 +133,6 @@ test.describe('スナップショット復元機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // テスト用のスナップショットデータ（親子関係あり）
     const snapshotData = {
       id: 'snapshot-test-1',
       createdAt: new Date().toISOString(),
@@ -189,7 +163,6 @@ test.describe('スナップショット復元機能', () => {
       },
     };
 
-    // スナップショットを復元（新しいタブとして）
     await sidePanelPage.evaluate(async (jsonData: string) => {
       await chrome.runtime.sendMessage({
         type: 'RESTORE_SNAPSHOT',
@@ -197,7 +170,6 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 復元されたタブとノードが存在するまでポーリングで待機
     interface NodeInfo {
       id: string;
       tabId: number;
@@ -238,7 +210,6 @@ test.describe('スナップショット復元機能', () => {
       { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with parent-child relationship did not appear' }
     );
 
-    // 親子関係が正しく復元されていることを確認
     expect(parentNode).toBeDefined();
     expect(childNode).toBeDefined();
     expect(childNode?.parentId).toBe(parentNode?.id);
@@ -253,7 +224,6 @@ test.describe('スナップショット復元機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 複数ビューを持つスナップショットデータ
     const snapshotData = {
       id: 'snapshot-test-2',
       createdAt: new Date().toISOString(),
@@ -287,7 +257,6 @@ test.describe('スナップショット復元機能', () => {
       },
     };
 
-    // スナップショットを復元
     await sidePanelPage.evaluate(async (jsonData: string) => {
       await chrome.runtime.sendMessage({
         type: 'RESTORE_SNAPSHOT',
@@ -295,7 +264,6 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 復元されたタブとノードが存在するまでポーリングで待機
     interface ViewNodeInfo {
       id: string;
       tabId: number;
@@ -328,7 +296,6 @@ test.describe('スナップショット復元機能', () => {
       { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with correct viewId did not appear' }
     );
 
-    // 正しいビューに配置されていることを確認
     expect(workNodeInfo).toBeDefined();
     expect(personalNodeInfo).toBeDefined();
     expect(workNodeInfo?.viewId).toBe('view-work');
@@ -344,12 +311,10 @@ test.describe('スナップショット復元機能', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 既存タブを作成
     const existingPage = await extensionContext.newPage();
     await existingPage.goto(getTestServerUrl('/existing'));
     await existingPage.waitForLoadState('domcontentloaded');
 
-    // タブがツリー状態に追加されるまでポーリングで待機
     await waitForCondition(
       async () => {
         const treeState = await getTreeState(serviceWorker) as {
@@ -365,14 +330,12 @@ test.describe('スナップショット復元機能', () => {
       { timeout: 5000, timeoutMessage: 'Existing tab did not appear in tree state' }
     );
 
-    // 復元前のタブ数を確認
     const tabsBeforeRestore = await serviceWorker.evaluate(async () => {
       return await chrome.tabs.query({});
     });
     const existingTabCount = tabsBeforeRestore.length;
     expect(existingTabCount).toBeGreaterThanOrEqual(2);
 
-    // テスト用のスナップショットデータ
     const snapshotData = {
       id: 'snapshot-test-3',
       createdAt: new Date().toISOString(),
@@ -403,7 +366,6 @@ test.describe('スナップショット復元機能', () => {
       },
     };
 
-    // 既存タブを削除してスナップショットを復元
     await sidePanelPage.evaluate(async (jsonData: string) => {
       await chrome.runtime.sendMessage({
         type: 'RESTORE_SNAPSHOT',
@@ -411,7 +373,6 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    // 復元されたタブが存在するまでポーリングで待機
     await waitForCondition(
       async () => {
         const tabs = await serviceWorker.evaluate(async () => {
@@ -424,16 +385,13 @@ test.describe('スナップショット復元機能', () => {
       { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
     );
 
-    // 復元後のタブを確認
     const tabsAfterRestore = await serviceWorker.evaluate(async () => {
       return await chrome.tabs.query({});
     });
 
-    // 既存タブが閉じられ、スナップショットのタブのみになっていることを確認
     const hasExistingTab = tabsAfterRestore.some(t => t.url?.includes('/existing'));
     expect(hasExistingTab).toBe(false);
 
-    // 復元されたタブが存在することを確認
     const hasRestoredTab1 = tabsAfterRestore.some(t => t.url?.includes('/restored-tab-1'));
     const hasRestoredTab2 = tabsAfterRestore.some(t => t.url?.includes('/restored-tab-2'));
     expect(hasRestoredTab1).toBe(true);

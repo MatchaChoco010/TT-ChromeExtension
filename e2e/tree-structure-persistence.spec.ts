@@ -14,22 +14,16 @@ test.describe('Tree Structure Persistence', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 親タブを作成
       const parentUrl = getTestServerUrl('/page');
       const parentTabId = await createTab(serviceWorker, parentUrl, undefined, { active: false });
 
-      // 2. 子タブを作成（parentTabIdを親として）
       const childUrl = getTestServerUrl('/page2');
       const childTabId = await createTab(serviceWorker, childUrl, parentTabId, { active: false });
 
-      // 3. 孫タブを作成（childTabIdを親として）
       const grandchildUrl = getTestServerUrl('/page3');
       await createTab(serviceWorker, grandchildUrl, childTabId, { active: false });
 
-      // 4. 少し待機してtreeStructureが保存されるのを待つ
       await new Promise(resolve => setTimeout(resolve, 500));
-
-      // 5. treeStructureがストレージに保存されていることを確認
       const treeStructure = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { treeStructure?: unknown[] };
@@ -39,7 +33,6 @@ test.describe('Tree Structure Persistence', () => {
       expect(treeStructure).toBeDefined();
       expect(Array.isArray(treeStructure)).toBe(true);
 
-      // 5. 親子関係（parentIndex）が正しく保存されていることを確認
       interface TreeStructureEntry {
         url: string;
         parentIndex: number | null;
@@ -58,18 +51,13 @@ test.describe('Tree Structure Persistence', () => {
       expect(childEntry).toBeDefined();
       expect(grandchildEntry).toBeDefined();
 
-      // 親タブはparentIndexがnull
       expect(parentEntry?.parentIndex).toBeNull();
 
-      // 子タブは親タブのインデックスを指す
       const parentIndex = entries.indexOf(parentEntry!);
       expect(childEntry?.parentIndex).toBe(parentIndex);
 
-      // 孫タブは子タブのインデックスを指す
       const childIndex = entries.indexOf(childEntry!);
       expect(grandchildEntry?.parentIndex).toBe(childIndex);
-
-      // クリーンアップ（テストで作成したタブをURLで検索してクローズ）
       await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({});
         for (const tab of tabs) {
@@ -87,26 +75,19 @@ test.describe('Tree Structure Persistence', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 親タブを作成
       const parentUrl = getTestServerUrl('/page');
       const parentTabId = await createTab(serviceWorker, parentUrl, undefined, { active: false });
 
-      // 2. 子タブを作成
       const childUrl = getTestServerUrl('/page2');
       const childTabId = await createTab(serviceWorker, childUrl, parentTabId, { active: false });
 
-      // 3. 孫タブを作成
       const grandchildUrl = getTestServerUrl('/page3');
       const grandchildTabId = await createTab(serviceWorker, grandchildUrl, childTabId, { active: false });
 
-      // 4. ひ孫タブを作成
       const greatGrandchildUrl = getTestServerUrl('/page4');
       const greatGrandchildTabId = await createTab(serviceWorker, greatGrandchildUrl, grandchildTabId, { active: false });
 
-      // 5. 少し待機してtreeStructureが保存されるのを待つ
       await new Promise(resolve => setTimeout(resolve, 500));
-
-      // 6. treeStructureを確認
       interface TreeStructureEntry {
         url: string;
         parentIndex: number | null;
@@ -120,13 +101,10 @@ test.describe('Tree Structure Persistence', () => {
         return treeState?.treeStructure;
       }) as TreeStructureEntry[];
 
-      // 各タブを検索
       const parentEntry = entries(treeStructure, '/page');
       const childEntry = entries(treeStructure, '/page2');
       const grandchildEntry = entries(treeStructure, '/page3');
       const greatGrandchildEntry = entries(treeStructure, '/page4');
-
-      // 親子関係の連鎖を確認
       expect(parentEntry?.parentIndex).toBeNull();
 
       const parentIdx = treeStructure.indexOf(parentEntry!);
@@ -138,20 +116,17 @@ test.describe('Tree Structure Persistence', () => {
       const grandchildIdx = treeStructure.indexOf(grandchildEntry!);
       expect(greatGrandchildEntry?.parentIndex).toBe(grandchildIdx);
 
-      // クリーンアップ
       await closeTab(serviceWorker, greatGrandchildTabId);
       await closeTab(serviceWorker, grandchildTabId);
       await closeTab(serviceWorker, childTabId);
       await closeTab(serviceWorker, parentTabId);
 
       function entries(structure: TreeStructureEntry[], urlPart: string): TreeStructureEntry | undefined {
-        // 完全一致を優先
         const exactMatch = structure.find(e => {
           const urlPath = new URL(e.url).pathname;
           return urlPath === urlPart;
         });
         if (exactMatch) return exactMatch;
-        // 部分一致フォールバック
         return structure.find(e => e.url.includes(urlPart));
       }
     });
@@ -164,7 +139,6 @@ test.describe('Tree Structure Persistence', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. タブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -172,7 +146,6 @@ test.describe('Tree Structure Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // 2. 新しいビューを作成
       const newViewId = 'test-view-' + Date.now();
       await serviceWorker.evaluate(async ({ viewId }) => {
         interface ViewState {
@@ -201,7 +174,6 @@ test.describe('Tree Structure Persistence', () => {
         await chrome.storage.local.set({ tree_state: treeState });
       }, { viewId: newViewId });
 
-      // 3. タブを新しいビューに移動（TreeStateManagerのAPIを使用）
       await serviceWorker.evaluate(async ({ tabId, viewId }) => {
         // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager) {
@@ -214,7 +186,6 @@ test.describe('Tree Structure Persistence', () => {
         }
       }, { tabId, viewId: newViewId });
 
-      // 4. treeStructureのviewIdを確認
       await waitForCondition(
         async () => {
           interface TreeStructureEntry {
@@ -233,7 +204,6 @@ test.describe('Tree Structure Persistence', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'viewId was not saved correctly' }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
     });
 
@@ -245,11 +215,9 @@ test.describe('Tree Structure Persistence', () => {
       const { initialBrowserTabId: _initialBrowserTabId, sidePanelPage: _sidePanelPage, pseudoSidePanelTabId: _pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 親タブと子タブを作成
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
       const childTabId = await createTab(serviceWorker, getTestServerUrl('/page2'), parentTabId, { active: false });
 
-      // 2. 親タブを折りたたむ（isExpanded: false）
       await serviceWorker.evaluate(async ({ tabId }) => {
         interface TreeNode {
           isExpanded: boolean;
@@ -281,7 +249,6 @@ test.describe('Tree Structure Persistence', () => {
         }
       }, { tabId: parentTabId });
 
-      // 3. treeStructureのisExpandedを確認
       await waitForCondition(
         async () => {
           interface TreeStructureEntry {
@@ -300,7 +267,6 @@ test.describe('Tree Structure Persistence', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'isExpanded was not saved correctly' }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, childTabId);
       await closeTab(serviceWorker, parentTabId);
     });
@@ -314,14 +280,12 @@ test.describe('Tree Structure Persistence', () => {
       const windowId = await getCurrentWindowId(serviceWorker);
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 1. 親タブと子タブを作成
       const parentUrl = getTestServerUrl('/page');
       const parentTabId = await createTab(serviceWorker, parentUrl, undefined, { active: false });
 
       const childUrl = getTestServerUrl('/page2');
       const childTabId = await createTab(serviceWorker, childUrl, parentTabId, { active: false });
 
-      // 2. treeStructureが親子関係付きで保存されるのを待つ
       interface TreeStructureEntry {
         url: string;
         parentIndex: number | null;
@@ -352,8 +316,6 @@ test.describe('Tree Structure Persistence', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'treeStructure with parent-child relationship was not saved' }
       );
 
-      // 3. syncWithChromeTabsを呼び出してインデックスベースの復元をテスト
-      // （syncCompletedをリセットして再実行）
       await serviceWorker.evaluate(async () => {
         // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager) {
@@ -364,7 +326,6 @@ test.describe('Tree Structure Persistence', () => {
         }
       });
 
-      // 4. syncWithChromeTabs後もtreeStructureの親子関係が維持されていることを確認
       await waitForCondition(
         async () => {
           const treeStructureAfter = await serviceWorker.evaluate(async () => {
@@ -387,7 +348,6 @@ test.describe('Tree Structure Persistence', () => {
         { timeout: 5000, interval: 100, timeoutMessage: 'Parent-child relationship was not maintained after syncWithChromeTabs' }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, childTabId);
       await closeTab(serviceWorker, parentTabId);
     });

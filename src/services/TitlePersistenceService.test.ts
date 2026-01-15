@@ -2,10 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TitlePersistenceService } from './TitlePersistenceService';
 import type { IStorageService, StorageSchema } from '@/types';
 
-/**
- * TitlePersistenceService のユニットテスト
- */
-
 function createMockStorageService(): IStorageService & {
   mockData: Record<string, unknown>;
 } {

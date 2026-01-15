@@ -11,7 +11,6 @@ import type { StorageChangeListener } from '@/test/test-types';
  * このテストは、フォント設定の変更がサイドパネル全体に正しく適用されることを確認します。
  */
 describe('フォントカスタマイズ機能', () => {
-  // chrome.storage.local のモック
   const mockGet = vi.fn();
   const mockSet = vi.fn();
   let onChangedListeners: StorageChangeListener[] = [];
@@ -19,7 +18,6 @@ describe('フォントカスタマイズ機能', () => {
   beforeEach(() => {
     onChangedListeners = [];
 
-    // グローバルなchromeオブジェクトをモック
     vi.stubGlobal('chrome', {
       storage: {
         local: {
@@ -37,9 +35,7 @@ describe('フォントカスタマイズ機能', () => {
       },
     });
 
-    // chrome.storage.local.setが呼ばれたときにonChangedリスナーをトリガー
     mockSet.mockImplementation(async (items: Record<string, unknown>) => {
-      // 変更通知をトリガー
       const changes: StorageChanges = {};
       for (const key in items) {
         changes[key] = { oldValue: undefined, newValue: items[key] };
@@ -48,13 +44,11 @@ describe('フォントカスタマイズ機能', () => {
       return Promise.resolve();
     });
 
-    // 既存のスタイル要素をクリア
     const existingStyle = document.getElementById('vivaldi-tt-theme');
     if (existingStyle) {
       existingStyle.remove();
     }
 
-    // モックをリセット
     mockGet.mockClear();
     mockSet.mockClear();
   });
@@ -78,7 +72,6 @@ describe('フォントカスタマイズ機能', () => {
       });
 
       const onSettingsChange = vi.fn((settings: UserSettings) => {
-        // 設定変更時にThemeProviderが適用するスタイルをシミュレート
         const style = document.createElement('style');
         style.id = 'vivaldi-tt-theme';
         style.textContent = `
@@ -107,19 +100,13 @@ describe('フォントカスタマイズ機能', () => {
         </ThemeProvider>
       );
 
-      // フォントサイズ入力フィールドを取得
       const fontSizeInput = screen.getByLabelText(/フォントサイズ/i);
-
-      // フォントサイズを18pxに変更
       fireEvent.change(fontSizeInput, { target: { value: '18' } });
-
-      // onSettingsChangeが呼ばれたことを確認
       expect(onSettingsChange).toHaveBeenCalledWith({
         ...defaultSettings,
         fontSize: 18,
       });
 
-      // スタイルが適用されていることを確認
       await waitFor(() => {
         const styleElement = document.getElementById('vivaldi-tt-theme');
         expect(styleElement).toBeTruthy();
@@ -153,7 +140,6 @@ describe('フォントカスタマイズ機能', () => {
         />
       );
 
-      // 「小」ボタンをクリック
       const smallButton = screen.getByText('小');
       fireEvent.click(smallButton);
       expect(onSettingsChange).toHaveBeenCalledWith({
@@ -161,7 +147,6 @@ describe('フォントカスタマイズ機能', () => {
         fontSize: 12,
       });
 
-      // 「中」ボタンをクリック
       const mediumButton = screen.getByText('中');
       fireEvent.click(mediumButton);
       expect(onSettingsChange).toHaveBeenCalledWith({
@@ -169,7 +154,6 @@ describe('フォントカスタマイズ機能', () => {
         fontSize: 14,
       });
 
-      // 「大」ボタンをクリック
       const largeButton = screen.getByText('大');
       fireEvent.click(largeButton);
       expect(onSettingsChange).toHaveBeenCalledWith({
@@ -197,7 +181,6 @@ describe('フォントカスタマイズ機能', () => {
         user_settings: initialSettings,
       });
 
-      // テスト用のコンポーネント: useThemeを使用してThemeProviderと統合
       const TestComponent = () => {
         const { settings, updateSettings } = useTheme();
 
@@ -222,16 +205,13 @@ describe('フォントカスタマイズ機能', () => {
         </ThemeProvider>
       );
 
-      // ThemeProviderが初期化されるまで待つ
       await waitFor(() => {
         expect(screen.getByLabelText(/フォントサイズ/i)).toBeInTheDocument();
       });
 
-      // フォントサイズを20pxに変更
       const fontSizeInput = screen.getByLabelText(/フォントサイズ/i);
       fireEvent.change(fontSizeInput, { target: { value: '20' } });
 
-      // CSS変数が更新されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
@@ -241,7 +221,6 @@ describe('フォントカスタマイズ機能', () => {
         { timeout: 2000 }
       );
 
-      // bodyにフォントサイズが適用されることを確認
       await waitFor(() => {
         const styleElement = document.getElementById('vivaldi-tt-theme');
         expect(styleElement?.textContent).toContain('body {');
@@ -277,15 +256,11 @@ describe('フォントカスタマイズ機能', () => {
         />
       );
 
-      // フォントファミリー入力フィールドを取得
       const fontFamilyInput = screen.getByLabelText(/フォントファミリー/i);
-
-      // フォントファミリーを変更
       fireEvent.change(fontFamilyInput, {
         target: { value: 'Arial, sans-serif' },
       });
 
-      // onSettingsChangeが呼ばれたことを確認
       expect(onSettingsChange).toHaveBeenCalledWith({
         ...defaultSettings,
         fontFamily: 'Arial, sans-serif',
@@ -309,7 +284,6 @@ describe('フォントカスタマイズ機能', () => {
         user_settings: initialSettings,
       });
 
-      // テスト用のコンポーネント: useThemeを使用してThemeProviderと統合
       const TestComponent = () => {
         const { settings, updateSettings } = useTheme();
 
@@ -331,18 +305,15 @@ describe('フォントカスタマイズ機能', () => {
         </ThemeProvider>
       );
 
-      // ThemeProviderが初期化されるまで待つ
       await waitFor(() => {
         expect(screen.getByLabelText(/フォントファミリー/i)).toBeInTheDocument();
       });
 
-      // フォントファミリーを変更
       const fontFamilyInput = screen.getByLabelText(/フォントファミリー/i);
       fireEvent.change(fontFamilyInput, {
         target: { value: 'Comic Sans MS, cursive' },
       });
 
-      // CSS変数が更新されることを確認
       await waitFor(
         () => {
           const styleElement = document.getElementById('vivaldi-tt-theme');
@@ -358,8 +329,6 @@ describe('フォントカスタマイズ機能', () => {
 
   describe('タブタイトルへのフォントサイズ反映', () => {
     it('タブタイトルにtext-smクラスが使用されていないこと', async () => {
-      // このテストは、タブタイトル要素がTailwindのtext-smクラスを使用せず、
-      // CSS変数var(--font-size)を継承することを確認します
       const initialSettings: UserSettings = {
         fontSize: 18,
         fontFamily: 'system-ui',
@@ -376,8 +345,6 @@ describe('フォントカスタマイズ機能', () => {
         user_settings: initialSettings,
       });
 
-      // TreeNodeコンポーネントをレンダリングするテスト
-      // TreeNode.tsxでタブタイトルがtext-smではなくCSS変数を使用することを確認
       const TestComponent = () => {
         const { settings, updateSettings } = useTheme();
 
@@ -405,12 +372,10 @@ describe('フォントカスタマイズ機能', () => {
         </ThemeProvider>
       );
 
-      // ThemeProviderが初期化されるまで待つ
       await waitFor(() => {
         expect(screen.getByLabelText(/フォントサイズ/i)).toBeInTheDocument();
       });
 
-      // CSS変数が正しく設定されていることを確認
       await waitFor(() => {
         const styleElement = document.getElementById('vivaldi-tt-theme');
         expect(styleElement).toBeTruthy();
@@ -418,7 +383,6 @@ describe('フォントカスタマイズ機能', () => {
         expect(styleElement?.textContent).toContain('font-size: var(--font-size)');
       });
 
-      // タブタイトル要素がtext-smクラスを持たないことを確認
       const tabTitle = screen.getByTestId('tab-title-test');
       expect(tabTitle).not.toHaveClass('text-sm');
     });
@@ -448,11 +412,7 @@ describe('フォントカスタマイズ機能', () => {
       );
 
       const fontSizeInput = screen.getByLabelText(/フォントサイズ/i);
-
-      // 範囲外の値（7px）を設定
       fireEvent.change(fontSizeInput, { target: { value: '7' } });
-
-      // onSettingsChangeが呼ばれないことを確認
       expect(onSettingsChange).not.toHaveBeenCalled();
     });
 
@@ -479,11 +439,7 @@ describe('フォントカスタマイズ機能', () => {
       );
 
       const fontSizeInput = screen.getByLabelText(/フォントサイズ/i);
-
-      // 範囲外の値（73px）を設定
       fireEvent.change(fontSizeInput, { target: { value: '73' } });
-
-      // onSettingsChangeが呼ばれないことを確認
       expect(onSettingsChange).not.toHaveBeenCalled();
     });
 
@@ -510,11 +466,7 @@ describe('フォントカスタマイズ機能', () => {
       );
 
       const fontFamilyInput = screen.getByLabelText(/フォントファミリー/i);
-
-      // 空の値を設定
       fireEvent.change(fontFamilyInput, { target: { value: '' } });
-
-      // onSettingsChangeが呼ばれることを確認
       expect(onSettingsChange).toHaveBeenCalledWith({
         ...defaultSettings,
         fontFamily: '',

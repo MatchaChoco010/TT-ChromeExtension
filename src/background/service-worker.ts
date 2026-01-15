@@ -81,7 +81,6 @@ function startPeriodicPersist(): void {
   chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === PERIODIC_PERSIST_ALARM_NAME) {
       try {
-        // refreshTreeStructureは内部でloadStateとpersistStateを呼び出す
         await testTreeStateManager.refreshTreeStructure();
       } catch {
         // 永続化失敗は無視
@@ -111,7 +110,6 @@ chrome.runtime.onInstalled.addListener(async () => {
 
   await initializeAutoSnapshot();
 
-  // 定期的なツリー状態の永続化を開始
   startPeriodicPersist();
 
   // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
@@ -144,7 +142,6 @@ chrome.runtime.onInstalled.addListener(async () => {
 
     await initializeAutoSnapshot();
 
-    // 定期的なツリー状態の永続化を開始
     startPeriodicPersist();
 
     // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）

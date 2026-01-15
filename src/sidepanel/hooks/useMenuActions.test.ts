@@ -81,7 +81,6 @@ describe('useMenuActions', () => {
         .mockResolvedValueOnce({ id: 4 })
         .mockResolvedValueOnce({ id: 5 })
         .mockResolvedValueOnce({ id: 6 });
-      // タブIDに応じて正しいインデックスを返すモック
       chromeMock.tabs.get.mockImplementation(async (tabId: number) => {
         const tabData: Record<number, { id: number; index: number }> = {
           1: { id: 1, index: 0 },
@@ -99,7 +98,6 @@ describe('useMenuActions', () => {
       });
 
       expect(chromeMock.tabs.duplicate).toHaveBeenCalledTimes(3);
-      // sibling設定（デフォルト）の場合はインデックス降順で処理される
       expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(1, 3);
       expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(2, 2);
       expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(3, 1);
@@ -110,7 +108,6 @@ describe('useMenuActions', () => {
         .mockResolvedValueOnce({ id: 4 })
         .mockResolvedValueOnce({ id: 5 })
         .mockResolvedValueOnce({ id: 6 });
-      // タブIDに応じて正しいインデックスを返すモック
       chromeMock.tabs.get.mockImplementation(async (tabId: number) => {
         const tabData: Record<number, { id: number; index: number }> = {
           1: { id: 1, index: 0 },
@@ -123,13 +120,11 @@ describe('useMenuActions', () => {
 
       const { result } = renderHook(() => useMenuActions());
 
-      // 逆順で選択された場合でも
       await act(async () => {
         await result.current.executeAction('duplicate', [3, 2, 1]);
       });
 
       expect(chromeMock.tabs.duplicate).toHaveBeenCalledTimes(3);
-      // 選択順序に関係なく、インデックス降順で処理されるべき
       expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(1, 3);
       expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(2, 2);
       expect(chromeMock.tabs.duplicate).toHaveBeenNthCalledWith(3, 1);

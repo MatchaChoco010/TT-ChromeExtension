@@ -12,7 +12,6 @@ describe('ViewManager', () => {
   let mockTreeStateManager: Partial<TreeStateManager>;
 
   beforeEach(() => {
-    // モックのストレージサービスを作成
     mockStorageService = {
       get: vi.fn().mockResolvedValue(null),
       set: vi.fn().mockResolvedValue(undefined),
@@ -20,7 +19,6 @@ describe('ViewManager', () => {
       onChange: vi.fn().mockReturnValue(() => {}),
     };
 
-    // モックのTreeStateManagerを作成
     mockTreeStateManager = {
       getTree: vi.fn().mockReturnValue([]),
       moveSubtreeToView: vi.fn().mockResolvedValue(undefined),
@@ -32,7 +30,6 @@ describe('ViewManager', () => {
 
   describe('createView', () => {
     it('新しいビューを作成できる', () => {
-      // 新しいビューを作成する
       const view = viewManager.createView('Work', '#ff0000');
 
       expect(view).toBeDefined();
@@ -54,10 +51,9 @@ describe('ViewManager', () => {
     it('ビュー作成時にストレージに永続化される', async () => {
       viewManager.createView('Work', '#ff0000');
 
-      // 非同期処理が完了するまで待機
+      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // ストレージのsetが呼ばれることを確認
       expect(mockStorageService.set).toHaveBeenCalled();
     });
 
@@ -101,7 +97,6 @@ describe('ViewManager', () => {
 
   describe('switchView', () => {
     it('ビューを切り替えられる', () => {
-      // ビュー切り替えUIを操作する
       const view1 = viewManager.createView('Work', '#ff0000');
       const view2 = viewManager.createView('Personal', '#00ff00');
 
@@ -118,10 +113,8 @@ describe('ViewManager', () => {
 
       const beforeSwitch = viewManager.getCurrentView();
 
-      // 存在しないビューIDで切り替えを試みる
       viewManager.switchView('non-existent-view-id');
 
-      // 現在のビューは変更されない
       expect(viewManager.getCurrentView().id).toBe(beforeSwitch.id);
     });
 
@@ -130,10 +123,9 @@ describe('ViewManager', () => {
 
       viewManager.switchView(view.id);
 
-      // 非同期処理が完了するまで待機
+      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // ストレージのsetが呼ばれることを確認
       expect(mockStorageService.set).toHaveBeenCalled();
     });
   });
@@ -172,10 +164,9 @@ describe('ViewManager', () => {
 
       viewManager.deleteView(view.id);
 
-      // 非同期処理が完了するまで待機
+      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // ストレージのsetが呼ばれることを確認
       expect(mockStorageService.set).toHaveBeenCalled();
     });
   });
@@ -213,10 +204,9 @@ describe('ViewManager', () => {
 
       viewManager.updateView(view.id, { name: 'Updated Work' });
 
-      // 非同期処理が完了するまで待機
+      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // ストレージのsetが呼ばれることを確認
       expect(mockStorageService.set).toHaveBeenCalled();
     });
 
@@ -233,7 +223,6 @@ describe('ViewManager', () => {
 
   describe('loadState', () => {
     it('ストレージから状態を復元できる', async () => {
-      // 新しいデータ構造: views: Record<string, ViewState>
       const mockTreeState = {
         views: {
           'view-1': {
@@ -270,15 +259,12 @@ describe('ViewManager', () => {
   });
 
   describe('moveTabToView', () => {
-    // ユーザーがタブを別のビューに移動する
     it('タブを別のビューに移動できる', async () => {
       const view1 = viewManager.createView('Work', '#ff0000');
       const view2 = viewManager.createView('Personal', '#00ff00');
 
-      // moveTabToView メソッドを呼び出す
       await viewManager.moveTabToView(1, view1.id, view2.id);
 
-      // TreeStateManager.moveSubtreeToView が呼ばれることを確認
       expect(mockTreeStateManager.moveSubtreeToView).toHaveBeenCalledWith(1, view2.id);
     });
 
@@ -287,17 +273,14 @@ describe('ViewManager', () => {
 
       await viewManager.moveTabToView(1, view.id, view.id);
 
-      // TreeStateManager.moveSubtreeToView が呼ばれないことを確認
       expect(mockTreeStateManager.moveSubtreeToView).not.toHaveBeenCalled();
     });
 
     it('存在しないビューIDを指定した場合は何もしない', async () => {
       const view = viewManager.createView('Work', '#ff0000');
 
-      // 存在しないビューIDで移動を試みる
       await viewManager.moveTabToView(1, view.id, 'non-existent-view-id');
 
-      // TreeStateManager.moveSubtreeToView が呼ばれないことを確認
       expect(mockTreeStateManager.moveSubtreeToView).not.toHaveBeenCalled();
     });
   });
@@ -308,7 +291,6 @@ describe('ViewManager', () => {
 
       viewManager.getTabsByView(view.id);
 
-      // TreeStateManager.getTree が呼ばれることを確認
       expect(mockTreeStateManager.getTree).toHaveBeenCalledWith(view.id);
     });
   });

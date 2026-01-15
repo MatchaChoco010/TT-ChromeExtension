@@ -483,12 +483,10 @@ describe('useDragDrop', () => {
 
       const props = result.current.getItemProps('node-1', 1);
 
-      // ドラッグ開始
       act(() => {
         props.onMouseDown(createReactMouseEvent(100, 100));
       });
 
-      // アンマウント
       unmount();
 
       expect(removeEventListenerSpy).toHaveBeenCalled();

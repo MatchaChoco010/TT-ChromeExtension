@@ -557,7 +557,6 @@ test.describe('タブ複製時の配置', () => {
       await duplicateItem.click();
       await sidePanelPage.waitForSelector('[role="menu"]', { state: 'hidden', timeout: 3000 });
 
-      // duplicated child2のタブIDを探す（URLが?child2のもの）
       const knownTabIds = [initialBrowserTabId, pseudoSidePanelTabId, parentTabId, child1TabId, child2TabId, grandchildTabId];
       const duplicatedChild2TabId = await serviceWorker.evaluate(async (excludeIds) => {
         const tabs = await chrome.tabs.query({ currentWindow: true });

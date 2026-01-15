@@ -68,7 +68,7 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
             viewId: 'default',
           },
         ],
-        isExpanded: false, // 折りたたまれている
+        isExpanded: false,
         depth: 0,
         viewId: 'default',
       },

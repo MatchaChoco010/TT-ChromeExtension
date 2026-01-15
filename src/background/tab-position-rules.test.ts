@@ -27,9 +27,7 @@ describe('タブ開き方別の位置ルール', () => {
       tabToNode: {},
     });
 
-    // テスト用に内部状態をリセットし、syncCompletedをtrueに設定
     testTreeStateManager.resetForTesting();
-    // ストレージの状態をTreeStateManagerに読み込む
     await testTreeStateManager.loadState();
 
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
@@ -68,7 +66,6 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
       chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
         tabId: 2,
         sourceTabId: 1,
@@ -128,7 +125,6 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
       chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
         tabId: 2,
         sourceTabId: 1,
@@ -218,7 +214,6 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
       chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
         tabId: 2,
         sourceTabId: 1,
@@ -264,9 +259,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
       tabToNode: {},
     });
 
-    // テスト用に内部状態をリセットし、syncCompletedをtrueに設定
     testTreeStateManager.resetForTesting();
-    // ストレージの状態をTreeStateManagerに読み込む
     await testTreeStateManager.loadState();
 
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
@@ -305,7 +298,6 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
       chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
         tabId: 2,
         sourceTabId: 1,
@@ -352,7 +344,6 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // webNavigation.onCreatedNavigationTargetを発火してリンククリックをシミュレート
       chromeMock.webNavigation.onCreatedNavigationTarget.trigger({
         tabId: 2,
         sourceTabId: 1,

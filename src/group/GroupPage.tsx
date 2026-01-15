@@ -61,7 +61,7 @@ export const GroupPage: React.FC = () => {
   }, [tabId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 初回マウント時のデータ読み込みパターン
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadGroupInfo();
   }, [loadGroupInfo]);
 

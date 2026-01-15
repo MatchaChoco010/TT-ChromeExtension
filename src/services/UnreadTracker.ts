@@ -52,9 +52,6 @@ export class UnreadTracker implements IUnreadTracker {
     this.initialLoadComplete = true;
   }
 
-  /**
-   * 起動完了後に開かれたタブを「新規タブ」として識別する
-   */
   isInitialLoadComplete(): boolean {
     return this.initialLoadComplete;
   }

@@ -17,7 +17,6 @@ test.describe('ビューのタブカウント正確性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
@@ -69,7 +68,6 @@ test.describe('ビューのタブカウント正確性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -129,7 +127,6 @@ test.describe('ビューのタブカウント正確性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
@@ -217,7 +214,6 @@ test.describe('ビューのタブカウント正確性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -227,7 +223,6 @@ test.describe('ビューのタブカウント正確性', () => {
         { tabId: normalTabId, depth: 0 },
       ], 0);
 
-      // 2. ストレージにゴーストタブ（存在しないタブID）を直接追加
       const ghostTabId = 99998;
       const ghostNodeId = `ghost-node-${ghostTabId}`;
 
@@ -266,7 +261,6 @@ test.describe('ビューのタブカウント正確性', () => {
         { ghostTabId, ghostNodeId }
       );
 
-      // 3. ゴーストタブがストレージに存在することを確認（ポーリングで待機）
       await waitForCondition(
         async () => {
           const hasGhost = await serviceWorker.evaluate(
@@ -288,7 +282,6 @@ test.describe('ビューのタブカウント正確性', () => {
         }
       );
 
-      // 4. タブカウントを取得（ゴーストタブは実際には存在しないため、カウントに含まれない）
       // viewTabCountsはtabInfoMapに存在するタブのみをカウントするため、
       // ゴーストタブはカウントに含まれないはず
       const getTabCountBadge = async () => {
@@ -300,11 +293,9 @@ test.describe('ビューのタブカウント正確性', () => {
         return 0;
       };
 
-      // 5. サイドパネルをリロードして状態を更新
       await sidePanelPage.reload();
       await waitForViewSwitcher(sidePanelPage);
 
-      // 6. タブカウントがゴーストタブを含まないことを確認
       // (viewTabCountsはtabInfoMapに存在するタブのみをカウント)
       // ゴーストタブはchrome.tabs APIに存在しないため、tabInfoMapに含まれず、
       // したがってviewTabCountsにも含まれない
@@ -320,7 +311,6 @@ test.describe('ビューのタブカウント正確性', () => {
         }
       );
 
-      // 7. ゴーストタブをクリーンアップ
       await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({});
         const existingTabIds = tabs.filter((t) => t.id).map((t) => t.id!);
@@ -346,7 +336,6 @@ test.describe('ビューのタブカウント正確性', () => {
         await chrome.storage.local.set({ tree_state: treeState });
       });
 
-      // 8. クリーンアップ後もタブカウントが正確であることを確認
       await waitForCondition(
         async () => {
           const hasGhost = await serviceWorker.evaluate(
@@ -380,7 +369,6 @@ test.describe('ビューのタブカウント正確性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -399,7 +387,6 @@ test.describe('ビューのタブカウント正確性', () => {
         return 0;
       };
 
-      // 2. タブカウントを取得
       await waitForCondition(
         async () => {
           const count = await getTabCountBadge();
@@ -410,14 +397,12 @@ test.describe('ビューのタブカウント正確性', () => {
 
       const tabCountWithTab = await getTabCountBadge();
 
-      // 3. タブを削除
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // 4. タブカウントが減少したことを確認（ポーリング内で検証）
       await waitForCondition(
         async () => {
           const count = await getTabCountBadge();
@@ -444,7 +429,6 @@ test.describe('タブ数表示の視認性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
@@ -528,7 +512,6 @@ test.describe('タブ数表示の視認性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
@@ -599,7 +582,6 @@ test.describe('タブ数表示の視認性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
@@ -659,7 +641,6 @@ test.describe('タブ数表示の視認性', () => {
       const { sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       await waitForViewSwitcher(sidePanelPage);
 
       // 現在のウィンドウのタブをすべて取得

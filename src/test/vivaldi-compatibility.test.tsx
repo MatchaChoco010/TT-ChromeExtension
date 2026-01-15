@@ -35,7 +35,6 @@ describe('Vivaldi互換性テスト', () => {
       if (keys === null || keys === undefined) {
         Object.assign(result, mockStorage);
       } else if (typeof keys === 'string') {
-        // Single key as string
         if (keys in mockStorage) {
           result[keys] = mockStorage[keys as keyof MockStorageData];
         }

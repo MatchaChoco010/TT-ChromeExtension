@@ -7,6 +7,7 @@ import { setupWindow } from './utils/setup-utils';
 
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 
+// Sets the expanded state of a node in storage by modifying tree_state directly
 async function setNodeExpanded(serviceWorker: Worker, tabId: number, isExpanded: boolean): Promise<void> {
   await serviceWorker.evaluate(async ({ tabId, isExpanded }: { tabId: number; isExpanded: boolean }) => {
     interface TreeState {
@@ -89,7 +90,6 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await hoverOverTab(sidePanelPage, parentTab);
 
-    // 自動展開タイマー（1秒）+ マージン分待機
     await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 1000);
 
     const childTabSelector = `[data-testid="tree-node-${childTab}"]`;
@@ -183,12 +183,10 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await hoverOverTab(sidePanelPage, parentTab);
 
-    // Reactの状態更新を待機
     await sidePanelPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
     await hoverOverTab(sidePanelPage, anotherTab);
 
-    // Reactの状態更新を待機
     await sidePanelPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
     const viewport = sidePanelPage.viewportSize() || { width: 400, height: 600 };
@@ -196,7 +194,6 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await dropTab(sidePanelPage);
 
-    // 自動展開タイマーの時間が経過するまで待機
     await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 500);
 
     await assertTabStructure(sidePanelPage, windowId, [
@@ -216,8 +213,6 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // level0 (ルートレベル)
-    //   └─ level1
     const level0 = await createTab(serviceWorker, 'data:text/html,<h1>Level0</h1>');
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -268,7 +263,6 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await hoverOverTab(sidePanelPage, level0);
 
-    // 自動展開タイマー（1秒）+ マージン分待機
     await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 1000);
 
     const level1Selector = `[data-testid="tree-node-${level1}"]`;

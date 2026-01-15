@@ -46,16 +46,13 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // ピン留めタブセクションが表示されること
       const section = screen.getByTestId('pinned-tabs-section');
       expect(section).toBeInTheDocument();
 
-      // 3つのピン留めタブが表示されること
       expect(screen.getByTestId('pinned-tab-1')).toBeInTheDocument();
       expect(screen.getByTestId('pinned-tab-2')).toBeInTheDocument();
       expect(screen.getByTestId('pinned-tab-3')).toBeInTheDocument();
 
-      // 横並びのグリッドレイアウトであること
       expect(section).toHaveClass('flex', 'flex-wrap');
     });
 
@@ -131,9 +128,7 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // セクションが表示されないこと
       expect(screen.queryByTestId('pinned-tabs-section')).not.toBeInTheDocument();
-      // 区切り線も表示されないこと
       expect(screen.queryByTestId('pinned-tabs-separator')).not.toBeInTheDocument();
     });
   });
@@ -179,14 +174,11 @@ describe('PinnedTabsSection', () => {
 
       const pinnedTab = screen.getByTestId('pinned-tab-1');
 
-      // 初期状態では閉じるボタンは表示されない
       expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
 
-      // ホバーしても閉じるボタンは表示されない
       await user.hover(pinnedTab);
       expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
 
-      // ホバーを外しても閉じるボタンは表示されない
       await user.unhover(pinnedTab);
       expect(screen.queryByTestId('pinned-tab-1-close-button')).not.toBeInTheDocument();
     });
@@ -205,7 +197,6 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // 閉じるボタンが存在しないことを確認
       expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument();
     });
   });
@@ -235,7 +226,6 @@ describe('PinnedTabsSection', () => {
       const pinnedTabIds = [1, 2, 3];
       const tabInfoMap: TabInfoMap = {
         1: createMockTabInfo(1, 'Tab 1', true),
-        // 2 is missing
         3: createMockTabInfo(3, 'Tab 3', true),
       };
 
@@ -271,11 +261,9 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // タブ2のみがアクティブスタイル（bg-gray-600）を持つこと
       const pinnedTab2 = screen.getByTestId('pinned-tab-2');
       expect(pinnedTab2).toHaveClass('bg-gray-600');
 
-      // 他のタブはアクティブスタイルを持たないこと
       const pinnedTab1 = screen.getByTestId('pinned-tab-1');
       const pinnedTab3 = screen.getByTestId('pinned-tab-3');
       expect(pinnedTab1).not.toHaveClass('bg-gray-600');
@@ -316,7 +304,7 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          activeTabId={999} // 存在しないタブID
+          activeTabId={999}
         />
       );
 
@@ -345,12 +333,10 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // bg-gray-600クラスを持つ要素を数える
       const section = screen.getByTestId('pinned-tabs-section');
       const highlightedTabs = section.querySelectorAll('.bg-gray-600');
       expect(highlightedTabs).toHaveLength(1);
 
-      // タブ3のみがハイライトされていること
       expect(screen.getByTestId('pinned-tab-3')).toHaveClass('bg-gray-600');
     });
   });
@@ -398,7 +384,6 @@ describe('PinnedTabsSection', () => {
 
       const pinnedTab = screen.getByTestId('pinned-tab-1');
 
-      // エラーが発生しないことを確認
       await expect(user.pointer({ target: pinnedTab, keys: '[MouseRight]' })).resolves.not.toThrow();
     });
   });
@@ -427,7 +412,6 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // 各ピン留めタブがdata-sortable属性を持つこと（ドラッグ可能であることを示す）
       const pinnedTab1 = screen.getByTestId('pinned-tab-1');
       const pinnedTab2 = screen.getByTestId('pinned-tab-2');
       const pinnedTab3 = screen.getByTestId('pinned-tab-3');
@@ -449,11 +433,9 @@ describe('PinnedTabsSection', () => {
           pinnedTabIds={pinnedTabIds}
           tabInfoMap={tabInfoMap}
           onTabClick={mockOnTabClick}
-          // onPinnedTabReorder is not provided
         />
       );
 
-      // ドラッグ可能属性がないこと
       const pinnedTab1 = screen.getByTestId('pinned-tab-1');
       expect(pinnedTab1).not.toHaveAttribute('data-sortable', 'true');
     });
@@ -466,8 +448,6 @@ describe('PinnedTabsSection', () => {
         3: createMockTabInfo(3, 'Tab 3', true),
       };
 
-      // 内部のドラッグ&ドロップハンドラをシミュレートするためのラッパーが必要
-      // ここではpropsの型をテスト
       render(
         <PinnedTabsSection
           pinnedTabIds={pinnedTabIds}
@@ -477,11 +457,9 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // コンポーネントがレンダリングされることを確認
       const section = screen.getByTestId('pinned-tabs-section');
       expect(section).toBeInTheDocument();
 
-      // onPinnedTabReorderが関数として渡されていることを確認
       expect(typeof mockOnPinnedTabReorder).toBe('function');
     });
 
@@ -502,8 +480,6 @@ describe('PinnedTabsSection', () => {
         />
       );
 
-      // 各ピン留めタブがpinned-プレフィックスのIDを持つこと
-      // これによりピン留めセクション外へのドロップを防止できる
       const pinnedTab1 = screen.getByTestId('pinned-tab-1');
       expect(pinnedTab1).toHaveAttribute('data-pinned-id', 'pinned-1');
     });
