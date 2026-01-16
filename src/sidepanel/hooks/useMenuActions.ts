@@ -25,7 +25,11 @@ export const useMenuActions = () => {
               payload: { tabIds },
             });
           } else {
-            await chrome.tabs.remove(tabIds);
+            // 単一タブの場合もServiceWorker経由
+            await chrome.runtime.sendMessage({
+              type: 'CLOSE_TAB',
+              payload: { tabId: tabIds[0] },
+            });
           }
           break;
 
@@ -37,15 +41,10 @@ export const useMenuActions = () => {
           break;
 
         case 'closeOthers':
-          {
-            const allTabs = await chrome.tabs.query({ currentWindow: true });
-            const tabIdsToClose = allTabs
-              .filter((tab) => tab.id && !tabIds.includes(tab.id))
-              .map((tab) => tab.id!);
-            if (tabIdsToClose.length > 0) {
-              await chrome.tabs.remove(tabIdsToClose);
-            }
-          }
+          await chrome.runtime.sendMessage({
+            type: 'CLOSE_OTHER_TABS',
+            payload: { excludeTabIds: tabIds },
+          });
           break;
 
         case 'duplicate':
@@ -55,126 +54,46 @@ export const useMenuActions = () => {
               payload: { tabId: tabIds[0] },
             });
           } else {
-            const settingsResult = await chrome.storage.local.get('user_settings');
-            const duplicateTabPosition = settingsResult.user_settings?.duplicateTabPosition ?? 'sibling';
-
-            // 複数タブを複製する際、各タブのインデックスを事前に取得してソート
-            // sibling設定の場合は逆順で処理することで、前のタブのインデックスに影響を与えない
-            const tabsWithIndex = await Promise.all(
-              tabIds.map(async (tabId) => {
-                const tab = await chrome.tabs.get(tabId);
-                return { tabId, index: tab.index };
-              })
-            );
-
-            tabsWithIndex.sort((a, b) => a.index - b.index);
-
-            const orderedTabs = duplicateTabPosition === 'sibling'
-              ? [...tabsWithIndex].reverse()
-              : tabsWithIndex;
-
-            for (const { tabId } of orderedTabs) {
-              await chrome.runtime.sendMessage({
-                type: 'REGISTER_DUPLICATE_SOURCE',
-                payload: { sourceTabId: tabId },
-              });
-
-              const duplicatedTab = await chrome.tabs.duplicate(tabId);
-
-              if (duplicatedTab?.id) {
-                if (duplicateTabPosition === 'end') {
-                  await chrome.tabs.move(duplicatedTab.id, { index: -1 });
-                } else if (duplicateTabPosition === 'sibling') {
-                  const originalTab = await chrome.tabs.get(tabId);
-                  await chrome.tabs.move(duplicatedTab.id, { index: originalTab.index + 1 });
-                }
-              }
-            }
+            await chrome.runtime.sendMessage({
+              type: 'DUPLICATE_TABS',
+              payload: { tabIds },
+            });
           }
           break;
 
         case 'pin':
-          for (const tabId of tabIds) {
-            await chrome.tabs.update(tabId, { pinned: true });
-          }
+          await chrome.runtime.sendMessage({
+            type: 'PIN_TABS',
+            payload: { tabIds },
+          });
           break;
 
         case 'unpin':
-          for (const tabId of tabIds) {
-            await chrome.tabs.update(tabId, { pinned: false });
-          }
+          await chrome.runtime.sendMessage({
+            type: 'UNPIN_TABS',
+            payload: { tabIds },
+          });
           break;
 
         case 'newWindow':
-          {
-            const sourceTab = await chrome.tabs.get(tabIds[0]);
-            const sourceWindowId = sourceTab.windowId;
-
-            const newWindow = await chrome.windows.create({ tabId: tabIds[0] });
-
-            if (tabIds.length > 1 && newWindow.id) {
-              await chrome.tabs.move(tabIds.slice(1), { windowId: newWindow.id, index: -1 });
-            }
-
-            const movedTabIds = new Set(tabIds);
-            const remainingTabs = await chrome.tabs.query({ windowId: sourceWindowId });
-            const actualRemainingTabs = remainingTabs.filter(
-              (tab) => tab.id !== undefined && !movedTabIds.has(tab.id)
-            );
-
-            if (actualRemainingTabs.length === 0) {
-              try {
-                await chrome.windows.remove(sourceWindowId);
-              } catch {
-                // ウィンドウが既に閉じられている場合のエラーは無視
-              }
-            }
-          }
+          await chrome.runtime.sendMessage({
+            type: 'MOVE_TABS_TO_NEW_WINDOW',
+            payload: { tabIds },
+          });
           break;
 
         case 'reload':
-          for (const tabId of tabIds) {
-            await chrome.tabs.reload(tabId);
-          }
+          await chrome.runtime.sendMessage({
+            type: 'RELOAD_TABS',
+            payload: { tabIds },
+          });
           break;
 
         case 'discard':
-          {
-            const tabs = await chrome.tabs.query({ currentWindow: true });
-            const activeTab = tabs.find(tab => tab.active);
-            const tabIdSet = new Set(tabIds);
-
-            // アクティブタブは休止できないため、先に別のタブをアクティブにする
-            if (activeTab?.id && tabIdSet.has(activeTab.id)) {
-              const alternativeTab = tabs.find(tab =>
-                tab.id &&
-                !tabIdSet.has(tab.id) &&
-                !tab.discarded &&
-                !tab.pinned
-              );
-
-              const alternativeTabWithPinned = alternativeTab ?? tabs.find(tab =>
-                tab.id &&
-                !tabIdSet.has(tab.id) &&
-                !tab.discarded
-              );
-
-              if (alternativeTabWithPinned?.id) {
-                await chrome.tabs.update(alternativeTabWithPinned.id, { active: true });
-              }
-            }
-
-            for (const tabId of tabIds) {
-              try {
-                const tab = await chrome.tabs.get(tabId);
-                if (!tab.active) {
-                  await chrome.tabs.discard(tabId);
-                }
-              } catch {
-                // タブが既に休止されている場合などはエラーを無視
-              }
-            }
-          }
+          await chrome.runtime.sendMessage({
+            type: 'DISCARD_TABS',
+            payload: { tabIds },
+          });
           break;
 
         case 'group':
@@ -198,11 +117,6 @@ export const useMenuActions = () => {
         case 'copyUrl':
           if (options?.url) {
             await navigator.clipboard.writeText(options.url);
-          } else if (tabIds.length === 1) {
-            const tab = await chrome.tabs.get(tabIds[0]);
-            if (tab.url) {
-              await navigator.clipboard.writeText(tab.url);
-            }
           }
           break;
 

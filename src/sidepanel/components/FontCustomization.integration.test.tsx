@@ -33,6 +33,9 @@ describe('フォントカスタマイズ機能', () => {
           }),
         },
       },
+      runtime: {
+        sendMessage: vi.fn().mockResolvedValue(undefined),
+      },
     });
 
     mockSet.mockImplementation(async (items: Record<string, unknown>) => {

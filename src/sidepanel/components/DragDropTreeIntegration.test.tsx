@@ -155,17 +155,18 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
       await testHandleDragEnd!(dragEndEvent);
     });
 
-    await waitFor(() => {
-      expect(chrome.storage.local.set).toHaveBeenCalled();
-    });
-
     const mockChrome = getMockChrome();
-    const setCall = mockChrome.storage.local.set.mock.calls[0];
-    expect(setCall).toBeDefined();
-    const savedState = setCall[0].tree_state as TreeState;
-    expect(savedState).toBeDefined();
-    expect(savedState.views['default'].nodes['node-2'].parentId).toBe('node-1');
-    expect(savedState.views['default'].nodes['node-2'].depth).toBe(1);
+    await waitFor(() => {
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'MOVE_NODE',
+        payload: {
+          nodeId: 'node-2',
+          targetParentId: 'node-1',
+          viewId: 'default',
+          selectedNodeIds: [],
+        },
+      });
+    });
   });
 
   it('タブを同階層で順序変更できる', async () => {
@@ -212,17 +213,18 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
       await testHandleDragEnd!(dragEndEvent);
     });
 
-    await waitFor(() => {
-      expect(chrome.storage.local.set).toHaveBeenCalled();
-    });
-
     const mockChrome = getMockChrome();
-    const setCall = mockChrome.storage.local.set.mock.calls[0];
-    expect(setCall).toBeDefined();
-    const savedState = setCall[0].tree_state as TreeState;
-    expect(savedState).toBeDefined();
-    expect(savedState.views['default'].nodes['node-3'].parentId).toBe('node-2');
-    expect(savedState.views['default'].nodes['node-3'].depth).toBe(1);
+    await waitFor(() => {
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'MOVE_NODE',
+        payload: {
+          nodeId: 'node-3',
+          targetParentId: 'node-2',
+          viewId: 'default',
+          selectedNodeIds: [],
+        },
+      });
+    });
   });
 
   it('循環参照を防ぐ', async () => {
@@ -315,7 +317,17 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
       await testHandleDragEnd!(dragEndEvent);
     });
 
-    await new Promise(resolve => setTimeout(resolve, 100));
-    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    // 循環参照チェックはServiceWorker側で行われるため、メッセージは送信される
+    await waitFor(() => {
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'MOVE_NODE',
+        payload: {
+          nodeId: 'node-1',
+          targetParentId: 'node-2',
+          viewId: 'default',
+          selectedNodeIds: [],
+        },
+      });
+    });
   });
 });

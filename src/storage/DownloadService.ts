@@ -39,28 +39,56 @@ export class DownloadService implements IDownloadService {
 
   /**
    * ダウンロードが完了するまで待機
+   *
+   * レースコンディション対策:
+   * リスナーを先に追加してから状態を確認することで、
+   * 「状態確認→リスナー追加」の間にダウンロードが完了するケースを防ぐ
    */
-  private waitForDownloadComplete(downloadId: number): Promise<void> {
+  private async waitForDownloadComplete(downloadId: number): Promise<void> {
     return new Promise((resolve, reject) => {
-      const listener = (
-        delta: chrome.downloads.DownloadDelta,
-      ) => {
-        if (delta.id !== downloadId) return;
+      let resolved = false;
+
+      const cleanup = () => {
+        chrome.downloads.onChanged.removeListener(listener);
+      };
+
+      const listener = (delta: chrome.downloads.DownloadDelta) => {
+        if (delta.id !== downloadId || resolved) return;
 
         if (delta.state?.current === 'complete') {
-          chrome.downloads.onChanged.removeListener(listener);
+          resolved = true;
+          cleanup();
           resolve();
         } else if (delta.state?.current === 'interrupted') {
-          chrome.downloads.onChanged.removeListener(listener);
+          resolved = true;
+          cleanup();
           reject(new Error(`Download interrupted: ${delta.error?.current || 'Unknown error'}`));
         }
       };
 
+      // リスナーを先に追加
       chrome.downloads.onChanged.addListener(listener);
+
+      // リスナー追加後に現在の状態を確認（既に完了している場合への対応）
+      chrome.downloads.search({ id: downloadId }).then(([item]) => {
+        if (resolved) return;
+
+        if (item?.state === 'complete') {
+          resolved = true;
+          cleanup();
+          resolve();
+        } else if (item?.state === 'interrupted') {
+          resolved = true;
+          cleanup();
+          reject(new Error(`Download interrupted: ${item.error || 'Unknown error'}`));
+        }
+      });
 
       // タイムアウト設定（30秒）
       setTimeout(() => {
-        chrome.downloads.onChanged.removeListener(listener);
+        if (resolved) return;
+        resolved = true;
+        cleanup();
         reject(new Error('Download timed out'));
       }, 30000);
     });

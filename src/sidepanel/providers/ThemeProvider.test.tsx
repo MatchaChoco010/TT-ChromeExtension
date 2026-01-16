@@ -376,8 +376,9 @@ describe('ThemeProvider', () => {
       });
 
       await waitFor(() => {
-        expect(chromeMock.storage.local.set).toHaveBeenCalledWith({
-          user_settings: expect.objectContaining({ fontSize: 20 }),
+        expect(chromeMock.runtime.sendMessage).toHaveBeenCalledWith({
+          type: 'SAVE_USER_SETTINGS',
+          payload: { settings: expect.objectContaining({ fontSize: 20 }) },
         });
       });
     });

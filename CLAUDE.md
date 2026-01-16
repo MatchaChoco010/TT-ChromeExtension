@@ -216,6 +216,27 @@ Chrome Extension Manifest V3アーキテクチャ。Service WorkerとSide Panel�
 
 保守性を最優先。ほとんど発生しない競合状態や異常系に対して複雑なロジックを追加しない。
 
+**本番コードでの例外の握りつぶし禁止（必須）**:
+- `.catch(() => {})` や `try { } catch { }` で例外を握りつぶすことは本番コードでは禁止
+- **異常系で例外が発生する場合**: 握りつぶさずに素通しする。これにより問題を検知しやすくなる
+- **正常系で例外が発生する場合**: 適切にハンドルする（ログ出力、フォールバック値の返却など）
+
+```typescript
+// ❌ 禁止: 例外の握りつぶし
+await someOperation().catch(() => {});
+
+// ✅ 正しい: 異常系の例外は素通し
+await someOperation();
+
+// ✅ 正しい: 正常系の例外は適切にハンドル
+try {
+  await someOperation();
+} catch (error) {
+  logger.warn('Operation failed, using fallback', error);
+  return fallbackValue;
+}
+```
+
 ### リファクタリング規約（必須）
 
 **原則: 修正量を減らすために「あるべきコードの姿」を歪めてはならない**
@@ -506,6 +527,40 @@ npm run test:e2e 2>&1 | tee /tmp/e2e-test.log
 - `0 failed` であることを必ず確認する
 - passed数だけを見て判断してはいけない（テスト総数が変動するため）
 
+#### 複数回実行時のログ保存（必須）
+
+フレーキーテスト確認のために複数回実行する場合、**各実行のログを個別ファイルに保存**すること。
+
+```bash
+# ✅ 正しい: 各実行のログを個別ファイルに保存
+for i in {1..10}; do
+  npm run test:e2e 2>&1 | tee e2e-run-$i.log
+  grep -E "failed|passed" e2e-run-$i.log
+done
+
+# ✅ 正しい: 失敗が見つかったら保存済みログから調査
+# 例: Run 3で失敗した場合
+grep -B30 "failed" e2e-run-3.log  # エラー詳細を確認
+```
+
+```bash
+# ❌ 禁止: ログを保存せずにサマリーだけを収集
+for i in {1..10}; do
+  npm run test:e2e 2>&1 | grep -E "passed|failed"
+done
+
+# ❌ 禁止: 失敗を検知しても詳細を追跡できない方法
+for i in {1..10}; do
+  echo "Run $i: $(npm run test:e2e 2>&1 | tail -1)"
+done
+```
+
+**失敗時の調査ワークフロー**:
+1. 失敗が発生したら、保存済みのログファイルから詳細を確認する
+2. エラーメッセージ、スタックトレース、失敗したテスト名を特定する
+3. 確率的に再現しない失敗でも、最初に保存したログから原因を調査できる状態にする
+4. ログを保存せずに実行して失敗した場合、調査に必要な情報が失われる
+
 ---
 
 ## 機能追加時の必須要件
@@ -539,6 +594,75 @@ npm run test:e2e   # Playwright E2Eテスト
 
 ## Key Technical Decisions
 
+### 状態管理アーキテクチャ（最重要）
+
+**TreeStateManager（Service Worker）がSingle Source of Truth**
+
+すべての状態変更は以下のフローに従う：
+
+```
+Action（UI操作/Chromeイベント）
+    │
+    ▼
+Service Worker (event-handlers.ts)
+    │
+    ▼
+TreeStateManager
+    │
+    ├──→ メモリ上の状態を変更（純粋な状態変更）
+    │    ※例外: addTab/duplicateTabのみtabId取得のためChrome API呼び出し
+    │
+    ├──→ syncTreeStateToChromeTabs() → Chrome APIs
+    │         TreeStateManagerの状態を正として、Chromeタブを同期
+    │         - 順序（chrome.tabs.move）
+    │         - ピン留め（chrome.tabs.update({pinned})）
+    │         - ウィンドウ配置（chrome.tabs.move({windowId})）
+    │
+    ├──→ persistState() → chrome.storage.local (永続化)
+    │
+    └──→ sendMessage({ type: 'STATE_UPDATED', payload: state })
+              │
+              ▼
+         Side Panel (React state更新 → UI再レンダリング)
+```
+
+**原則**:
+1. **TreeStateManager（Service Worker）がSingle Source of Truth**
+2. **TreeStateManagerのメソッドは純粋にメモリ上の状態変更のみ**（addTab/duplicateTabのみ例外：tabIdを得るためChrome APIが必要）
+3. **`syncTreeStateToChromeTabs()`でChromeタブの状態をTreeStateManagerに合わせる** - 順序、ピン留め、ウィンドウ配置など全てを同期
+4. **Chrome APIを直接呼ぶのはsyncメソッド内のみ**（addTab/duplicateTabの例外を除く）
+5. chrome.storage.localは永続化専用（ブラウザ再起動時の復元用）
+6. リアルタイム同期にはメッセージの引数（payload）を使用
+7. Side Panelは読み取り専用（状態変更はService Workerにメッセージを送信）
+
+**Side Panel側の禁止事項**:
+- `chrome.storage.local.set()`を直接呼び出すこと
+- `chrome.tabs.move()`、`chrome.tabs.update()`、`chrome.tabs.create()`を直接呼び出すこと
+- `chrome.windows.create()`を直接呼び出すこと
+- TreeStateManagerを経由しない状態変更
+
+**ServiceWorker側の禁止事項**:
+- イベントハンドラから直接`chrome.tabs.move()`、`chrome.tabs.update({pinned})`、`chrome.windows.create()`を呼び出すこと
+- これらの操作はTreeStateManagerのメソッドでメモリ状態を変更後、`syncTreeStateToChromeTabs()`で一括反映する
+
+**理由**: Side PanelとService Workerは別プロセスで動作する。共有メモリ（chrome.storage.local）を介した非同期処理はレースコンディションの温床となる。
+
+### chrome.storage.localの役割
+
+**永続化専用**（ブラウザ再起動時の状態復元のため）
+
+| 用途 | 使用するもの |
+|------|-------------|
+| 永続化（再起動時の復元） | chrome.storage.local |
+| リアルタイム同期（状態変更通知） | メッセージの引数（payload） |
+
+**リアルタイム同期でストレージを使わない理由**:
+- 「書き込み → 通知 → 読み込み」の間に別の書き込みが入る可能性
+- 複数の非同期処理が同時に走るとレースコンディションが発生
+- メッセージと状態の1対1対応が保証されない
+
+### その他の技術決定
+
 - **Vite + @crxjs/vite-plugin**: 高速HMRと拡張機能ビルド両立
 - **chrome.downloads API**: スナップショットをJSONファイルとしてダウンロードフォルダに保存
 - **Service Worker**: バックグラウンドでのタブイベント監視とツリー同期
@@ -547,8 +671,8 @@ npm run test:e2e   # Playwright E2Eテスト
 - **ウィンドウ間タブ移動**: コンテキストメニューから「別のウィンドウに移動」「新しいウィンドウに移動」で実現
 - **リンククリック検出**: `chrome.webNavigation.onCreatedNavigationTarget` APIを使用。このAPIはリンククリックまたは`window.open()`の場合のみ発火し、`chrome.tabs.create()`・ブックマーク・アドレスバー・Ctrl+Tでは発火しない。これにより「リンクから開いたタブ」と「手動で開いたタブ」を正確に区別し、それぞれの設定（`newTabPositionFromLink` / `newTabPositionManual`）を適用する
 - **ストレージ設計**: `chrome.storage.local`を使用（`unlimitedStorage`権限あり）。IndexedDBは使用しない。想定最大タブ数は2500。15秒ごとの定期永続化でブラウザクラッシュ時のデータロスを最小化。ファビコンはURL文字列（またはdata:URL）として保存
-- **タブ休止（discard）時のtabId変更**: `chrome.tabs.discard()`でタブを休止すると、ChromeはtabIdを変更する。この変更は`chrome.tabs.onReplaced`イベントで検知する。`onReplaced(addedTabId, removedTabId)`が発火したら、ツリー状態内の旧tabIdを新tabIdに置き換える。複数タブを同時に休止する場合は競合状態が発生するため、キューで直列化処理する
-- **ツリービュー→Chrome一方通行同期**: タブの順序・構造はツリービューが常に正（Single Source of Truth）。Chrome側でタブを直接操作（D&D、ピン留め解除など）した場合、ツリービューの状態をChromeに再同期して元に戻す。これにより、Chrome側操作での親子関係やビュー整合性の破綻を防ぐ
+- **タブ休止（discard）時のtabId変更**: `chrome.tabs.discard()`でタブを休止すると、ChromeはtabIdを変更する。この変更は`chrome.tabs.onReplaced`イベントで検知する。`onReplaced(addedTabId, removedTabId)`が発火したら、TreeStateManagerで旧tabIdを新tabIdに置き換える。Service Worker内ではイベントハンドラが逐次実行されるため、明示的なキューは不要
+- **TreeStateManager→UI/Chrome一方通行同期**: タブの順序・構造はTreeStateManager（Service Worker）が常に正（Single Source of Truth）。Chrome側でタブを直接操作（D&D、ピン留め解除など）した場合、TreeStateManagerの状態をChromeに再同期して元に戻す。これにより、Chrome側操作での親子関係やビュー整合性の破綻を防ぐ
 
 ---
 
@@ -667,6 +791,39 @@ npm run test:e2e   # Playwright E2Eテスト
 - 修正前後でログを比較し、期待通りのデータフローになっているか確認する
 - 修正を一部だけ適用して、どの部分が効果的かを切り分ける
 - 問題の再現テストを複数回実行し、統計的に有意な結果を得る
+
+## 3.5 推測と検証の精度に関する必須要件（最重要）
+
+試行錯誤ループ自体は禁止しないが、**推測の精度が十分でない状態での検証は禁止する**。
+
+### 禁止されるパターン
+
+1. **表面的な挙動だけからの推測**
+   - ❌「タイムアウトしてるからイベント発火が遅いのかも」
+   - ✅ コードパスを追跡し「この行でこの値がこうなるからタイムアウトする」と特定
+
+2. **「気になったから試す」**
+   - ❌ コードを見て気になる箇所があったから変更して実行
+   - ✅ コードパスを完全に理解し「ここでバグが起きるはず」という確信を得てから検証
+
+3. **テスト結果の統計で判断**
+   - 「10回中1回→2回になったので悪化」は統計的に無意味
+   - 「失敗率が改善した」は根本解決の証明にならない
+   - 判断基準：**失敗が1回でもあれば未解決。0回でも原因不明なら未解決**
+
+### 推測前の必須調査プロセス
+
+1. **観察**: ログ追加・デバッガ等で、問題発生時に**実際に何が起きているか**を記録する
+2. **追跡**: 問題が発生するコードパスを**完全に**追跡し、各ステップで変数・状態がどう変化するかを理解する
+3. **特定**: 「この行で、この条件で、この値になるから問題が起きる」と言えるまで調査する
+4. **説明**: **「なぜそうなるか」を論理的に説明できる状態**になってから、初めて修正を検討する
+
+### 検証の正しい手順
+
+1. 原因を特定し、**なぜその原因で問題が起きるか**を説明できる
+2. 修正内容が**なぜその原因を解決するか**を説明できる
+3. その状態で初めて修正コードを書き、テストで確認する
+4. テストが通っても、上記の説明ができなければ**未解決として扱う**
 
 ## 4. デバッグ用コードの管理を徹底する
 

@@ -48,26 +48,26 @@ export class ChromeMock {
   tabs = {
     onCreated: new MockEvent<(tab: chrome.tabs.Tab) => void>(),
     onRemoved: new MockEvent<
-      (tabId: number, removeInfo: chrome.tabs.TabRemoveInfo) => void
+      (tabId: number, removeInfo: chrome.tabs.OnRemovedInfo) => void
     >(),
     onMoved: new MockEvent<
-      (tabId: number, moveInfo: chrome.tabs.TabMoveInfo) => void
+      (tabId: number, moveInfo: chrome.tabs.OnMovedInfo) => void
     >(),
     onUpdated: new MockEvent<
       (
         tabId: number,
-        changeInfo: chrome.tabs.TabChangeInfo,
+        changeInfo: chrome.tabs.OnUpdatedInfo,
         tab: chrome.tabs.Tab,
       ) => void
     >(),
     onActivated: new MockEvent<
-      (activeInfo: chrome.tabs.TabActiveInfo) => void
+      (activeInfo: chrome.tabs.OnActivatedInfo) => void
     >(),
     onDetached: new MockEvent<
-      (tabId: number, detachInfo: chrome.tabs.TabDetachInfo) => void
+      (tabId: number, detachInfo: chrome.tabs.OnDetachedInfo) => void
     >(),
     onAttached: new MockEvent<
-      (tabId: number, attachInfo: chrome.tabs.TabAttachInfo) => void
+      (tabId: number, attachInfo: chrome.tabs.OnAttachedInfo) => void
     >(),
     onReplaced: new MockEvent<
       (addedTabId: number, removedTabId: number) => void

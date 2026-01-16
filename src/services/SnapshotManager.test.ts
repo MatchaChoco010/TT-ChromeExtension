@@ -38,6 +38,7 @@ describe('SnapshotManager', () => {
     viewOrder: ['default'],
     currentViewId: 'default',
     tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
+    treeStructure: [],
   };
 
   const mockSettings: UserSettings = {

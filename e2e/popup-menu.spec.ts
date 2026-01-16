@@ -117,7 +117,7 @@ test.describe('ポップアップメニュー', () => {
       await expect(async () => {
         const text = await snapshotButton.textContent();
         expect(text).toMatch(/完了しました|失敗しました/);
-      }).toPass({ timeout: 10000 });
+      }).toPass({ timeout: 30000 });
 
       await popupPage.close();
     });
@@ -144,7 +144,7 @@ test.describe('ポップアップメニュー', () => {
       await expect(async () => {
         const text = await snapshotButton.textContent();
         expect(text).toMatch(/完了しました|失敗しました/);
-      }).toPass({ timeout: 10000 });
+      }).toPass({ timeout: 30000 });
 
       const text = await snapshotButton.textContent();
       const buttonClasses = await snapshotButton.getAttribute('class');

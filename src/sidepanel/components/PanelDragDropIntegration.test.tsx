@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { act } from 'react';
-import type { TreeState, DragEndEvent } from '@/types';
+import type { DragEndEvent } from '@/types';
 import { getMockChrome } from '@/test/test-types';
 
 function IntegrationTestComponent() {
@@ -209,15 +209,18 @@ describe('パネル内D&Dの統合テスト', () => {
 
       const mockChrome = getMockChrome();
       await waitFor(() => {
-        expect(chrome.storage.local.set).toHaveBeenCalled();
-        const lastCall = mockChrome.storage.local.set.mock.calls.slice(-1)[0];
-        if (lastCall && lastCall[0]?.tree_state) {
-          const updatedNodes = (lastCall[0].tree_state as TreeState).views['default'].nodes;
-          expect(updatedNodes['node-2'].parentId).toBe('node-1');
-        }
+        expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
+          type: 'MOVE_NODE',
+          payload: {
+            nodeId: 'node-2',
+            targetParentId: 'node-1',
+            viewId: 'default',
+            selectedNodeIds: [],
+          },
+        });
       });
 
-      vi.mocked(chrome.storage.local.set).mockClear();
+      vi.mocked(sendMessageMock).mockClear();
 
       // Step 2: Reorder tabs within same level
       const dragEndEvent2 = {
@@ -242,7 +245,15 @@ describe('パネル内D&Dの統合テスト', () => {
       });
 
       await waitFor(() => {
-        expect(chrome.storage.local.set).toHaveBeenCalled();
+        expect(sendMessageMock).toHaveBeenCalledWith({
+          type: 'MOVE_NODE',
+          payload: {
+            nodeId: 'node-3',
+            targetParentId: 'node-1',
+            viewId: 'default',
+            selectedNodeIds: [],
+          },
+        });
       });
     });
 
@@ -287,14 +298,16 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
-      const mockChrome = getMockChrome();
       await waitFor(() => {
-        expect(chrome.storage.local.set).toHaveBeenCalled();
-        const lastCall = mockChrome.storage.local.set.mock.calls.slice(-1)[0];
-        if (lastCall && lastCall[0]?.tree_state) {
-          const updatedNodes = (lastCall[0].tree_state as TreeState).views['default'].nodes;
-          expect(updatedNodes['node-2'].parentId).toBe('node-1');
-        }
+        expect(sendMessageMock).toHaveBeenCalledWith({
+          type: 'MOVE_NODE',
+          payload: {
+            nodeId: 'node-2',
+            targetParentId: 'node-1',
+            viewId: 'default',
+            selectedNodeIds: [],
+          },
+        });
       });
     });
 
@@ -340,7 +353,15 @@ describe('パネル内D&Dの統合テスト', () => {
       });
 
       await waitFor(() => {
-        expect(chrome.storage.local.set).toHaveBeenCalled();
+        expect(sendMessageMock).toHaveBeenCalledWith({
+          type: 'MOVE_NODE',
+          payload: {
+            nodeId: 'node-2',
+            targetParentId: 'node-1',
+            viewId: 'default',
+            selectedNodeIds: [],
+          },
+        });
       });
     });
 
@@ -453,8 +474,17 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
+      // 循環参照チェックはServiceWorker側で行われるため、メッセージは送信される
       await waitFor(() => {
-        expect(sendMessageMock).not.toHaveBeenCalled();
+        expect(sendMessageMock).toHaveBeenCalledWith({
+          type: 'MOVE_NODE',
+          payload: {
+            nodeId: 'node-1',
+            targetParentId: 'node-2',
+            viewId: 'default',
+            selectedNodeIds: [],
+          },
+        });
       });
     });
 

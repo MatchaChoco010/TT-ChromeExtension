@@ -34,7 +34,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     const loadSettings = async () => {
       const result = await chrome.storage.local.get('user_settings');
       if (result.user_settings) {
-        setSettings(result.user_settings);
+        setSettings(result.user_settings as UserSettings);
       } else {
         const defaultSettings: UserSettings = {
           fontSize: 14,
@@ -48,7 +48,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           snapshotSubfolder: 'TT-Snapshots',
         };
         setSettings(defaultSettings);
-        await chrome.storage.local.set({ user_settings: defaultSettings });
+        await chrome.runtime.sendMessage({
+          type: 'SAVE_USER_SETTINGS',
+          payload: { settings: defaultSettings },
+        });
       }
     };
 
@@ -71,7 +74,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   const updateSettings = useCallback((newSettings: UserSettings) => {
     setSettings(newSettings);
-    chrome.storage.local.set({ user_settings: newSettings });
+    chrome.runtime.sendMessage({
+      type: 'SAVE_USER_SETTINGS',
+      payload: { settings: newSettings },
+    });
   }, []);
 
   useEffect(() => {

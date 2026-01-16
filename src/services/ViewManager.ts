@@ -232,6 +232,7 @@ export class ViewManager {
         viewOrder: currentTreeState?.viewOrder || Object.keys(updatedViews),
         currentViewId: this.currentViewId,
         tabToNode: currentTreeState?.tabToNode || {},
+        treeStructure: currentTreeState?.treeStructure || [],
       };
 
       await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);

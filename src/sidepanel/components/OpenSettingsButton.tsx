@@ -1,8 +1,7 @@
 import React, { useCallback } from 'react';
 
 export async function openSettingsInNewTab(): Promise<void> {
-  const settingsUrl = chrome.runtime.getURL('settings.html');
-  await chrome.tabs.create({ url: settingsUrl });
+  await chrome.runtime.sendMessage({ type: 'OPEN_SETTINGS_TAB' });
 }
 
 export const OpenSettingsButton: React.FC = () => {

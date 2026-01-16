@@ -316,7 +316,7 @@ describe('useAutoScroll', () => {
     it('handleAutoScrollが何もしない', () => {
       const nullRef = { current: null };
       const { result } = renderHook(() =>
-        useAutoScroll(nullRef as React.RefObject<HTMLElement>)
+        useAutoScroll(nullRef as unknown as React.RefObject<HTMLElement>)
       );
 
       const containerRect = {

@@ -3,18 +3,18 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NewTabButton from './NewTabButton';
 
-const mockChromeTabs = {
-  create: vi.fn(),
-};
+const mockSendMessage = vi.fn();
 
 vi.stubGlobal('chrome', {
-  tabs: mockChromeTabs,
+  runtime: {
+    sendMessage: mockSendMessage,
+  },
 });
 
 describe('NewTabButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockChromeTabs.create.mockResolvedValue({ id: 999, windowId: 1 });
+    mockSendMessage.mockResolvedValue({ success: true });
   });
 
   describe('表示テスト', () => {
@@ -51,42 +51,24 @@ describe('NewTabButton', () => {
   });
 
   describe('クリック動作テスト', () => {
-    it('クリック時にchrome.tabs.createが呼ばれること', async () => {
+    it('クリック時にchrome.runtime.sendMessageが呼ばれること', async () => {
       const user = userEvent.setup();
       render(<NewTabButton />);
 
       const button = screen.getByTestId('new-tab-button');
       await user.click(button);
 
-      expect(mockChromeTabs.create).toHaveBeenCalledTimes(1);
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
     });
 
-    it('クリック時に新規タブがアクティブになるように作成されること', async () => {
+    it('クリック時にCREATE_NEW_TABメッセージが送信されること', async () => {
       const user = userEvent.setup();
       render(<NewTabButton />);
 
       const button = screen.getByTestId('new-tab-button');
       await user.click(button);
 
-      expect(mockChromeTabs.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          active: true,
-        })
-      );
-    });
-
-    it('クリック時にVivaldiスタートページが開かれること', async () => {
-      const user = userEvent.setup();
-      render(<NewTabButton />);
-
-      const button = screen.getByTestId('new-tab-button');
-      await user.click(button);
-
-      expect(mockChromeTabs.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          url: 'chrome://vivaldi-webui/startpage',
-        })
-      );
+      expect(mockSendMessage).toHaveBeenCalledWith({ type: 'CREATE_NEW_TAB' });
     });
 
     it('onNewTabコールバックが提供された場合、新規タブ作成後に呼ばれること', async () => {
@@ -134,10 +116,10 @@ describe('NewTabButton', () => {
   });
 
   describe('エラーハンドリングテスト', () => {
-    it('chrome.tabs.createが失敗してもエラーがスローされないこと', async () => {
+    it('chrome.runtime.sendMessageが失敗してもエラーがスローされないこと', async () => {
       const user = userEvent.setup();
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockChromeTabs.create.mockRejectedValue(new Error('Tab creation failed'));
+      mockSendMessage.mockRejectedValue(new Error('Message sending failed'));
 
       render(<NewTabButton />);
       const button = screen.getByTestId('new-tab-button');

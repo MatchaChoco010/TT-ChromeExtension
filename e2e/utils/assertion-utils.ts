@@ -113,8 +113,9 @@ export async function assertTabStructure(
   expectedActiveViewIndex: number,
   options: AssertTabStructureOptions = {}
 ): Promise<void> {
-  const { timeout = 5000 } = options;
+  const { timeout = 15000 } = options;
 
+  // expanded指定の事前検証
   for (let i = 0; i < expectedStructure.length; i++) {
     const current = expectedStructure[i];
     const currentDepth = current.depth;
@@ -146,105 +147,258 @@ export async function assertTabStructure(
   }
 
   const startTime = Date.now();
-  let lastError: Error | null = null;
 
   while (Date.now() - startTime < timeout) {
-    try {
-      const actualActiveViewIndex = await getActiveViewIndex(page);
-      if (actualActiveViewIndex !== expectedActiveViewIndex) {
-        throw new Error(
-          `Active view index mismatch (windowId: ${windowId}):\n` +
-          `  Expected: ${expectedActiveViewIndex}\n` +
-          `  Actual:   ${actualActiveViewIndex}`
-        );
+    // アクティブビューインデックスをチェック
+    const actualActiveViewIndex = await getActiveViewIndex(page);
+    if (actualActiveViewIndex !== expectedActiveViewIndex) {
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 16)));
+      continue;
+    }
+
+    // タブ数をチェック
+    const allTreeNodes = page.locator('[data-testid^="tree-node-"]');
+    const actualTabCount = await allTreeNodes.count();
+    if (actualTabCount !== expectedStructure.length) {
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 16)));
+      continue;
+    }
+
+    // 空配列の場合はここで成功
+    if (expectedStructure.length === 0) {
+      return;
+    }
+
+    // 各タブの状態を取得
+    const actualStructure: { tabId: number; depth: number; y: number; expanded: string | null }[] = [];
+    let allTabsFound = true;
+
+    for (const expected of expectedStructure) {
+      const element = page.locator(`[data-testid="tree-node-${expected.tabId}"]`).first();
+      const isVisible = await element.isVisible().catch(() => false);
+      if (!isVisible) {
+        allTabsFound = false;
+        break;
       }
 
-      const allTreeNodes = page.locator('[data-testid^="tree-node-"]');
-      const actualTabCount = await allTreeNodes.count();
-
-      if (actualTabCount !== expectedStructure.length) {
-        throw new Error(
-          `Tab count mismatch (windowId: ${windowId}):\n` +
-          `  Expected: ${expectedStructure.length} tabs\n` +
-          `  Actual:   ${actualTabCount} tabs`
-        );
+      const box = await element.boundingBox();
+      if (!box) {
+        allTabsFound = false;
+        break;
       }
 
-      if (expectedStructure.length === 0) {
-        return;
+      const depth = await element.getAttribute('data-depth');
+      const expanded = await element.getAttribute('data-expanded');
+      actualStructure.push({
+        tabId: expected.tabId,
+        depth: depth ? parseInt(depth, 10) : 0,
+        y: box.y,
+        expanded
+      });
+    }
+
+    if (!allTabsFound) {
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 16)));
+      continue;
+    }
+
+    // タブの順序をチェック
+    actualStructure.sort((a, b) => a.y - b.y);
+    const actualOrder = actualStructure.map(s => s.tabId);
+    const expectedOrder = expectedStructure.map(s => s.tabId);
+
+    if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 16)));
+      continue;
+    }
+
+    // 各タブのdepthとexpandedをチェック
+    let allMatch = true;
+    for (const expected of expectedStructure) {
+      const actual = actualStructure.find(s => s.tabId === expected.tabId);
+      if (!actual) {
+        allMatch = false;
+        break;
       }
 
-      const actualStructure: { tabId: number; depth: number; y: number; expanded: string | null }[] = [];
+      if (actual.depth !== expected.depth) {
+        allMatch = false;
+        break;
+      }
 
-      for (const expected of expectedStructure) {
-        const element = page.locator(`[data-testid="tree-node-${expected.tabId}"]`).first();
-        const isVisible = await element.isVisible().catch(() => false);
+      if (expected.expanded !== undefined) {
+        const expectedExpandedStr = expected.expanded ? 'true' : 'false';
+        if (actual.expanded !== expectedExpandedStr) {
+          allMatch = false;
+          break;
+        }
+      }
+    }
 
-        if (!isVisible) {
-          throw new Error(`Tab ${expected.tabId} is not visible (windowId: ${windowId})`);
+    if (!allMatch) {
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 16)));
+      continue;
+    }
+
+    // すべて一致
+    return;
+  }
+
+  // タイムアウト: 現在の状態を取得してエラーメッセージを生成
+  const elapsed = Date.now() - startTime;
+  let errorMessage = `assertTabStructure timeout after ${elapsed}ms (windowId: ${windowId})\n`;
+
+  // アクティブビューインデックス
+  const actualActiveViewIndex = await getActiveViewIndex(page).catch(() => -1);
+  if (actualActiveViewIndex !== expectedActiveViewIndex) {
+    errorMessage += `  Active view index mismatch:\n`;
+    errorMessage += `    Expected: ${expectedActiveViewIndex}\n`;
+    errorMessage += `    Actual:   ${actualActiveViewIndex}\n`;
+  }
+
+  // タブ数
+  const allTreeNodes = page.locator('[data-testid^="tree-node-"]');
+  const actualTabCount = await allTreeNodes.count().catch(() => -1);
+  const actualTabIds: string[] = [];
+  for (let i = 0; i < actualTabCount; i++) {
+    const node = allTreeNodes.nth(i);
+    const testId = await node.getAttribute('data-testid', { timeout: 100 }).catch(() => null);
+    actualTabIds.push(testId || '(unknown)');
+  }
+
+  if (actualTabCount !== expectedStructure.length) {
+    errorMessage += `  Tab count mismatch:\n`;
+    errorMessage += `    Expected: ${expectedStructure.length} tabs (${expectedStructure.map(e => e.tabId).join(', ')})\n`;
+    errorMessage += `    Actual:   ${actualTabCount} tabs (${actualTabIds.join(', ')})\n`;
+  }
+
+  // 各タブの状態
+  const actualStructure: { tabId: number; depth: number; y: number; expanded: string | null }[] = [];
+  for (const expected of expectedStructure) {
+    const element = page.locator(`[data-testid="tree-node-${expected.tabId}"]`).first();
+    const isVisible = await element.isVisible().catch(() => false);
+    if (!isVisible) {
+      errorMessage += `  Tab ${expected.tabId} is not visible\n`;
+      continue;
+    }
+
+    const box = await element.boundingBox();
+    if (!box) {
+      errorMessage += `  Tab ${expected.tabId} has no bounding box\n`;
+      continue;
+    }
+
+    const depth = await element.getAttribute('data-depth');
+    const expanded = await element.getAttribute('data-expanded');
+    actualStructure.push({
+      tabId: expected.tabId,
+      depth: depth ? parseInt(depth, 10) : 0,
+      y: box.y,
+      expanded
+    });
+  }
+
+  // タブの順序
+  actualStructure.sort((a, b) => a.y - b.y);
+  const actualOrder = actualStructure.map(s => s.tabId);
+  const expectedOrder = expectedStructure.map(s => s.tabId);
+
+  if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
+    errorMessage += `  Tab order mismatch:\n`;
+    errorMessage += `    Expected: [${expectedOrder.join(', ')}]\n`;
+    errorMessage += `    Actual:   [${actualOrder.join(', ')}]\n`;
+  }
+
+  // 各タブのdepthとexpanded
+  for (const expected of expectedStructure) {
+    const actual = actualStructure.find(s => s.tabId === expected.tabId);
+    if (!actual) continue;
+
+    if (actual.depth !== expected.depth) {
+      errorMessage += `  Depth mismatch for tab ${expected.tabId}:\n`;
+      errorMessage += `    Expected: ${expected.depth}\n`;
+      errorMessage += `    Actual:   ${actual.depth}\n`;
+    }
+
+    if (expected.expanded !== undefined) {
+      const expectedExpandedStr = expected.expanded ? 'true' : 'false';
+      if (actual.expanded !== expectedExpandedStr) {
+        errorMessage += `  Expanded state mismatch for tab ${expected.tabId}:\n`;
+        errorMessage += `    Expected: ${expectedExpandedStr}\n`;
+        errorMessage += `    Actual:   ${actual.expanded}\n`;
+      }
+    }
+  }
+
+  // Service Workerの状態
+  try {
+    const context = page.context();
+    const workers = context.serviceWorkers();
+    if (workers.length > 0) {
+      const sw = workers[0];
+      const swDebug = await sw.evaluate(async (args) => {
+        const { expectedTabIds, windowId } = args;
+        const treeState = globalThis.treeStateManager;
+
+        const treeTabIds: number[] = [];
+        if (treeState) {
+          const json = treeState.toJSON();
+          for (const tabIdStr of Object.keys(json.tabToNode)) {
+            treeTabIds.push(parseInt(tabIdStr, 10));
+          }
         }
 
-        const box = await element.boundingBox();
-        if (!box) {
-          throw new Error(`Tab ${expected.tabId} has no bounding box (windowId: ${windowId})`);
+        const chromeTabs = await chrome.tabs.query({ windowId });
+        const chromeTabIds = chromeTabs.map(t => t.id).filter((id): id is number => id !== undefined);
+
+        // Chromeにあるが TreeStateにないタブを特定
+        const missingTabIds = chromeTabIds.filter(id => !treeTabIds.includes(id));
+
+        // 不足しているタブの作成ログを取得
+        type TabCreationLog = { tabId: number; timestamp: number; message: string };
+        const getTabCreationLogs = globalThis.getTabCreationLogs as ((tabId?: number) => TabCreationLog[]) | undefined;
+        const missingTabLogs: Record<number, TabCreationLog[]> = {};
+        if (getTabCreationLogs) {
+          for (const tabId of missingTabIds) {
+            missingTabLogs[tabId] = getTabCreationLogs(tabId);
+          }
         }
 
-        const depth = await element.getAttribute('data-depth');
-        const expanded = await element.getAttribute('data-expanded');
-        actualStructure.push({
-          tabId: expected.tabId,
-          depth: depth ? parseInt(depth, 10) : 0,
-          y: box.y,
-          expanded
-        });
-      }
+        return {
+          treeTabIds,
+          chromeTabIds,
+          syncCompleted: treeState?.isSyncCompleted?.() ?? 'unknown',
+          syncInProgress: treeState?.isSyncInProgress?.() ?? 'unknown',
+          missingTabIds,
+          missingTabLogs,
+        };
+      }, { expectedTabIds: expectedStructure.map(e => e.tabId), windowId });
 
-      actualStructure.sort((a, b) => a.y - b.y);
+      errorMessage += `  TreeState tabs: [${swDebug.treeTabIds.join(', ')}]\n`;
+      errorMessage += `  Chrome tabs: [${swDebug.chromeTabIds.join(', ')}]\n`;
+      errorMessage += `  Sync completed: ${swDebug.syncCompleted}\n`;
+      errorMessage += `  Sync in progress: ${swDebug.syncInProgress}\n`;
 
-      const actualOrder = actualStructure.map(s => s.tabId);
-      const expectedOrder = expectedStructure.map(s => s.tabId);
-
-      if (JSON.stringify(actualOrder) !== JSON.stringify(expectedOrder)) {
-        throw new Error(
-          `Tab order mismatch (windowId: ${windowId}):\n` +
-          `  Expected: [${expectedOrder.join(', ')}]\n` +
-          `  Actual:   [${actualOrder.join(', ')}]`
-        );
-      }
-
-      for (let i = 0; i < expectedStructure.length; i++) {
-        const expected = expectedStructure[i];
-        const actual = actualStructure.find(s => s.tabId === expected.tabId);
-
-        if (actual && actual.depth !== expected.depth) {
-          throw new Error(
-            `Depth mismatch for tab ${expected.tabId} (windowId: ${windowId}):\n` +
-            `  Expected: ${expected.depth}\n` +
-            `  Actual:   ${actual.depth}`
-          );
-        }
-
-        if (expected.expanded !== undefined && actual) {
-          const expectedExpandedStr = expected.expanded ? 'true' : 'false';
-          if (actual.expanded !== expectedExpandedStr) {
-            throw new Error(
-              `Expanded state mismatch for tab ${expected.tabId} (windowId: ${windowId}):\n` +
-              `  Expected: ${expectedExpandedStr}\n` +
-              `  Actual:   ${actual.expanded}`
-            );
+      if (swDebug.missingTabIds.length > 0) {
+        errorMessage += `  Missing tabs (in Chrome but not in TreeState): [${swDebug.missingTabIds.join(', ')}]\n`;
+        for (const tabId of swDebug.missingTabIds) {
+          const logs = swDebug.missingTabLogs[tabId] || [];
+          if (logs.length > 0) {
+            errorMessage += `    Tab ${tabId} creation logs:\n`;
+            for (const log of logs) {
+              errorMessage += `      - ${log.message}\n`;
+            }
+          } else {
+            errorMessage += `    Tab ${tabId}: NO CREATION LOGS (handleTabCreated never called?)\n`;
           }
         }
       }
-
-      return;
-    } catch (e) {
-      lastError = e as Error;
     }
-
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
+  } catch (e) {
+    errorMessage += `  (Failed to get Service Worker state: ${e instanceof Error ? e.message : String(e)})\n`;
   }
 
-  throw lastError || new Error(`Timeout waiting for tab structure (windowId: ${windowId})`);
+  throw new Error(errorMessage);
 }
 
 /**

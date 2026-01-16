@@ -513,18 +513,31 @@ test.describe('ファビコンの永続化復元', () => {
           const favicons = (result.tab_favicons as Record<string, string>) || {};
           favicons[tabUrl] = faviconUrl;
           await chrome.storage.local.set({ tab_favicons: favicons });
-
-          chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
         },
         { tabUrl, faviconUrl: newFaviconUrl }
       );
 
+      // サイドパネルをリロードして更新を反映させる
+      await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
+      await sidePanelPage.waitForLoadState('domcontentloaded');
+      await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
+
       await waitForCondition(async () => {
-        const src = await faviconImg.getAttribute('src');
+        const node = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+        return (await node.count()) > 0;
+      }, { timeout: 10000, timeoutMessage: `Tree node for tab ${tabId} not visible after reload` });
+
+      const treeNodeAfterUpdate = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
+      const faviconImgAfterUpdate = treeNodeAfterUpdate.locator('img[alt="Favicon"]');
+
+      await waitForCondition(async () => {
+        const count = await faviconImgAfterUpdate.count();
+        if (count === 0) return false;
+        const src = await faviconImgAfterUpdate.getAttribute('src');
         return src === newFaviconUrl;
       }, { timeout: 10000, timeoutMessage: 'Favicon was not updated with new value' });
 
-      const updatedFaviconSrc = await faviconImg.getAttribute('src');
+      const updatedFaviconSrc = await faviconImgAfterUpdate.getAttribute('src');
       expect(updatedFaviconSrc).toBe(newFaviconUrl);
       expect(updatedFaviconSrc).not.toBe(initialFaviconUrl);
 

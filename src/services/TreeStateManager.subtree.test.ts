@@ -25,11 +25,11 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   │   ├── tab4
       //   │   └── tab5
       //   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
-      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
-      const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
+      const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
 
       await treeStateManager.addTab(tab1, null, 'view1');
       const node1Result = treeStateManager.getNodeByTabId(1);
@@ -53,7 +53,7 @@ describe('TreeStateManager - Subtree Operations', () => {
 
     it('should return only the root node if it has no children', async () => {
       // Arrange: Create a single tab with no children
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
       await treeStateManager.addTab(tab1, null, 'view1');
 
       // Act: Get subtree
@@ -77,9 +77,9 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   tab1
       //   ├── tab2
       //   │   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
 
       await treeStateManager.addTab(tab1, null, 'view1');
       const node1Result = treeStateManager.getNodeByTabId(1);
@@ -115,11 +115,11 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   │   ├── tab4
       //   │   └── tab5
       //   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
-      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
-      const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
+      const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
 
       await treeStateManager.addTab(tab1, null, 'view1');
       const node1Result = treeStateManager.getNodeByTabId(1);
@@ -138,7 +138,7 @@ describe('TreeStateManager - Subtree Operations', () => {
 
     it('should return 1 for a node without children', async () => {
       // Arrange: Create a single tab with no children
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
       await treeStateManager.addTab(tab1, null, 'view1');
 
       // Act & Assert: Should return 1
@@ -156,10 +156,10 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   └── tab2
       //       └── tab3
       //           └── tab4
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2 };
-      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 3 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
+      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 3, frozen: false };
 
       await treeStateManager.addTab(tab1, null, 'view1');
       const node1Result = treeStateManager.getNodeByTabId(1);
@@ -183,9 +183,9 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   tab1
       //   ├── tab2
       //   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
 
       await treeStateManager.addTab(tab1, null, 'view1');
       const node1Result = treeStateManager.getNodeByTabId(1);
@@ -211,7 +211,7 @@ describe('TreeStateManager - Subtree Operations', () => {
 
     it('should handle moving a single node without children', async () => {
       // Arrange: Create a single tab
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1 };
+      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: 1, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
       await treeStateManager.addTab(tab1, null, 'view1');
 
       // Act: Move to view2

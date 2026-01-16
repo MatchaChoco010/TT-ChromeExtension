@@ -25,6 +25,7 @@ describe('タブ開き方別の位置ルール', () => {
       viewOrder: ['default-view'],
       currentViewId: 'default-view',
       tabToNode: {},
+      treeStructure: [],
     });
 
     testTreeStateManager.resetForTesting();
@@ -257,6 +258,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
       viewOrder: ['default-view'],
       currentViewId: 'default-view',
       tabToNode: {},
+      treeStructure: [],
     });
 
     testTreeStateManager.resetForTesting();

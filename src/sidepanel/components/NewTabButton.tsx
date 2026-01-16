@@ -12,12 +12,8 @@ const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
     e.stopPropagation();
 
     try {
-      await chrome.tabs.create({
-        active: true,
-        url: 'chrome://vivaldi-webui/startpage',
-      });
-
-      if (onNewTab) {
+      const response = await chrome.runtime.sendMessage({ type: 'CREATE_NEW_TAB' });
+      if (response?.success && onNewTab) {
         onNewTab();
       }
     } catch (error) {

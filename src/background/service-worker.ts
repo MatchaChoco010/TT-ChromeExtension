@@ -78,13 +78,11 @@ function startPeriodicPersist(): void {
     periodInMinutes: 0.25, // 15秒 = 0.25分
   });
 
-  chrome.alarms.onAlarm.addListener(async (alarm) => {
+  chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === PERIODIC_PERSIST_ALARM_NAME) {
-      try {
-        await testTreeStateManager.refreshTreeStructure();
-      } catch {
+      testTreeStateManager.refreshTreeStructure().catch(() => {
         // 永続化失敗は無視
-      }
+      });
     }
   });
 }

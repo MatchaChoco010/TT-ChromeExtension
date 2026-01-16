@@ -43,9 +43,9 @@ describe('ツリー同期とリアルタイム更新', () => {
   describe('chrome.tabs API との同期', () => {
     it('syncWithChromeTabs: 既存タブをツリー状態に同期できる', async () => {
       const tabs: chrome.tabs.Tab[] = [
-        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
-        { id: 2, url: 'https://example.com/2', title: 'Tab 2', index: 1, openerTabId: 1, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
-        { id: 3, url: 'https://example.com/3', title: 'Tab 3', index: 2, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        { id: 2, url: 'https://example.com/2', title: 'Tab 2', index: 1, openerTabId: 1, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        { id: 3, url: 'https://example.com/3', title: 'Tab 3', index: 2, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
       ];
 
       mockChrome.tabs.query.mockResolvedValue(tabs);
@@ -74,7 +74,7 @@ describe('ツリー同期とリアルタイム更新', () => {
 
     it('syncWithChromeTabs: 既にツリーに存在するタブは重複追加されない', async () => {
       const tabs: chrome.tabs.Tab[] = [
-        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 },
+        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
       ];
 
       mockChrome.tabs.query.mockResolvedValue(tabs);
@@ -101,7 +101,7 @@ describe('ツリー同期とリアルタイム更新', () => {
       const { handleTabMoved } = await import('@/background/event-handlers');
 
       const tabId = 1;
-      const moveInfo: chrome.tabs.TabMoveInfo = {
+      const moveInfo: chrome.tabs.OnMovedInfo = {
         windowId: 1,
         fromIndex: 0,
         toIndex: 2,
@@ -109,9 +109,12 @@ describe('ツリー同期とリアルタイム更新', () => {
 
       await handleTabMoved(tabId, moveInfo);
 
-      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'STATE_UPDATED',
-      });
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'STATE_UPDATED',
+          payload: expect.any(Object),
+        })
+      );
     });
   });
 
@@ -122,7 +125,7 @@ describe('ツリー同期とリアルタイム更新', () => {
       const { handleTabUpdated } = await import('@/background/event-handlers');
 
       const tabId = 1;
-      const changeInfo: chrome.tabs.TabChangeInfo = {
+      const changeInfo: chrome.tabs.OnUpdatedInfo = {
         title: 'New Title',
         url: 'https://new-url.com',
       };
@@ -140,13 +143,17 @@ describe('ツリー同期とリアルタイム更新', () => {
         discarded: false,
         autoDiscardable: true,
         groupId: -1,
+        frozen: false,
       };
 
       await handleTabUpdated(tabId, changeInfo, tab);
 
-      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
-        type: 'STATE_UPDATED',
-      });
+      expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'STATE_UPDATED',
+          payload: expect.any(Object),
+        })
+      );
     });
   });
 
@@ -172,6 +179,7 @@ describe('ツリー同期とリアルタイム更新', () => {
         discarded: false,
         autoDiscardable: true,
         groupId: -1,
+        frozen: false,
       };
       await manager.addTab(tab, null, 'default-view');
 

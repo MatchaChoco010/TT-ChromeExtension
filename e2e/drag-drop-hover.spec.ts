@@ -1,33 +1,10 @@
 import { test } from './fixtures/extension';
-import type { Worker } from '@playwright/test';
-import { createTab, refreshSidePanel, getCurrentWindowId } from './utils/tab-utils';
+import { createTab, getCurrentWindowId, collapseNode } from './utils/tab-utils';
 import { startDrag, hoverOverTab, dropTab, moveTabToParent } from './utils/drag-drop-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
-
-// Sets the expanded state of a node in storage by modifying tree_state directly
-async function setNodeExpanded(serviceWorker: Worker, tabId: number, isExpanded: boolean): Promise<void> {
-  await serviceWorker.evaluate(async ({ tabId, isExpanded }: { tabId: number; isExpanded: boolean }) => {
-    interface TreeState {
-      views: Record<string, { nodes: Record<string, { isExpanded: boolean }> }>;
-      tabToNode: Record<number, { viewId: string; nodeId: string }>;
-    }
-    const result = await chrome.storage.local.get('tree_state');
-    if (result.tree_state) {
-      const treeState = result.tree_state as TreeState;
-      const nodeInfo = treeState.tabToNode[tabId];
-      if (nodeInfo) {
-        const viewState = treeState.views[nodeInfo.viewId];
-        if (viewState && viewState.nodes[nodeInfo.nodeId]) {
-          viewState.nodes[nodeInfo.nodeId].isExpanded = isExpanded;
-          await chrome.storage.local.set({ tree_state: treeState });
-        }
-      }
-    }
-  }, { tabId, isExpanded });
-}
 
 test.describe('ドラッグ&ドロップのホバー自動展開', () => {
   test.setTimeout(60000);
@@ -73,11 +50,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
       { tabId: dragTab, depth: 0 },
     ], 0);
 
-    await refreshSidePanel(serviceWorker, sidePanelPage);
-
-    await setNodeExpanded(serviceWorker, parentTab, false);
-
-    await refreshSidePanel(serviceWorker, sidePanelPage);
+    await collapseNode(sidePanelPage, parentTab);
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -90,11 +63,10 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await hoverOverTab(sidePanelPage, parentTab);
 
-    await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 1000);
-
+    // 自動展開が完了するまでポーリングで待機（固定時間待機は禁止）
     const childTabSelector = `[data-testid="tree-node-${childTab}"]`;
     const childTabElement = sidePanelPage.locator(childTabSelector).first();
-    await childTabElement.waitFor({ state: 'visible', timeout: 5000 });
+    await childTabElement.waitFor({ state: 'visible', timeout: AUTO_EXPAND_HOVER_DELAY_MS + 5000 });
 
     const viewport = sidePanelPage.viewportSize() || { width: 400, height: 600 };
     await sidePanelPage.mouse.move(30, viewport.height - 80, { steps: 5 });
@@ -162,11 +134,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
       { tabId: dragTab, depth: 0 },
     ], 0);
 
-    await refreshSidePanel(serviceWorker, sidePanelPage);
-
-    await setNodeExpanded(serviceWorker, parentTab, false);
-
-    await refreshSidePanel(serviceWorker, sidePanelPage);
+    await collapseNode(sidePanelPage, parentTab);
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -194,8 +162,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await dropTab(sidePanelPage);
 
-    await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 500);
-
+    // assertTabStructureはポーリングで待機するため、固定時間待機は不要
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -246,11 +213,7 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
       { tabId: dragTab, depth: 0 },
     ], 0);
 
-    await refreshSidePanel(serviceWorker, sidePanelPage);
-
-    await setNodeExpanded(serviceWorker, level0, false);
-
-    await refreshSidePanel(serviceWorker, sidePanelPage);
+    await collapseNode(sidePanelPage, level0);
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -263,11 +226,10 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
 
     await hoverOverTab(sidePanelPage, level0);
 
-    await sidePanelPage.waitForTimeout(AUTO_EXPAND_HOVER_DELAY_MS + 1000);
-
+    // 自動展開が完了するまでポーリングで待機（固定時間待機は禁止）
     const level1Selector = `[data-testid="tree-node-${level1}"]`;
     const level1Element = sidePanelPage.locator(level1Selector).first();
-    await level1Element.waitFor({ state: 'visible', timeout: 5000 });
+    await level1Element.waitFor({ state: 'visible', timeout: AUTO_EXPAND_HOVER_DELAY_MS + 5000 });
 
     const viewport = sidePanelPage.viewportSize() || { width: 400, height: 600 };
     await sidePanelPage.mouse.move(30, viewport.height - 80, { steps: 5 });

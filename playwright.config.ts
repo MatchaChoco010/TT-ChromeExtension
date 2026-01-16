@@ -10,10 +10,8 @@ import { defineConfig, devices } from '@playwright/test';
 // ワーカー数の設定
 const getWorkerCount = () => {
   if (process.env.CI === 'true') {
-    // CI環境ではデフォルトのワーカー数を使用
     return undefined;
   }
-  // ローカル環境では8ワーカーに制限
   return 8;
 };
 

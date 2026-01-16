@@ -231,11 +231,36 @@ export async function openSidePanelForWindow(
   await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 200)));
 
   const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
+  const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`;
+  await page.goto(sidePanelUrl);
 
   await page.waitForLoadState('domcontentloaded');
   await page.waitForSelector('#root', { timeout: 5000 });
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
+
+  // sidePanelPageのタブが正しいウィンドウにあることを確認し、必要に応じて移動
+  const sidePanelTabId = await serviceWorker.evaluate(async (url) => {
+    const tabs = await chrome.tabs.query({});
+    const tab = tabs.find(t => (t.url || t.pendingUrl) === url);
+    return tab?.id;
+  }, sidePanelUrl);
+
+  if (sidePanelTabId !== undefined) {
+    const currentWindowId = await serviceWorker.evaluate(async (tabId) => {
+      const tab = await chrome.tabs.get(tabId);
+      return tab.windowId;
+    }, sidePanelTabId);
+
+    if (currentWindowId !== windowId) {
+      // sidePanelPageが別のウィンドウに開かれている場合、正しいウィンドウに移動
+      await serviceWorker.evaluate(async ({ tabId, targetWindowId }) => {
+        await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
+      }, { tabId: sidePanelTabId, targetWindowId: windowId });
+
+      // 移動後に少し待機
+      await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
+    }
+  }
 
   return page;
 }

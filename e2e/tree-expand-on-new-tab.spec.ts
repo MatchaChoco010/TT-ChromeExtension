@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/extension';
-import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
+import { createTab, closeTab, getTestServerUrl, getCurrentWindowId, collapseNode } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 
@@ -34,15 +34,7 @@ test.describe('新規タブ作成時のツリー展開', () => {
       { tabId: childTabId1, depth: 1 },
     ], 0);
 
-    await serviceWorker.evaluate(async (parentTabId) => {
-      const manager = (globalThis as { treeStateManager?: { toggleExpand: (nodeId: string) => Promise<void>; getNodeByTabId: (tabId: number) => { viewId: string; node: { id: string } } | null } }).treeStateManager;
-      if (manager) {
-        const result = manager.getNodeByTabId(parentTabId);
-        if (result) {
-          await manager.toggleExpand(result.node.id);
-        }
-      }
-    }, parentTabId);
+    await collapseNode(sidePanelPage, parentTabId);
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },

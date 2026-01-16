@@ -154,13 +154,31 @@ const createExtensionContext = async (
       '--metrics-recording-only',
       '--mute-audio',
       '--no-first-run',
-      '--disable-features=TranslateUI',
+      '--disable-features=TranslateUI,TabDiscarding,IntensiveWakeUpThrottling',
       '--disable-component-extensions-with-background-pages',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-hang-monitor',
     ],
   });
 
   const timeout = 30000;
   await waitForServiceWorker(context, timeout);
+
+  // デバッグ: コンテキストのクローズを追跡
+  const contextCreateStack = new Error('[Context Create Stack]');
+  context.on('close', () => {
+    console.log(`[DEBUG] BrowserContext was closed at ${new Date().toISOString()}!`);
+    console.log(`[DEBUG] Context create stack: ${contextCreateStack.stack}`);
+  });
+
+  // デバッグ: ページの作成/クローズを追跡
+  context.on('page', (page) => {
+    console.log(`[DEBUG] Page created: ${page.url()}`);
+    page.on('close', () => {
+      console.log(`[DEBUG] Page closed: ${page.url()}`);
+    });
+  });
 
   return { context, userDataDir, downloadDir };
 };

@@ -1,28 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
-const mockChromeTabs = {
-  create: vi.fn(),
-};
-
-const mockChromeRuntime = {
-  getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
-};
+const mockSendMessage = vi.fn();
 
 beforeEach(() => {
   vi.stubGlobal('chrome', {
-    tabs: mockChromeTabs,
-    runtime: mockChromeRuntime,
+    runtime: {
+      sendMessage: mockSendMessage,
+    },
   });
-  mockChromeTabs.create.mockClear();
-  mockChromeRuntime.getURL.mockClear();
+  mockSendMessage.mockClear();
+  mockSendMessage.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-import { OpenSettingsButton } from './OpenSettingsButton';
+import { OpenSettingsButton, openSettingsInNewTab } from './OpenSettingsButton';
 
 describe('OpenSettingsButton', () => {
   it('設定ボタンがレンダリングされる', () => {
@@ -32,32 +27,25 @@ describe('OpenSettingsButton', () => {
     expect(button).toBeInTheDocument();
   });
 
-  it('設定ボタンをクリックすると chrome.tabs.create が呼び出される', async () => {
-    mockChromeTabs.create.mockResolvedValue({ id: 1 });
-
+  it('設定ボタンをクリックすると chrome.runtime.sendMessage が呼び出される', async () => {
     render(<OpenSettingsButton />);
 
     const button = screen.getByRole('button', { name: /設定/i });
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(mockChromeTabs.create).toHaveBeenCalledTimes(1);
+      expect(mockSendMessage).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('settings.html が新規タブで開かれる', async () => {
-    mockChromeTabs.create.mockResolvedValue({ id: 1 });
-
+  it('OPEN_SETTINGS_TAB メッセージが送信される', async () => {
     render(<OpenSettingsButton />);
 
     const button = screen.getByRole('button', { name: /設定/i });
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(mockChromeRuntime.getURL).toHaveBeenCalledWith('settings.html');
-      expect(mockChromeTabs.create).toHaveBeenCalledWith({
-        url: 'chrome-extension://test-extension-id/settings.html',
-      });
+      expect(mockSendMessage).toHaveBeenCalledWith({ type: 'OPEN_SETTINGS_TAB' });
     });
   });
 
@@ -70,23 +58,15 @@ describe('OpenSettingsButton', () => {
 });
 
 describe('openSettingsInNewTab utility', () => {
-  it('chrome.runtime.getURL で settings.html の URL を取得する', async () => {
-    mockChromeTabs.create.mockResolvedValue({ id: 1 });
-
-    const { openSettingsInNewTab } = await import('./OpenSettingsButton');
+  it('OPEN_SETTINGS_TAB メッセージを送信する', async () => {
     await openSettingsInNewTab();
 
-    expect(mockChromeRuntime.getURL).toHaveBeenCalledWith('settings.html');
+    expect(mockSendMessage).toHaveBeenCalledWith({ type: 'OPEN_SETTINGS_TAB' });
   });
 
-  it('chrome.tabs.create で新規タブを作成する', async () => {
-    mockChromeTabs.create.mockResolvedValue({ id: 1 });
-
-    const { openSettingsInNewTab } = await import('./OpenSettingsButton');
+  it('chrome.runtime.sendMessage を1回呼び出す', async () => {
     await openSettingsInNewTab();
 
-    expect(mockChromeTabs.create).toHaveBeenCalledWith({
-      url: 'chrome-extension://test-extension-id/settings.html',
-    });
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
   });
 });

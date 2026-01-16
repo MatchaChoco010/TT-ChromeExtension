@@ -198,19 +198,18 @@ export class SnapshotManager {
     }
     const windowIndices = Array.from(windowIndexSet).sort((a, b) => a - b);
 
-    // 各windowIndexに対して新しいウィンドウを作成
     const windowIndexToNewWindowId = new Map<number, number>();
     for (const windowIndex of windowIndices) {
       try {
         const newWindow = await chrome.windows.create({});
-        if (newWindow.id !== undefined) {
+        if (newWindow && newWindow.id !== undefined) {
           windowIndexToNewWindowId.set(windowIndex, newWindow.id);
           if (newWindow.tabs && newWindow.tabs.length > 0) {
             const blankTabId = newWindow.tabs[0].id;
             if (blankTabId !== undefined) {
               setTimeout(() => {
                 chrome.tabs.remove(blankTabId).catch(() => {
-                  // 既に閉じられている場合は無視
+                  // ignore
                 });
               }, 1000);
             }

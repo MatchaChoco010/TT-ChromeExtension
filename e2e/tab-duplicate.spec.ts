@@ -47,11 +47,16 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      const newTabId = await serviceWorker.evaluate(async (originalTabId) => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        const sortedTabs = tabs.filter(t => t.id && t.id !== originalTabId).sort((a, b) => (b.id || 0) - (a.id || 0));
-        return sortedTabs[0]?.id;
-      }, tabId);
+      // 複製タブが作成されるまでポーリングで待機
+      let newTabId: number | undefined;
+      await expect(async () => {
+        newTabId = await serviceWorker.evaluate(async (excludeIds) => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
+          return sortedTabs[0]?.id;
+        }, [initialBrowserTabId, pseudoSidePanelTabId, tabId]);
+        expect(newTabId).toBeDefined();
+      }).toPass({ timeout: 10000 });
 
       await waitForTabInTreeState(serviceWorker, newTabId!);
 
@@ -135,11 +140,16 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
-        return sortedTabs[0]?.id;
-      }, [tabId1, tabId2, tabId3]);
+      // 複製タブが作成されるまでポーリングで待機
+      let duplicatedTabId: number | undefined;
+      await expect(async () => {
+        duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
+          return sortedTabs[0]?.id;
+        }, [initialBrowserTabId, pseudoSidePanelTabId, tabId1, tabId2, tabId3]);
+        expect(duplicatedTabId).toBeDefined();
+      }).toPass({ timeout: 10000 });
 
       await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
@@ -223,11 +233,16 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
-        return sortedTabs[0]?.id;
-      }, [tabId1]);
+      // 複製タブが作成されるまでポーリングで待機
+      let duplicatedTabId: number | undefined;
+      await expect(async () => {
+        duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
+          return sortedTabs[0]?.id;
+        }, [initialBrowserTabId, pseudoSidePanelTabId, tabId1]);
+        expect(duplicatedTabId).toBeDefined();
+      }).toPass({ timeout: 10000 });
 
       await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
@@ -302,11 +317,16 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
-        return sortedTabs[0]?.id;
-      }, [parentTabId, childTabId]);
+      // 複製タブが作成されるまでポーリングで待機
+      let duplicatedTabId: number | undefined;
+      await expect(async () => {
+        duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
+          return sortedTabs[0]?.id;
+        }, [initialBrowserTabId, pseudoSidePanelTabId, parentTabId, childTabId]);
+        expect(duplicatedTabId).toBeDefined();
+      }).toPass({ timeout: 10000 });
 
       await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
@@ -315,10 +335,10 @@ test.describe('タブ複製時の配置', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
-        { tabId: duplicatedTabId!, depth: 1 },
+        { tabId: duplicatedTabId, depth: 1 },
       ], 0);
 
-      await closeTab(serviceWorker, duplicatedTabId!);
+      await closeTab(serviceWorker, duplicatedTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -391,11 +411,16 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
-        return sortedTabs[0]?.id;
-      }, [tabId1, tabId2]);
+      // 複製タブが作成されるまでポーリングで待機
+      let duplicatedTabId: number | undefined;
+      await expect(async () => {
+        duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
+          return sortedTabs[0]?.id;
+        }, [initialBrowserTabId, pseudoSidePanelTabId, tabId1, tabId2]);
+        expect(duplicatedTabId).toBeDefined();
+      }).toPass({ timeout: 10000 });
 
       await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
@@ -465,11 +490,16 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      const duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
-        return sortedTabs[0]?.id;
-      }, [tabId1, tabId2]);
+      // 複製タブが作成されるまでポーリングで待機
+      let duplicatedTabId: number | undefined;
+      await expect(async () => {
+        duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          const sortedTabs = tabs.filter(t => t.id && !excludeIds.includes(t.id)).sort((a, b) => (b.id || 0) - (a.id || 0));
+          return sortedTabs[0]?.id;
+        }, [initialBrowserTabId, pseudoSidePanelTabId, tabId1, tabId2]);
+        expect(duplicatedTabId).toBeDefined();
+      }).toPass({ timeout: 10000 });
 
       await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
 
@@ -558,13 +588,26 @@ test.describe('タブ複製時の配置', () => {
       await sidePanelPage.waitForSelector('[role="menu"]', { state: 'hidden', timeout: 3000 });
 
       const knownTabIds = [initialBrowserTabId, pseudoSidePanelTabId, parentTabId, child1TabId, child2TabId, grandchildTabId];
-      const duplicatedChild2TabId = await serviceWorker.evaluate(async (excludeIds) => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        const duplicatedChild2 = tabs.find(t => t.id && !excludeIds.includes(t.id) && t.url?.includes('child2'));
-        return duplicatedChild2?.id;
-      }, knownTabIds);
 
-      await waitForTabInTreeState(serviceWorker, duplicatedChild2TabId!);
+      // 複製されたタブがChrome APIで見つかるまでポーリング
+      let duplicatedChild2TabId: number | undefined;
+      const startTime = Date.now();
+      const timeout = 15000;
+      while (Date.now() - startTime < timeout) {
+        duplicatedChild2TabId = await serviceWorker.evaluate(async (excludeIds) => {
+          const tabs = await chrome.tabs.query({ currentWindow: true });
+          const duplicatedChild2 = tabs.find(t => t.id && !excludeIds.includes(t.id) && t.url?.includes('child2'));
+          return duplicatedChild2?.id;
+        }, knownTabIds);
+        if (duplicatedChild2TabId !== undefined) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      if (duplicatedChild2TabId === undefined) {
+        throw new Error('Duplicated child2 tab was not found in Chrome tabs within timeout');
+      }
+
+      await waitForTabInTreeState(serviceWorker, duplicatedChild2TabId);
 
       // handleDuplicateSubtreeのmoveNode操作が完了するのを待つ
       await sidePanelPage.waitForTimeout(500);
@@ -773,18 +816,10 @@ test.describe('タブ複製時の配置', () => {
       extensionContext,
       serviceWorker,
     }) => {
+      await setUserSettings(extensionContext, { duplicateTabPosition: 'sibling' });
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
-
-      // 設定をsiblingに変更
-      await serviceWorker.evaluate(async () => {
-        await chrome.storage.local.set({
-          user_settings: {
-            duplicateTabPosition: 'sibling',
-          },
-        });
-      });
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
@@ -870,33 +905,16 @@ test.describe('タブ複製時の配置', () => {
       for (const tabId of allTabIds.filter(id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId)) {
         await closeTab(serviceWorker, tabId);
       }
-
-      // 設定をデフォルトに戻す
-      await serviceWorker.evaluate(async () => {
-        await chrome.storage.local.set({
-          user_settings: {
-            duplicateTabPosition: 'sibling',
-          },
-        });
-      });
     });
 
     test('sibling設定で3タブを複製すると、各複製タブが元のタブの直後に配置される', async ({
       extensionContext,
       serviceWorker,
     }) => {
+      await setUserSettings(extensionContext, { duplicateTabPosition: 'sibling' });
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
-
-      // 設定をsiblingに変更
-      await serviceWorker.evaluate(async () => {
-        await chrome.storage.local.set({
-          user_settings: {
-            duplicateTabPosition: 'sibling',
-          },
-        });
-      });
 
       // 3タブを作成
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
@@ -1013,37 +1031,25 @@ test.describe('タブ複製時の配置', () => {
       for (const tabId of allTabIds.filter(id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId)) {
         await closeTab(serviceWorker, tabId);
       }
-
-      // 設定をデフォルトに戻す
-      await serviceWorker.evaluate(async () => {
-        await chrome.storage.local.set({
-          user_settings: {
-            duplicateTabPosition: 'sibling',
-          },
-        });
-      });
     });
 
     test('end設定で複数タブを複製すると、全ての複製タブがリストの最後に配置される', async ({
       extensionContext,
       serviceWorker,
     }) => {
+      await setUserSettings(extensionContext, { duplicateTabPosition: 'end' });
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 設定をendに変更
-      await serviceWorker.evaluate(async () => {
-        await chrome.storage.local.set({
-          user_settings: {
-            duplicateTabPosition: 'end',
-          },
-        });
-      });
-
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
-      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
 
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -1082,7 +1088,7 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製されたタブがツリービューに表示されるまで待機
+      // 複製されたタブがツリービューに表示されるまで待機（初期2 + 作成2 + 複製2 = 6）
       await expect.poll(async () => {
         const tabs = await serviceWorker.evaluate(async () => {
           const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -1091,40 +1097,37 @@ test.describe('タブ複製時の配置', () => {
         return tabs.length;
       }, { timeout: 10000 }).toBe(6);
 
-      // タブの順序を確認: 複製タブが最後に配置されていることを確認
+      // Chrome APIのタブ順序を取得（インデックス順でソート）
       const tabOrder = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
-        return tabs.sort((a, b) => a.index - b.index).map(t => t.id);
+        return tabs.sort((a, b) => a.index - b.index).map(t => t.id).filter((id): id is number => id !== undefined);
       });
 
-      // 期待される順序: initialBrowserTab, pseudoSidePanelTab, tabId1, tabId2, 複製1, 複製2
-      expect(tabOrder[0]).toBe(initialBrowserTabId);
-      expect(tabOrder[1]).toBe(pseudoSidePanelTabId);
-      expect(tabOrder[2]).toBe(tabId1);
-      expect(tabOrder[3]).toBe(tabId2);
-      // 最後の2つが複製タブ
-      const duplicatedTabIds = tabOrder.slice(4);
+      // 複製されたタブのIDを特定（最後の2つ）
+      const duplicatedTabIds = tabOrder.filter(
+        id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId && id !== tabId1 && id !== tabId2
+      );
       expect(duplicatedTabIds.length).toBe(2);
-      expect(duplicatedTabIds).not.toContain(tabId1);
-      expect(duplicatedTabIds).not.toContain(tabId2);
+
+      // ツリー構造を検証: 複製タブが最後に配置されていることを確認
+      // "end"設定では、複製タブはリストの最後に順番に配置される
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: duplicatedTabIds[0], depth: 0 },
+        { tabId: duplicatedTabIds[1], depth: 0 },
+      ], 0);
 
       // クリーンアップ
-      const allTabIds = await serviceWorker.evaluate(async () => {
-        const tabs = await chrome.tabs.query({ currentWindow: true });
-        return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
-      });
-      for (const tabId of allTabIds.filter(id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId)) {
+      for (const tabId of tabOrder.filter(id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId)) {
         await closeTab(serviceWorker, tabId);
       }
-
-      // 設定をデフォルトに戻す
-      await serviceWorker.evaluate(async () => {
-        await chrome.storage.local.set({
-          user_settings: {
-            duplicateTabPosition: 'sibling',
-          },
-        });
-      });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 });

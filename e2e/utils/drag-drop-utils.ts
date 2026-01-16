@@ -120,7 +120,7 @@ export async function moveTo(page: Page, x: number, y: number): Promise<void> {
 export async function dropTab(page: Page): Promise<void> {
   await page.mouse.up();
 
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await waitForDragEnd(page, 2000);
 }
 
 /**

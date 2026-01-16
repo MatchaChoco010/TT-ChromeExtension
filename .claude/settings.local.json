@@ -3,7 +3,15 @@
     "allow": [
       "WebFetch(domain:github.com)",
       "WebFetch(domain:playwright.dev)",
-      "WebFetch(domain:developer.chrome.com)"
+      "WebFetch(domain:developer.chrome.com)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "Bash(npm outdated:*)",
+      "Bash(npm install:*)",
+      "Bash(for:*)",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(do echo \"=== Run $i ===\")",
+      "Bash(done)"
     ]
   },
   "language": "japanese",

@@ -26,6 +26,7 @@ describe('新規タブ位置の統合テスト', () => {
       viewOrder: ['default-view'],
       currentViewId: 'default-view',
       tabToNode: {},
+      treeStructure: [],
     });
 
     const defaultSettings: UserSettings = {

@@ -11,9 +11,16 @@ export class TreeStateManager {
   private views: Map<string, ViewState> = new Map();
   private viewOrder: string[] = [];
   private tabToNode: Map<number, { viewId: string; nodeId: string }> = new Map();
-  private persistQueue: Promise<void> = Promise.resolve();
+  private currentViewId: string = 'default';
+  private currentViewByWindowId: Record<number, string> = {};
+  /**
+   * ウィンドウ毎のピン留めタブIDリスト（順序付き）
+   * TreeStateManagerがピン留め状態のSingle Source of Truth
+   */
+  private pinnedTabIdsByWindow: Map<number, number[]> = new Map();
   private syncInProgress: boolean = false;
   private syncCompleted: boolean = false;
+  private syncCompletedResolvers: (() => void)[] = [];
 
   constructor(private storageService: IStorageService) {}
 
@@ -32,6 +39,43 @@ export class TreeStateManager {
   }
 
   /**
+   * 同期が完了するまで待機する
+   * タイムアウトを指定可能（デフォルト5秒）
+   * @returns 同期が完了したらtrue、タイムアウトしたらfalse
+   */
+  async waitForSyncComplete(timeoutMs: number = 5000): Promise<boolean> {
+    if (this.syncCompleted) {
+      return true;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const timeoutId = setTimeout(() => {
+        const index = this.syncCompletedResolvers.indexOf(resolver);
+        if (index !== -1) {
+          this.syncCompletedResolvers.splice(index, 1);
+        }
+        resolve(false);
+      }, timeoutMs);
+
+      const resolver = () => {
+        clearTimeout(timeoutId);
+        resolve(true);
+      };
+
+      this.syncCompletedResolvers.push(resolver);
+    });
+  }
+
+  /**
+   * 同期完了を待機しているハンドラーに通知する
+   */
+  private notifySyncComplete(): void {
+    const resolvers = this.syncCompletedResolvers;
+    this.syncCompletedResolvers = [];
+    resolvers.forEach(resolve => resolve());
+  }
+
+  /**
    * テスト用: 内部状態をリセットし、syncCompletedをtrueに設定
    * 本番コードでは使用しない
    */
@@ -40,6 +84,27 @@ export class TreeStateManager {
     this.tabToNode.clear();
     this.syncInProgress = false;
     this.syncCompleted = true;
+    this.notifySyncComplete();
+  }
+
+  /**
+   * E2Eテスト用: 同期状態をリセット前の準備状態にする
+   *
+   * 【目的】
+   * E2Eテストのリセット処理で、次のsyncWithChromeTabsが確実に実行されるよう
+   * 同期状態をクリーンにする。
+   *
+   * 【処理内容】
+   * 1. 待機中のウェイター（syncCompletedResolvers）をすべて解決
+   *    - これにより、前のテストからの古いウェイターがタイムアウトするのを防ぐ
+   * 2. syncCompleted と syncInProgress を false にリセット
+   *    - これにより、次のsyncWithChromeTabsが早期リターンせずに実行される
+   */
+  prepareForSyncReset(): void {
+    this.notifySyncComplete();
+    this.syncCompletedResolvers = [];
+    this.syncCompleted = false;
+    this.syncInProgress = false;
   }
 
   /**
@@ -154,6 +219,19 @@ export class TreeStateManager {
 
     this.views.delete(viewId);
     this.viewOrder = this.viewOrder.filter(id => id !== viewId);
+
+    // 削除されたビューを表示していたウィンドウのビューをターゲットビューに更新
+    for (const windowId of Object.keys(this.currentViewByWindowId)) {
+      if (this.currentViewByWindowId[Number(windowId)] === viewId) {
+        this.currentViewByWindowId[Number(windowId)] = targetViewId;
+      }
+    }
+
+    // グローバルなcurrentViewIdも更新
+    if (this.currentViewId === viewId) {
+      this.currentViewId = targetViewId;
+    }
+
     await this.persistState();
   }
 
@@ -519,13 +597,18 @@ export class TreeStateManager {
   async syncWithChromeTabs(userSettings?: {
     newTabPositionManual?: 'child' | 'sibling' | 'end';
   }): Promise<void> {
+    // [DEBUG] syncWithChromeTabs呼び出しログ
+    console.log(`[DEBUG] syncWithChromeTabs called. syncInProgress=${this.syncInProgress}, syncCompleted=${this.syncCompleted}`);
     if (this.syncInProgress || this.syncCompleted) {
+      console.log(`[DEBUG] syncWithChromeTabs early return`);
       return;
     }
     this.syncInProgress = true;
 
     try {
+      console.log(`[DEBUG] syncWithChromeTabs: calling loadState()`);
       await this.loadState();
+      console.log(`[DEBUG] syncWithChromeTabs: loadState() completed. views count=${this.views.size}, tabToNode size=${this.tabToNode.size}`);
 
       const tabs = await chrome.tabs.query({});
       const defaultViewId = 'default';
@@ -548,108 +631,309 @@ export class TreeStateManager {
         await this.syncWithOpenerTabId(tabs, defaultViewId, userSettings);
       }
 
+      // ストレージにpinnedTabIdsByWindowがない場合、Chromeの現在のピン留め状態で初期化
+      // これにより初回起動時や古い状態からの復元時に既存のピン留めタブが保持される
+      const hasPinnedData = this.pinnedTabIdsByWindow.size > 0;
+      if (!hasPinnedData) {
+        const pinnedTabs = tabs.filter(t => t.pinned && t.id !== undefined);
+        for (const tab of pinnedTabs) {
+          if (tab.windowId === undefined || tab.id === undefined) continue;
+          const windowPinned = this.pinnedTabIdsByWindow.get(tab.windowId) ?? [];
+          windowPinned.push(tab.id);
+          this.pinnedTabIdsByWindow.set(tab.windowId, windowPinned);
+        }
+      }
+
       await this.persistState();
 
       // 内部ツリーの順序をChromeタブに反映
-      await this.syncTreeOrderToChromeTabs();
+      await this.syncTreeStateToChromeTabs();
 
       this.syncCompleted = true;
+      this.notifySyncComplete();
     } catch {
-      // エラーは無視
+      // エラーが発生しても、syncCompletedをtrueに設定
+      // これにより、その後のタブイベント（handleTabCreated等）が処理される
+      this.syncCompleted = true;
+      this.notifySyncComplete();
     } finally {
       this.syncInProgress = false;
     }
   }
 
   /**
-   * treeStructureをリフレッシュする
+   * 現在のメモリ状態をストレージに永続化する
+   *
+   * TreeStateManagerはSingle Source of Truthであり、メモリ上の状態が常に正しい。
+   * ストレージからの再読込み（loadState）は行わない。
+   * loadStateを呼ぶと、進行中の操作（addTab等）で追加された状態が失われる可能性がある。
    */
   async refreshTreeStructure(): Promise<void> {
     try {
-      await this.loadState();
       await this.persistState();
     } catch {
-      // エラーは無視
+      // 永続化失敗は無視（次回のアラームで再試行される）
     }
   }
 
   /**
-   * 内部ツリーの順序をChromeタブの順序に反映する
-   * viewOrderの順序で全ビューを処理し、各ビュー内は深さ優先でフラット化
-   * @param windowId - 対象ウィンドウID（省略時は現在のウィンドウ）
+   * TreeStateManagerの状態をChromeタブに冪等に反映する
+   *
+   * この関数は冪等であり、TreeStateManagerの状態が変わらない限り
+   * 何回呼び出しても同じ結果になる。
+   *
+   * 同期内容：
+   * - TreeStateManagerに存在しないタブの削除
+   * - タブの順序（chrome.tabs.move）
+   * - ピン留め状態（chrome.tabs.update({pinned})）
+   *
+   * @param windowId - 対象ウィンドウID（省略時は全ウィンドウ）
    */
-  async syncTreeOrderToChromeTabs(windowId?: number): Promise<void> {
-    try {
-      // 現在のタブ情報を取得
-      const queryOptions = windowId !== undefined ? { windowId } : { currentWindow: true as const };
-      const currentTabs = await chrome.tabs.query(queryOptions);
-      const pinnedSet = new Set<number>();
-      const currentWindowTabIds = new Set<number>();
-      for (const tab of currentTabs) {
-        if (tab.id !== undefined) {
-          currentWindowTabIds.add(tab.id);
-          if (tab.pinned) {
-            pinnedSet.add(tab.id);
-          }
-        }
-      }
-
-      const orderedTabIds: number[] = [];
-      const traverse = (node: TabNode): void => {
-        if (!pinnedSet.has(node.tabId) && currentWindowTabIds.has(node.tabId)) {
-          orderedTabIds.push(node.tabId);
-        }
-        for (const child of node.children) {
-          traverse(child);
-        }
-      };
-
-      for (const viewId of this.viewOrder) {
-        const viewState = this.views.get(viewId);
-        if (!viewState) continue;
-
-        for (const rootNodeId of viewState.rootNodeIds) {
-          const rootNode = viewState.nodes[rootNodeId];
-          if (rootNode && !rootNode.parentId) {
-            traverse(rootNode);
-          }
-        }
-      }
-
-      const pinnedCount = pinnedSet.size;
-
-      // 最新のタブインデックスを取得
-      const currentIndexMap = new Map<number, number>();
-      for (const tab of currentTabs) {
-        if (tab.id !== undefined) {
-          currentIndexMap.set(tab.id, tab.index);
-        }
-      }
-
-      // 各タブを正しい位置に移動
-      for (let i = 0; i < orderedTabIds.length; i++) {
-        const tabId = orderedTabIds[i];
-        const expectedIndex = pinnedCount + i;
-        const currentIndex = currentIndexMap.get(tabId);
-
-        if (currentIndex !== undefined && currentIndex !== expectedIndex) {
-          try {
-            await chrome.tabs.move(tabId, { index: expectedIndex });
-            const updatedTabs = await chrome.tabs.query(queryOptions);
-            currentIndexMap.clear();
-            for (const tab of updatedTabs) {
-              if (tab.id !== undefined) {
-                currentIndexMap.set(tab.id, tab.index);
-              }
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-    } catch {
-      // ignore
+  async syncTreeStateToChromeTabs(windowId?: number): Promise<void> {
+    // [DEBUG] sync前のTreeStateManager状態をログ
+    console.log(`[DEBUG] syncTreeStateToChromeTabs called. windowId=${windowId}`);
+    console.log(`[DEBUG] TreeStateManager state before sync:`);
+    console.log(`[DEBUG]   views count: ${this.views.size}`);
+    console.log(`[DEBUG]   tabToNode size: ${this.tabToNode.size}`);
+    console.log(`[DEBUG]   pinnedTabIdsByWindow: ${JSON.stringify([...this.pinnedTabIdsByWindow.entries()])}`);
+    for (const [viewId, view] of this.views) {
+      console.log(`[DEBUG]   view "${viewId}" rootNodeIds: ${view.rootNodeIds.length}, nodes: ${Object.keys(view.nodes).length}`);
     }
+
+    // 現在のChromeタブを取得
+    const queryOptions = windowId !== undefined ? { windowId } : {};
+    const currentTabs = await chrome.tabs.query(queryOptions);
+
+    // ウィンドウIDのリスト
+    const windowIds = windowId !== undefined
+      ? [windowId]
+      : [...new Set(currentTabs.map(t => t.windowId).filter((id): id is number => id !== undefined))];
+
+    // 1. ピン留め状態を同期（TreeStateManagerの状態が正）
+    for (const wid of windowIds) {
+      await this.syncPinnedStateForWindow(wid, currentTabs);
+    }
+
+    // 再度タブ情報を取得（ピン留め状態変更後）
+    const refreshedTabs = await chrome.tabs.query(queryOptions);
+
+    // Chromeの現在のピン留め状態を取得（更新後）
+    const pinnedSet = new Set<number>();
+    for (const tab of refreshedTabs) {
+      if (tab.id !== undefined && tab.pinned) {
+        pinnedSet.add(tab.id);
+      }
+    }
+
+    // 2. タブの順序を同期
+    for (const wid of windowIds) {
+      await this.syncTabOrderForWindow(wid, pinnedSet);
+    }
+  }
+
+  /**
+   * 指定ウィンドウのピン留め状態を同期
+   * TreeStateManagerのpinnedTabIdsByWindowが正
+   */
+  private async syncPinnedStateForWindow(windowId: number, currentTabs: chrome.tabs.Tab[]): Promise<void> {
+    const expectedPinnedIds = new Set(this.pinnedTabIdsByWindow.get(windowId) ?? []);
+    const windowTabs = currentTabs.filter(t => t.windowId === windowId);
+
+    // Chromeで現在ピン留めされているタブ
+    const actuallyPinnedIds = new Set<number>();
+    for (const tab of windowTabs) {
+      if (tab.id !== undefined && tab.pinned) {
+        actuallyPinnedIds.add(tab.id);
+      }
+    }
+
+    // TreeStateManagerでピン留めされるべきだが、Chromeでピン留めされていないタブをピン留め
+    for (const tabId of expectedPinnedIds) {
+      if (!actuallyPinnedIds.has(tabId)) {
+        try {
+          await chrome.tabs.update(tabId, { pinned: true });
+        } catch {
+          // タブが存在しない場合は無視
+        }
+      }
+    }
+
+    // TreeStateManagerでピン留めされるべきでないが、Chromeでピン留めされているタブのピン留めを解除
+    for (const tabId of actuallyPinnedIds) {
+      if (!expectedPinnedIds.has(tabId)) {
+        try {
+          await chrome.tabs.update(tabId, { pinned: false });
+        } catch {
+          // タブが存在しない場合は無視
+        }
+      }
+    }
+
+    // ピン留めタブの順序を同期
+    const expectedOrder = this.pinnedTabIdsByWindow.get(windowId) ?? [];
+    for (let i = 0; i < expectedOrder.length; i++) {
+      const tabId = expectedOrder[i];
+      try {
+        await chrome.tabs.move(tabId, { index: i });
+      } catch {
+        // タブが存在しない場合は無視
+      }
+    }
+  }
+
+  /**
+   * 指定ウィンドウのタブ順序を同期
+   */
+  private async syncTabOrderForWindow(windowId: number, pinnedSet: Set<number>): Promise<void> {
+    // 現在のウィンドウのタブを取得
+    const currentTabs = await chrome.tabs.query({ windowId });
+    const currentWindowTabIds = new Set<number>();
+    for (const tab of currentTabs) {
+      if (tab.id !== undefined) {
+        currentWindowTabIds.add(tab.id);
+      }
+    }
+
+    // TreeStateManagerの状態から期待される順序を計算
+    const orderedTabIds: number[] = [];
+    const traverse = (node: TabNode): void => {
+      if (!pinnedSet.has(node.tabId) && currentWindowTabIds.has(node.tabId)) {
+        orderedTabIds.push(node.tabId);
+      }
+      for (const child of node.children) {
+        traverse(child);
+      }
+    };
+
+    for (const viewId of this.viewOrder) {
+      const viewState = this.views.get(viewId);
+      if (!viewState) continue;
+
+      for (const rootNodeId of viewState.rootNodeIds) {
+        const rootNode = viewState.nodes[rootNodeId];
+        if (rootNode && !rootNode.parentId) {
+          traverse(rootNode);
+        }
+      }
+    }
+
+    const pinnedCount = currentTabs.filter(t => t.pinned).length;
+
+    // 現在のタブインデックスを取得
+    const currentIndexMap = new Map<number, number>();
+    for (const tab of currentTabs) {
+      if (tab.id !== undefined) {
+        currentIndexMap.set(tab.id, tab.index);
+      }
+    }
+
+    // 各タブを正しい位置に移動
+    for (let i = 0; i < orderedTabIds.length; i++) {
+      const tabId = orderedTabIds[i];
+      const expectedIndex = pinnedCount + i;
+      const currentIndex = currentIndexMap.get(tabId);
+
+      if (currentIndex !== undefined && currentIndex !== expectedIndex) {
+        try {
+          await chrome.tabs.move(tabId, { index: expectedIndex });
+          // 移動後のインデックスを再取得
+          const updatedTabs = await chrome.tabs.query({ windowId });
+          currentIndexMap.clear();
+          for (const tab of updatedTabs) {
+            if (tab.id !== undefined) {
+              currentIndexMap.set(tab.id, tab.index);
+            }
+          }
+        } catch {
+          // タブが存在しない場合は無視
+        }
+      }
+    }
+  }
+
+  /**
+   * 指定ウィンドウのピン留めタブIDリストを取得
+   */
+  getPinnedTabIds(windowId: number): number[] {
+    return this.pinnedTabIdsByWindow.get(windowId) ?? [];
+  }
+
+  /**
+   * タブをピン留め状態に変更（メモリ状態のみ更新）
+   * 実際のChromeタブのピン留めはsyncTreeStateToChromeTabs()で行う
+   */
+  async pinTabs(tabIds: number[], windowId: number): Promise<void> {
+    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
+
+    for (const tabId of tabIds) {
+      if (!pinnedList.includes(tabId)) {
+        pinnedList.push(tabId);
+      }
+    }
+
+    this.pinnedTabIdsByWindow.set(windowId, pinnedList);
+    await this.persistState();
+  }
+
+  /**
+   * タブのピン留めを解除（メモリ状態のみ更新）
+   * 実際のChromeタブのピン留め解除はsyncTreeStateToChromeTabs()で行う
+   */
+  async unpinTabs(tabIds: number[], windowId: number): Promise<void> {
+    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
+    const tabIdSet = new Set(tabIds);
+
+    const newPinnedList = pinnedList.filter(id => !tabIdSet.has(id));
+    this.pinnedTabIdsByWindow.set(windowId, newPinnedList);
+    await this.persistState();
+  }
+
+  /**
+   * ピン留めタブの順序を変更（メモリ状態のみ更新）
+   * 実際のChromeタブの順序変更はsyncTreeStateToChromeTabs()で行う
+   */
+  async reorderPinnedTab(tabId: number, newIndex: number, windowId: number): Promise<void> {
+    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
+    const currentIndex = pinnedList.indexOf(tabId);
+
+    if (currentIndex === -1) return;
+    if (newIndex < 0 || newIndex >= pinnedList.length) return;
+    if (currentIndex === newIndex) return;
+
+    pinnedList.splice(currentIndex, 1);
+    pinnedList.splice(newIndex, 0, tabId);
+
+    this.pinnedTabIdsByWindow.set(windowId, pinnedList);
+    await this.persistState();
+  }
+
+  /**
+   * Chromeイベントからのピン留め状態変更を反映
+   * chrome.tabs.onUpdatedでpinnedが変わった場合に呼び出す
+   */
+  updatePinnedStateFromChromeEvent(tabId: number, windowId: number, isPinned: boolean): void {
+    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
+    const isInList = pinnedList.includes(tabId);
+
+    if (isPinned && !isInList) {
+      pinnedList.push(tabId);
+      this.pinnedTabIdsByWindow.set(windowId, pinnedList);
+    } else if (!isPinned && isInList) {
+      const newList = pinnedList.filter(id => id !== tabId);
+      this.pinnedTabIdsByWindow.set(windowId, newList);
+    }
+  }
+
+  /**
+   * Chromeのピン留めタブ順序をTreeStateManagerに反映
+   * chrome.tabs.onMovedでピン留めタブが移動された場合に呼び出す
+   */
+  async syncPinnedOrderFromChrome(windowId: number): Promise<void> {
+    const tabs = await chrome.tabs.query({ windowId, pinned: true });
+    // index順でソート
+    tabs.sort((a, b) => a.index - b.index);
+    const pinnedOrder = tabs.filter(t => t.id !== undefined).map(t => t.id!);
+    this.pinnedTabIdsByWindow.set(windowId, pinnedOrder);
   }
 
   /**
@@ -1020,7 +1304,7 @@ export class TreeStateManager {
 
     try {
       const result = await chrome.storage.local.get('groups');
-      const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = result.groups || {};
+      const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = (result.groups as Record<string, { id: string; name: string; color: string; isExpanded: boolean }> | undefined) || {};
       existingGroups[groupNodeId] = {
         id: groupNodeId,
         name: groupName,
@@ -1104,7 +1388,7 @@ export class TreeStateManager {
     let groupName = '新しいグループ';
     try {
       const storageResult = await chrome.storage.local.get('groups');
-      const groups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = storageResult.groups || {};
+      const groups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = (storageResult.groups as Record<string, { id: string; name: string; color: string; isExpanded: boolean }> | undefined) || {};
       if (groups[result.node.id]) {
         groupName = groups[result.node.id].name;
       }
@@ -1137,17 +1421,72 @@ export class TreeStateManager {
   }
 
   /**
+   * 現在の状態をシリアライズ可能な形式に変換
+   * STATE_UPDATEDメッセージのペイロードとして使用
+   */
+  toJSON(): TreeState {
+    const viewsRecord: Record<string, ViewState> = {};
+
+    for (const [viewId, viewState] of this.views) {
+      const nodesRecord: Record<string, TabNode> = {};
+
+      for (const [nodeId, node] of Object.entries(viewState.nodes)) {
+        nodesRecord[nodeId] = {
+          ...node,
+          children: node.children.map(child => ({ id: child.id })) as unknown as TabNode[],
+        };
+      }
+
+      viewsRecord[viewId] = {
+        info: viewState.info,
+        rootNodeIds: [...viewState.rootNodeIds],
+        nodes: nodesRecord,
+      };
+    }
+
+    const tabToNodeRecord: Record<number, { viewId: string; nodeId: string }> = {};
+    this.tabToNode.forEach((mapping, tabId) => {
+      tabToNodeRecord[tabId] = mapping;
+    });
+
+    // pinnedTabIdsByWindowをRecordに変換
+    const pinnedTabIdsByWindowRecord: Record<number, number[]> = {};
+    this.pinnedTabIdsByWindow.forEach((tabIds, windowId) => {
+      pinnedTabIdsByWindowRecord[windowId] = [...tabIds];
+    });
+
+    return {
+      views: viewsRecord,
+      viewOrder: [...this.viewOrder],
+      currentViewId: this.currentViewId,
+      currentViewByWindowId: { ...this.currentViewByWindowId },
+      tabToNode: tabToNodeRecord,
+      treeStructure: [],
+      pinnedTabIdsByWindow: pinnedTabIdsByWindowRecord,
+    };
+  }
+
+  /**
+   * 状態変更後の通知を送信
+   * payloadにシリアライズした状態を含める
+   */
+  notifyStateChanged(): void {
+    const payload = this.toJSON();
+    const tabCount = Object.keys(payload.tabToNode).length;
+    console.log(`[notifyStateChanged] Sending STATE_UPDATED with ${tabCount} tabs`);
+    chrome.runtime.sendMessage({
+      type: 'STATE_UPDATED',
+      payload,
+    }).catch((error) => {
+      // サイドパネルが開いていない場合など、メッセージ送信失敗は無視
+      console.log(`[notifyStateChanged] Message send failed (expected if no sidepanel): ${error.message}`);
+    });
+  }
+
+  /**
    * ストレージに状態を永続化
    */
   private async persistState(): Promise<void> {
-    this.persistQueue = this.persistQueue
-      .then(() => this.persistStateInternal())
-      .catch(() => {
-      });
-    return this.persistQueue;
-  }
-
-  private async persistStateInternal(): Promise<void> {
     const viewsRecord: Record<string, ViewState> = {};
 
     for (const [viewId, viewState] of this.views) {
@@ -1174,15 +1513,20 @@ export class TreeStateManager {
 
     const treeStructure = await this.buildTreeStructure();
 
-    const existingState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+    // pinnedTabIdsByWindowをRecordに変換
+    const pinnedTabIdsByWindowRecord: Record<number, number[]> = {};
+    this.pinnedTabIdsByWindow.forEach((tabIds, windowId) => {
+      pinnedTabIdsByWindowRecord[windowId] = [...tabIds];
+    });
 
     const treeState: TreeState = {
       views: viewsRecord,
       viewOrder: [...this.viewOrder],
-      currentViewId: existingState?.currentViewId || 'default',
-      currentViewByWindowId: existingState?.currentViewByWindowId,
+      currentViewId: this.currentViewId,
+      currentViewByWindowId: { ...this.currentViewByWindowId },
       tabToNode: tabToNodeRecord,
       treeStructure,
+      pinnedTabIdsByWindow: pinnedTabIdsByWindowRecord,
     };
 
     await this.storageService.set(STORAGE_KEYS.TREE_STATE, treeState);
@@ -1223,7 +1567,7 @@ export class TreeStateManager {
       const treeStructure: TreeStructureEntry[] = nodesInOrder.map(({ node, viewId }) => {
         const tab = tabMap.get(node.tabId);
         return {
-          url: tab?.url || '',
+          url: tab?.pendingUrl || tab?.url || '',
           parentIndex: node.parentId ? (nodeIdToIndex.get(node.parentId) ?? null) : null,
           index: tab?.index ?? -1,
           viewId,
@@ -1243,7 +1587,9 @@ export class TreeStateManager {
   async loadState(): Promise<void> {
     try {
       const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-      if (!state) return;
+      if (!state) {
+        return;
+      }
 
       this.views.clear();
       this.tabToNode.clear();
@@ -1318,6 +1664,21 @@ export class TreeStateManager {
           const node = viewState.nodes[nodeId];
           if (node) {
             recalculateDepth(node, 0);
+          }
+        }
+      }
+
+      // ビュー関連のプロパティを初期化
+      this.currentViewId = state.currentViewId || 'default';
+      this.currentViewByWindowId = state.currentViewByWindowId || {};
+
+      // ピン留めタブの状態を読み込み
+      this.pinnedTabIdsByWindow.clear();
+      if (state.pinnedTabIdsByWindow) {
+        for (const [windowIdStr, tabIds] of Object.entries(state.pinnedTabIdsByWindow)) {
+          const windowId = parseInt(windowIdStr);
+          if (!isNaN(windowId) && Array.isArray(tabIds)) {
+            this.pinnedTabIdsByWindow.set(windowId, [...tabIds]);
           }
         }
       }
@@ -1416,5 +1777,724 @@ export class TreeStateManager {
     for (const child of node.children) {
       this.collectSubtreeNodes(child, result);
     }
+  }
+
+  /**
+   * ノードを指定した親の子として移動（D&Dの子としてドロップ）
+   * 複数選択対応：選択内でルートになるノードのみを移動先に移動し、
+   * 選択内の親子関係は維持する
+   *
+   * @param nodeId - ドラッグしたノードID
+   * @param targetParentId - ドロップ先の親ノードID
+   * @param viewId - ビューID
+   * @param selectedNodeIds - 選択されているノードID一覧
+   */
+  async moveNodeToParent(
+    nodeId: string,
+    targetParentId: string,
+    viewId: string,
+    selectedNodeIds: string[]
+  ): Promise<void> {
+    const viewState = this.views.get(viewId);
+    if (!viewState) return;
+
+    const activeNode = viewState.nodes[nodeId];
+    const targetParent = viewState.nodes[targetParentId];
+    if (!activeNode || !targetParent) return;
+
+    // ドラッグ中のノードが選択に含まれているかチェック
+    const isActiveNodeSelected = selectedNodeIds.includes(nodeId);
+    // 移動対象のノードID一覧（選択されていれば全選択ノード、そうでなければアクティブノードのみ）
+    const nodesToMove = isActiveNodeSelected ? selectedNodeIds : [nodeId];
+    const nodesToMoveSet = new Set(nodesToMove);
+
+    // 移動先が移動対象のノードの子孫でないかチェック
+    for (const id of nodesToMove) {
+      if (this.isDescendant(viewState, id, targetParentId)) {
+        return;
+      }
+    }
+
+    // 移動先が移動対象に含まれている場合は移動不可
+    if (nodesToMoveSet.has(targetParentId)) {
+      return;
+    }
+
+    // 選択ノードのうち、選択内に親がないノード（選択内のルート）のみを移動先に移動
+    // 選択内で親子関係があるノードは元の親子関係を保持
+    const rootNodesInSelection = nodesToMove.filter(id => {
+      const node = viewState.nodes[id];
+      if (!node) return false;
+      return !node.parentId || !nodesToMoveSet.has(node.parentId);
+    });
+
+    // 選択内のルートノードを元の親から削除
+    for (const id of rootNodesInSelection) {
+      const node = viewState.nodes[id];
+      if (!node) continue;
+
+      if (node.parentId) {
+        const oldParent = viewState.nodes[node.parentId];
+        if (oldParent) {
+          oldParent.children = oldParent.children.filter(child => child.id !== id);
+        }
+      } else {
+        viewState.rootNodeIds = viewState.rootNodeIds.filter(rootId => rootId !== id);
+      }
+    }
+
+    // 選択内のルートノードを移動先の子に追加
+    for (const id of rootNodesInSelection) {
+      const node = viewState.nodes[id];
+      if (!node) continue;
+
+      node.parentId = targetParentId;
+      node.depth = targetParent.depth + 1;
+      this.updateChildrenDepth(node);
+      targetParent.children.push(node);
+    }
+
+    // 移動先を自動展開
+    targetParent.isExpanded = true;
+
+    await this.persistState();
+  }
+
+  /**
+   * ビュー色パレット
+   */
+  private static readonly VIEW_COLOR_PALETTE = [
+    '#3B82F6', // blue (default)
+    '#10B981', // green
+    '#F59E0B', // yellow
+    '#EF4444', // red
+    '#8B5CF6', // purple
+    '#EC4899', // pink
+    '#06B6D4', // cyan
+    '#F97316', // orange
+  ];
+
+  /**
+   * ビューを切り替え
+   * ウィンドウ毎のcurrentViewByWindowIdを更新し、グローバルなcurrentViewIdも更新
+   */
+  async switchView(
+    viewId: string,
+    windowId: number,
+    _previousViewId: string,
+    _activeTabId: number | null
+  ): Promise<void> {
+    // メモリ上のプロパティを更新
+    this.currentViewId = viewId;
+    this.currentViewByWindowId = {
+      ...this.currentViewByWindowId,
+      [windowId]: viewId,
+    };
+
+    // ストレージを更新
+    const existingState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+    if (!existingState) return;
+
+    const updatedState: TreeState = {
+      ...existingState,
+      currentViewByWindowId: this.currentViewByWindowId,
+      currentViewId: viewId,
+    };
+
+    await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedState);
+  }
+
+  /**
+   * 新しいビューを自動で色を決定して作成
+   */
+  async createViewWithAutoColor(): Promise<string> {
+    const viewCount = this.views.size;
+    const colorIndex = viewCount % TreeStateManager.VIEW_COLOR_PALETTE.length;
+    const newColor = TreeStateManager.VIEW_COLOR_PALETTE[colorIndex];
+
+    const newViewId = `view_${Date.now()}`;
+    this.createView({
+      id: newViewId,
+      name: 'View',
+      color: newColor,
+    });
+
+    await this.persistState();
+    return newViewId;
+  }
+
+  /**
+   * グループを削除し、関連ノードのgroupIdをクリア
+   */
+  async deleteTreeGroup(groupId: string, viewId: string): Promise<void> {
+    const viewState = this.views.get(viewId);
+    if (!viewState) return;
+
+    for (const nodeId of Object.keys(viewState.nodes)) {
+      const node = viewState.nodes[nodeId];
+      if (node && node.groupId === groupId) {
+        node.groupId = undefined;
+      }
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * タブをグループに追加
+   */
+  async addTabToTreeGroup(nodeId: string, groupId: string, viewId: string): Promise<void> {
+    const viewState = this.views.get(viewId);
+    if (!viewState) return;
+
+    const node = viewState.nodes[nodeId];
+    if (!node) return;
+
+    const groupNode = viewState.nodes[groupId];
+    const groupDepth = groupNode?.depth ?? 0;
+
+    // 元の親から削除
+    if (node.parentId) {
+      const oldParent = viewState.nodes[node.parentId];
+      if (oldParent) {
+        oldParent.children = oldParent.children.filter(child => child.id !== nodeId);
+      }
+    } else {
+      viewState.rootNodeIds = viewState.rootNodeIds.filter(id => id !== nodeId);
+    }
+
+    // グループの子として追加
+    node.groupId = groupId;
+    node.parentId = groupId;
+    node.depth = groupDepth + 1;
+    this.updateChildrenDepth(node);
+
+    if (groupNode) {
+      groupNode.children.push(node);
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * タブをグループから削除
+   */
+  async removeTabFromTreeGroup(nodeId: string, viewId: string): Promise<void> {
+    const viewState = this.views.get(viewId);
+    if (!viewState) return;
+
+    const node = viewState.nodes[nodeId];
+    if (!node) return;
+
+    // 元のグループから削除
+    if (node.groupId && viewState.nodes[node.groupId]) {
+      const groupNode = viewState.nodes[node.groupId];
+      groupNode.children = groupNode.children.filter(child => child.id !== nodeId);
+    }
+
+    // ルートノードとして設定
+    node.groupId = undefined;
+    node.parentId = null;
+    node.depth = 0;
+    this.updateChildrenDepth(node);
+    viewState.rootNodeIds.push(nodeId);
+
+    await this.persistState();
+  }
+
+  /**
+   * タブを別のビューに移動
+   */
+  async moveTabsToViewInternal(targetViewId: string, tabIds: number[]): Promise<void> {
+    // ターゲットビューが存在しない場合は作成
+    if (!this.views.has(targetViewId)) {
+      const viewCount = this.views.size;
+      const colorIndex = viewCount % TreeStateManager.VIEW_COLOR_PALETTE.length;
+      this.createView({
+        id: targetViewId,
+        name: 'View',
+        color: TreeStateManager.VIEW_COLOR_PALETTE[colorIndex],
+      });
+    }
+
+    const targetViewState = this.views.get(targetViewId)!;
+
+    // サブツリー全体を収集する関数
+    const collectSubtreeNodeIds = (nodes: Record<string, TabNode>, nodeId: string): string[] => {
+      const result: string[] = [nodeId];
+      const node = nodes[nodeId];
+      if (node && node.children) {
+        for (const child of node.children) {
+          result.push(...collectSubtreeNodeIds(nodes, child.id));
+        }
+      }
+      return result;
+    };
+
+    // 選択内でルートになるタブID（親が選択に含まれていないタブ）を特定
+    const tabIdsSet = new Set(tabIds);
+    const topLevelTabIds: number[] = [];
+    for (const tabId of tabIds) {
+      const mapping = this.tabToNode.get(tabId);
+      if (!mapping) continue;
+      const sourceViewState = this.views.get(mapping.viewId);
+      if (!sourceViewState) continue;
+      const node = sourceViewState.nodes[mapping.nodeId];
+      if (!node) continue;
+      if (!node.parentId) {
+        topLevelTabIds.push(tabId);
+      } else {
+        const parentNode = sourceViewState.nodes[node.parentId];
+        if (!parentNode || !tabIdsSet.has(parentNode.tabId)) {
+          topLevelTabIds.push(tabId);
+        }
+      }
+    }
+
+    const topLevelTabIdSet = new Set(topLevelTabIds);
+
+    for (const tabId of topLevelTabIds) {
+      const mapping = this.tabToNode.get(tabId);
+      if (!mapping) continue;
+
+      const sourceViewId = mapping.viewId;
+      if (sourceViewId === targetViewId) continue;
+
+      const sourceViewState = this.views.get(sourceViewId);
+      if (!sourceViewState) continue;
+
+      const rootNode = sourceViewState.nodes[mapping.nodeId];
+      if (!rootNode) continue;
+
+      // サブツリーのすべてのノードを収集
+      const subtreeNodeIds = collectSubtreeNodeIds(sourceViewState.nodes, rootNode.id);
+
+      // ソースビューから削除
+      if (rootNode.parentId) {
+        const parentNode = sourceViewState.nodes[rootNode.parentId];
+        if (parentNode) {
+          parentNode.children = parentNode.children.filter(c => c.id !== rootNode.id);
+        }
+      } else {
+        sourceViewState.rootNodeIds = sourceViewState.rootNodeIds.filter(id => id !== rootNode.id);
+      }
+
+      // ノードをターゲットビューに移動
+      for (const nodeId of subtreeNodeIds) {
+        const node = sourceViewState.nodes[nodeId];
+        if (!node) continue;
+
+        delete sourceViewState.nodes[nodeId];
+
+        // topLevelタブのみparentIdをnullに
+        if (topLevelTabIdSet.has(node.tabId)) {
+          node.parentId = null;
+          node.depth = 0;
+        }
+
+        targetViewState.nodes[nodeId] = node;
+        this.tabToNode.set(node.tabId, { viewId: targetViewId, nodeId: node.id });
+      }
+
+      // rootNodeIdsに追加
+      targetViewState.rootNodeIds.push(rootNode.id);
+    }
+
+    // 深さを再計算
+    for (const nodeId of targetViewState.rootNodeIds) {
+      const node = targetViewState.nodes[nodeId];
+      if (node) {
+        node.depth = 0;
+        this.updateChildrenDepth(node);
+      }
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * ノードを兄弟として指定位置に挿入（D&DのGapドロップ）
+   * 複数選択対応：選択内でルートになるノードのみを移動し、
+   * 選択内の親子関係は維持する
+   *
+   * @param nodeId - ドラッグしたノードID
+   * @param aboveNodeId - 上のノードID（挿入位置の上）
+   * @param belowNodeId - 下のノードID（挿入位置の下）
+   * @param viewId - ビューID
+   * @param selectedNodeIds - 選択されているノードID一覧
+   */
+  async moveNodeAsSibling(
+    nodeId: string,
+    aboveNodeId: string | undefined,
+    belowNodeId: string | undefined,
+    viewId: string,
+    selectedNodeIds: string[]
+  ): Promise<void> {
+    const viewState = this.views.get(viewId);
+    if (!viewState) return;
+
+    const activeNode = viewState.nodes[nodeId];
+    if (!activeNode) return;
+
+    // ドラッグ中のノードが選択に含まれているかチェック
+    const isActiveNodeSelected = selectedNodeIds.includes(nodeId);
+    // 移動対象のノードID一覧
+    const nodesToMove = isActiveNodeSelected ? selectedNodeIds : [nodeId];
+    const nodesToMoveSet = new Set(nodesToMove);
+
+    // ターゲットの親IDを決定
+    let targetParentId: string | null = null;
+    if (belowNodeId && viewState.nodes[belowNodeId]) {
+      targetParentId = viewState.nodes[belowNodeId].parentId;
+    } else if (aboveNodeId && viewState.nodes[aboveNodeId]) {
+      targetParentId = viewState.nodes[aboveNodeId].parentId;
+    }
+
+    // 移動先が移動対象のノードの子孫でないかチェック
+    if (targetParentId) {
+      for (const id of nodesToMove) {
+        if (this.isDescendant(viewState, id, targetParentId)) {
+          return;
+        }
+      }
+    }
+
+    // 選択内でルートになるノード（親が選択に含まれていないノード）を特定
+    const topLevelNodesToMove = nodesToMove.filter(id => {
+      const node = viewState.nodes[id];
+      if (!node) return false;
+      return !node.parentId || !nodesToMoveSet.has(node.parentId);
+    });
+
+    // 選択内のルートノードを元の親から削除
+    for (const id of topLevelNodesToMove) {
+      const node = viewState.nodes[id];
+      if (!node) continue;
+
+      if (node.parentId) {
+        const oldParent = viewState.nodes[node.parentId];
+        if (oldParent) {
+          oldParent.children = oldParent.children.filter(child => child.id !== id);
+        }
+      } else {
+        viewState.rootNodeIds = viewState.rootNodeIds.filter(rootId => rootId !== id);
+      }
+    }
+
+    // ノードをソート（元の順序を維持）
+    const sortedNodesToMove = topLevelNodesToMove
+      .map(id => viewState.nodes[id])
+      .filter((node): node is TabNode => node !== undefined);
+
+    // 選択内のルートノードのparentIdを更新
+    for (const node of sortedNodesToMove) {
+      node.parentId = targetParentId;
+      node.depth = targetParentId ? (viewState.nodes[targetParentId]?.depth ?? 0) + 1 : 0;
+      this.updateChildrenDepth(node);
+    }
+
+    if (targetParentId) {
+      // 親の子として挿入
+      const targetParent = viewState.nodes[targetParentId];
+      if (targetParent) {
+        if (belowNodeId) {
+          const belowNode = viewState.nodes[belowNodeId];
+          if (belowNode && belowNode.parentId === targetParentId) {
+            const insertIndex = targetParent.children.findIndex(c => c.id === belowNodeId);
+            if (insertIndex !== -1) {
+              targetParent.children.splice(insertIndex, 0, ...sortedNodesToMove);
+            } else {
+              targetParent.children.push(...sortedNodesToMove);
+            }
+          } else {
+            targetParent.children.push(...sortedNodesToMove);
+          }
+        } else if (aboveNodeId) {
+          const aboveNode = viewState.nodes[aboveNodeId];
+          if (aboveNode && aboveNode.parentId === targetParentId) {
+            const insertIndex = targetParent.children.findIndex(c => c.id === aboveNodeId);
+            if (insertIndex !== -1) {
+              targetParent.children.splice(insertIndex + 1, 0, ...sortedNodesToMove);
+            } else {
+              targetParent.children.push(...sortedNodesToMove);
+            }
+          } else {
+            targetParent.children.push(...sortedNodesToMove);
+          }
+        } else {
+          targetParent.children.push(...sortedNodesToMove);
+        }
+      }
+    } else {
+      // ルートレベルへの挿入
+      const nodesToInsertIds = sortedNodesToMove.map(n => n.id);
+      if (belowNodeId) {
+        const insertIndex = viewState.rootNodeIds.indexOf(belowNodeId);
+        if (insertIndex !== -1) {
+          viewState.rootNodeIds.splice(insertIndex, 0, ...nodesToInsertIds);
+        } else {
+          viewState.rootNodeIds.push(...nodesToInsertIds);
+        }
+      } else if (aboveNodeId) {
+        const insertIndex = viewState.rootNodeIds.indexOf(aboveNodeId);
+        if (insertIndex !== -1) {
+          viewState.rootNodeIds.splice(insertIndex + 1, 0, ...nodesToInsertIds);
+        } else {
+          viewState.rootNodeIds.push(...nodesToInsertIds);
+        }
+      } else {
+        viewState.rootNodeIds.push(...nodesToInsertIds);
+      }
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * タブを別ウィンドウに移動
+   * ツリー状態を更新してからChromeタブを移動し、同期を行う
+   */
+  async moveTabToWindow(tabId: number, targetWindowId: number): Promise<void> {
+    await this.moveTabToRootEnd(tabId);
+    await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
+    await this.syncTreeStateToChromeTabs();
+    await this.persistState();
+  }
+
+  /**
+   * タブで新しいウィンドウを作成
+   * ツリー状態を更新してから新ウィンドウを作成し、同期を行う
+   */
+  async createWindowWithTab(tabId: number): Promise<number | undefined> {
+    await this.moveTabToRootEnd(tabId);
+    const newWindow = await chrome.windows.create({ tabId });
+    await this.syncTreeStateToChromeTabs();
+    await this.persistState();
+    return newWindow?.id;
+  }
+
+  /**
+   * サブツリー全体で新しいウィンドウを作成
+   * 先頭タブで新ウィンドウを作成し、残りのタブを移動する
+   * @returns 作成されたウィンドウID（失敗時はundefined）
+   */
+  async createWindowWithSubtree(rootTabId: number): Promise<number | undefined> {
+    const subtree = this.getSubtree(rootTabId);
+    if (subtree.length === 0) return undefined;
+
+    const tabIds = subtree.map(node => node.tabId);
+    const firstTabId = tabIds[0];
+
+    const newWindow = await chrome.windows.create({ tabId: firstTabId });
+    if (!newWindow || newWindow.id === undefined) return undefined;
+
+    if (tabIds.length > 1) {
+      const remainingTabIds = tabIds.slice(1);
+      for (const tid of remainingTabIds) {
+        try {
+          await chrome.tabs.move(tid, { windowId: newWindow.id, index: -1 });
+        } catch {
+          // タブ移動失敗は無視
+        }
+      }
+    }
+
+    await this.syncTreeStateToChromeTabs();
+    await this.persistState();
+    return newWindow.id;
+  }
+
+  /**
+   * サブツリー全体を別ウィンドウに移動
+   */
+  async moveSubtreeToWindow(rootTabId: number, targetWindowId: number): Promise<void> {
+    const subtree = this.getSubtree(rootTabId);
+    if (subtree.length === 0) return;
+
+    const tabIds = subtree.map(node => node.tabId);
+
+    for (const tid of tabIds) {
+      try {
+        await chrome.tabs.move(tid, { windowId: targetWindowId, index: -1 });
+      } catch {
+        // タブ移動失敗は無視
+      }
+    }
+
+    await this.syncTreeStateToChromeTabs();
+    await this.persistState();
+  }
+
+  /**
+   * 複数タブを新しいウィンドウに移動
+   * コンテキストメニューの「新しいウィンドウに移動」で使用
+   */
+  async moveTabsToNewWindow(tabIds: number[]): Promise<number | undefined> {
+    if (tabIds.length === 0) return undefined;
+
+    const newWindow = await chrome.windows.create({ tabId: tabIds[0] });
+    if (!newWindow || newWindow.id === undefined) return undefined;
+
+    if (tabIds.length > 1) {
+      for (let i = 1; i < tabIds.length; i++) {
+        try {
+          await chrome.tabs.move(tabIds[i], { windowId: newWindow.id, index: -1 });
+        } catch {
+          // タブ移動失敗は無視
+        }
+      }
+    }
+
+    await this.syncTreeStateToChromeTabs();
+    await this.persistState();
+    return newWindow.id;
+  }
+
+  /**
+   * スナップショットからツリー状態を復元
+   * メモリ上の状態を直接更新し、永続化する
+   *
+   * @param snapshotViews - スナップショットのビュー情報
+   * @param indexToNewTabId - スナップショットのindex -> 新しいtabIdのマッピング
+   * @param indexToSnapshot - スナップショットのindex -> タブ情報のマッピング
+   * @param closeCurrentTabs - 既存タブを閉じるかどうか
+   */
+  async restoreTreeStateFromSnapshot(
+    snapshotViews: Array<{ id: string; name: string; color: string }>,
+    indexToNewTabId: Map<number, number>,
+    indexToSnapshot: Map<number, {
+      index: number;
+      url: string;
+      title: string;
+      parentIndex: number | null;
+      viewId: string;
+      isExpanded: boolean;
+      pinned: boolean;
+      windowIndex?: number;
+    }>,
+    closeCurrentTabs: boolean
+  ): Promise<void> {
+    // 既存のビューとtabToNodeをコピーまたはクリア
+    const updatedViews: Map<string, ViewState> = new Map();
+    const updatedTabToNode: Map<number, { viewId: string; nodeId: string }> = new Map();
+
+    if (!closeCurrentTabs) {
+      // 既存のビューをコピー
+      for (const [viewId, viewState] of this.views) {
+        updatedViews.set(viewId, {
+          info: { ...viewState.info },
+          rootNodeIds: [...viewState.rootNodeIds],
+          nodes: { ...viewState.nodes },
+        });
+      }
+      // 既存のtabToNodeをコピー
+      for (const [tabId, mapping] of this.tabToNode) {
+        updatedTabToNode.set(tabId, { ...mapping });
+      }
+    }
+
+    // スナップショットのビューを追加（存在しない場合）
+    for (const view of snapshotViews) {
+      if (!updatedViews.has(view.id)) {
+        updatedViews.set(view.id, {
+          info: { id: view.id, name: view.name, color: view.color },
+          rootNodeIds: [],
+          nodes: {},
+        });
+      }
+    }
+
+    // デフォルトビューが存在しない場合は作成
+    if (!updatedViews.has('default')) {
+      updatedViews.set('default', {
+        info: { id: 'default', name: 'Default', color: '#3B82F6' },
+        rootNodeIds: [],
+        nodes: {},
+      });
+    }
+
+    // 一時的にすべてのノードを保持するマップ（親子関係構築用）
+    const allNewNodes: Map<string, TabNode> = new Map();
+    const nodeIdToViewId: Map<string, string> = new Map();
+
+    // 新しいノードを作成
+    for (const [index, newTabId] of indexToNewTabId) {
+      const snapshot = indexToSnapshot.get(index);
+      if (!snapshot) continue;
+
+      const nodeId = `node-${newTabId}`;
+      let parentId: string | null = null;
+      let depth = 0;
+
+      if (snapshot.parentIndex !== null) {
+        const parentTabId = indexToNewTabId.get(snapshot.parentIndex);
+        if (parentTabId !== undefined) {
+          parentId = `node-${parentTabId}`;
+          const parentNode = allNewNodes.get(parentId);
+          if (parentNode) {
+            depth = parentNode.depth + 1;
+          }
+        }
+      }
+
+      const newNode: TabNode = {
+        id: nodeId,
+        tabId: newTabId,
+        parentId,
+        children: [],
+        isExpanded: snapshot.isExpanded,
+        depth,
+      };
+
+      allNewNodes.set(nodeId, newNode);
+      nodeIdToViewId.set(nodeId, snapshot.viewId);
+      updatedTabToNode.set(newTabId, { viewId: snapshot.viewId, nodeId });
+    }
+
+    // 親子関係を構築（childrenを設定）
+    for (const [nodeId, node] of allNewNodes) {
+      if (node.parentId && allNewNodes.has(node.parentId)) {
+        const parent = allNewNodes.get(node.parentId)!;
+        const childExists = parent.children.some(c => c.id === nodeId);
+        if (!childExists) {
+          parent.children = [...parent.children, node];
+        }
+      }
+    }
+
+    // ノードを各ビューに配置
+    for (const [nodeId, node] of allNewNodes) {
+      const viewId = nodeIdToViewId.get(nodeId) || 'default';
+      let viewState = updatedViews.get(viewId);
+      if (!viewState) {
+        viewState = {
+          info: { id: viewId, name: viewId === 'default' ? 'Default' : 'View', color: '#3B82F6' },
+          rootNodeIds: [],
+          nodes: {},
+        };
+        updatedViews.set(viewId, viewState);
+      }
+      viewState.nodes[nodeId] = node;
+
+      // ルートノードの場合、rootNodeIdsに追加
+      if (!node.parentId) {
+        viewState.rootNodeIds.push(nodeId);
+      }
+    }
+
+    // メモリ上の状態を更新
+    this.views = updatedViews;
+    this.tabToNode = updatedTabToNode;
+
+    // viewOrderを更新（新しいビューを追加）
+    const existingViewOrder = new Set(this.viewOrder);
+    for (const viewId of updatedViews.keys()) {
+      if (!existingViewOrder.has(viewId)) {
+        this.viewOrder.push(viewId);
+      }
+    }
+
+    // 永続化
+    await this.persistState();
   }
 }

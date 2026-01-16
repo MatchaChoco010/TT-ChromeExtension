@@ -148,8 +148,10 @@ export async function waitForTabInTreeState(
   tabId: number,
   options: PollingOptions = {}
 ): Promise<void> {
+  // Service Workerの処理が遅れる場合（waitForSyncComplete等）に対応するため、
+  // デフォルトタイムアウトを15秒に設定
   const {
-    timeout = DEFAULT_TIMEOUT,
+    timeout = 15000,
     interval = 50,
     timeoutMessage = `Timeout waiting for tab ${tabId} to be added to tree`,
   } = options;
@@ -158,23 +160,69 @@ export async function waitForTabInTreeState(
 
   const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
+      // TreeStateManager（メモリ上）がSingle Source of Truthなので、
+      // chrome.storage.localではなくメモリ上の状態を直接確認する
       for (let i = 0; i < iterations; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as
-          | { tabToNode?: Record<number, string> }
-          | undefined;
-        if (treeState?.tabToNode?.[tabId]) {
+        const node = globalThis.treeStateManager?.getNodeByTabId?.(tabId);
+        if (node) {
           return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
-      return { success: false };
+
+      // タイムアウト時のデバッグ情報を収集
+      let tabExists = false;
+      let tabInfo: chrome.tabs.Tab | null = null;
+      try {
+        tabInfo = await chrome.tabs.get(tabId);
+        tabExists = true;
+      } catch {
+        tabExists = false;
+      }
+
+      const syncCompleted = globalThis.treeStateManager?.isSyncCompleted?.() ?? 'unknown';
+
+      // メモリ上のツリー状態を確認
+      const memoryNode = globalThis.treeStateManager?.getNodeByTabId?.(tabId);
+      const hasNodeInMemory = !!memoryNode;
+
+      // メモリ上のtabToNodeから全タブIDを取得
+      const treeState = globalThis.treeStateManager?.toJSON?.();
+      const registeredTabIds = treeState?.tabToNode
+        ? Object.keys(treeState.tabToNode).map(Number)
+        : [];
+
+      // 全Chromeタブを取得して比較
+      const allChromeTabs = await chrome.tabs.query({});
+      const allChromeTabIds = allChromeTabs.map(t => t.id).filter((id): id is number => id !== undefined);
+
+      // タブ作成ログを取得
+      const tabCreationLogs = globalThis.getTabCreationLogs?.(tabId) ?? [];
+      const recentLogs = globalThis.getTabCreationLogs?.() ?? [];
+      const last50Logs = recentLogs.slice(-50);
+
+      return {
+        success: false,
+        debug: {
+          tabId,
+          tabExistsInChrome: tabExists,
+          tabWindowId: tabInfo?.windowId,
+          registeredTabIds,
+          allChromeTabIds,
+          missingFromTree: allChromeTabIds.filter(id => !registeredTabIds.includes(id)),
+          syncCompleted,
+          hasNodeInMemory,
+          tabCreationLogs: tabCreationLogs.map(l => l.message),
+          last50Logs: last50Logs.map(l => `[tabId=${l.tabId}] ${l.message}`),
+        },
+      };
     },
     { tabId, iterations, interval }
   );
 
   if (!result.success) {
-    throw new Error(timeoutMessage);
+    const debugInfo = (result as { debug?: unknown }).debug;
+    throw new Error(`${timeoutMessage}\n[DEBUG] ${JSON.stringify(debugInfo, null, 2)}`);
   }
 }
 
@@ -191,7 +239,7 @@ export async function waitForTabRemovedFromTreeState(
   options: PollingOptions = {}
 ): Promise<void> {
   const {
-    timeout = DEFAULT_TIMEOUT,
+    timeout = 15000,
     interval = 50,
     timeoutMessage = `Timeout waiting for tab ${tabId} to be removed from tree`,
   } = options;
@@ -200,12 +248,11 @@ export async function waitForTabRemovedFromTreeState(
 
   const result = await serviceWorker.evaluate(
     async ({ tabId, iterations, interval }) => {
+      // TreeStateManager（メモリ上）がSingle Source of Truthなので、
+      // chrome.storage.localではなくメモリ上の状態を直接確認する
       for (let i = 0; i < iterations; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as
-          | { tabToNode?: Record<number, string> }
-          | undefined;
-        if (!treeState?.tabToNode?.[tabId]) {
+        const node = globalThis.treeStateManager?.getNodeByTabId?.(tabId);
+        if (!node) {
           return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
@@ -509,6 +556,46 @@ export async function waitForGroupRemovedFromStorage(
       return { success: false };
     },
     { groupId, iterations, interval }
+  );
+
+  if (!result.success) {
+    throw new Error(timeoutMessage);
+  }
+}
+
+/**
+ * syncWithChromeTabsが完了するまで待機
+ *
+ * Service WorkerのsyncCompletedフラグがtrueになるまでポーリングで待機する。
+ * これはタブ作成イベント（handleTabCreated）が処理されるために必要。
+ *
+ * @param serviceWorker - Service Worker
+ * @param options - ポーリングオプション
+ */
+export async function waitForSyncCompleted(
+  serviceWorker: Worker,
+  options: PollingOptions = {}
+): Promise<void> {
+  const {
+    timeout = 10000,
+    interval = 100,
+    timeoutMessage = 'Timeout waiting for syncWithChromeTabs to complete',
+  } = options;
+
+  const iterations = Math.ceil(timeout / interval);
+
+  const result = await serviceWorker.evaluate(
+    async ({ iterations, interval }) => {
+      for (let i = 0; i < iterations; i++) {
+        // @ts-expect-error accessing global treeStateManager
+        if (globalThis.treeStateManager?.isSyncCompleted?.()) {
+          return { success: true };
+        }
+        await new Promise((resolve) => setTimeout(resolve, interval));
+      }
+      return { success: false };
+    },
+    { iterations, interval }
   );
 
   if (!result.success) {

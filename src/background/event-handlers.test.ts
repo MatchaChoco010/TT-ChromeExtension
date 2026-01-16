@@ -37,6 +37,7 @@ describe('Service Worker - Tab Events', () => {
       viewOrder: ['default'],
       currentViewId: 'default',
       tabToNode: {},
+      treeStructure: [],
     });
 
     testTreeStateManager.resetForTesting();
@@ -138,7 +139,7 @@ describe('Service Worker - Tab Events', () => {
   it('chrome.tabs.onUpdated リスナーが登録されている', () => {
     registerTabEventListeners();
 
-    const changeInfo = { status: 'complete' };
+    const changeInfo: chrome.tabs.OnUpdatedInfo = { status: 'complete' };
     const mockTab = { id: 1, index: 0, windowId: 1 } as chrome.tabs.Tab;
     chromeMock.tabs.onUpdated.trigger(1, changeInfo, mockTab);
 

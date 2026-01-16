@@ -245,7 +245,10 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         payload: { tabId: node.tabId },
       });
     } else {
-      chrome.tabs.remove(node.tabId);
+      chrome.runtime.sendMessage({
+        type: 'CLOSE_TAB',
+        payload: { tabId: node.tabId },
+      });
     }
   };
 
@@ -257,7 +260,12 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         payload: { tabId: pendingCloseAction.tabIds[0] },
       });
     } else if (pendingCloseAction?.type === 'tabs') {
-      chrome.tabs.remove(pendingCloseAction.tabIds);
+      for (const tabId of pendingCloseAction.tabIds) {
+        chrome.runtime.sendMessage({
+          type: 'CLOSE_TAB',
+          payload: { tabId },
+        });
+      }
     }
     setPendingCloseAction(null);
   };
@@ -565,7 +573,10 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         payload: { tabId: node.tabId },
       });
     } else {
-      chrome.tabs.remove(node.tabId);
+      chrome.runtime.sendMessage({
+        type: 'CLOSE_TAB',
+        payload: { tabId: node.tabId },
+      });
     }
   };
 
@@ -577,7 +588,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         payload: { tabId: pendingCloseAction.tabIds[0] },
       });
     } else if (pendingCloseAction?.type === 'tabs') {
-      chrome.tabs.remove(pendingCloseAction.tabIds);
+      for (const tabId of pendingCloseAction.tabIds) {
+        chrome.runtime.sendMessage({
+          type: 'CLOSE_TAB',
+          payload: { tabId },
+        });
+      }
     }
     setPendingCloseAction(null);
   };
@@ -1071,7 +1087,10 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         onDragCancelProp();
       }
     }, [onDragCancelProp, handleDropTargetChange]),
-    onExternalDrop,
+    onExternalDrop: useCallback((tabId: number) => {
+      onExternalDrop?.(tabId);
+      setGlobalIsDragging(false);
+    }, [onExternalDrop]),
     dragOutBoundaryRef: sidePanelRef,
   });
 

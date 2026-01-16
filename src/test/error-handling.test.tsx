@@ -52,6 +52,7 @@ describe('エラーハンドリングとエッジケース', () => {
         discarded: false,
         autoDiscardable: true,
         groupId: -1,
+        frozen: false,
       };
 
       await treeStateManager.addTab(tab, null, 'view-1');
@@ -122,6 +123,7 @@ describe('エラーハンドリングとエッジケース', () => {
         viewOrder,
         currentViewId: 'view-1',
         tabToNode: {},
+        treeStructure: [],
       };
 
       await expect(
@@ -157,6 +159,7 @@ describe('エラーハンドリングとエッジケース', () => {
         discarded: false,
         autoDiscardable: true,
         groupId: -1,
+        frozen: false,
       };
 
       const tabB: chrome.tabs.Tab = {
@@ -171,6 +174,7 @@ describe('エラーハンドリングとエッジケース', () => {
         discarded: false,
         autoDiscardable: true,
         groupId: -1,
+        frozen: false,
       };
 
       const tabC: chrome.tabs.Tab = {
@@ -185,6 +189,7 @@ describe('エラーハンドリングとエッジケース', () => {
         discarded: false,
         autoDiscardable: true,
         groupId: -1,
+        frozen: false,
       };
 
       await treeStateManager.addTab(tabA, null, 'view-1');
@@ -222,6 +227,7 @@ describe('エラーハンドリングとエッジケース', () => {
         discarded: false,
         autoDiscardable: true,
         groupId: -1,
+        frozen: false,
       };
 
       await treeStateManager.addTab(tab, null, 'view-1');
@@ -477,7 +483,7 @@ describe('エラーハンドリングとエッジケース', () => {
       const storageService = new StorageService();
       const treeStateManager = new TreeStateManager(storageService);
 
-      const invalidTab = { id: undefined } as chrome.tabs.Tab;
+      const invalidTab = { id: undefined, frozen: false } as chrome.tabs.Tab;
 
       await expect(
         treeStateManager.addTab(invalidTab, null, 'view-1')

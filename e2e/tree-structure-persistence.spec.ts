@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
-import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
+import { createTab, closeTab, getTestServerUrl, getCurrentWindowId, collapseNode } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 import './types';
@@ -12,26 +12,35 @@ test.describe('Tree Structure Persistence', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      await setupWindow(extensionContext, serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentUrl = getTestServerUrl('/page');
       const parentTabId = await createTab(serviceWorker, parentUrl, undefined, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
 
       const childUrl = getTestServerUrl('/page2');
       const childTabId = await createTab(serviceWorker, childUrl, parentTabId, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       const grandchildUrl = getTestServerUrl('/page3');
-      await createTab(serviceWorker, grandchildUrl, childTabId, { active: false });
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const treeStructure = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: unknown[] };
-        return treeState?.treeStructure;
-      });
-
-      expect(treeStructure).toBeDefined();
-      expect(Array.isArray(treeStructure)).toBe(true);
+      const grandchildTabId = await createTab(serviceWorker, grandchildUrl, childTabId, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1, expanded: true },
+        { tabId: grandchildTabId, depth: 2 },
+      ], 0);
 
       interface TreeStructureEntry {
         url: string;
@@ -40,12 +49,31 @@ test.describe('Tree Structure Persistence', () => {
         isExpanded: boolean;
       }
 
-      const entries = treeStructure as TreeStructureEntry[];
+      await waitForCondition(async () => {
+        const structure = await serviceWorker.evaluate(async () => {
+          const result = await chrome.storage.local.get('tree_state');
+          const treeState = result.tree_state as { treeStructure?: Array<{ url: string }> };
+          return treeState?.treeStructure;
+        });
+        if (!structure || !Array.isArray(structure)) return false;
+        const hasParent = structure.some(e => e.url && e.url.includes('/page') && !e.url.includes('/page2') && !e.url.includes('/page3'));
+        const hasChild = structure.some(e => e.url && e.url.includes('/page2'));
+        const hasGrandchild = structure.some(e => e.url && e.url.includes('/page3'));
+        return hasParent && hasChild && hasGrandchild;
+      }, { timeout: 5000, timeoutMessage: 'treeStructure did not contain expected URLs' });
 
-      // 各タブのURLで検索
-      const parentEntry = entries.find(e => e.url.includes('/page') && !e.url.includes('/page2') && !e.url.includes('/page3'));
-      const childEntry = entries.find(e => e.url.includes('/page2'));
-      const grandchildEntry = entries.find(e => e.url.includes('/page3'));
+      const treeStructure = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { treeStructure?: unknown[] };
+        return treeState?.treeStructure;
+      }) as TreeStructureEntry[];
+
+      expect(treeStructure).toBeDefined();
+      expect(Array.isArray(treeStructure)).toBe(true);
+
+      const parentEntry = treeStructure.find(e => e.url.includes('/page') && !e.url.includes('/page2') && !e.url.includes('/page3'));
+      const childEntry = treeStructure.find(e => e.url.includes('/page2'));
+      const grandchildEntry = treeStructure.find(e => e.url.includes('/page3'));
 
       expect(parentEntry).toBeDefined();
       expect(childEntry).toBeDefined();
@@ -53,19 +81,32 @@ test.describe('Tree Structure Persistence', () => {
 
       expect(parentEntry?.parentIndex).toBeNull();
 
-      const parentIndex = entries.indexOf(parentEntry!);
+      const parentIndex = treeStructure.indexOf(parentEntry!);
       expect(childEntry?.parentIndex).toBe(parentIndex);
 
-      const childIndex = entries.indexOf(childEntry!);
+      const childIndex = treeStructure.indexOf(childEntry!);
       expect(grandchildEntry?.parentIndex).toBe(childIndex);
-      await serviceWorker.evaluate(async () => {
-        const tabs = await chrome.tabs.query({});
-        for (const tab of tabs) {
-          if (tab.id && (tab.url?.includes('/page3') || tab.url?.includes('/page2') || (tab.url?.includes('/page') && !tab.url?.includes('/page2') && !tab.url?.includes('/page3')))) {
-            try { await chrome.tabs.remove(tab.id); } catch { /* ignore */ }
-          }
-        }
-      });
+
+      await closeTab(serviceWorker, grandchildTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
+
+      await closeTab(serviceWorker, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('4階層（親→子→孫→ひ孫）の親子関係がtreeStructureに保存されること', async ({
@@ -73,27 +114,68 @@ test.describe('Tree Structure Persistence', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      await setupWindow(extensionContext, serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentUrl = getTestServerUrl('/page');
       const parentTabId = await createTab(serviceWorker, parentUrl, undefined, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
 
       const childUrl = getTestServerUrl('/page2');
       const childTabId = await createTab(serviceWorker, childUrl, parentTabId, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       const grandchildUrl = getTestServerUrl('/page3');
       const grandchildTabId = await createTab(serviceWorker, grandchildUrl, childTabId, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1, expanded: true },
+        { tabId: grandchildTabId, depth: 2 },
+      ], 0);
 
       const greatGrandchildUrl = getTestServerUrl('/page4');
       const greatGrandchildTabId = await createTab(serviceWorker, greatGrandchildUrl, grandchildTabId, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1, expanded: true },
+        { tabId: grandchildTabId, depth: 2, expanded: true },
+        { tabId: greatGrandchildTabId, depth: 3 },
+      ], 0);
 
-      await new Promise(resolve => setTimeout(resolve, 500));
       interface TreeStructureEntry {
         url: string;
         parentIndex: number | null;
         viewId: string;
         isExpanded: boolean;
       }
+
+      // treeStructureに期待するURLが永続化されるまで待機
+      await waitForCondition(async () => {
+        const structure = await serviceWorker.evaluate(async () => {
+          const result = await chrome.storage.local.get('tree_state');
+          const treeState = result.tree_state as { treeStructure?: Array<{ url: string }> };
+          return treeState?.treeStructure;
+        });
+        if (!structure || !Array.isArray(structure)) return false;
+        const hasParent = structure.some(e => e.url && e.url.includes('/page') && !e.url.includes('/page2') && !e.url.includes('/page3') && !e.url.includes('/page4'));
+        const hasChild = structure.some(e => e.url && e.url.includes('/page2'));
+        const hasGrandchild = structure.some(e => e.url && e.url.includes('/page3'));
+        const hasGreatGrandchild = structure.some(e => e.url && e.url.includes('/page4'));
+        return hasParent && hasChild && hasGrandchild && hasGreatGrandchild;
+      }, { timeout: 5000, timeoutMessage: 'treeStructure did not contain expected URLs for 4 levels' });
 
       const treeStructure = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
@@ -117,17 +199,47 @@ test.describe('Tree Structure Persistence', () => {
       expect(greatGrandchildEntry?.parentIndex).toBe(grandchildIdx);
 
       await closeTab(serviceWorker, greatGrandchildTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1, expanded: true },
+        { tabId: grandchildTabId, depth: 2 },
+      ], 0);
+
       await closeTab(serviceWorker, grandchildTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
+
       await closeTab(serviceWorker, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
       await closeTab(serviceWorker, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
 
       function entries(structure: TreeStructureEntry[], urlPart: string): TreeStructureEntry | undefined {
         const exactMatch = structure.find(e => {
-          const urlPath = new URL(e.url).pathname;
-          return urlPath === urlPart;
+          if (!e.url) return false;
+          try {
+            const urlPath = new URL(e.url).pathname;
+            return urlPath === urlPart;
+          } catch {
+            return false;
+          }
         });
         if (exactMatch) return exactMatch;
-        return structure.find(e => e.url.includes(urlPart));
+        return structure.find(e => e.url && e.url.includes(urlPart));
       }
     });
 
@@ -146,44 +258,29 @@ test.describe('Tree Structure Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      const newViewId = 'test-view-' + Date.now();
-      await serviceWorker.evaluate(async ({ viewId }) => {
-        interface ViewState {
-          info: { id: string; name: string; color: string };
-          rootNodeIds: string[];
-          nodes: Record<string, unknown>;
-        }
-        interface TreeStateWithViews {
-          views?: Record<string, ViewState>;
-          viewOrder?: string[];
-        }
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as TreeStateWithViews;
-        if (!treeState.views) {
-          treeState.views = {};
-        }
-        if (!treeState.viewOrder) {
-          treeState.viewOrder = [];
-        }
-        treeState.views[viewId] = {
-          info: { id: viewId, name: 'Test View', color: '#ff0000' },
-          rootNodeIds: [],
-          nodes: {},
-        };
-        treeState.viewOrder.push(viewId);
-        await chrome.storage.local.set({ tree_state: treeState });
-      }, { viewId: newViewId });
+      // メッセージ経由でビューを作成
+      await serviceWorker.evaluate(async () => {
+        return new Promise<void>((resolve) => {
+          chrome.runtime.sendMessage({ type: 'CREATE_VIEW' }, () => resolve());
+        });
+      });
 
+      // 作成されたビューIDを取得
+      const newViewId = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as { viewOrder?: string[] };
+        const viewOrder = treeState?.viewOrder || [];
+        return viewOrder[viewOrder.length - 1];
+      }) as string;
+
+      // メッセージ経由でタブをビューに移動
       await serviceWorker.evaluate(async ({ tabId, viewId }) => {
-        // @ts-expect-error accessing global treeStateManager
-        if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.loadState();
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.moveSubtreeToView(tabId, viewId);
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.refreshTreeStructure();
-        }
+        return new Promise<void>((resolve) => {
+          chrome.runtime.sendMessage({
+            type: 'MOVE_TABS_TO_VIEW',
+            payload: { targetViewId: viewId, tabIds: [tabId] },
+          }, () => resolve());
+        });
       }, { tabId, viewId: newViewId });
 
       await waitForCondition(
@@ -205,6 +302,10 @@ test.describe('Tree Structure Persistence', () => {
       );
 
       await closeTab(serviceWorker, tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
 
     test('isExpandedが正しくtreeStructureに保存されること', async ({
@@ -212,42 +313,26 @@ test.describe('Tree Structure Persistence', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId: _initialBrowserTabId, sidePanelPage: _sidePanelPage, pseudoSidePanelTabId: _pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'), undefined, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
       const childTabId = await createTab(serviceWorker, getTestServerUrl('/page2'), parentTabId, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
-      await serviceWorker.evaluate(async ({ tabId }) => {
-        interface TreeNode {
-          isExpanded: boolean;
-        }
-        interface ViewState {
-          nodes: Record<string, TreeNode>;
-        }
-        interface TreeState {
-          views: Record<string, ViewState>;
-          tabToNode: Record<number, { viewId: string; nodeId: string }>;
-        }
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as TreeState;
-        const nodeInfo = treeState.tabToNode[tabId];
-        if (nodeInfo) {
-          const viewState = treeState.views[nodeInfo.viewId];
-          if (viewState && viewState.nodes[nodeInfo.nodeId]) {
-            viewState.nodes[nodeInfo.nodeId].isExpanded = false;
-            await chrome.storage.local.set({ tree_state: treeState });
-          }
-        }
-
-        // @ts-expect-error accessing global treeStateManager
-        if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.loadState();
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.refreshTreeStructure();
-        }
-      }, { tabId: parentTabId });
+      // UIを通じてノードを折りたたむ
+      await collapseNode(sidePanelPage, parentTabId);
 
       await waitForCondition(
         async () => {
@@ -268,7 +353,17 @@ test.describe('Tree Structure Persistence', () => {
       );
 
       await closeTab(serviceWorker, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
       await closeTab(serviceWorker, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 
@@ -278,13 +373,25 @@ test.describe('Tree Structure Persistence', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      await setupWindow(extensionContext, serviceWorker, windowId);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentUrl = getTestServerUrl('/page');
       const parentTabId = await createTab(serviceWorker, parentUrl, undefined, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
 
       const childUrl = getTestServerUrl('/page2');
       const childTabId = await createTab(serviceWorker, childUrl, parentTabId, { active: false });
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       interface TreeStructureEntry {
         url: string;
@@ -349,7 +456,17 @@ test.describe('Tree Structure Persistence', () => {
       );
 
       await closeTab(serviceWorker, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
       await closeTab(serviceWorker, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
     });
   });
 });

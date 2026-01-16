@@ -67,6 +67,8 @@ export async function resetExtensionState(
   );
 
   // Step 3: メモリ上の状態をクリア
+  // prepareForSyncReset()を使用して同期待機中のウェイターを解決し、
+  // 同期フラグを適切にリセットする
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -77,23 +79,22 @@ export async function resetExtensionState(
         views: Map<string, unknown>;
         viewOrder: string[];
         currentViewId: string;
-        syncCompleted: boolean;
-        syncInProgress: boolean;
+        prepareForSyncReset: () => void;
       } }).treeStateManager;
       if (treeStateManager) {
         treeStateManager.tabToNode.clear();
         treeStateManager.views.clear();
         treeStateManager.viewOrder = [];
         treeStateManager.currentViewId = 'default';
-        treeStateManager.syncCompleted = false;
-        treeStateManager.syncInProgress = false;
+        treeStateManager.prepareForSyncReset();
       }
 
-      const g = globalThis as unknown as { pendingTabParents?: Map<unknown, unknown>; pendingDuplicateSources?: Map<unknown, unknown>; pendingGroupTabIds?: Map<unknown, unknown>; pendingLinkClicks?: Map<unknown, unknown> };
+      const g = globalThis as unknown as { pendingTabParents?: Map<unknown, unknown>; pendingDuplicateSources?: Map<unknown, unknown>; pendingGroupTabIds?: Map<unknown, unknown>; pendingLinkClicks?: Map<unknown, unknown>; clearTabCreationLogs?: () => void };
       g.pendingTabParents?.clear();
       g.pendingDuplicateSources?.clear();
       g.pendingGroupTabIds?.clear();
       g.pendingLinkClicks?.clear();
+      g.clearTabCreationLogs?.();
     },
     10000,
     'clearMemoryState'
@@ -205,15 +206,17 @@ export async function resetExtensionState(
   );
 
   // Step 9: Chromeタブと同期
-  // Step 4でウィンドウ作成時にsyncWithChromeTabsが呼ばれてsyncCompletedがtrueになっている可能性があるため
-  // 再度フラグをリセットしてからsyncWithChromeTabsを呼ぶ
+  // prepareForSyncReset()を使用して同期状態を適切にリセットする:
+  // 1. 前のテストからの古いウェイターを解決（タイムアウト防止）
+  // 2. syncCompletedResolversをクリア
+  // 3. syncCompleted/syncInProgressをfalseにリセット
+  // これにより、次のsyncWithChromeTabsが確実に実行される
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: { syncWithChromeTabs: () => Promise<void>; syncCompleted: boolean; syncInProgress: boolean } }).treeStateManager;
+      const treeStateManager = (globalThis as unknown as { treeStateManager?: { prepareForSyncReset: () => void; syncWithChromeTabs: () => Promise<void> } }).treeStateManager;
       if (treeStateManager) {
-        treeStateManager.syncCompleted = false;
-        treeStateManager.syncInProgress = false;
+        treeStateManager.prepareForSyncReset();
         await treeStateManager.syncWithChromeTabs();
       }
     },
@@ -221,7 +224,31 @@ export async function resetExtensionState(
     'syncWithChromeTabs'
   );
 
-  // Step 10: リセット後の状態を検証（新しいウィンドウのタブのみ存在すること）
+  // Step 10: syncCompletedがtrueであることを検証
+  // syncWithChromeTabsが正常に完了していれば、syncCompleted = trueになる
+  // これがfalseの場合、handleTabCreatedがwaitForSyncCompleteでブロックされる
+  const syncStatus = await evaluateWithTimeout(
+    serviceWorker,
+    async () => {
+      const treeStateManager = (globalThis as unknown as { treeStateManager?: { isSyncCompleted: () => boolean; isSyncInProgress: () => boolean } }).treeStateManager;
+      return {
+        syncCompleted: treeStateManager?.isSyncCompleted() ?? false,
+        syncInProgress: treeStateManager?.isSyncInProgress() ?? false,
+      };
+    },
+    5000,
+    'verifySyncCompleted'
+  );
+
+  if (!syncStatus.syncCompleted) {
+    throw new Error(
+      `Reset failed: syncCompleted is false after syncWithChromeTabs. ` +
+      `syncInProgress: ${syncStatus.syncInProgress}. ` +
+      `This will cause handleTabCreated to timeout waiting for sync.`
+    );
+  }
+
+  // Step 11: リセット後の状態を検証（新しいウィンドウのタブのみ存在すること）
   const remainingTabCount = await serviceWorker.evaluate(async () => {
     const tabs = await chrome.tabs.query({});
     return tabs.length;

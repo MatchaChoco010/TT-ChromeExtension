@@ -20,7 +20,6 @@ interface SidePanelRootProps {
 const TreeViewContent: React.FC = () => {
   const {
     treeState,
-    updateTreeState,
     handleDragEnd,
     handleSiblingDrop,
     switchView,
@@ -120,31 +119,16 @@ const TreeViewContent: React.FC = () => {
   }, []);
 
   const handleNodeClick = (tabId: number) => {
-    chrome.tabs.update(tabId, { active: true });
+    chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId } });
   };
 
-  const handleToggleExpand = (nodeId: string) => {
-    if (!treeState) return;
-
-    const viewState = treeState.views[currentViewId];
-    if (!viewState) return;
-
-    const updatedNodes = { ...viewState.nodes };
-    const node = updatedNodes[nodeId];
-    if (node) {
-      updatedNodes[nodeId] = { ...node, isExpanded: !node.isExpanded };
-      updateTreeState({
-        ...treeState,
-        views: {
-          ...treeState.views,
-          [currentViewId]: {
-            ...viewState,
-            nodes: updatedNodes,
-          },
-        },
-      });
-    }
-  };
+  const handleToggleExpand = useCallback((nodeId: string) => {
+    // ServiceWorkerにメッセージを送信してノードの展開状態をトグル
+    chrome.runtime.sendMessage({
+      type: 'TOGGLE_NODE_EXPAND',
+      payload: { nodeId, viewId: currentViewId },
+    });
+  }, [currentViewId]);
 
   // 現在のビューのViewStateを取得（buildTreeの前に定義する必要がある）
   const currentViewState = useMemo(() => {
@@ -232,7 +216,7 @@ const TreeViewContent: React.FC = () => {
   const handlePinnedTabClick = (tabId: number) => {
     // ピン留めタブをクリックしたとき、通常タブの選択状態をクリアする
     clearSelection();
-    chrome.tabs.update(tabId, { active: true });
+    chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId } });
   };
 
   const [pinnedContextMenu, setPinnedContextMenu] = useState<{

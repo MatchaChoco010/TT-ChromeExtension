@@ -10,7 +10,7 @@
  */
 import type { Page, Worker } from '@playwright/test';
 import type { TestGlobals } from '../types';
-import { waitForTabStatusComplete } from './polling-utils';
+import { waitForTabStatusComplete, waitForTabInTreeState } from './polling-utils';
 
 declare let globalThis: TestGlobals;
 
@@ -101,97 +101,13 @@ export async function createTab(
     { url, parentTabId, active, index, windowId }
   );
 
-  await serviceWorker.evaluate(
-    async (tabId) => {
-      for (let i = 0; i < 100; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        if (treeState?.tabToNode?.[tabId!]) {
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-      throw new Error(`Timeout waiting for tab ${tabId} to be added to tree`);
-    },
-    tab.id
-  );
+  // まずタブがツリーに追加されるまで待機（parentTabId有無に関わらず必須）
+  await waitForTabInTreeState(serviceWorker, tab.id!);
 
   if (parentTabId !== undefined) {
-    await serviceWorker.evaluate(
-      async ({ tabId, parentTabId }) => {
-        interface TreeNode {
-          parentId: string | null;
-          depth: number;
-          isExpanded?: boolean;
-        }
-        interface ViewState {
-          info: { id: string; name: string; color: string };
-          rootNodeIds: string[];
-          nodes: Record<string, TreeNode>;
-        }
-        interface LocalTreeState {
-          tabToNode: Record<number, { viewId: string; nodeId: string }>;
-          views: Record<string, ViewState>;
-          viewOrder: string[];
-          currentViewId: string;
-        }
-
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState) return;
-
-        const childNodeInfo = treeState.tabToNode[tabId];
-        const parentNodeInfo = treeState.tabToNode[parentTabId];
-
-        if (!childNodeInfo || !parentNodeInfo) return;
-
-        const childViewId = childNodeInfo.viewId;
-        const childNodeId = childNodeInfo.nodeId;
-        const parentViewId = parentNodeInfo.viewId;
-        const parentNodeId = parentNodeInfo.nodeId;
-
-        // 親と子が同じビューにいるか確認
-        if (childViewId !== parentViewId) return;
-
-        const viewState = treeState.views[childViewId];
-        if (!viewState) return;
-
-        const childNode = viewState.nodes[childNodeId];
-        const parentNode = viewState.nodes[parentNodeId];
-
-        if (childNode && parentNode) {
-          childNode.parentId = parentNodeId;
-          const parentDepth = parentNode.depth || 0;
-          childNode.depth = parentDepth + 1;
-
-          // 子タブ作成時に親ノードを展開（handleTabCreatedの動作を模倣）
-          parentNode.isExpanded = true;
-
-          await chrome.storage.local.set({ tree_state: treeState });
-
-          // ストレージからtreeStateManagerを再読み込みしてメモリ内状態を同期し、
-          // refreshTreeStructureを呼び出してtreeStructureを再構築して保存する
-          // @ts-expect-error accessing global treeStateManager
-          if (globalThis.treeStateManager) {
-            // @ts-expect-error accessing global treeStateManager
-            await globalThis.treeStateManager.loadState();
-            // @ts-expect-error accessing global treeStateManager
-            await globalThis.treeStateManager.refreshTreeStructure();
-          }
-
-          try {
-            await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
-          } catch {
-            // リスナーが存在しない場合のエラーは無視
-          }
-        }
-      },
-      { tabId: tab.id!, parentTabId }
-    );
-
-    await serviceWorker.evaluate(
+    // handleTabCreatedがpendingTabParentsを使用して親子関係を設定する
+    // タブがツリーに追加された後、親子関係が正しく設定されるまで待機
+    const parentChildSet = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
         interface TreeNode {
           parentId: string | null;
@@ -205,7 +121,7 @@ export async function createTab(
           tabToNode: Record<number, { viewId: string; nodeId: string }>;
           views: Record<string, ViewState>;
         }
-        for (let i = 0; i < 50; i++) {
+        for (let i = 0; i < 100; i++) {
           const result = await chrome.storage.local.get('tree_state');
           const treeState = result.tree_state as LocalTreeState | undefined;
           if (treeState?.views && treeState?.tabToNode) {
@@ -216,16 +132,23 @@ export async function createTab(
               if (viewState) {
                 const childNode = viewState.nodes[childNodeInfo.nodeId];
                 if (childNode && childNode.parentId === parentNodeInfo.nodeId) {
-                  return;
+                  return true;
                 }
               }
             }
           }
           await new Promise(resolve => setTimeout(resolve, 20));
         }
+        return false;
       },
       { parentTabId, childTabId: tab.id! }
     );
+
+    if (!parentChildSet) {
+      throw new Error(
+        `Timeout waiting for parent-child relationship: parentTabId=${parentTabId}, childTabId=${tab.id}`
+      );
+    }
   }
 
   return tab.id as number;
@@ -241,27 +164,6 @@ export async function closeTab(serviceWorker: Worker, tabId: number): Promise<vo
   await serviceWorker.evaluate((tabId) => {
     return chrome.tabs.remove(tabId);
   }, tabId);
-
-  const result = await serviceWorker.evaluate(
-    async (tabId) => {
-      for (let i = 0; i < 100; i++) {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        if (!treeState?.tabToNode?.[tabId]) {
-          return { success: true };
-        }
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-      return { success: false };
-    },
-    tabId
-  );
-
-  if (!result.success) {
-    throw new Error(`Timeout waiting for tab ${tabId} to be removed from tree`);
-  }
 }
 
 /**
@@ -295,12 +197,6 @@ export async function activateTab(
   if (!result.success) {
     throw new Error(`Timeout waiting for tab ${tabId} to become active`);
   }
-
-  // handleTabActivatedが完了してlastActiveTabByWindowが更新されるのを待機
-  await serviceWorker.evaluate(async () => {
-    const g = globalThis as unknown as { prepareForReset: () => Promise<void> };
-    await g.prepareForReset();
-  });
 }
 
 /**
@@ -393,28 +289,6 @@ export async function updateTabUrl(serviceWorker: Worker, tabId: number, url: st
     throw new Error(`Timeout waiting for tab ${tabId} URL to contain "${url}"`);
   }
 }
-
-/**
- * Side PanelのUIを再読み込みして最新のストレージ状態を反映
- *
- * @param serviceWorker - Service Worker
- * @param page - Side PanelのPage
- */
-export async function refreshSidePanel(
-  serviceWorker: Worker,
-  page: Page
-): Promise<void> {
-  await serviceWorker.evaluate(async () => {
-    try {
-      await chrome.runtime.sendMessage({ type: 'STATE_UPDATED' });
-    } catch {
-      // リスナーが存在しない場合のエラーは無視
-    }
-  });
-
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 50)));
-}
-
 
 /**
  * 現在のウィンドウIDを取得
@@ -638,5 +512,27 @@ export async function clickLinkToNavigate(
   if (tabId) {
     await waitForTabStatusComplete(serviceWorker, tabId);
   }
+}
+
+/**
+ * UIの展開/折りたたみボタンをクリックしてノードを折りたたむ
+ *
+ * @param page - サイドパネルページ
+ * @param tabId - 折りたたむタブのID
+ */
+export async function collapseNode(page: Page, tabId: number): Promise<void> {
+  const collapseButton = page.locator(`[data-testid="tree-node-${tabId}"] button[aria-label="Collapse"]`).first();
+  await collapseButton.click();
+}
+
+/**
+ * UIの展開/折りたたみボタンをクリックしてノードを展開する
+ *
+ * @param page - サイドパネルページ
+ * @param tabId - 展開するタブのID
+ */
+export async function expandNode(page: Page, tabId: number): Promise<void> {
+  const expandButton = page.locator(`[data-testid="tree-node-${tabId}"] button[aria-label="Expand"]`).first();
+  await expandButton.click();
 }
 

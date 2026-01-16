@@ -96,7 +96,12 @@ export interface TreeState {
    * ツリー構造（順序付き）
    * ブラウザ再起動時にタブIDが変わっても親子関係を復元するために使用
    */
-  treeStructure?: TreeStructureEntry[];
+  treeStructure: TreeStructureEntry[];
+  /**
+   * ウィンドウ毎のピン留めタブIDリスト（順序付き）
+   * TreeStateManagerがピン留め状態のSingle Source of Truth
+   */
+  pinnedTabIdsByWindow?: Record<number, number[]>;
 }
 
 /** タブタイトルマップ (tabId -> title) */
@@ -223,7 +228,79 @@ export type MessageType =
   | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
   | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
   | { type: 'NOTIFY_DRAG_OUT' }
-  | { type: 'DRAG_SESSION_ENDED' };
+  | { type: 'DRAG_SESSION_ENDED' }
+  | { type: 'CLOSE_OTHER_TABS'; payload: { excludeTabIds: number[] } }
+  | { type: 'DUPLICATE_TABS'; payload: { tabIds: number[] } }
+  | { type: 'PIN_TABS'; payload: { tabIds: number[] } }
+  | { type: 'UNPIN_TABS'; payload: { tabIds: number[] } }
+  | { type: 'MOVE_TABS_TO_NEW_WINDOW'; payload: { tabIds: number[] } }
+  | { type: 'RELOAD_TABS'; payload: { tabIds: number[] } }
+  | { type: 'DISCARD_TABS'; payload: { tabIds: number[] } }
+  | { type: 'REORDER_PINNED_TAB'; payload: { tabId: number; newIndex: number } }
+  | {
+      type: 'MOVE_NODE';
+      payload: {
+        nodeId: string;
+        targetParentId: string;
+        viewId: string;
+        selectedNodeIds: string[];
+      };
+    }
+  | {
+      type: 'MOVE_NODE_AS_SIBLING';
+      payload: {
+        nodeId: string;
+        aboveNodeId?: string;
+        belowNodeId?: string;
+        viewId: string;
+        selectedNodeIds: string[];
+      };
+    }
+  | {
+      type: 'SWITCH_VIEW';
+      payload: {
+        viewId: string;
+        windowId: number;
+        previousViewId: string;
+        activeTabId: number | null;
+      };
+    }
+  | { type: 'CREATE_VIEW' }
+  | { type: 'DELETE_VIEW'; payload: { viewId: string } }
+  | {
+      type: 'UPDATE_VIEW';
+      payload: { viewId: string; updates: Partial<View> };
+    }
+  | {
+      type: 'TOGGLE_NODE_EXPAND';
+      payload: { nodeId: string; viewId: string };
+    }
+  | {
+      type: 'MOVE_TABS_TO_VIEW';
+      payload: { targetViewId: string; tabIds: number[] };
+    }
+  | {
+      type: 'DELETE_TREE_GROUP';
+      payload: { groupId: string; viewId: string };
+    }
+  | {
+      type: 'ADD_TAB_TO_TREE_GROUP';
+      payload: { nodeId: string; groupId: string; viewId: string };
+    }
+  | {
+      type: 'REMOVE_TAB_FROM_TREE_GROUP';
+      payload: { nodeId: string; viewId: string };
+    }
+  | {
+      type: 'SAVE_GROUPS';
+      payload: { groups: Record<string, Group> };
+    }
+  | {
+      type: 'SAVE_USER_SETTINGS';
+      payload: { settings: UserSettings };
+    }
+  | { type: 'CREATE_NEW_TAB' }
+  | { type: 'OPEN_SETTINGS_TAB' };
 
 export type MessageResponse<T> =
   | { success: true; data: T }
