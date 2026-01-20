@@ -191,7 +191,6 @@ test.describe('複数選択機能', () => {
     const contextMenu = sidePanelPage.locator('[role="menu"]');
     await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
-    // 件数表示は削除されたため、「選択されたタブを閉じる」のみを確認
     const closeMenuItem = sidePanelPage.getByRole('menuitem', { name: '選択されたタブを閉じる' });
     await expect(closeMenuItem).toBeVisible();
 

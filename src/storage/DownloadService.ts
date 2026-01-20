@@ -7,8 +7,6 @@ export class DownloadService implements IDownloadService {
   /**
    * スナップショットをJSONファイルとしてダウンロード
    *
-   * Service Workerでは URL.createObjectURL が使えないため、data URL を使用
-   *
    * @param jsonContent - JSON文字列
    * @param filename - ファイル名
    * @param subfolder - サブフォルダ名（省略時はダウンロードフォルダ直下）
@@ -39,10 +37,6 @@ export class DownloadService implements IDownloadService {
 
   /**
    * ダウンロードが完了するまで待機
-   *
-   * レースコンディション対策:
-   * リスナーを先に追加してから状態を確認することで、
-   * 「状態確認→リスナー追加」の間にダウンロードが完了するケースを防ぐ
    */
   private async waitForDownloadComplete(downloadId: number): Promise<void> {
     return new Promise((resolve, reject) => {

@@ -1282,7 +1282,6 @@ describe('TabTreeView', () => {
       mockGetTabInfo.mockReset();
     });
 
-    // グループテスト用のgroupsオブジェクトを生成するヘルパー
     const createMockGroups = (groupId: string) => ({
       [groupId]: {
         id: groupId,
@@ -1434,7 +1433,6 @@ describe('TabTreeView', () => {
     });
 
     it('グループノードと通常のタブノードが混在する場合、両方が正しくレンダリングされること', () => {
-      // グループノード
       const groupNode = createMockGroupNode('group-100', 100, 'default');
       const groupChildNode: TabNode = {
         ...createMockNode('node-1', 1, 'default', 'group-100'),
@@ -1443,7 +1441,6 @@ describe('TabTreeView', () => {
       };
       groupNode.children = [groupChildNode];
 
-      // 通常のタブノード
       const regularNode = createMockNode('node-2', 2, 'default');
 
       mockGetTabInfo.mockImplementation((tabId: number) => {

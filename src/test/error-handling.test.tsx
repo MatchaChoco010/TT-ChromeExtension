@@ -39,7 +39,6 @@ describe('エラーハンドリングとエッジケース', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.tabs.move).mockRejectedValue(new Error('Move failed'));
 
-      // タブを追加
       const tab: chrome.tabs.Tab = {
         id: 1,
         index: 0,
@@ -103,7 +102,6 @@ describe('エラーハンドリングとエッジケース', () => {
     it('chrome.storage.local.set がQUOTA_BYTES_PER_ITEMエラーを投げたとき警告を表示', async () => {
       const storageService = new StorageService();
 
-      // ストレージAPIをモック（容量超過エラー）
       const quotaError = new Error('QUOTA_BYTES_PER_ITEM quota exceeded');
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.storage.local.set).mockRejectedValue(quotaError);
@@ -291,7 +289,6 @@ describe('エラーハンドリングとエッジケース', () => {
         );
       });
 
-      // エラー通知が表示されるまで待機
       await waitFor(
         () => {
           const errorNotification = document.getElementById('vivaldi-tt-css-error');
@@ -388,7 +385,6 @@ describe('エラーハンドリングとエッジケース', () => {
         { timeout: 3000 }
       );
 
-      // エラー通知が表示されていないことを確認
       const errorNotification = document.getElementById('vivaldi-tt-css-error');
       expect(errorNotification).toBeNull();
     });

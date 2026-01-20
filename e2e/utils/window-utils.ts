@@ -252,12 +252,10 @@ export async function openSidePanelForWindow(
     }, sidePanelTabId);
 
     if (currentWindowId !== windowId) {
-      // sidePanelPageが別のウィンドウに開かれている場合、正しいウィンドウに移動
       await serviceWorker.evaluate(async ({ tabId, targetWindowId }) => {
         await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
       }, { tabId: sidePanelTabId, targetWindowId: windowId });
 
-      // 移動後に少し待機
       await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
     }
   }

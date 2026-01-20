@@ -147,7 +147,6 @@ describe('calculateDropTarget with subtree exclusion', () => {
     { nodeId: 'tab-C', top: 120, bottom: 150, depth: 0 },
   ];
 
-  // サブツリーノードID取得のモック関数
   const getSubtreeNodeIds = (nodeId: string): string[] => {
     if (nodeId === 'tab-A') {
       return ['tab-A', 'child-1', 'child-2'];

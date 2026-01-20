@@ -780,7 +780,6 @@ test.describe('chrome.tabs API統合', () => {
         { tabId: tabC, depth: 0 },
       ], 0);
 
-      // Chrome API経由でタブCをタブAの前に移動しようとする
       await serviceWorker.evaluate(async ({ tabId, targetIndex }) => {
         await chrome.tabs.move(tabId, { index: targetIndex });
       }, { tabId: tabC, targetIndex: 0 });

@@ -47,7 +47,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製タブが作成されるまでポーリングで待機
       let newTabId: number | undefined;
       await expect(async () => {
         newTabId = await serviceWorker.evaluate(async (excludeIds) => {
@@ -140,7 +139,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製タブが作成されるまでポーリングで待機
       let duplicatedTabId: number | undefined;
       await expect(async () => {
         duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
@@ -233,7 +231,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製タブが作成されるまでポーリングで待機
       let duplicatedTabId: number | undefined;
       await expect(async () => {
         duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
@@ -317,7 +314,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製タブが作成されるまでポーリングで待機
       let duplicatedTabId: number | undefined;
       await expect(async () => {
         duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
@@ -411,7 +407,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製タブが作成されるまでポーリングで待機
       let duplicatedTabId: number | undefined;
       await expect(async () => {
         duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
@@ -490,7 +485,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製タブが作成されるまでポーリングで待機
       let duplicatedTabId: number | undefined;
       await expect(async () => {
         duplicatedTabId = await serviceWorker.evaluate(async (excludeIds) => {
@@ -589,7 +583,6 @@ test.describe('タブ複製時の配置', () => {
 
       const knownTabIds = [initialBrowserTabId, pseudoSidePanelTabId, parentTabId, child1TabId, child2TabId, grandchildTabId];
 
-      // 複製されたタブがChrome APIで見つかるまでポーリング
       let duplicatedChild2TabId: number | undefined;
       const startTime = Date.now();
       const timeout = 15000;
@@ -621,9 +614,7 @@ test.describe('タブ複製時の配置', () => {
         { tabId: duplicatedChild2TabId!, depth: 1, expanded: false },
       ], 0);
 
-      // duplicated child2とその子（duplicated grandchild）を閉じる
       await closeTab(serviceWorker, duplicatedChild2TabId!);
-      // duplicated grandchildもツリーから削除される（子タブの処理による）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -706,7 +697,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製されたタブがツリービューに表示されるまで待機
       await expect.poll(async () => {
         const tabs = await serviceWorker.evaluate(async () => {
           const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -715,7 +705,6 @@ test.describe('タブ複製時の配置', () => {
         return tabs.length;
       }, { timeout: 10000 }).toBe(7);
 
-      // ツリービューに7つのタブが表示されていることを確認
       await expect.poll(async () => {
         const nodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').all();
         return nodes.length;
@@ -784,7 +773,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製されたタブがツリービューに表示されるまで待機
       await expect.poll(async () => {
         const tabs = await serviceWorker.evaluate(async () => {
           const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -793,7 +781,6 @@ test.describe('タブ複製時の配置', () => {
         return tabs.length;
       }, { timeout: 10000 }).toBe(7);
 
-      // ツリービューに7つのタブが表示されていることを確認
       await expect.poll(async () => {
         const nodes = await sidePanelPage.locator('[data-testid^="tree-node-"]').all();
         return nodes.length;
@@ -845,14 +832,12 @@ test.describe('タブ複製時の配置', () => {
         { timeout: 5000 }
       );
 
-      // tabId1とtabId2を選択
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
 
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
       await tabNode2.click({ modifiers: ['Shift'] });
 
-      // コンテキストメニューを開いて複製
       await tabNode2.click({ button: 'right' });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
 
@@ -862,7 +847,6 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製されたタブがツリービューに表示されるまで待機
       await expect.poll(async () => {
         const tabs = await serviceWorker.evaluate(async () => {
           const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -871,7 +855,6 @@ test.describe('タブ複製時の配置', () => {
         return tabs.length;
       }, { timeout: 10000 }).toBe(6); // 初期2 + 作成2 + 複製2 = 6
 
-      // 複製されたタブのIDを取得
       const allTabIds = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
         return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
@@ -880,28 +863,21 @@ test.describe('タブ複製時の配置', () => {
         id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId && id !== tabId1 && id !== tabId2
       );
 
-      // 期待される順序:
-      // initialBrowserTab, pseudoSidePanelTab, tabId1, 複製1, tabId2, 複製2
-      // 各複製タブが対応する元のタブの直後に配置されていることを確認
       const tabOrder = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
         return tabs.sort((a, b) => a.index - b.index).map(t => t.id);
       });
 
-      // tabId1の直後に複製タブ1があることを確認
       const tabId1Index = tabOrder.indexOf(tabId1);
       const duplicatedTab1 = tabOrder[tabId1Index + 1];
       expect(duplicatedTabIds).toContain(duplicatedTab1);
 
-      // tabId2の直後に複製タブ2があることを確認
       const tabId2Index = tabOrder.indexOf(tabId2);
       const duplicatedTab2 = tabOrder[tabId2Index + 1];
       expect(duplicatedTabIds).toContain(duplicatedTab2);
 
-      // 2つの複製タブが異なることを確認
       expect(duplicatedTab1).not.toBe(duplicatedTab2);
 
-      // クリーンアップ
       for (const tabId of allTabIds.filter(id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId)) {
         await closeTab(serviceWorker, tabId);
       }
@@ -916,7 +892,6 @@ test.describe('タブ複製時の配置', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 3タブを作成
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -955,14 +930,12 @@ test.describe('タブ複製時の配置', () => {
         { timeout: 5000 }
       );
 
-      // tabId1, tabId2, tabId3を全て選択
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
 
       const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);
       await tabNode3.click({ modifiers: ['Shift'] });
 
-      // コンテキストメニューを開いて複製
       await tabNode3.click({ button: 'right' });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
 
@@ -972,16 +945,14 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製されたタブがツリービューに表示されるまで待機（初期2 + 作成3 + 複製3 = 8）
       await expect.poll(async () => {
         const tabs = await serviceWorker.evaluate(async () => {
           const tabs = await chrome.tabs.query({ currentWindow: true });
           return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
         });
         return tabs.length;
-      }, { timeout: 10000 }).toBe(8);
+      }, { timeout: 10000 }).toBe(8); // 初期2 + 作成3 + 複製3 = 8
 
-      // 複製されたタブのIDを取得
       const allTabIds = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
         return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
@@ -990,32 +961,25 @@ test.describe('タブ複製時の配置', () => {
         id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId && id !== tabId1 && id !== tabId2 && id !== tabId3
       );
 
-      // Chrome APIのタブ順序を取得
       const tabOrder = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
         return tabs.sort((a, b) => a.index - b.index).map(t => t.id);
       });
 
-      // tabId1の直後に複製タブ1があることを確認
       const tabId1Index = tabOrder.indexOf(tabId1);
       const duplicatedTab1 = tabOrder[tabId1Index + 1];
       expect(duplicatedTabIds).toContain(duplicatedTab1);
 
-      // tabId2の直後に複製タブ2があることを確認
       const tabId2Index = tabOrder.indexOf(tabId2);
       const duplicatedTab2 = tabOrder[tabId2Index + 1];
       expect(duplicatedTabIds).toContain(duplicatedTab2);
 
-      // tabId3の直後に複製タブ3があることを確認
       const tabId3Index = tabOrder.indexOf(tabId3);
       const duplicatedTab3 = tabOrder[tabId3Index + 1];
       expect(duplicatedTabIds).toContain(duplicatedTab3);
 
-      // 3つの複製タブが全て異なることを確認
       expect(new Set([duplicatedTab1, duplicatedTab2, duplicatedTab3]).size).toBe(3);
 
-      // DOM上の表示順序も確認（rootNodeIds順序）
-      // 期待値: tabId1 → dup1 → tabId2 → dup2 → tabId3 → dup3
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -1027,7 +991,6 @@ test.describe('タブ複製時の配置', () => {
         { tabId: duplicatedTab3!, depth: 0 },
       ], 0);
 
-      // クリーンアップ
       for (const tabId of allTabIds.filter(id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId)) {
         await closeTab(serviceWorker, tabId);
       }
@@ -1071,14 +1034,12 @@ test.describe('タブ複製時の配置', () => {
         { timeout: 5000 }
       );
 
-      // tabId1とtabId2を選択
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       await tabNode1.click();
 
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
       await tabNode2.click({ modifiers: ['Shift'] });
 
-      // コンテキストメニューを開いて複製
       await tabNode2.click({ button: 'right' });
       await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 5000 });
 
@@ -1088,29 +1049,24 @@ test.describe('タブ複製時の配置', () => {
 
       await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-      // 複製されたタブがツリービューに表示されるまで待機（初期2 + 作成2 + 複製2 = 6）
       await expect.poll(async () => {
         const tabs = await serviceWorker.evaluate(async () => {
           const tabs = await chrome.tabs.query({ currentWindow: true });
           return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
         });
         return tabs.length;
-      }, { timeout: 10000 }).toBe(6);
+      }, { timeout: 10000 }).toBe(6); // 初期2 + 作成2 + 複製2 = 6
 
-      // Chrome APIのタブ順序を取得（インデックス順でソート）
       const tabOrder = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ currentWindow: true });
         return tabs.sort((a, b) => a.index - b.index).map(t => t.id).filter((id): id is number => id !== undefined);
       });
 
-      // 複製されたタブのIDを特定（最後の2つ）
       const duplicatedTabIds = tabOrder.filter(
         id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId && id !== tabId1 && id !== tabId2
       );
       expect(duplicatedTabIds.length).toBe(2);
 
-      // ツリー構造を検証: 複製タブが最後に配置されていることを確認
-      // "end"設定では、複製タブはリストの最後に順番に配置される
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -1120,7 +1076,6 @@ test.describe('タブ複製時の配置', () => {
         { tabId: duplicatedTabIds[1], depth: 0 },
       ], 0);
 
-      // クリーンアップ
       for (const tabId of tabOrder.filter(id => id !== initialBrowserTabId && id !== pseudoSidePanelTabId)) {
         await closeTab(serviceWorker, tabId);
       }

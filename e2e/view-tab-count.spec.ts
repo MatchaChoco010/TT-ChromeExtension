@@ -20,7 +20,6 @@ test.describe('ビューのタブカウント正確性', () => {
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
-        // デフォルトビューのタブカウントバッジを取得
         const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
@@ -31,7 +30,6 @@ test.describe('ビューのタブカウント正確性', () => {
 
       const initialCount = await getTabCountBadge();
 
-      // 新しいタブを作成
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -39,7 +37,6 @@ test.describe('ビューのタブカウント正確性', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // タブカウントが増加するまで待機し検証（ポーリング内で確認）
       await waitForCondition(
         async () => {
           const currentCount = await getTabCountBadge();
@@ -52,7 +49,6 @@ test.describe('ビューのタブカウント正確性', () => {
         }
       );
 
-      // クリーンアップ: 作成したタブを閉じる
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -77,7 +73,6 @@ test.describe('ビューのタブカウント正確性', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // タブカウントバッジを取得するヘルパー関数
       const getTabCountBadge = async () => {
         const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
         if (await badge.isVisible()) {
@@ -87,7 +82,6 @@ test.describe('ビューのタブカウント正確性', () => {
         return 0;
       };
 
-      // タブ追加後のカウントを取得
       await waitForCondition(
         async () => {
           const count = await getTabCountBadge();
@@ -98,14 +92,12 @@ test.describe('ビューのタブカウント正確性', () => {
 
       const countBeforeDelete = await getTabCountBadge();
 
-      // タブを削除
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
-      // タブカウントが減少するまで待機し検証（ポーリング内で確認）
       await waitForCondition(
         async () => {
           const currentCount = await getTabCountBadge();
@@ -168,7 +160,6 @@ test.describe('ビューのタブカウント正確性', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      // タブカウントが3増加するまで待機し検証（ポーリング内で確認）
       await waitForCondition(
         async () => {
           const currentCount = await getTabCountBadge();
@@ -181,7 +172,6 @@ test.describe('ビューのタブカウント正確性', () => {
         }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -240,10 +230,8 @@ test.describe('ビューのタブカウント正確性', () => {
             currentViewId: string;
           };
 
-          // デフォルトビューIDを取得
           const defaultViewId = 'default';
 
-          // ゴーストノードを追加
           if (treeState.views[defaultViewId]) {
             treeState.views[defaultViewId].nodes[ghostNodeId] = {
               id: ghostNodeId,
@@ -321,7 +309,6 @@ test.describe('ビューのタブカウント正確性', () => {
           tabToNode: Record<number, { viewId: string; nodeId: string }>;
         };
 
-        // 存在しないタブを削除
         for (const tabIdStr of Object.keys(treeState.tabToNode)) {
           const tabId = parseInt(tabIdStr);
           if (!existingTabIds.includes(tabId)) {
@@ -353,7 +340,6 @@ test.describe('ビューのタブカウント正確性', () => {
         { timeout: 5000, interval: 100 }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, normalTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -466,7 +452,6 @@ test.describe('タブ数表示の視認性', () => {
         { tabId: tab3, depth: 0 },
       ], 0);
 
-      // タブカウントが正確に更新されるまで待機（ポーリング内で検証）
       await waitForCondition(
         async () => {
           const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
@@ -481,7 +466,6 @@ test.describe('タブ数表示の視認性', () => {
         }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -532,7 +516,6 @@ test.describe('タブ数表示の視認性', () => {
       for (let i = 0; i < tabsToAdd; i++) {
         const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
         tabIds.push(tabId);
-        // 各タブ作成後にassertTabStructure
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
           { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -540,7 +523,6 @@ test.describe('タブ数表示の視認性', () => {
         ], 0);
       }
 
-      // タブカウントが2桁になり、バッジサイズが適切であることを確認（ポーリング内で検証）
       await waitForCondition(
         async () => {
           const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
@@ -548,7 +530,7 @@ test.describe('タブ数表示の視認性', () => {
           const count = parseInt(badgeText || '0', 10);
           if (count < targetTotal) return false;
 
-          // バッジが見切れていないことを検証（min-width: 20px）
+          // min-width: 20px
           const badgeBox = await badge.boundingBox();
           if (!badgeBox) return false;
           return badgeBox.width >= 20;
@@ -560,7 +542,6 @@ test.describe('タブ数表示の視認性', () => {
         }
       );
 
-      // クリーンアップ
       for (let i = 0; i < tabIds.length; i++) {
         await closeTab(serviceWorker, tabIds[i]);
         const remainingTabIds = tabIds.slice(i + 1);
@@ -591,8 +572,6 @@ test.describe('タブ数表示の視認性', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // バッジが表示され、適切なサイズと位置であることを確認（ポーリング内で検証）
-      // UI要素のスタイル・レイアウト確認は「避け得ない必要なもの」に該当
       await waitForCondition(
         async () => {
           const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
@@ -601,19 +580,16 @@ test.describe('タブ数表示の視認性', () => {
           const badgeBox = await badge.boundingBox();
           if (!badgeBox) return false;
 
-          // 高さが適切であること（h-4 = 16px）
+          // h-4 = 16px
           if (badgeBox.height < 14 || badgeBox.height > 20) return false;
-          // 幅が最小値以上であること（min-w-[20px]）
+          // min-w-[20px]
           if (badgeBox.width < 18) return false;
 
-          // バッジがビューボタンの右上付近に配置されていることを確認
           const viewButton = sidePanelPage.locator('[data-active="true"]');
           const viewButtonBox = await viewButton.boundingBox();
           if (!viewButtonBox) return false;
 
-          // バッジの左端がボタンのx座標以上にある
           if (badgeBox.x < viewButtonBox.x) return false;
-          // バッジの上端がボタンの中央より上にある
           if (badgeBox.y > viewButtonBox.y + viewButtonBox.height / 2) return false;
 
           return true;
@@ -625,7 +601,6 @@ test.describe('タブ数表示の視認性', () => {
         }
       );
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -643,7 +618,6 @@ test.describe('タブ数表示の視認性', () => {
 
       await waitForViewSwitcher(sidePanelPage);
 
-      // 現在のウィンドウのタブをすべて取得
       const tabs = await serviceWorker.evaluate(async (windowId) => {
         const tabs = await chrome.tabs.query({ windowId });
         return tabs.map((t) => t.id);
@@ -653,7 +627,6 @@ test.describe('タブ数表示の視認性', () => {
       // （実際にすべてのタブを閉じるとウィンドウも閉じてしまうため）
       // ViewSwitcherのコード: {tabCount > 0 && (...)} を検証
 
-      // タブが存在する場合、バッジが表示されることをポーリングで確認
       if (tabs.length > 0) {
         await waitForCondition(
           async () => {

@@ -119,12 +119,10 @@ const getInternalPageFavicon = (url: string): string | null => {
  * 3. null（デフォルトアイコンを表示）
  */
 const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
-  // 既存のファビコンがあればそれを使用
   if (tabInfo.favIconUrl) {
     return tabInfo.favIconUrl;
   }
 
-  // 内部ページのファビコンを取得
   if (tabInfo.url) {
     const internalFavicon = getInternalPageFavicon(tabInfo.url);
     if (internalFavicon) {
@@ -300,7 +298,6 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     const shouldCloseSubtree = targetTabIds.length === 1 && !isSelected && isCollapsedParent;
 
     if (action === 'close') {
-      // サブツリーを閉じる場合はサブツリー全体のタブ数を計算
       const tabCount = shouldCloseSubtree ? countSubtreeNodes(node) : targetTabIds.length;
       if (closeWarningThreshold > 0 && tabCount >= closeWarningThreshold) {
         setPendingSubtreeCount(tabCount);
@@ -320,7 +317,6 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       isCollapsedParent: shouldCloseSubtree,
     });
 
-    // アクション実行後に選択状態を解除
     if (clearSelection) {
       clearSelection();
     }
@@ -623,7 +619,6 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
     const shouldCloseSubtree = targetTabIds.length === 1 && !isSelected && isCollapsedParent;
 
     if (action === 'close') {
-      // サブツリーを閉じる場合はサブツリー全体のタブ数を計算
       const tabCount = shouldCloseSubtree ? countSubtreeNodes(node) : targetTabIds.length;
       if (closeWarningThreshold > 0 && tabCount >= closeWarningThreshold) {
         setPendingSubtreeCount(tabCount);
@@ -643,7 +638,6 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       isCollapsedParent: shouldCloseSubtree,
     });
 
-    // アクション実行後に選択状態を解除
     if (clearSelection) {
       clearSelection();
     }

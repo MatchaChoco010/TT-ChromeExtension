@@ -18,7 +18,6 @@ extensionTest.describe('復元タブの未読状態', () => {
 
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
 
-      // 起動時の既存タブは未読インジケーターが付かないことを確認
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${initialBrowserTabId}"]`);
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
@@ -35,11 +34,9 @@ extensionTest.describe('復元タブの未読状態', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 初期状態では未読バッジがないことを確認
       const initialUnreadBadges = sidePanelPage.locator('[data-testid="unread-badge"]');
       await expect(initialUnreadBadges).toHaveCount(0, { timeout: 5000 });
 
-      // バックグラウンドで新しいタブを作成
       const bgTabId = await createTab(
       serviceWorker,
         getTestServerUrl('/page'),
@@ -52,8 +49,6 @@ extensionTest.describe('復元タブの未読状態', () => {
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
-      // 新しいタブには未読バッジが表示されることを確認
-      // assertTabStructureでタブの存在は検証済み
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
@@ -74,7 +69,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // アクティブ状態で新しいタブを作成
       const activeTabId = await createTab(
       serviceWorker,
         getTestServerUrl('/page'),
@@ -87,8 +81,6 @@ extensionTest.describe('復元タブの未読状態', () => {
         { tabId: activeTabId, depth: 0 },
       ], 0);
 
-      // アクティブなタブには未読バッジが表示されないことを確認
-      // assertTabStructureでタブの存在は検証済み
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${activeTabId}"]`);
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toHaveCount(0, { timeout: 5000 });
@@ -122,8 +114,6 @@ extensionTest.describe('復元タブの未読状態', () => {
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
-      // 未読バッジが表示されることを確認
-      // assertTabStructureでタブの存在は検証済み
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
@@ -137,10 +127,8 @@ extensionTest.describe('復元タブの未読状態', () => {
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
-      // 未読バッジが消えることを確認
       await expect(unreadBadge).toHaveCount(0, { timeout: 10000 });
 
-      // サイドパネルをリロード
       await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="tab-tree-view"]', { timeout: 10000 });
@@ -152,7 +140,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       ], 0);
 
       // リロード後も既存タブに未読バッジが付かないことを確認
-      // assertTabStructureでタブの存在は検証済み
       const reloadedTabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
       const reloadedUnreadBadge = reloadedTabNode.locator('[data-testid="unread-badge"]');
       await expect(reloadedUnreadBadge).toHaveCount(0, { timeout: 5000 });
@@ -173,7 +160,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // バックグラウンドで新しいタブを作成
       const bgTabId = await createTab(
       serviceWorker,
         getTestServerUrl('/page'),
@@ -186,8 +172,6 @@ extensionTest.describe('復元タブの未読状態', () => {
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
-      // 未読バッジが表示されることを確認
-      // assertTabStructureでタブの存在は検証済み
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
@@ -208,7 +192,6 @@ extensionTest.describe('復元タブの未読状態', () => {
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
-      // 未読バッジが消えることを確認
       await expect(unreadBadge).toHaveCount(0, { timeout: 10000 });
 
       // ストレージから未読状態が削除されていることを確認（永続化テスト固有の検証）

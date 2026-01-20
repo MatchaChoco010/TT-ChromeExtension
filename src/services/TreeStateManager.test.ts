@@ -762,20 +762,16 @@ describe('TreeStateManager', () => {
       const parentResult = manager.getNodeByTabId(1);
       await manager.addTab(childTab, parentResult!.node.id, viewId);
 
-      // 子タブのIDを置き換え
       const newChildTabId = 200;
       await manager.replaceTabId(2, newChildTabId);
 
-      // ツリー構造を確認（ルートレベルのノード数）
       const tree = manager.getTree(viewId);
       expect(tree.length).toBe(1);
 
-      // 親タブを確認
       const parentNode = tree.find(n => n.tabId === 1);
       expect(parentNode).toBeDefined();
       expect(parentNode?.children.length).toBe(1);
 
-      // 子タブを確認（新しいIDで）
       const childNode = parentNode?.children.find(n => n.tabId === newChildTabId);
       expect(childNode).toBeDefined();
       expect(childNode?.parentId).toBe(parentNode?.id);
@@ -787,10 +783,8 @@ describe('TreeStateManager', () => {
 
       await manager.addTab(tab, null, viewId);
 
-      // 存在しないIDを置き換え
       await manager.replaceTabId(999, 1000);
 
-      // 既存のタブに影響がないことを確認
       expect(manager.getNodeByTabId(1)).toBeDefined();
       expect(manager.getNodeByTabId(999)).toBeNull();
       expect(manager.getNodeByTabId(1000)).toBeNull();

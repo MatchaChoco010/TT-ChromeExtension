@@ -157,10 +157,6 @@ test.describe('選択状態の自動解除', () => {
       ], 0);
     });
 
-    // Note: アクティブタブ変更時の選択状態解除テストは削除
-    // ツリー内でタブをクリックするとonActivatedイベントが発火するため、
-    // 複数選択機能と競合してしまう
-
     test('新規タブボタンをクリックすると選択状態が解除される', async ({
       extensionContext,
       serviceWorker,
@@ -204,7 +200,6 @@ test.describe('選択状態の自動解除', () => {
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
       await newTabButton.click();
 
-      // 新規タブIDを取得
       const newTabId = await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         return tabs[0]?.id;

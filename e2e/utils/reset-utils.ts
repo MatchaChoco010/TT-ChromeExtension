@@ -72,8 +72,6 @@ export async function resetExtensionState(
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      // TreeStateManagerの新構造に対応
-      // views: Map<string, ViewState>（内部はMap）、viewOrder: string[]
       const treeStateManager = (globalThis as unknown as { treeStateManager?: {
         tabToNode: Map<unknown, unknown>;
         views: Map<string, unknown>;
@@ -135,7 +133,6 @@ export async function resetExtensionState(
     newWindowId
   );
 
-  // 閉じたウィンドウが実際に閉じられたことを確認
   for (const windowId of windowsToClose) {
     await waitForWindowClosed(serviceWorker, windowId, { timeout: 5000 });
   }
@@ -176,7 +173,6 @@ export async function resetExtensionState(
   );
 
   // Step 8: tree_stateにデフォルトのviewsを明示的に設定
-  // 新しいTreeState構造: views は Record<string, ViewState>
   await evaluateWithTimeout(
     serviceWorker,
     async () => {

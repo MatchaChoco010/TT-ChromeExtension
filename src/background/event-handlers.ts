@@ -204,15 +204,11 @@ async function waitForPendingHandlers(timeoutMs: number = 5000): Promise<void> {
  */
 async function prepareForReset(): Promise<void> {
   await waitForPendingHandlers();
-  // E2Eテスト用: 状態変数をリセット
-  // handleTabCreatedをスキップさせるフラグ
   isCreatingGroupTab = false;
   isRestoringSnapshot = false;
   restoringTabIds.clear();
-  // タブ状態の追跡用Map/Set
   lastActiveTabByWindow.clear();
   detachedPinnedTabsByWindow.clear();
-  // ドラッグ状態
   dragState = null;
 }
 
@@ -434,9 +430,6 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     logTabCreation(tab.id, `SKIP - already exists in tree`);
     return;
   }
-
-  // 以下、元のhandleTabCreatedの処理を継続
-  // capturedLastActiveTabIdはキュー待機前に取得済み（引数で渡される）
 
   if (isCreatingGroupTab) {
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -698,7 +691,6 @@ export async function handleTabMoved(
   // ツリー状態をChromeに再同期して元に戻す
   // ただしピン留めタブの順序変更はChromeを正として受け入れる
   try {
-    // ピン留めタブの順序変更はChromeを正として受け入れる
     await treeStateManager.syncPinnedOrderFromChrome(moveInfo.windowId);
     await treeStateManager.syncTreeStateToChromeTabs(moveInfo.windowId);
   } catch {

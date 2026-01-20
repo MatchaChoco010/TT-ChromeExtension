@@ -23,7 +23,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const moveToViewButtonRef = useRef<HTMLDivElement>(null);
   const moveToWindowButtonRef = useRef<HTMLDivElement>(null);
-  // サブメニューを閉じるのを遅延させるためのタイマー
   const viewSubMenuCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const windowSubMenuCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMultipleSelection = targetTabIds.length > 1;
@@ -81,7 +80,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     };
   }, [onClose]);
 
-  // サイドパネルがフォーカスを失った時（ユーザーが通常のタブなどをクリックした時）にメニューを閉じる
   useEffect(() => {
     const handleWindowBlur = () => {
       onClose();
@@ -119,12 +117,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [onMoveToView, targetTabIds, onClose]);
 
   const handleMoveToViewMouseEnter = useCallback(() => {
-    // 閉じるタイムアウトをキャンセル
     if (viewSubMenuCloseTimeoutRef.current) {
       clearTimeout(viewSubMenuCloseTimeoutRef.current);
       viewSubMenuCloseTimeoutRef.current = null;
     }
-    // 別のサブメニューが開いている場合は閉じる
     setIsWindowSubMenuOpen(false);
     if (moveToViewButtonRef.current) {
       setSubMenuParentRect(moveToViewButtonRef.current.getBoundingClientRect());
@@ -135,7 +131,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [adjustedPosition]);
 
   const handleMoveToViewMouseLeave = useCallback(() => {
-    // 少し遅延してからサブメニューを閉じる
     if (viewSubMenuCloseTimeoutRef.current) {
       clearTimeout(viewSubMenuCloseTimeoutRef.current);
     }
@@ -166,12 +161,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [otherWindows]);
 
   const handleMoveToWindowMouseEnter = useCallback(() => {
-    // 閉じるタイムアウトをキャンセル
     if (windowSubMenuCloseTimeoutRef.current) {
       clearTimeout(windowSubMenuCloseTimeoutRef.current);
       windowSubMenuCloseTimeoutRef.current = null;
     }
-    // 別のサブメニューが開いている場合は閉じる
     setIsSubMenuOpen(false);
     if (moveToWindowButtonRef.current) {
       setWindowSubMenuParentRect(moveToWindowButtonRef.current.getBoundingClientRect());
@@ -182,7 +175,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [adjustedPosition]);
 
   const handleMoveToWindowMouseLeave = useCallback(() => {
-    // 少し遅延してからサブメニューを閉じる
     if (windowSubMenuCloseTimeoutRef.current) {
       clearTimeout(windowSubMenuCloseTimeoutRef.current);
     }
@@ -207,7 +199,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     onClose();
   }, [onAction, onMoveToWindow, targetTabIds, onClose]);
 
-  // 通常のメニュー項目にマウスを移動した時にサブメニューを閉じる
   const handleRegularItemMouseEnter = useCallback(() => {
     setIsSubMenuOpen(false);
     setIsWindowSubMenuOpen(false);

@@ -8,9 +8,6 @@ import { startDrag, hoverOverTab, dropTab } from './utils/drag-drop-utils';
 import { setupWindow } from './utils/setup-utils';
 import type { Page } from '@playwright/test';
 
-/**
- * タブノードのサイズ（幅と高さ）を取得
- */
 async function getTabNodeSize(
   page: Page,
   tabId: number
@@ -24,9 +21,6 @@ async function getTabNodeSize(
   return { width: box.width, height: box.height };
 }
 
-/**
- * ドラッグ中のタブノード（ドラッグ元）のサイズを取得
- */
 async function getDraggedTabSize(
   page: Page,
   tabId: number

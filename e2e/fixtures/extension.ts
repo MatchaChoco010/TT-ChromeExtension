@@ -168,20 +168,16 @@ const createExtensionContext = async (
   return { context, userDataDir, downloadDir };
 };
 
-// 自動リセットフィクスチャ（テストスコープ）
 interface TestFixtures {
   autoReset: void;
 }
 
-// ワーカーごとの前回テストを追跡
 const workerLastTest = new Map<number, string>();
 
-// コンテキストごとのダウンロードディレクトリを追跡
 const contextDownloadDirs = new Map<BrowserContext, string>();
 
 /**
  * Service Workerが応答可能か確認する
- * シンプルな計算を実行して応答性をテストする
  * Chrome APIは使用しない（ハングする可能性があるため）
  */
 const isWorkerAlive = async (worker: Worker, timeout: number = 2000): Promise<boolean> => {
@@ -235,7 +231,6 @@ export const test = base.extend<TestFixtures, ExtensionFixtures>({
     const headless = process.env.HEADED !== 'true';
     const { context, userDataDir, downloadDir } = await createExtensionContext(pathToExtension, headless);
 
-    // ダウンロードディレクトリをコンテキストに紐付け
     contextDownloadDirs.set(context, downloadDir);
 
     await use(context);

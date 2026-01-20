@@ -14,7 +14,6 @@ test.describe('UX改善機能', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -58,7 +57,6 @@ test.describe('UX改善機能', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // Side Panelが表示されることを確認
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
       await expect(sidePanelRoot).toBeVisible();
 
@@ -102,7 +100,6 @@ test.describe('UX改善機能', () => {
 
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
@@ -112,7 +109,6 @@ test.describe('UX改善機能', () => {
         { viewIdentifier: '#10B981' },
       ], 0);
 
-      // ビュースイッチャーコンテナを取得してマウスホイールイベントを発火（下スクロール）
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: 100 });
 
@@ -133,7 +129,6 @@ test.describe('UX改善機能', () => {
 
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
@@ -143,7 +138,6 @@ test.describe('UX改善機能', () => {
         { viewIdentifier: '#10B981' },
       ], 0);
 
-      // 新しいビューに切り替え
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to View view"]'
       );
@@ -153,7 +147,6 @@ test.describe('UX改善機能', () => {
         { viewIdentifier: '#10B981' },
       ], 1);
 
-      // ビュースイッチャーコンテナを取得してマウスホイールイベントを発火（上スクロール）
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: -100 });
 
@@ -174,7 +167,6 @@ test.describe('UX改善機能', () => {
 
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
@@ -184,7 +176,6 @@ test.describe('UX改善機能', () => {
         { viewIdentifier: '#10B981' },
       ], 0);
 
-      // ビュースイッチャーコンテナを取得してマウスホイールイベントを発火（上スクロール）
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: -100 });
 
@@ -205,7 +196,6 @@ test.describe('UX改善機能', () => {
 
       await waitForViewSwitcher(sidePanelPage);
 
-      // 新しいビューを追加
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
@@ -215,7 +205,6 @@ test.describe('UX改善機能', () => {
         { viewIdentifier: '#10B981' },
       ], 0);
 
-      // 新しいビューに切り替え
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to View view"]'
       );
@@ -225,7 +214,6 @@ test.describe('UX改善機能', () => {
         { viewIdentifier: '#10B981' },
       ], 1);
 
-      // ビュースイッチャーコンテナを取得してマウスホイールイベントを発火（下スクロール）
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: 100 });
 
@@ -257,7 +245,6 @@ test.describe('UX改善機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
-      // ビュー追加後の構造を検証
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -275,10 +262,8 @@ test.describe('UX改善機能', () => {
         return box !== null && box.width > 0 && box.height > 0;
       }, { timeout: 5000 });
 
-      // 右クリックでコンテキストメニューを開く
       await tabNode.click({ button: 'right' });
 
-      // コンテキストメニュー操作（機能テスト固有の検証）
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 
@@ -389,7 +374,6 @@ test.describe('UX改善機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
-      // ビュー追加後の構造を検証
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -400,10 +384,8 @@ test.describe('UX改善機能', () => {
       // バックグラウンドスロットリングを回避
       await sidePanelPage.bringToFront();
 
-      // 右クリックでコンテキストメニューを開く
       await tabNode.click({ button: 'right' });
 
-      // コンテキストメニュー操作（機能テスト固有の検証）
       const contextMenu = sidePanelPage.locator('[role="menu"]');
       await expect(contextMenu).toBeVisible({ timeout: 5000 });
 

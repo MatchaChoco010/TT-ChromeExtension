@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 /**
  * Generic callback function type for Chrome API events.
- * Uses 'never[]' for args to allow any callback signature to be assigned.
+ * Uses 'any[]' for args to allow any callback signature to be assigned.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericCallback = (...args: any[]) => unknown;

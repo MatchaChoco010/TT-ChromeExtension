@@ -609,7 +609,6 @@ describe('複数タブのグループ化機能', () => {
     if (lastSetCall && lastSetCall[0]['tree_state']) {
       const savedTreeState = lastSetCall[0]['tree_state'];
 
-      // Collect all nodes from all views
       const allNodes: TabNode[] = [];
       for (const viewState of Object.values(savedTreeState.views) as { nodes: Record<string, TabNode> }[]) {
         allNodes.push(...Object.values(viewState.nodes));
@@ -672,7 +671,6 @@ describe('複数タブのグループ化機能', () => {
 
     for (const call of setCalls) {
       if (call[0]['tree_state'] && call[0]['tree_state'].views) {
-        // Collect all nodes from all views
         const allNodes: TabNode[] = [];
         for (const viewState of Object.values(call[0]['tree_state'].views) as { nodes?: Record<string, TabNode> }[]) {
           if (viewState.nodes) {

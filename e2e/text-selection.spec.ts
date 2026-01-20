@@ -49,7 +49,6 @@ test.describe('テキスト選択禁止機能', () => {
     const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
     await tabNode1.click();
 
-    // Shift+クリックで3番目のタブを選択（範囲選択）
     const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);
     await tabNode3.click({ modifiers: ['Shift'] });
 
@@ -60,7 +59,6 @@ test.describe('テキスト選択禁止機能', () => {
     });
     expect(selectedText).toBe('');
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId1);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -103,7 +101,6 @@ test.describe('テキスト選択禁止機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // タブノード要素のbounding boxを取得
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
     const boundingBox = await tabNode.boundingBox();
     expect(boundingBox).not.toBeNull();
@@ -127,7 +124,6 @@ test.describe('テキスト選択禁止機能', () => {
       expect(selectedText).toBe('');
     }
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -154,7 +150,6 @@ test.describe('テキスト選択禁止機能', () => {
     const treeView = sidePanelPage.locator('[data-testid="tab-tree-view"]');
     await expect(treeView).toHaveClass(/select-none/);
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -182,7 +177,6 @@ test.describe('テキスト選択禁止機能', () => {
     const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
     await expect(tabNode).toHaveClass(/select-none/);
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -214,7 +208,6 @@ test.describe('テキスト選択禁止機能', () => {
     });
     expect(userSelect).toBe('none');
 
-    // ツリービュー全体も確認
     const treeView = sidePanelPage.locator('[data-testid="tab-tree-view"]');
     const treeViewUserSelect = await treeView.evaluate((el) => {
       const computedStyle = window.getComputedStyle(el);
@@ -222,7 +215,6 @@ test.describe('テキスト選択禁止機能', () => {
     });
     expect(treeViewUserSelect).toBe('none');
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },

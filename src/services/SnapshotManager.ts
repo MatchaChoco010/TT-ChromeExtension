@@ -191,7 +191,6 @@ export class SnapshotManager {
       indexToSnapshot.set(tabSnapshot.index, tabSnapshot);
     }
 
-    // windowIndexのセットを取得
     const windowIndexSet = new Set<number>();
     for (const tabSnapshot of sortedTabs) {
       windowIndexSet.add(tabSnapshot.windowIndex ?? 0);
@@ -209,7 +208,7 @@ export class SnapshotManager {
             if (blankTabId !== undefined) {
               setTimeout(() => {
                 chrome.tabs.remove(blankTabId).catch(() => {
-                  // ignore
+                  // 空白タブの削除失敗は無視（既に閉じられている可能性がある）
                 });
               }, 1000);
             }
@@ -243,7 +242,6 @@ export class SnapshotManager {
     const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
     if (!treeState) return;
 
-    // 既存のビューをコピー
     const updatedViews: Record<string, { info: View; rootNodeIds: string[]; nodes: Record<string, TabNode> }> = {};
     for (const [viewId, viewState] of Object.entries(treeState.views)) {
       updatedViews[viewId] = {
@@ -253,7 +251,6 @@ export class SnapshotManager {
       };
     }
 
-    // スナップショットのビューを追加（存在しない場合）
     for (const view of views) {
       if (!updatedViews[view.id]) {
         updatedViews[view.id] = {
@@ -264,7 +261,6 @@ export class SnapshotManager {
       }
     }
 
-    // デフォルトビューが存在しない場合は作成
     if (!updatedViews['default']) {
       updatedViews['default'] = {
         info: { id: 'default', name: 'Default', color: '#3B82F6' },
@@ -310,7 +306,6 @@ export class SnapshotManager {
       updatedTabToNode[newTabId] = { viewId: snapshot.viewId, nodeId };
     }
 
-    // 親子関係を構築（childrenを設定）
     for (const [nodeId, node] of allNewNodes) {
       if (node.parentId && allNewNodes.has(node.parentId)) {
         const parent = allNewNodes.get(node.parentId)!;
@@ -321,7 +316,6 @@ export class SnapshotManager {
       }
     }
 
-    // ノードを各ビューに配置
     for (const [nodeId, node] of allNewNodes) {
       const viewId = nodeIdToViewId.get(nodeId) || 'default';
       if (!updatedViews[viewId]) {
@@ -333,7 +327,6 @@ export class SnapshotManager {
       }
       updatedViews[viewId].nodes[nodeId] = node;
 
-      // ルートノードの場合、rootNodeIdsに追加
       if (!node.parentId) {
         updatedViews[viewId].rootNodeIds.push(nodeId);
       }

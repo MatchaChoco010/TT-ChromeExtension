@@ -47,7 +47,7 @@ async function initializeAutoSnapshot(): Promise<void> {
       }
     }
   } catch {
-    // エラーを無視
+    // 初期化失敗時は自動スナップショット機能が動作しないだけで致命的ではない
   }
 }
 
@@ -81,7 +81,7 @@ function startPeriodicPersist(): void {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === PERIODIC_PERSIST_ALARM_NAME) {
       testTreeStateManager.refreshTreeStructure().catch(() => {
-        // 永続化失敗は無視
+        // 定期永続化失敗は次回のアラームで再試行されるため無視
       });
     }
   });
@@ -149,7 +149,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     // UIサイドに初期化完了を通知（未読状態をリフレッシュさせる）
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
-    // エラーを無視
+    // 初期化失敗時もService Workerは動作を継続（次回起動時に再試行される）
   }
 })();
 
@@ -166,7 +166,7 @@ chrome.action.onClicked.addListener(() => {
       const settingsUrl = chrome.runtime.getURL('settings.html');
       await chrome.tabs.create({ url: settingsUrl });
     } catch {
-      // エラーを無視
+      // タブ作成失敗時はユーザーに設定画面が開かないだけで致命的ではない
     }
   });
 });

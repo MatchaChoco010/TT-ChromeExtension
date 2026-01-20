@@ -220,14 +220,12 @@ export class TreeStateManager {
     this.views.delete(viewId);
     this.viewOrder = this.viewOrder.filter(id => id !== viewId);
 
-    // 削除されたビューを表示していたウィンドウのビューをターゲットビューに更新
     for (const windowId of Object.keys(this.currentViewByWindowId)) {
       if (this.currentViewByWindowId[Number(windowId)] === viewId) {
         this.currentViewByWindowId[Number(windowId)] = targetViewId;
       }
     }
 
-    // グローバルなcurrentViewIdも更新
     if (this.currentViewId === viewId) {
       this.currentViewId = targetViewId;
     }
@@ -475,7 +473,6 @@ export class TreeStateManager {
     const sourceViewState = this.views.get(mapping.viewId);
     if (!sourceViewState) return;
 
-    // ターゲットビューが存在しない場合は作成
     if (!this.views.has(targetViewId)) {
       this.createView({
         id: targetViewId,
@@ -608,7 +605,6 @@ export class TreeStateManager {
       const tabs = await chrome.tabs.query({});
       const defaultViewId = 'default';
 
-      // デフォルトビューが存在しない場合は作成
       if (!this.views.has(defaultViewId)) {
         this.createView({
           id: defaultViewId,
@@ -626,8 +622,6 @@ export class TreeStateManager {
         await this.syncWithOpenerTabId(tabs, defaultViewId, userSettings);
       }
 
-      // ストレージにpinnedTabIdsByWindowがない場合、Chromeの現在のピン留め状態で初期化
-      // これにより初回起動時や古い状態からの復元時に既存のピン留めタブが保持される
       const hasPinnedData = this.pinnedTabIdsByWindow.size > 0;
       if (!hasPinnedData) {
         const pinnedTabs = tabs.filter(t => t.pinned && t.id !== undefined);
@@ -641,14 +635,11 @@ export class TreeStateManager {
 
       await this.persistState();
 
-      // 内部ツリーの順序をChromeタブに反映
       await this.syncTreeStateToChromeTabs();
 
       this.syncCompleted = true;
       this.notifySyncComplete();
     } catch {
-      // エラーが発生しても、syncCompletedをtrueに設定
-      // これにより、その後のタブイベント（handleTabCreated等）が処理される
       this.syncCompleted = true;
       this.notifySyncComplete();
     } finally {
@@ -689,20 +680,16 @@ export class TreeStateManager {
     const queryOptions = windowId !== undefined ? { windowId } : {};
     const currentTabs = await chrome.tabs.query(queryOptions);
 
-    // ウィンドウIDのリスト
     const windowIds = windowId !== undefined
       ? [windowId]
       : [...new Set(currentTabs.map(t => t.windowId).filter((id): id is number => id !== undefined))];
 
-    // 1. ピン留め状態を同期（TreeStateManagerの状態が正）
     for (const wid of windowIds) {
       await this.syncPinnedStateForWindow(wid, currentTabs);
     }
 
-    // 再度タブ情報を取得（ピン留め状態変更後）
     const refreshedTabs = await chrome.tabs.query(queryOptions);
 
-    // Chromeの現在のピン留め状態を取得（更新後）
     const pinnedSet = new Set<number>();
     for (const tab of refreshedTabs) {
       if (tab.id !== undefined && tab.pinned) {
@@ -710,7 +697,6 @@ export class TreeStateManager {
       }
     }
 
-    // 2. タブの順序を同期
     for (const wid of windowIds) {
       await this.syncTabOrderForWindow(wid, pinnedSet);
     }
@@ -724,7 +710,6 @@ export class TreeStateManager {
     const expectedPinnedIds = new Set(this.pinnedTabIdsByWindow.get(windowId) ?? []);
     const windowTabs = currentTabs.filter(t => t.windowId === windowId);
 
-    // Chromeで現在ピン留めされているタブ
     const actuallyPinnedIds = new Set<number>();
     for (const tab of windowTabs) {
       if (tab.id !== undefined && tab.pinned) {
@@ -732,7 +717,6 @@ export class TreeStateManager {
       }
     }
 
-    // TreeStateManagerでピン留めされるべきだが、Chromeでピン留めされていないタブをピン留め
     for (const tabId of expectedPinnedIds) {
       if (!actuallyPinnedIds.has(tabId)) {
         try {
@@ -743,7 +727,6 @@ export class TreeStateManager {
       }
     }
 
-    // TreeStateManagerでピン留めされるべきでないが、Chromeでピン留めされているタブのピン留めを解除
     for (const tabId of actuallyPinnedIds) {
       if (!expectedPinnedIds.has(tabId)) {
         try {
@@ -754,7 +737,6 @@ export class TreeStateManager {
       }
     }
 
-    // ピン留めタブの順序を同期
     const expectedOrder = this.pinnedTabIdsByWindow.get(windowId) ?? [];
     for (let i = 0; i < expectedOrder.length; i++) {
       const tabId = expectedOrder[i];
@@ -770,7 +752,6 @@ export class TreeStateManager {
    * 指定ウィンドウのタブ順序を同期
    */
   private async syncTabOrderForWindow(windowId: number, pinnedSet: Set<number>): Promise<void> {
-    // 現在のウィンドウのタブを取得
     const currentTabs = await chrome.tabs.query({ windowId });
     const currentWindowTabIds = new Set<number>();
     for (const tab of currentTabs) {
@@ -779,7 +760,6 @@ export class TreeStateManager {
       }
     }
 
-    // TreeStateManagerの状態から期待される順序を計算
     const orderedTabIds: number[] = [];
     const traverse = (node: TabNode): void => {
       if (!pinnedSet.has(node.tabId) && currentWindowTabIds.has(node.tabId)) {
@@ -804,7 +784,6 @@ export class TreeStateManager {
 
     const pinnedCount = currentTabs.filter(t => t.pinned).length;
 
-    // 現在のタブインデックスを取得
     const currentIndexMap = new Map<number, number>();
     for (const tab of currentTabs) {
       if (tab.id !== undefined) {
@@ -812,7 +791,6 @@ export class TreeStateManager {
       }
     }
 
-    // 各タブを正しい位置に移動
     for (let i = 0; i < orderedTabIds.length; i++) {
       const tabId = orderedTabIds[i];
       const expectedIndex = pinnedCount + i;
@@ -821,7 +799,6 @@ export class TreeStateManager {
       if (currentIndex !== undefined && currentIndex !== expectedIndex) {
         try {
           await chrome.tabs.move(tabId, { index: expectedIndex });
-          // 移動後のインデックスを再取得
           const updatedTabs = await chrome.tabs.query({ windowId });
           currentIndexMap.clear();
           for (const tab of updatedTabs) {
@@ -915,7 +892,6 @@ export class TreeStateManager {
    */
   async syncPinnedOrderFromChrome(windowId: number): Promise<void> {
     const tabs = await chrome.tabs.query({ windowId, pinned: true });
-    // index順でソート
     tabs.sort((a, b) => a.index - b.index);
     const pinnedOrder = tabs.filter(t => t.id !== undefined).map(t => t.id!);
     this.pinnedTabIdsByWindow.set(windowId, pinnedOrder);
@@ -1031,7 +1007,6 @@ export class TreeStateManager {
       const parentMapping = this.tabToNode.get(parentTabId);
       if (!childMapping || !parentMapping) continue;
 
-      // 同じビューの場合のみ親子関係を設定
       if (childMapping.viewId !== parentMapping.viewId) continue;
 
       const viewState = this.views.get(childMapping.viewId);
@@ -1207,7 +1182,6 @@ export class TreeStateManager {
 
     const groupNodeId = `group-${groupTabId}`;
 
-    // 全タブの親を確認
     const parentIds = new Set<string | null>();
     for (const tabId of tabIds) {
       const mapping = this.tabToNode.get(tabId);
@@ -1434,7 +1408,6 @@ export class TreeStateManager {
       tabToNodeRecord[tabId] = mapping;
     });
 
-    // pinnedTabIdsByWindowをRecordに変換
     const pinnedTabIdsByWindowRecord: Record<number, number[]> = {};
     this.pinnedTabIdsByWindow.forEach((tabIds, windowId) => {
       pinnedTabIdsByWindowRecord[windowId] = [...tabIds];
@@ -1461,7 +1434,7 @@ export class TreeStateManager {
       type: 'STATE_UPDATED',
       payload,
     }).catch(() => {
-      // サイドパネルが開いていない場合など、メッセージ送信失敗は無視
+      // メッセージ送信失敗は無視（サイドパネルが閉じている場合など）
     });
   }
 
@@ -1495,7 +1468,6 @@ export class TreeStateManager {
 
     const treeStructure = await this.buildTreeStructure();
 
-    // pinnedTabIdsByWindowをRecordに変換
     const pinnedTabIdsByWindowRecord: Record<number, number[]> = {};
     this.pinnedTabIdsByWindow.forEach((tabIds, windowId) => {
       pinnedTabIdsByWindowRecord[windowId] = [...tabIds];
@@ -1650,11 +1622,9 @@ export class TreeStateManager {
         }
       }
 
-      // ビュー関連のプロパティを初期化
       this.currentViewId = state.currentViewId || 'default';
       this.currentViewByWindowId = state.currentViewByWindowId || {};
 
-      // ピン留めタブの状態を読み込み
       this.pinnedTabIdsByWindow.clear();
       if (state.pinnedTabIdsByWindow) {
         for (const [windowIdStr, tabIds] of Object.entries(state.pinnedTabIdsByWindow)) {
@@ -1784,33 +1754,26 @@ export class TreeStateManager {
     const targetParent = viewState.nodes[targetParentId];
     if (!activeNode || !targetParent) return;
 
-    // ドラッグ中のノードが選択に含まれているかチェック
     const isActiveNodeSelected = selectedNodeIds.includes(nodeId);
-    // 移動対象のノードID一覧（選択されていれば全選択ノード、そうでなければアクティブノードのみ）
     const nodesToMove = isActiveNodeSelected ? selectedNodeIds : [nodeId];
     const nodesToMoveSet = new Set(nodesToMove);
 
-    // 移動先が移動対象のノードの子孫でないかチェック
     for (const id of nodesToMove) {
       if (this.isDescendant(viewState, id, targetParentId)) {
         return;
       }
     }
 
-    // 移動先が移動対象に含まれている場合は移動不可
     if (nodesToMoveSet.has(targetParentId)) {
       return;
     }
 
-    // 選択ノードのうち、選択内に親がないノード（選択内のルート）のみを移動先に移動
-    // 選択内で親子関係があるノードは元の親子関係を保持
     const rootNodesInSelection = nodesToMove.filter(id => {
       const node = viewState.nodes[id];
       if (!node) return false;
       return !node.parentId || !nodesToMoveSet.has(node.parentId);
     });
 
-    // 選択内のルートノードを元の親から削除
     for (const id of rootNodesInSelection) {
       const node = viewState.nodes[id];
       if (!node) continue;
@@ -1825,7 +1788,6 @@ export class TreeStateManager {
       }
     }
 
-    // 選択内のルートノードを移動先の子に追加
     for (const id of rootNodesInSelection) {
       const node = viewState.nodes[id];
       if (!node) continue;
@@ -1836,7 +1798,6 @@ export class TreeStateManager {
       targetParent.children.push(node);
     }
 
-    // 移動先を自動展開
     targetParent.isExpanded = true;
 
     await this.persistState();
@@ -1866,14 +1827,12 @@ export class TreeStateManager {
     _previousViewId: string,
     _activeTabId: number | null
   ): Promise<void> {
-    // メモリ上のプロパティを更新
     this.currentViewId = viewId;
     this.currentViewByWindowId = {
       ...this.currentViewByWindowId,
       [windowId]: viewId,
     };
 
-    // ストレージを更新
     const existingState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
     if (!existingState) return;
 
@@ -1935,7 +1894,6 @@ export class TreeStateManager {
     const groupNode = viewState.nodes[groupId];
     const groupDepth = groupNode?.depth ?? 0;
 
-    // 元の親から削除
     if (node.parentId) {
       const oldParent = viewState.nodes[node.parentId];
       if (oldParent) {
@@ -1945,7 +1903,6 @@ export class TreeStateManager {
       viewState.rootNodeIds = viewState.rootNodeIds.filter(id => id !== nodeId);
     }
 
-    // グループの子として追加
     node.groupId = groupId;
     node.parentId = groupId;
     node.depth = groupDepth + 1;
@@ -1968,13 +1925,11 @@ export class TreeStateManager {
     const node = viewState.nodes[nodeId];
     if (!node) return;
 
-    // 元のグループから削除
     if (node.groupId && viewState.nodes[node.groupId]) {
       const groupNode = viewState.nodes[node.groupId];
       groupNode.children = groupNode.children.filter(child => child.id !== nodeId);
     }
 
-    // ルートノードとして設定
     node.groupId = undefined;
     node.parentId = null;
     node.depth = 0;
@@ -1988,7 +1943,6 @@ export class TreeStateManager {
    * タブを別のビューに移動
    */
   async moveTabsToViewInternal(targetViewId: string, tabIds: number[]): Promise<void> {
-    // ターゲットビューが存在しない場合は作成
     if (!this.views.has(targetViewId)) {
       const viewCount = this.views.size;
       const colorIndex = viewCount % TreeStateManager.VIEW_COLOR_PALETTE.length;
@@ -2001,7 +1955,6 @@ export class TreeStateManager {
 
     const targetViewState = this.views.get(targetViewId)!;
 
-    // サブツリー全体を収集する関数
     const collectSubtreeNodeIds = (nodes: Record<string, TabNode>, nodeId: string): string[] => {
       const result: string[] = [nodeId];
       const node = nodes[nodeId];
@@ -2013,7 +1966,6 @@ export class TreeStateManager {
       return result;
     };
 
-    // 選択内でルートになるタブID（親が選択に含まれていないタブ）を特定
     const tabIdsSet = new Set(tabIds);
     const topLevelTabIds: number[] = [];
     for (const tabId of tabIds) {
@@ -2048,10 +2000,8 @@ export class TreeStateManager {
       const rootNode = sourceViewState.nodes[mapping.nodeId];
       if (!rootNode) continue;
 
-      // サブツリーのすべてのノードを収集
       const subtreeNodeIds = collectSubtreeNodeIds(sourceViewState.nodes, rootNode.id);
 
-      // ソースビューから削除
       if (rootNode.parentId) {
         const parentNode = sourceViewState.nodes[rootNode.parentId];
         if (parentNode) {
@@ -2061,14 +2011,12 @@ export class TreeStateManager {
         sourceViewState.rootNodeIds = sourceViewState.rootNodeIds.filter(id => id !== rootNode.id);
       }
 
-      // ノードをターゲットビューに移動
       for (const nodeId of subtreeNodeIds) {
         const node = sourceViewState.nodes[nodeId];
         if (!node) continue;
 
         delete sourceViewState.nodes[nodeId];
 
-        // topLevelタブのみparentIdをnullに
         if (topLevelTabIdSet.has(node.tabId)) {
           node.parentId = null;
           node.depth = 0;
@@ -2078,11 +2026,9 @@ export class TreeStateManager {
         this.tabToNode.set(node.tabId, { viewId: targetViewId, nodeId: node.id });
       }
 
-      // rootNodeIdsに追加
       targetViewState.rootNodeIds.push(rootNode.id);
     }
 
-    // 深さを再計算
     for (const nodeId of targetViewState.rootNodeIds) {
       const node = targetViewState.nodes[nodeId];
       if (node) {
@@ -2118,13 +2064,10 @@ export class TreeStateManager {
     const activeNode = viewState.nodes[nodeId];
     if (!activeNode) return;
 
-    // ドラッグ中のノードが選択に含まれているかチェック
     const isActiveNodeSelected = selectedNodeIds.includes(nodeId);
-    // 移動対象のノードID一覧
     const nodesToMove = isActiveNodeSelected ? selectedNodeIds : [nodeId];
     const nodesToMoveSet = new Set(nodesToMove);
 
-    // ターゲットの親IDを決定
     let targetParentId: string | null = null;
     if (belowNodeId && viewState.nodes[belowNodeId]) {
       targetParentId = viewState.nodes[belowNodeId].parentId;
@@ -2132,7 +2075,6 @@ export class TreeStateManager {
       targetParentId = viewState.nodes[aboveNodeId].parentId;
     }
 
-    // 移動先が移動対象のノードの子孫でないかチェック
     if (targetParentId) {
       for (const id of nodesToMove) {
         if (this.isDescendant(viewState, id, targetParentId)) {
@@ -2141,14 +2083,12 @@ export class TreeStateManager {
       }
     }
 
-    // 選択内でルートになるノード（親が選択に含まれていないノード）を特定
     const topLevelNodesToMove = nodesToMove.filter(id => {
       const node = viewState.nodes[id];
       if (!node) return false;
       return !node.parentId || !nodesToMoveSet.has(node.parentId);
     });
 
-    // 選択内のルートノードを元の親から削除
     for (const id of topLevelNodesToMove) {
       const node = viewState.nodes[id];
       if (!node) continue;
@@ -2163,12 +2103,10 @@ export class TreeStateManager {
       }
     }
 
-    // ノードをソート（元の順序を維持）
     const sortedNodesToMove = topLevelNodesToMove
       .map(id => viewState.nodes[id])
       .filter((node): node is TabNode => node !== undefined);
 
-    // 選択内のルートノードのparentIdを更新
     for (const node of sortedNodesToMove) {
       node.parentId = targetParentId;
       node.depth = targetParentId ? (viewState.nodes[targetParentId]?.depth ?? 0) + 1 : 0;
@@ -2176,7 +2114,6 @@ export class TreeStateManager {
     }
 
     if (targetParentId) {
-      // 親の子として挿入
       const targetParent = viewState.nodes[targetParentId];
       if (targetParent) {
         if (belowNodeId) {
@@ -2208,7 +2145,6 @@ export class TreeStateManager {
         }
       }
     } else {
-      // ルートレベルへの挿入
       const nodesToInsertIds = sortedNodesToMove.map(n => n.id);
       if (belowNodeId) {
         const insertIndex = viewState.rootNodeIds.indexOf(belowNodeId);
@@ -2356,12 +2292,10 @@ export class TreeStateManager {
     }>,
     closeCurrentTabs: boolean
   ): Promise<void> {
-    // 既存のビューとtabToNodeをコピーまたはクリア
     const updatedViews: Map<string, ViewState> = new Map();
     const updatedTabToNode: Map<number, { viewId: string; nodeId: string }> = new Map();
 
     if (!closeCurrentTabs) {
-      // 既存のビューをコピー
       for (const [viewId, viewState] of this.views) {
         updatedViews.set(viewId, {
           info: { ...viewState.info },
@@ -2369,13 +2303,11 @@ export class TreeStateManager {
           nodes: { ...viewState.nodes },
         });
       }
-      // 既存のtabToNodeをコピー
       for (const [tabId, mapping] of this.tabToNode) {
         updatedTabToNode.set(tabId, { ...mapping });
       }
     }
 
-    // スナップショットのビューを追加（存在しない場合）
     for (const view of snapshotViews) {
       if (!updatedViews.has(view.id)) {
         updatedViews.set(view.id, {
@@ -2386,7 +2318,6 @@ export class TreeStateManager {
       }
     }
 
-    // デフォルトビューが存在しない場合は作成
     if (!updatedViews.has('default')) {
       updatedViews.set('default', {
         info: { id: 'default', name: 'Default', color: '#3B82F6' },
@@ -2395,11 +2326,9 @@ export class TreeStateManager {
       });
     }
 
-    // 一時的にすべてのノードを保持するマップ（親子関係構築用）
     const allNewNodes: Map<string, TabNode> = new Map();
     const nodeIdToViewId: Map<string, string> = new Map();
 
-    // 新しいノードを作成
     for (const [index, newTabId] of indexToNewTabId) {
       const snapshot = indexToSnapshot.get(index);
       if (!snapshot) continue;
@@ -2433,7 +2362,6 @@ export class TreeStateManager {
       updatedTabToNode.set(newTabId, { viewId: snapshot.viewId, nodeId });
     }
 
-    // 親子関係を構築（childrenを設定）
     for (const [nodeId, node] of allNewNodes) {
       if (node.parentId && allNewNodes.has(node.parentId)) {
         const parent = allNewNodes.get(node.parentId)!;
@@ -2444,7 +2372,6 @@ export class TreeStateManager {
       }
     }
 
-    // ノードを各ビューに配置
     for (const [nodeId, node] of allNewNodes) {
       const viewId = nodeIdToViewId.get(nodeId) || 'default';
       let viewState = updatedViews.get(viewId);
@@ -2458,17 +2385,14 @@ export class TreeStateManager {
       }
       viewState.nodes[nodeId] = node;
 
-      // ルートノードの場合、rootNodeIdsに追加
       if (!node.parentId) {
         viewState.rootNodeIds.push(nodeId);
       }
     }
 
-    // メモリ上の状態を更新
     this.views = updatedViews;
     this.tabToNode = updatedTabToNode;
 
-    // viewOrderを更新（新しいビューを追加）
     const existingViewOrder = new Set(this.viewOrder);
     for (const viewId of updatedViews.keys()) {
       if (!existingViewOrder.has(viewId)) {
@@ -2476,7 +2400,6 @@ export class TreeStateManager {
       }
     }
 
-    // 永続化
     await this.persistState();
   }
 }

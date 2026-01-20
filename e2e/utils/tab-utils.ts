@@ -306,7 +306,6 @@ export async function getCurrentWindowId(serviceWorker: Worker): Promise<number>
     const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
     const tabs = await chrome.tabs.query({});
 
-    // sidePanelTabが存在する場合はそのwindowIdを返す
     const sidePanelTab = tabs.find(t => {
       const url = t.url || t.pendingUrl || '';
       return url.startsWith(sidePanelUrlPrefix);
@@ -315,7 +314,6 @@ export async function getCurrentWindowId(serviceWorker: Worker): Promise<number>
       return sidePanelTab.windowId;
     }
 
-    // sidePanelTabが存在しない場合は最初のタブのwindowIdを返す
     if (tabs.length > 0 && tabs[0].windowId) {
       return tabs[0].windowId;
     }
@@ -506,7 +504,6 @@ export async function clickLinkToNavigate(
     return tab?.id;
   }, page.url());
 
-  // noWaitAfter: trueを追加して遅延が解消されるか検証
   await page.click(selector, { noWaitAfter: true });
 
   if (tabId) {

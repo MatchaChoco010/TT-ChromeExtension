@@ -359,7 +359,6 @@ describe('フォントカスタマイズ機能', () => {
                   settings={settings}
                   onSettingsChange={updateSettings}
                 />
-                {/* タブタイトル用のテスト要素 */}
                 <span data-testid="tab-title-test" className="truncate">
                   テストタブタイトル
                 </span>

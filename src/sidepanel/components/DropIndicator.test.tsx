@@ -72,7 +72,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // Tailwind CSSのbg-blue-500に相当するカラー
       expect(indicator).toHaveClass('bg-blue-500');
     });
 

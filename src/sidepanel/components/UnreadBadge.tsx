@@ -2,13 +2,11 @@ import React from 'react';
 import { TREE_INDENT_WIDTH_PX } from '../utils';
 
 interface UnreadBadgeProps {
-  /** 未読状態かどうか */
   isUnread: boolean;
   /** 未読インジケータを表示するかどうか（設定による制御） */
   showIndicator: boolean;
   /** タブの階層深度（インジケーター位置の調整に使用） */
   depth?: number;
-  /** カスタムクラス名 */
   className?: string;
 }
 

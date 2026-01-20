@@ -22,10 +22,6 @@ export async function openSidePanel(
 /**
  * ツリーが表示されることを検証
  *
- * 注: Side Panelのルート要素が表示されていることを確認します。
- * 実際のタブツリーは、TreeStateProviderによって動的に読み込まれるため、
- * この関数では Side Panel が正しくロードされたことのみを検証します。
- *
  * @param page - Side PanelのPage
  */
 export async function assertTreeVisible(page: Page): Promise<void> {
@@ -44,11 +40,6 @@ export async function assertTreeVisible(page: Page): Promise<void> {
  * リアルタイム更新を検証
  *
  * 別タブでタブを作成し、Side Panelで反映を確認します。
- *
- * 注: 現在の実装では、Side Panelがデフォルトコンテンツを表示しているため、
- * この関数はアクションが正常に実行されることのみを検証します。
- * 実際のツリー更新の検証は、タブツリーが実際にレンダリングされる
- * 統合テストで行う必要があります。
  *
  * @param sidePanelPage - Side PanelのPage
  * @param action - 実行するアクション（例: タブの作成または削除）

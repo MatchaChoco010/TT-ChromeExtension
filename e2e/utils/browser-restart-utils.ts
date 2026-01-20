@@ -73,14 +73,11 @@ export async function restartBrowser(
 ): Promise<BrowserRestartResult> {
   const extensionPath = getExtensionPath();
 
-  // 現在のコンテキストを閉じる（ブラウザ終了をシミュレート）
   await currentContext.close();
 
   // 少し待機（ストレージの書き込みが完了するのを待つ）
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // 同じuserDataDirで新しいコンテキストを作成（ブラウザ起動をシミュレート）
-  // --restore-last-sessionでセッション復元を有効にし、前回のタブを復元
   const newContext = await chromium.launchPersistentContext(userDataDir, {
     headless: false,
     channel: 'chromium',
@@ -103,17 +100,13 @@ export async function restartBrowser(
     ],
   });
 
-  // Service Workerが起動するのを待つ
   const serviceWorker = await waitForServiceWorker(newContext, 30000);
 
-  // 拡張機能IDを取得
   const extensionId = serviceWorker.url().split('/')[2];
 
   // Service Workerが完全に初期化されるのを待つ
-  // service-worker.tsのIIFEでsyncWithChromeTabsが呼ばれる
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // サイドパネルを開く
   const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel.html`;
   const sidePanelPage = await newContext.newPage();
   await sidePanelPage.goto(sidePanelUrl);
@@ -196,7 +189,6 @@ export async function createInitialContext(
   // Service Workerが完全に初期化されるのを待つ
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // サイドパネルを開く
   const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel.html`;
   const sidePanelPage = await context.newPage();
   await sidePanelPage.goto(sidePanelUrl);

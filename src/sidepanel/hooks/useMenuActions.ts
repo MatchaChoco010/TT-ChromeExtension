@@ -12,7 +12,6 @@ export const useMenuActions = () => {
     try {
       switch (action) {
         case 'close':
-          // isCollapsedParent（expanded: falseの親タブ）の場合はサブツリー全体を閉じる
           if (options?.isCollapsedParent && tabIds.length === 1) {
             await chrome.runtime.sendMessage({
               type: 'CLOSE_SUBTREE',
@@ -25,7 +24,6 @@ export const useMenuActions = () => {
               payload: { tabIds },
             });
           } else {
-            // 単一タブの場合もServiceWorker経由
             await chrome.runtime.sendMessage({
               type: 'CLOSE_TAB',
               payload: { tabId: tabIds[0] },

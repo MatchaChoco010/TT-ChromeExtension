@@ -134,7 +134,6 @@ describe('SettingsPanel', () => {
         />
       );
 
-      // リンククリックから開かれたタブの位置設定ラベルが表示される
       expect(screen.getByLabelText(/リンククリックから開かれたタブの位置/i)).toBeInTheDocument();
     });
 
@@ -146,7 +145,6 @@ describe('SettingsPanel', () => {
         />
       );
 
-      // 手動で開かれたタブの位置設定ラベルが表示される
       expect(screen.getByLabelText(/新規タブの位置/i)).toBeInTheDocument();
     });
 

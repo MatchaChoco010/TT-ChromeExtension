@@ -26,7 +26,6 @@ export function listDownloadedFiles(downloadDir: string): string[] {
     if (entry.isFile()) {
       files.push(entry.name);
     } else if (entry.isDirectory()) {
-      // サブディレクトリ内のファイルも含める
       const subDir = path.join(downloadDir, entry.name);
       const subFiles = fs.readdirSync(subDir, { withFileTypes: true });
       for (const subEntry of subFiles) {
@@ -116,7 +115,6 @@ export function findSnapshotFileByContent(downloadDir: string): string | null {
       try {
         const content = fs.readFileSync(filePath, 'utf-8');
         const parsed = JSON.parse(content);
-        // スナップショットファイルの特徴的なプロパティを確認
         if (
           parsed.id &&
           typeof parsed.id === 'string' &&

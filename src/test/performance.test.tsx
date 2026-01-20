@@ -111,9 +111,9 @@ describe('パフォーマンステスト', () => {
       }
 
       const averageFrameTime = totalFrameTime / frameCount;
-      const targetFrameTime = 1000 / 60; // ms
+      const targetFrameTimeMs = 1000 / 60;
 
-      expect(averageFrameTime).toBeLessThan(targetFrameTime);
+      expect(averageFrameTime).toBeLessThan(targetFrameTimeMs);
     });
   });
 

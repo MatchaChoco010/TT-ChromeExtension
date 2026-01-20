@@ -439,7 +439,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       const treeState = result.tree_state as TreeState | undefined;
 
       if (treeState) {
-        // 各ビューのnodesとrootNodeIdsをクリア、tabToNodeもクリア
         const clearedViews: Record<string, ViewState> = {};
         if (treeState.views) {
           for (const [viewId, viewState] of Object.entries(treeState.views)) {
@@ -615,7 +614,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       const treeState = result.tree_state as StoredTreeState | undefined;
       if (!treeState?.treeStructure || !treeState?.tabToNode) return;
 
-      // views を正しい Record<string, ViewState> 形式で設定
       const newViews: Record<string, ViewState> = {
         'default': {
           info: { id: 'default', name: 'Default', color: '#3b82f6' },
@@ -664,7 +662,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       const treeState = result.tree_state as StoredTreeState | undefined;
 
       if (treeState) {
-        // Clear nodes and rootNodeIds in all views and tabToNode
         const clearedViews: Record<string, ViewState> = {};
         if (treeState.views) {
           for (const [viewId, view] of Object.entries(treeState.views)) {

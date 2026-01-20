@@ -123,7 +123,6 @@ const TreeViewContent: React.FC = () => {
   };
 
   const handleToggleExpand = useCallback((nodeId: string) => {
-    // ServiceWorkerにメッセージを送信してノードの展開状態をトグル
     chrome.runtime.sendMessage({
       type: 'TOGGLE_NODE_EXPAND',
       payload: { nodeId, viewId: currentViewId },
@@ -153,7 +152,6 @@ const TreeViewContent: React.FC = () => {
 
     const nodesWithChildren: Record<string, TabNode> = {};
 
-    // 現在のビューのノードのみを処理（ビュー内のノードは必ずそのビューに属する）
     Object.entries(currentViewState.nodes).forEach(([id, node]) => {
       if (pinnedTabIdSet.has(node.tabId)) {
         return;
@@ -181,13 +179,12 @@ const TreeViewContent: React.FC = () => {
 
     const rootNodes: TabNode[] = [];
     Object.values(nodesWithChildren).forEach((node) => {
-      // 親がいない、または親がフィルタリングされた（ピン留めタブや別ウィンドウ）場合はルートノードとして扱う
+      // 親がフィルタリングされた（ピン留めタブや別ウィンドウ）場合もルートノードとして扱う
       if (!node.parentId || !nodesWithChildren[node.parentId]) {
         rootNodes.push(node);
       }
     });
 
-    // フィルタリング後のツリー構造に対してdepthを再計算
     const recalculateDepth = (node: TabNode, depth: number): void => {
       node.depth = depth;
       for (const child of node.children) {
@@ -199,7 +196,6 @@ const TreeViewContent: React.FC = () => {
       recalculateDepth(node, 0);
     });
 
-    // rootNodeIdsを使用してソート（ViewStateで管理されている順序を尊重）
     const rootNodeIdsArray = currentViewState.rootNodeIds ?? [];
     const nodeOrderMap = new Map(rootNodeIdsArray.map((id, index) => [id, index]));
     rootNodes.sort((a, b) => {
@@ -214,7 +210,6 @@ const TreeViewContent: React.FC = () => {
   const nodes = buildTree();
 
   const handlePinnedTabClick = (tabId: number) => {
-    // ピン留めタブをクリックしたとき、通常タブの選択状態をクリアする
     clearSelection();
     chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId } });
   };
@@ -250,19 +245,15 @@ const TreeViewContent: React.FC = () => {
     });
   }, [currentWindowId]);
 
-  // treeState.views (Record<string, ViewState>) から View[] に変換
-  // viewOrderの順序を尊重する
   const viewsArray = useMemo((): View[] => {
     if (!treeState) return [];
     const orderedViews: View[] = [];
-    // viewOrderの順序でビューを追加
     for (const viewId of treeState.viewOrder) {
       const viewState = treeState.views[viewId];
       if (viewState) {
         orderedViews.push(viewState.info);
       }
     }
-    // viewOrderに含まれていないビューがあれば末尾に追加
     for (const [viewId, viewState] of Object.entries(treeState.views)) {
       if (!treeState.viewOrder.includes(viewId)) {
         orderedViews.push(viewState.info);
@@ -275,8 +266,6 @@ const TreeViewContent: React.FC = () => {
     <div
       className="flex flex-col h-full bg-gray-900"
       onClick={(e) => {
-        // タブノードやボタンのクリックでない場合は選択解除
-        // ViewSwitcher、PinnedTabsSection、ツリービュー領域の空白など全てで機能する
         const target = e.target as HTMLElement;
         if (!target.closest('[data-node-id]') && !target.closest('button')) {
           clearSelection();

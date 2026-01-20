@@ -351,7 +351,6 @@ test.describe('ファビコンの永続化復元', () => {
       await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'https://www.google.com/favicon.ico';
-      // URLをキーにしてファビコンを保存（ブラウザ再起動後も復元可能）
       await serviceWorker.evaluate(
         async ({ tabUrl, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -415,7 +414,6 @@ test.describe('ファビコンの永続化復元', () => {
       await expect(defaultIcon).toBeVisible({ timeout: 5000 });
 
       const testFaviconUrl = 'http://127.0.0.1/test-favicon.png';
-      // URLをキーにしてファビコンを保存
       await serviceWorker.evaluate(
         async ({ tabUrl, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -475,7 +473,6 @@ test.describe('ファビコンの永続化復元', () => {
       await waitForTabInTreeState(serviceWorker, tabId);
 
       const initialFaviconUrl = 'http://127.0.0.1/initial-favicon.ico';
-      // URLをキーにしてファビコンを保存
       await serviceWorker.evaluate(
         async ({ tabUrl, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -506,7 +503,6 @@ test.describe('ファビコンの永続化復元', () => {
       }, { timeout: 10000, timeoutMessage: 'Initial favicon not displayed' });
 
       const newFaviconUrl = 'http://127.0.0.1/new-favicon.ico';
-      // URLをキーにしてファビコンを更新
       await serviceWorker.evaluate(
         async ({ tabUrl, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');
@@ -517,7 +513,6 @@ test.describe('ファビコンの永続化復元', () => {
         { tabUrl, faviconUrl: newFaviconUrl }
       );
 
-      // サイドパネルをリロードして更新を反映させる
       await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`);
       await sidePanelPage.waitForLoadState('domcontentloaded');
       await sidePanelPage.waitForSelector('[data-testid="side-panel-root"]', { timeout: 10000 });
@@ -682,7 +677,6 @@ test.describe('ファビコンの永続化復元', () => {
       await waitForTabInTreeState(serviceWorker, tabId);
 
       const testFaviconUrl = 'http://127.0.0.1/cleanup-test.ico';
-      // URLをキーにしてファビコンを保存
       await serviceWorker.evaluate(
         async ({ tabUrl, faviconUrl }) => {
           const result = await chrome.storage.local.get('tab_favicons');

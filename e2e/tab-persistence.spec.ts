@@ -141,7 +141,6 @@ test.describe('Tab Persistence', () => {
 
         if (!treeState?.tabToNode) return 0;
 
-        // 現在のウィンドウに属するタブのみをカウント
         let count = 0;
         for (const tabIdStr of Object.keys(treeState.tabToNode)) {
           const tabId = parseInt(tabIdStr);

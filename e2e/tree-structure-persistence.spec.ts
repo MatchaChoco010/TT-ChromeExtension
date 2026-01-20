@@ -162,7 +162,6 @@ test.describe('Tree Structure Persistence', () => {
         isExpanded: boolean;
       }
 
-      // treeStructureに期待するURLが永続化されるまで待機
       await waitForCondition(async () => {
         const structure = await serviceWorker.evaluate(async () => {
           const result = await chrome.storage.local.get('tree_state');
@@ -258,14 +257,12 @@ test.describe('Tree Structure Persistence', () => {
         { tabId, depth: 0 },
       ], 0);
 
-      // メッセージ経由でビューを作成
       await serviceWorker.evaluate(async () => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage({ type: 'CREATE_VIEW' }, () => resolve());
         });
       });
 
-      // 作成されたビューIDを取得
       const newViewId = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as { viewOrder?: string[] };
@@ -273,7 +270,6 @@ test.describe('Tree Structure Persistence', () => {
         return viewOrder[viewOrder.length - 1];
       }) as string;
 
-      // メッセージ経由でタブをビューに移動
       await serviceWorker.evaluate(async ({ tabId, viewId }) => {
         return new Promise<void>((resolve) => {
           chrome.runtime.sendMessage({
@@ -331,7 +327,6 @@ test.describe('Tree Structure Persistence', () => {
         { tabId: childTabId, depth: 1 },
       ], 0);
 
-      // UIを通じてノードを折りたたむ
       await collapseNode(sidePanelPage, parentTabId);
 
       await waitForCondition(

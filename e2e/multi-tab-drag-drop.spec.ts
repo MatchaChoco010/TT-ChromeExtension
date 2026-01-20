@@ -16,14 +16,12 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 5つのタブを作成
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
-    // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -38,7 +36,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // タブ1をクリックして選択
     const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
     await tabNode1.click();
     await expect(tabNode1).toHaveClass(/bg-gray-500/);
@@ -75,7 +72,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
       { tabId: tabId3, depth: 0 },
     ], 0);
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId1);
     await closeTab(serviceWorker, tabId2);
     await closeTab(serviceWorker, tabId3);
@@ -93,14 +89,12 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
-    // 5つのタブを作成
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
     const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
 
-    // 初期状態を確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -211,7 +205,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
       { tabId: tabId3, depth: 0 },
     ], 0);
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId1);
     await closeTab(serviceWorker, tabId2);
     await closeTab(serviceWorker, tabId3);

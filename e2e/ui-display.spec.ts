@@ -35,7 +35,7 @@ test.describe('UI表示の一貫性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // タブを作成してツリーに表示されるまで待機
+      // Arrange
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -43,15 +43,12 @@ test.describe('UI表示の一貫性', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // タブノードが表示されるまで待機
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await expect(treeNode).toBeVisible({ timeout: COMMON_TIMEOUTS.medium });
 
-      // タブタイトル要素を取得
       const tabTitleElement = treeNode.locator('span.truncate');
       await expect(tabTitleElement).toBeVisible();
 
-      // 変更前のフォントサイズを確認（デフォルトは14px）
       const initialFontSize = await sidePanelPage.evaluate(() => {
         return getComputedStyle(document.documentElement).getPropertyValue('--font-size').trim();
       });
@@ -98,7 +95,7 @@ test.describe('UI表示の一貫性', () => {
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // タブを作成してツリーに表示されるまで待機
+      // Arrange
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -106,11 +103,9 @@ test.describe('UI表示の一貫性', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // タブノードが表示されるまで待機
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await expect(treeNode).toBeVisible({ timeout: COMMON_TIMEOUTS.medium });
 
-      // タブタイトル要素を取得
       const tabTitleElement = treeNode.locator('span.truncate');
       await expect(tabTitleElement).toBeVisible();
 
@@ -207,7 +202,6 @@ test.describe('UI表示の一貫性', () => {
       // chrome://vivaldi-webui/startpage はChromiumでアクセスできないため、
       // TreeNode.tsxのgetDisplayTitle関数のロジックをSide Panel内でテスト
       const result = await sidePanelPage.evaluate(() => {
-        // isStartPageUrl関数のロジックを再現
         const isStartPageUrl = (url: string): boolean => {
           if (!url) return false;
           const startPageUrlPatterns = [
@@ -217,7 +211,6 @@ test.describe('UI表示の一貫性', () => {
           return startPageUrlPatterns.some(pattern => pattern.test(url));
         };
 
-        // isNewTabUrl関数のロジックを再現
         const isNewTabUrl = (url: string): boolean => {
           if (!url) return false;
           const newTabUrlPatterns = [
@@ -229,7 +222,6 @@ test.describe('UI表示の一貫性', () => {
           return newTabUrlPatterns.some(pattern => pattern.test(url));
         };
 
-        // getDisplayTitle関数のロジックを再現
         const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 'complete' }): string => {
           if (tab.status === 'loading') return 'Loading...';
           if (isStartPageUrl(tab.url)) return 'スタートページ';
@@ -237,7 +229,6 @@ test.describe('UI表示の一貫性', () => {
           return tab.title;
         };
 
-        // テストケースを実行
         return {
           startPage: getDisplayTitle({
             title: 'Some Title',
@@ -343,21 +334,16 @@ test.describe('UI表示の一貫性', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // タブノードが表示されるまで待機
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await expect(treeNode).toBeVisible({ timeout: COMMON_TIMEOUTS.medium });
 
-      // タブタイトル要素を取得
       const tabTitleElement = treeNode.locator('span.truncate');
       await expect(tabTitleElement).toBeVisible();
 
-      // Assert: 通常のWebサイトはタイトルがそのまま表示される
-      // example.comのタイトルは "Example Domain"
+      // Assert: 通常のWebサイトはタイトルがそのまま表示される（スタートページや新しいタブではない）
       await expect(async () => {
         const titleText = await tabTitleElement.textContent();
-        // Loading...でなく、実際のタイトルが表示されることを確認
         expect(titleText).not.toBe('Loading...');
-        // スタートページや新しいタブではないことを確認
         expect(titleText).not.toBe('スタートページ');
         expect(titleText).not.toBe('新しいタブ');
       }).toPass({ timeout: COMMON_TIMEOUTS.medium });
@@ -391,17 +377,14 @@ test.describe('UI表示の一貫性', () => {
         { tabId: tabId, depth: 0 },
       ], 0);
 
-      // タブノードが表示されるまで待機
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
       await expect(treeNode).toBeVisible({ timeout: COMMON_TIMEOUTS.medium });
 
-      // タブタイトル要素を取得
       const tabTitleElement = treeNode.locator('span.truncate');
       await expect(tabTitleElement).toBeVisible();
 
       // Assert: タブがロード完了後、「Loading...」でないタイトルが表示される
       await expect(async () => {
-        // タブのステータスを確認
         const tabStatus = await serviceWorker.evaluate(async (tabId: number) => {
           const tab = await chrome.tabs.get(tabId);
           return tab.status;
@@ -409,7 +392,6 @@ test.describe('UI表示の一貫性', () => {
 
         const titleText = await tabTitleElement.textContent();
 
-        // ロード完了後は「Loading...」ではないことを確認
         if (tabStatus === 'complete') {
           expect(titleText).not.toBe('Loading...');
         }

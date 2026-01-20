@@ -1,6 +1,3 @@
-/**
- * ServiceWorkerUtilsのテスト
- */
 import { test, expect } from './fixtures/extension';
 import {
   sendMessageToServiceWorker,

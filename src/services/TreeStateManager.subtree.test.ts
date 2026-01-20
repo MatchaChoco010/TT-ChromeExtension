@@ -101,7 +101,6 @@ describe('TreeStateManager - Subtree Operations', () => {
       expect(tab2Node).toBeDefined();
       expect(tab3Node).toBeDefined();
 
-      // Check parent-child relationships are preserved
       expect(tab2Node!.parentId).toBe(tab1Node!.id);
       expect(tab3Node!.parentId).toBe(tab2Node!.id);
     });
@@ -204,7 +203,6 @@ describe('TreeStateManager - Subtree Operations', () => {
       expect(node2After!.viewId).toBe('view2');
       expect(node3After!.viewId).toBe('view2');
 
-      // Tree structure should be preserved
       expect(node2After!.node.parentId).toBe(node1After!.node.id);
       expect(node3After!.node.parentId).toBe(node1After!.node.id);
     });

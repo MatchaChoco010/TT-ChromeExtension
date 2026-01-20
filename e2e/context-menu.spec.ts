@@ -122,7 +122,6 @@ test.describe('コンテキストメニュー操作', () => {
       { tabId: childTabId2, depth: 1 },
     ], 0);
 
-    // 親タブを折りたたむ（expanded: false）
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
     const expandButton = parentNode.locator('[data-testid="expand-button"]');
     await expandButton.click();
@@ -143,17 +142,14 @@ test.describe('コンテキストメニュー操作', () => {
       { timeout: 5000 }
     );
 
-    // 折りたたまれた親タブを右クリックしてコンテキストメニューを開く
     await parentNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
-    // 「タブを閉じる」を選択すると、サブツリー全体が閉じられる
     const closeItem = sidePanelPage.getByRole('menuitem', { name: 'タブを閉じる' });
     await expect(closeItem).toBeVisible({ timeout: 3000 });
     await closeItem.click({ force: true, noWaitAfter: true });
     await expect(sidePanelPage.locator('[role="menu"]')).not.toBeVisible({ timeout: 3000 });
 
-    // 親タブとその子タブがすべて閉じられている
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: pseudoSidePanelTabId, depth: 0 },
@@ -446,7 +442,6 @@ test.describe('コンテキストメニュー操作', () => {
     extensionContext,
     serviceWorker,
   }) => {
-    // メインウィンドウのセットアップ
     const window1Id = await getCurrentWindowId(serviceWorker);
     const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
       await setupWindow(extensionContext, serviceWorker, window1Id);
@@ -456,12 +451,10 @@ test.describe('コンテキストメニュー操作', () => {
       { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
-    // 2つ目のウィンドウを作成（サイドパネルなし）
     const window2Id = await createWindow(extensionContext);
     await assertWindowCount(extensionContext, 2);
     await assertWindowExists(extensionContext, window2Id);
 
-    // window2のデフォルトタブを取得
     const window2Tabs: chrome.tabs.Tab[] = await serviceWorker.evaluate(
       (wId) => chrome.tabs.query({ windowId: wId }),
       window2Id
@@ -469,8 +462,6 @@ test.describe('コンテキストメニュー操作', () => {
     const window2DefaultTabId = window2Tabs[0]?.id;
     expect(window2DefaultTabId).toBeDefined();
 
-    // window2の最後のタブをコンテキストメニューアクションで新しいウィンドウに移動
-    // Service Workerを通じてuseMenuActionsの'newWindow'アクションをシミュレート
     await serviceWorker.evaluate(async (tabId) => {
       const sourceTab = await chrome.tabs.get(tabId);
       const sourceWindowId = sourceTab.windowId;
@@ -489,10 +480,8 @@ test.describe('コンテキストメニュー操作', () => {
       return newWindow.id;
     }, window2DefaultTabId!);
 
-    // window2が閉じられることを検証
     await assertWindowClosed(extensionContext, window2Id);
 
-    // 最終的にウィンドウ数が2であることを検証（メインウィンドウ + 新しいウィンドウ）
     await assertWindowCount(extensionContext, 2);
   });
 
@@ -500,16 +489,13 @@ test.describe('コンテキストメニュー操作', () => {
     extensionContext,
     serviceWorker,
   }) => {
-    // 2つ目のウィンドウを作成（サイドパネル付き）
     const window2Id = await createWindow(extensionContext);
     await assertWindowCount(extensionContext, 2);
     await assertWindowExists(extensionContext, window2Id);
 
-    // window2のサイドパネルを開く
     const sidePanelPage2 = await openSidePanelForWindow(extensionContext, window2Id);
     await waitForSidePanelReady(sidePanelPage2, serviceWorker);
 
-    // window2のタブを取得
     const pseudoSidePanelTabId2 = await getPseudoSidePanelTabId(serviceWorker, window2Id);
     const window2Tabs: chrome.tabs.Tab[] = await serviceWorker.evaluate(
       (wId) => chrome.tabs.query({ windowId: wId }),
@@ -522,10 +508,8 @@ test.describe('コンテキストメニュー操作', () => {
       { tabId: pseudoSidePanelTabId2, depth: 0 },
     ], 0);
 
-    // デフォルトタブをアクティブにする
     await serviceWorker.evaluate((tabId) => chrome.tabs.update(tabId, { active: true }), defaultTabInWindow2!.id!);
 
-    // デフォルトタブを右クリックしてコンテキストメニューを開く
     const tabNode = sidePanelPage2.locator(`[data-testid="tree-node-${defaultTabInWindow2!.id}"]`);
     await sidePanelPage2.bringToFront();
     await sidePanelPage2.waitForFunction(
@@ -542,7 +526,6 @@ test.describe('コンテキストメニュー操作', () => {
     await tabNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(sidePanelPage2.locator('[role="menu"]')).toBeVisible({ timeout: 3000 });
 
-    // 「別のウィンドウに移動」→「新しいウィンドウ」を選択
     const moveToWindowTrigger = sidePanelPage2.locator('[data-testid="context-menu-move-to-window"]');
     await moveToWindowTrigger.hover({ force: true, noWaitAfter: true });
 
@@ -550,17 +533,10 @@ test.describe('コンテキストメニュー操作', () => {
     await expect(newWindowOption).toBeVisible({ timeout: 3000 });
     await newWindowOption.click({ force: true, noWaitAfter: true });
 
-    // 現在の実装では、タブを新しいウィンドウに移動した後、
-    // remainingTabs.length === 0 の場合のみウィンドウを閉じる
-    // テスト環境では擬似サイドパネルタブがあるため、条件を満たさない
-    // しかし、Chromeはウィンドウの「最後の通常タブ」が移動されると
-    // 自動的にウィンドウを閉じることがある
-    // この動作を確認するために、ウィンドウの状態をチェックする
-
-    // 少し待機してから状態を確認
+    // 擬似サイドパネルタブがあるためwindow2は自動クローズされない可能性がある
+    // Chromeの動作を確認するためにウィンドウの状態をチェック
     await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 500)));
 
-    // window2が閉じられたかどうかを確認
     const windowStillExists = await serviceWorker.evaluate(async (wId) => {
       try {
         const windows = await chrome.windows.getAll();
@@ -570,18 +546,14 @@ test.describe('コンテキストメニュー操作', () => {
       }
     }, window2Id);
 
-    // ウィンドウが閉じられた場合、ウィンドウ数は2（メインウィンドウ + 新しいウィンドウ）
-    // ウィンドウが閉じられなかった場合、ウィンドウ数は3
     if (windowStillExists) {
-      // window2がまだ存在する場合（擬似サイドパネルタブのため）
+      // 擬似サイドパネルタブのためwindow2がまだ存在する
       await assertWindowCount(extensionContext, 3);
-      // クリーンアップ: sidePanelPageを閉じると擬似サイドパネルタブも閉じられ、
-      // その結果window2にタブがなくなりウィンドウも自動的に閉じられる
+      // sidePanelPageを閉じると擬似サイドパネルタブも閉じられ、
+      // window2にタブがなくなりウィンドウも自動的に閉じられる
       await sidePanelPage2.close();
-      // ウィンドウが自動的に閉じられるのを待つ
       await assertWindowClosed(extensionContext, window2Id);
     } else {
-      // window2が閉じられた場合
       await assertWindowClosed(extensionContext, window2Id);
       await assertWindowCount(extensionContext, 2);
     }

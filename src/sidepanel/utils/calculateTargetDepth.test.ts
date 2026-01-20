@@ -1,8 +1,3 @@
-/**
- * calculateTargetDepth ユニットテスト
- *
- * マウスX座標からドロップ先のdepthを計算するユーティリティ関数のテスト
- */
 import { describe, it, expect } from 'vitest';
 import { calculateTargetDepth } from './calculateTargetDepth';
 

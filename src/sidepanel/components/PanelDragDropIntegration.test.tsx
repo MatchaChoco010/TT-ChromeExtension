@@ -366,7 +366,6 @@ describe('パネル内D&Dの統合テスト', () => {
     });
 
     it('ホバー時にブランチが自動展開される (既存テストで確認)', async () => {
-      // DragHoverAutoExpand.test.tsx で実装されています
       render(
         <TreeStateProvider>
           <IntegrationTestComponent />
@@ -384,7 +383,6 @@ describe('パネル内D&Dの統合テスト', () => {
 
       expect(screen.queryByTestId('tree-node-4')).not.toBeInTheDocument();
 
-      // DragHoverAutoExpand.test.tsx で詳細なテストを実施
       expect(true).toBe(true);
     });
   });

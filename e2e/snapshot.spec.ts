@@ -154,7 +154,7 @@ test.describe('スナップショット復元機能', () => {
             index: 1,
             url: getTestServerUrl('/child'),
             title: 'Child Tab',
-            parentIndex: 0,  // 親タブのindex
+            parentIndex: 0,
             viewId: 'default',
             isExpanded: false,
             pinned: false,
@@ -204,7 +204,6 @@ test.describe('スナップショット復元機能', () => {
         parentNode = parentViewState.nodes[parentNodeInfo.nodeId];
         childNode = childViewState.nodes[childNodeInfo.nodeId];
 
-        // 両方のノードが存在し、親子関係が設定されているか確認
         return parentNode !== undefined && childNode !== undefined && childNode.parentId === parentNode.id;
       },
       { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with parent-child relationship did not appear' }
@@ -240,7 +239,7 @@ test.describe('スナップショット復元機能', () => {
             url: getTestServerUrl('/work-tab'),
             title: 'Work Tab',
             parentIndex: null,
-            viewId: 'view-work',  // Workビューに配置
+            viewId: 'view-work',
             isExpanded: false,
             pinned: false,
           },
@@ -249,7 +248,7 @@ test.describe('スナップショット復元機能', () => {
             url: getTestServerUrl('/personal-tab'),
             title: 'Personal Tab',
             parentIndex: null,
-            viewId: 'view-personal',  // Personalビューに配置
+            viewId: 'view-personal',
             isExpanded: false,
             pinned: false,
           },
@@ -289,7 +288,6 @@ test.describe('スナップショット復元機能', () => {
         workNodeInfo = treeState.tabToNode[workTab!.id];
         personalNodeInfo = treeState.tabToNode[personalTab!.id];
 
-        // 両方のノードが存在し、正しいビューに配置されているか確認
         return workNodeInfo !== undefined && personalNodeInfo !== undefined &&
                workNodeInfo.viewId === 'view-work' && personalNodeInfo.viewId === 'view-personal';
       },

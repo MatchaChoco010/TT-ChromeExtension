@@ -211,11 +211,9 @@ describe('ContextMenu Integration with MenuActions', () => {
 
       render(<ContextMenuWrapper />);
 
-      // 別のウィンドウに移動のサブメニュートリガーにホバー
       const moveToWindowItem = screen.getByTestId('context-menu-move-to-window');
       await user.hover(moveToWindowItem);
 
-      // サブメニューが表示されるのを待つ
       const newWindowSubItem = await screen.findByText('新しいウィンドウ');
       await user.click(newWindowSubItem);
 

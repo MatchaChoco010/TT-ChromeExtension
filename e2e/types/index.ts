@@ -17,8 +17,6 @@ export type {
 
 /**
  * TabNode 型を再定義（evaluate 内で使用するため）
- * src/types/index.ts と同じ構造
- * Note: 新構造ではviewIdはノードに含まれない（ビューで管理）
  */
 export interface E2ETabNode {
   id: string;
@@ -37,9 +35,6 @@ export interface E2EGroup {
   isExpanded: boolean;
 }
 
-/**
- * View情報の型定義
- */
 export interface E2EViewInfo {
   id: string;
   name: string;
@@ -49,7 +44,6 @@ export interface E2EViewInfo {
 
 /**
  * ViewState 型を再定義（evaluate 内で使用するため）
- * 各ビューの状態を保持
  */
 export interface E2EViewState {
   info: E2EViewInfo;
@@ -59,7 +53,6 @@ export interface E2EViewState {
 
 /**
  * TreeState 型を再定義（evaluate 内で使用するため）
- * src/types/index.ts と同じ構造
  */
 export interface E2ETreeState {
   views: Record<string, E2EViewState>;

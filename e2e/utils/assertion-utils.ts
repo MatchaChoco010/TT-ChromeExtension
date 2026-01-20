@@ -115,7 +115,6 @@ export async function assertTabStructure(
 ): Promise<void> {
   const { timeout = 15000 } = options;
 
-  // expanded指定の事前検証
   for (let i = 0; i < expectedStructure.length; i++) {
     const current = expectedStructure[i];
     const currentDepth = current.depth;
@@ -149,14 +148,12 @@ export async function assertTabStructure(
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeout) {
-    // アクティブビューインデックスをチェック
     const actualActiveViewIndex = await getActiveViewIndex(page);
     if (actualActiveViewIndex !== expectedActiveViewIndex) {
       await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 16)));
       continue;
     }
 
-    // タブ数をチェック
     const allTreeNodes = page.locator('[data-testid^="tree-node-"]');
     const actualTabCount = await allTreeNodes.count();
     if (actualTabCount !== expectedStructure.length) {
@@ -164,12 +161,10 @@ export async function assertTabStructure(
       continue;
     }
 
-    // 空配列の場合はここで成功
     if (expectedStructure.length === 0) {
       return;
     }
 
-    // 各タブの状態を取得
     const actualStructure: { tabId: number; depth: number; y: number; expanded: string | null }[] = [];
     let allTabsFound = true;
 
@@ -202,7 +197,6 @@ export async function assertTabStructure(
       continue;
     }
 
-    // タブの順序をチェック
     actualStructure.sort((a, b) => a.y - b.y);
     const actualOrder = actualStructure.map(s => s.tabId);
     const expectedOrder = expectedStructure.map(s => s.tabId);
@@ -212,7 +206,6 @@ export async function assertTabStructure(
       continue;
     }
 
-    // 各タブのdepthとexpandedをチェック
     let allMatch = true;
     for (const expected of expectedStructure) {
       const actual = actualStructure.find(s => s.tabId === expected.tabId);
@@ -240,15 +233,12 @@ export async function assertTabStructure(
       continue;
     }
 
-    // すべて一致
     return;
   }
 
-  // タイムアウト: 現在の状態を取得してエラーメッセージを生成
   const elapsed = Date.now() - startTime;
   let errorMessage = `assertTabStructure timeout after ${elapsed}ms (windowId: ${windowId})\n`;
 
-  // アクティブビューインデックス
   const actualActiveViewIndex = await getActiveViewIndex(page).catch(() => -1);
   if (actualActiveViewIndex !== expectedActiveViewIndex) {
     errorMessage += `  Active view index mismatch:\n`;
@@ -256,7 +246,6 @@ export async function assertTabStructure(
     errorMessage += `    Actual:   ${actualActiveViewIndex}\n`;
   }
 
-  // タブ数
   const allTreeNodes = page.locator('[data-testid^="tree-node-"]');
   const actualTabCount = await allTreeNodes.count().catch(() => -1);
   const actualTabIds: string[] = [];
@@ -272,7 +261,6 @@ export async function assertTabStructure(
     errorMessage += `    Actual:   ${actualTabCount} tabs (${actualTabIds.join(', ')})\n`;
   }
 
-  // 各タブの状態
   const actualStructure: { tabId: number; depth: number; y: number; expanded: string | null }[] = [];
   for (const expected of expectedStructure) {
     const element = page.locator(`[data-testid="tree-node-${expected.tabId}"]`).first();
@@ -298,7 +286,6 @@ export async function assertTabStructure(
     });
   }
 
-  // タブの順序
   actualStructure.sort((a, b) => a.y - b.y);
   const actualOrder = actualStructure.map(s => s.tabId);
   const expectedOrder = expectedStructure.map(s => s.tabId);
@@ -309,7 +296,6 @@ export async function assertTabStructure(
     errorMessage += `    Actual:   [${actualOrder.join(', ')}]\n`;
   }
 
-  // 各タブのdepthとexpanded
   for (const expected of expectedStructure) {
     const actual = actualStructure.find(s => s.tabId === expected.tabId);
     if (!actual) continue;
@@ -330,7 +316,6 @@ export async function assertTabStructure(
     }
   }
 
-  // Service Workerの状態
   try {
     const context = page.context();
     const workers = context.serviceWorkers();
@@ -351,10 +336,8 @@ export async function assertTabStructure(
         const chromeTabs = await chrome.tabs.query({ windowId });
         const chromeTabIds = chromeTabs.map(t => t.id).filter((id): id is number => id !== undefined);
 
-        // Chromeにあるが TreeStateにないタブを特定
         const missingTabIds = chromeTabIds.filter(id => !treeTabIds.includes(id));
 
-        // 不足しているタブの作成ログを取得
         type TabCreationLog = { tabId: number; timestamp: number; message: string };
         const getTabCreationLogs = globalThis.getTabCreationLogs as ((tabId?: number) => TabCreationLog[]) | undefined;
         const missingTabLogs: Record<number, TabCreationLog[]> = {};

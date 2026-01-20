@@ -2,8 +2,6 @@
  * E2Eテスト用ウィンドウセットアップユーティリティ
  *
  * 各テストで一貫したウィンドウセットアップを行うためのヘルパー関数を提供する。
- * autoResetはクリーンアップのみを行い（1ウィンドウ、initialTabのみ）、
- * 各テストはこのヘルパー関数を使用してsidePanelPageを作成する。
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 import { getInitialBrowserTabId, getPseudoSidePanelTabId } from './tab-utils';
@@ -27,14 +25,9 @@ export interface WindowSetup {
 /**
  * ウィンドウのセットアップを行う
  *
- * autoResetで用意されたベース状態（1ウィンドウ、initialTabのみ）に対して、
- * openSidePanelForWindow()でsidePanelPageを作成し、必要なIDを取得する。
- *
- * メインウィンドウでも新規ウィンドウでも同じパターンで使用できる。
- *
  * @param context - ブラウザコンテキスト
  * @param serviceWorker - Service Worker
- * @param windowId - セットアップするウィンドウID（必須）
+ * @param windowId - セットアップするウィンドウID
  * @returns セットアップ情報
  */
 export async function setupWindow(
@@ -54,9 +47,6 @@ export async function setupWindow(
 
 /**
  * 新しいウィンドウを作成してセットアップを行う
- *
- * createWindow + setupWindowを一度に行うヘルパー。
- * マルチウィンドウテストで追加のウィンドウをセットアップする際に使用する。
  *
  * @param context - ブラウザコンテキスト
  * @param serviceWorker - Service Worker

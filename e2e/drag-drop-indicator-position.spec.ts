@@ -137,7 +137,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       const tabXBox = await getTabNodeBoundingBox(sidePanelPage, tabX);
 
-      // タブXの下端付近（タブXとタブAの間の隙間）にマウスを移動
       const gapY = tabXBox.y + tabXBox.height * 0.85;
       await sidePanelPage.mouse.move(tabXBox.x + tabXBox.width / 2, gapY, { steps: 10 });
 
@@ -220,7 +219,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabABox = await getTabNodeBoundingBox(sidePanelPage, tabA);
       const tabBBox = await getTabNodeBoundingBox(sidePanelPage, tabB);
 
-      // タブAの下端付近（タブAとタブBの間の隙間）にマウスを移動
       const gapY = tabABox.y + tabABox.height * 0.85;
       await sidePanelPage.mouse.move(tabABox.x + tabABox.width / 2, gapY, { steps: 10 });
 
@@ -302,7 +300,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabBBox = await getTabNodeBoundingBox(sidePanelPage, tabB);
       const tabCBox = await getTabNodeBoundingBox(sidePanelPage, tabC);
 
-      // タブCの上端付近（タブBとタブCの間の隙間）にマウスを移動
       const gapY = tabCBox.y + tabCBox.height * 0.15;
       await sidePanelPage.mouse.move(tabCBox.x + tabCBox.width / 2, gapY, { steps: 10 });
 
@@ -347,8 +344,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
         await setupWindow(extensionContext, serviceWorker, windowId);
-
-      // 準備: 4つのタブを作成
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [

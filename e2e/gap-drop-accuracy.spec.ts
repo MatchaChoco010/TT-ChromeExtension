@@ -1,6 +1,3 @@
-/**
- * Gapドロップ精度のE2Eテスト
- */
 import { test } from './fixtures/extension';
 import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { startDrag, dropTab, moveTabToParent, reorderTabs } from './utils/drag-drop-utils';
@@ -9,9 +6,6 @@ import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 import type { Page } from '@playwright/test';
 
-/**
- * タブノードのバウンディングボックスを取得
- */
 async function getTabNodeBoundingBox(
   page: Page,
   tabId: number

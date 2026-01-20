@@ -9,10 +9,8 @@
  * このモジュールでは、ポーリングで条件をチェックし、条件が満たされるか
  * タイムアウトするまで待機する共通関数を提供する。
  *
- * 重要: すべての関数は Worker を直接受け取る。
- * context.serviceWorkers()[0] から新しい参照を取得する getServiceWorker() は廃止。
- * これにより、Service Worker が再起動された場合に即座にエラーが発生し、
- * 根本原因が明確になる。
+ * すべての関数は Worker を直接受け取る設計であり、
+ * Service Worker が再起動された場合に即座にエラーが発生し、根本原因が明確になる。
  */
 import type { Page, Worker } from '@playwright/test';
 import '../types';
@@ -170,7 +168,6 @@ export async function waitForTabInTreeState(
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
 
-      // タイムアウト時のデバッグ情報を収集
       let tabExists = false;
       let tabInfo: chrome.tabs.Tab | null = null;
       try {
@@ -182,21 +179,17 @@ export async function waitForTabInTreeState(
 
       const syncCompleted = globalThis.treeStateManager?.isSyncCompleted?.() ?? 'unknown';
 
-      // メモリ上のツリー状態を確認
       const memoryNode = globalThis.treeStateManager?.getNodeByTabId?.(tabId);
       const hasNodeInMemory = !!memoryNode;
 
-      // メモリ上のtabToNodeから全タブIDを取得
       const treeState = globalThis.treeStateManager?.toJSON?.();
       const registeredTabIds = treeState?.tabToNode
         ? Object.keys(treeState.tabToNode).map(Number)
         : [];
 
-      // 全Chromeタブを取得して比較
       const allChromeTabs = await chrome.tabs.query({});
       const allChromeTabIds = allChromeTabs.map(t => t.id).filter((id): id is number => id !== undefined);
 
-      // タブ作成ログを取得
       const tabCreationLogs = globalThis.getTabCreationLogs?.(tabId) ?? [];
       const recentLogs = globalThis.getTabCreationLogs?.() ?? [];
       const last50Logs = recentLogs.slice(-50);

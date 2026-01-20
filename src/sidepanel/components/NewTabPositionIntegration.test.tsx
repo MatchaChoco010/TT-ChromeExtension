@@ -58,7 +58,7 @@ describe('新規タブ位置の統合テスト', () => {
         fontFamily: 'system-ui',
         customCSS: '',
         newTabPosition: 'child',
-        newTabPositionFromLink: 'child', // リンクから開かれたタブは子として配置
+        newTabPositionFromLink: 'child',
         newTabPositionManual: 'end',
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
@@ -68,7 +68,6 @@ describe('新規タブ位置の統合テスト', () => {
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
-      // 親タブを作成
       const parentTab = {
         id: 1,
         index: 0,
@@ -176,7 +175,7 @@ describe('新規タブ位置の統合テスト', () => {
         customCSS: '',
         newTabPosition: 'end',
         newTabPositionFromLink: 'child',
-        newTabPositionManual: 'end', // 手動で開かれたタブはツリーの最後に配置
+        newTabPositionManual: 'end',
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,

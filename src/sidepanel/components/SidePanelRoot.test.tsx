@@ -189,7 +189,6 @@ describe('SidePanelRoot', () => {
 
   describe('ビュー情報のTabTreeViewへの受け渡し', () => {
     it('treeStateにビューがある場合、TabTreeViewにviewsとonMoveToViewが渡されること', async () => {
-      // ビューを含むtreeStateを設定（新しいViewState構造を使用）
       const mockTreeState = {
         views: {
           'default': {
@@ -228,7 +227,6 @@ describe('SidePanelRoot', () => {
         render(<SidePanelRoot />);
       });
 
-      // TabTreeViewがレンダリングされることを確認
       await waitFor(() => {
         expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
       });

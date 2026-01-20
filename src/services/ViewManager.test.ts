@@ -3,9 +3,6 @@ import { ViewManager } from './ViewManager';
 import type { IStorageService } from '@/types';
 import type { TreeStateManager } from './TreeStateManager';
 
-/**
- * ViewManager のユニットテスト
- */
 describe('ViewManager', () => {
   let viewManager: ViewManager;
   let mockStorageService: IStorageService;
@@ -51,7 +48,6 @@ describe('ViewManager', () => {
     it('ビュー作成時にストレージに永続化される', async () => {
       viewManager.createView('Work', '#ff0000');
 
-      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(mockStorageService.set).toHaveBeenCalled();
@@ -123,7 +119,6 @@ describe('ViewManager', () => {
 
       viewManager.switchView(view.id);
 
-      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(mockStorageService.set).toHaveBeenCalled();
@@ -164,7 +159,6 @@ describe('ViewManager', () => {
 
       viewManager.deleteView(view.id);
 
-      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(mockStorageService.set).toHaveBeenCalled();
@@ -204,7 +198,6 @@ describe('ViewManager', () => {
 
       viewManager.updateView(view.id, { name: 'Updated Work' });
 
-      // 内部の非同期処理が完了するまで待機
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(mockStorageService.set).toHaveBeenCalled();

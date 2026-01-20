@@ -6,9 +6,6 @@ import { setupWindow } from './utils/setup-utils';
 import { COMMON_TIMEOUTS } from './test-data/common-constants';
 import type { Page, Worker as PlaywrightWorker } from '@playwright/test';
 
-/**
- * 設定ページを開くヘルパー関数
- */
 async function openSettingsPage(
   extensionContext: import('@playwright/test').BrowserContext,
   extensionId: string
@@ -20,9 +17,6 @@ async function openSettingsPage(
   return settingsPage;
 }
 
-/**
- * タブ位置設定を変更するヘルパー関数
- */
 async function changeTabPositionSetting(
   settingsPage: Page,
   settingType: 'link' | 'manual',
@@ -34,9 +28,6 @@ async function changeTabPositionSetting(
   await expect(select).toHaveValue(value, { timeout: 3000 });
 }
 
-/**
- * 設定がストレージに保存されるまで待機するヘルパー関数
- */
 async function waitForSettingsSaved(
   serviceWorker: PlaywrightWorker,
   settingKey: 'newTabPositionFromLink' | 'newTabPositionManual',
