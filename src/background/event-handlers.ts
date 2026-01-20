@@ -62,17 +62,15 @@ function logTabCreation(tabId: number, message: string): void {
   if (tabCreationLogs.length > MAX_LOGS) {
     tabCreationLogs.shift();
   }
-  // コンソールにも出力（デバッグ用）
-  console.log(`[TabCreationLog] tabId=${tabId} ${message}`);
 }
 
 // globalThisに関数を登録してE2Eテストからアクセス可能にする
 declare global {
-  // eslint-disable-next-line no-var
+   
   var getTabCreationLogs: (tabId?: number) => TabCreationLog[];
-  // eslint-disable-next-line no-var
+   
   var clearTabCreationLogs: () => void;
-  // eslint-disable-next-line no-var
+   
   var treeStateManager: TreeStateManager;
 }
 
@@ -473,8 +471,12 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     // ChromeのonCreatedイベントは常にopenerTabIdを含むとは限らないため、タブを再取得して確認する
     let openerTabIdFromChrome: number | undefined = tab.openerTabId;
     if (openerTabIdFromChrome === undefined) {
-      const freshTab = await chrome.tabs.get(tab.id);
-      openerTabIdFromChrome = freshTab.openerTabId;
+      try {
+        const freshTab = await chrome.tabs.get(tab.id);
+        openerTabIdFromChrome = freshTab?.openerTabId;
+      } catch {
+        // タブが既に閉じられている場合は無視
+      }
     }
 
     const pendingOpenerTabId = pendingTabParents.get(tab.id);

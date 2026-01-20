@@ -337,7 +337,7 @@ export async function assertTabStructure(
     if (workers.length > 0) {
       const sw = workers[0];
       const swDebug = await sw.evaluate(async (args) => {
-        const { expectedTabIds, windowId } = args;
+        const { expectedTabIds: _expectedTabIds, windowId } = args;
         const treeState = globalThis.treeStateManager;
 
         const treeTabIds: number[] = [];

@@ -49,21 +49,6 @@ export async function setupWindow(
   await waitForSyncCompleted(serviceWorker);
   const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 
-  // デバッグ: sidePanelPageのクローズを追跡
-  const closeStack = new Error('[Stack Capture Point]');
-  sidePanelPage.on('close', () => {
-    console.log(`[DEBUG] sidePanelPage was closed at ${new Date().toISOString()}! windowId=${windowId}, pseudoSidePanelTabId=${pseudoSidePanelTabId}`);
-    console.log(`[DEBUG] Close stack trace: ${closeStack.stack}`);
-    // Chromeタブの状態確認
-    serviceWorker.evaluate(() => {
-      return chrome.tabs.query({});
-    }).then(tabs => {
-      console.log(`[DEBUG] Chrome tabs at close: ${JSON.stringify(tabs)}`);
-    }).catch(err => {
-      console.log(`[DEBUG] Failed to get Chrome tabs: ${err}`);
-    });
-  });
-
   return { windowId, initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId };
 }
 

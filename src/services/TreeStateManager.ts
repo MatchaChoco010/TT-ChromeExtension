@@ -597,18 +597,13 @@ export class TreeStateManager {
   async syncWithChromeTabs(userSettings?: {
     newTabPositionManual?: 'child' | 'sibling' | 'end';
   }): Promise<void> {
-    // [DEBUG] syncWithChromeTabs呼び出しログ
-    console.log(`[DEBUG] syncWithChromeTabs called. syncInProgress=${this.syncInProgress}, syncCompleted=${this.syncCompleted}`);
     if (this.syncInProgress || this.syncCompleted) {
-      console.log(`[DEBUG] syncWithChromeTabs early return`);
       return;
     }
     this.syncInProgress = true;
 
     try {
-      console.log(`[DEBUG] syncWithChromeTabs: calling loadState()`);
       await this.loadState();
-      console.log(`[DEBUG] syncWithChromeTabs: loadState() completed. views count=${this.views.size}, tabToNode size=${this.tabToNode.size}`);
 
       const tabs = await chrome.tabs.query({});
       const defaultViewId = 'default';
@@ -690,16 +685,6 @@ export class TreeStateManager {
    * @param windowId - 対象ウィンドウID（省略時は全ウィンドウ）
    */
   async syncTreeStateToChromeTabs(windowId?: number): Promise<void> {
-    // [DEBUG] sync前のTreeStateManager状態をログ
-    console.log(`[DEBUG] syncTreeStateToChromeTabs called. windowId=${windowId}`);
-    console.log(`[DEBUG] TreeStateManager state before sync:`);
-    console.log(`[DEBUG]   views count: ${this.views.size}`);
-    console.log(`[DEBUG]   tabToNode size: ${this.tabToNode.size}`);
-    console.log(`[DEBUG]   pinnedTabIdsByWindow: ${JSON.stringify([...this.pinnedTabIdsByWindow.entries()])}`);
-    for (const [viewId, view] of this.views) {
-      console.log(`[DEBUG]   view "${viewId}" rootNodeIds: ${view.rootNodeIds.length}, nodes: ${Object.keys(view.nodes).length}`);
-    }
-
     // 現在のChromeタブを取得
     const queryOptions = windowId !== undefined ? { windowId } : {};
     const currentTabs = await chrome.tabs.query(queryOptions);
@@ -1472,14 +1457,11 @@ export class TreeStateManager {
    */
   notifyStateChanged(): void {
     const payload = this.toJSON();
-    const tabCount = Object.keys(payload.tabToNode).length;
-    console.log(`[notifyStateChanged] Sending STATE_UPDATED with ${tabCount} tabs`);
     chrome.runtime.sendMessage({
       type: 'STATE_UPDATED',
       payload,
-    }).catch((error) => {
+    }).catch(() => {
       // サイドパネルが開いていない場合など、メッセージ送信失敗は無視
-      console.log(`[notifyStateChanged] Message send failed (expected if no sidepanel): ${error.message}`);
     });
   }
 

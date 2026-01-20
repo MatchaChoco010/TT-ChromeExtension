@@ -5,14 +5,17 @@ import type { TabNode, ExtendedTabInfo } from '@/types';
 
 describe('タブにホバー時の閉じるボタンを実装する', () => {
   let originalChrome: typeof chrome;
-  let mockTabsRemove: Mock;
+  let mockSendMessage: Mock;
 
   beforeEach(() => {
     originalChrome = globalThis.chrome;
-    mockTabsRemove = vi.fn().mockResolvedValue(undefined);
+    mockSendMessage = vi.fn().mockResolvedValue(undefined);
     globalThis.chrome = {
       tabs: {
-        remove: mockTabsRemove,
+        remove: vi.fn().mockResolvedValue(undefined),
+      },
+      runtime: {
+        sendMessage: mockSendMessage,
       },
     } as unknown as typeof chrome;
   });
@@ -131,7 +134,10 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
       fireEvent.click(closeButton);
 
       await waitFor(() => {
-        expect(mockTabsRemove).toHaveBeenCalledWith(123);
+        expect(mockSendMessage).toHaveBeenCalledWith({
+          type: 'CLOSE_TAB',
+          payload: { tabId: 123 },
+        });
       });
     });
 
