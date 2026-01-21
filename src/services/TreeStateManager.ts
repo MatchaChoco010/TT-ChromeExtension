@@ -645,15 +645,15 @@ export class TreeStateManager {
         await this.syncWithOpenerTabId(tabs, defaultViewId, userSettings);
       }
 
-      const hasPinnedData = this.pinnedTabIdsByWindow.size > 0;
-      if (!hasPinnedData) {
-        const pinnedTabs = tabs.filter(t => t.pinned && t.id !== undefined);
-        for (const tab of pinnedTabs) {
-          if (tab.windowId === undefined || tab.id === undefined) continue;
-          const windowPinned = this.pinnedTabIdsByWindow.get(tab.windowId) ?? [];
-          windowPinned.push(tab.id);
-          this.pinnedTabIdsByWindow.set(tab.windowId, windowPinned);
-        }
+      // ブラウザ再起動時、タブIDが変わるため、常にChromeの現在のピン留め状態から再構築
+      this.pinnedTabIdsByWindow.clear();
+      const pinnedTabs = tabs.filter(t => t.pinned && t.id !== undefined);
+      pinnedTabs.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+      for (const tab of pinnedTabs) {
+        if (tab.windowId === undefined || tab.id === undefined) continue;
+        const windowPinned = this.pinnedTabIdsByWindow.get(tab.windowId) ?? [];
+        windowPinned.push(tab.id);
+        this.pinnedTabIdsByWindow.set(tab.windowId, windowPinned);
       }
 
       await this.persistState();
