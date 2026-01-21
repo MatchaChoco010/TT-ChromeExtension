@@ -304,7 +304,6 @@ export class TreeStateManager {
       children: [],
       isExpanded: true,
       depth,
-      groupId: undefined,
     };
 
     viewState.nodes[nodeId] = newNode;
@@ -1016,6 +1015,9 @@ export class TreeStateManager {
           const node = viewState.nodes[existing.nodeId];
           if (node) {
             node.isExpanded = entry.isExpanded;
+            if (entry.groupInfo) {
+              node.groupInfo = entry.groupInfo;
+            }
           }
         }
         continue;
@@ -1030,6 +1032,9 @@ export class TreeStateManager {
           const node = viewState.nodes[mapping.nodeId];
           if (node) {
             node.isExpanded = entry.isExpanded;
+            if (entry.groupInfo) {
+              node.groupInfo = entry.groupInfo;
+            }
           }
         }
       }
@@ -1257,7 +1262,10 @@ export class TreeStateManager {
       children: [],
       isExpanded: true,
       depth: groupDepth,
-      groupId: groupNodeId,
+      groupInfo: {
+        name: groupName,
+        color: '#f59e0b',
+      },
     };
 
     viewState.nodes[groupNodeId] = groupNode;
@@ -1305,27 +1313,12 @@ export class TreeStateManager {
 
       node.parentId = groupNodeId;
       node.depth = groupDepth + 1;
-      node.groupId = groupNodeId;
       groupNode.children.push(node);
 
       this.updateChildrenDepth(node);
     }
 
     await this.persistState();
-
-    try {
-      const result = await chrome.storage.local.get('groups');
-      const existingGroups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = (result.groups as Record<string, { id: string; name: string; color: string; isExpanded: boolean }> | undefined) || {};
-      existingGroups[groupNodeId] = {
-        id: groupNodeId,
-        name: groupName,
-        color: '#f59e0b',
-        isExpanded: true,
-      };
-      await chrome.storage.local.set({ groups: existingGroups });
-    } catch {
-      // ignore
-    }
 
     return groupNodeId;
   }
@@ -1349,8 +1342,8 @@ export class TreeStateManager {
 
     if (node.id.startsWith('group-')) {
       groupNode = node;
-    } else if (node.groupId) {
-      groupNode = viewState.nodes[node.groupId] || null;
+    } else if (node.parentId && node.parentId.startsWith('group-')) {
+      groupNode = viewState.nodes[node.parentId] || null;
     }
 
     if (!groupNode) {
@@ -1360,7 +1353,6 @@ export class TreeStateManager {
     for (const child of [...groupNode.children]) {
       child.parentId = null;
       child.depth = 0;
-      child.groupId = undefined;
       this.updateChildrenDepth(child);
       viewState.rootNodeIds.push(child.id);
     }
@@ -1384,6 +1376,7 @@ export class TreeStateManager {
    * グループ情報を取得
    */
   async getGroupInfo(tabId: number): Promise<{
+    nodeId: string;
     name: string;
     children: Array<{ tabId: number; title: string; url: string }>;
   }> {
@@ -1396,16 +1389,8 @@ export class TreeStateManager {
       throw new Error('Not a group tab');
     }
 
-    let groupName = '新しいグループ';
-    try {
-      const storageResult = await chrome.storage.local.get('groups');
-      const groups: Record<string, { id: string; name: string; color: string; isExpanded: boolean }> = (storageResult.groups as Record<string, { id: string; name: string; color: string; isExpanded: boolean }> | undefined) || {};
-      if (groups[result.node.id]) {
-        groupName = groups[result.node.id].name;
-      }
-    } catch {
-      // ignore
-    }
+    const nodeId = result.node.id;
+    const groupName = result.node.groupInfo?.name ?? '新しいグループ';
 
     const children: Array<{ tabId: number; title: string; url: string }> = [];
     for (const child of result.node.children) {
@@ -1421,7 +1406,26 @@ export class TreeStateManager {
       }
     }
 
-    return { name: groupName, children };
+    return { nodeId, name: groupName, children };
+  }
+
+  /**
+   * グループ名を更新
+   */
+  async updateGroupName(nodeId: string, name: string): Promise<boolean> {
+    for (const [, viewState] of this.views) {
+      const node = viewState.nodes[nodeId];
+      if (node && node.id.startsWith('group-')) {
+        if (!node.groupInfo) {
+          node.groupInfo = { name, color: '#f59e0b' };
+        } else {
+          node.groupInfo.name = name;
+        }
+        await this.persistState();
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -1572,13 +1576,17 @@ export class TreeStateManager {
 
       const treeStructure: TreeStructureEntry[] = nodesInOrder.map(({ node, viewId }) => {
         const tab = tabMap.get(node.tabId);
-        return {
+        const entry: TreeStructureEntry = {
           url: tab?.pendingUrl || tab?.url || '',
           parentIndex: node.parentId ? (nodeIdToIndex.get(node.parentId) ?? null) : null,
           index: tab?.index ?? -1,
           viewId,
           isExpanded: node.isExpanded,
         };
+        if (node.groupInfo) {
+          entry.groupInfo = node.groupInfo;
+        }
+        return entry;
       });
 
       return treeStructure;
@@ -1716,10 +1724,6 @@ export class TreeStateManager {
     for (const child of children) {
       child.parentId = parentNode.parentId;
       child.depth = parentNode.depth;
-
-      if (child.groupId === parentNode.id || child.groupId === parentNode.groupId) {
-        child.groupId = parentNode.parentId ? viewState.nodes[parentNode.parentId]?.groupId : undefined;
-      }
 
       this.updateChildrenDepth(child);
 
@@ -1917,33 +1921,23 @@ export class TreeStateManager {
   }
 
   /**
-   * グループを削除し、関連ノードのgroupIdをクリア
+   * グループを削除
    */
-  async deleteTreeGroup(groupId: string, viewId: string): Promise<void> {
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
-
-    for (const nodeId of Object.keys(viewState.nodes)) {
-      const node = viewState.nodes[nodeId];
-      if (node && node.groupId === groupId) {
-        node.groupId = undefined;
-      }
-    }
-
+  async deleteTreeGroup(_nodeId: string, _viewId: string): Promise<void> {
     await this.persistState();
   }
 
   /**
    * タブをグループに追加
    */
-  async addTabToTreeGroup(nodeId: string, groupId: string, viewId: string): Promise<void> {
+  async addTabToTreeGroup(nodeId: string, targetGroupNodeId: string, viewId: string): Promise<void> {
     const viewState = this.views.get(viewId);
     if (!viewState) return;
 
     const node = viewState.nodes[nodeId];
     if (!node) return;
 
-    const groupNode = viewState.nodes[groupId];
+    const groupNode = viewState.nodes[targetGroupNodeId];
     const groupDepth = groupNode?.depth ?? 0;
 
     if (node.parentId) {
@@ -1955,8 +1949,7 @@ export class TreeStateManager {
       viewState.rootNodeIds = viewState.rootNodeIds.filter(id => id !== nodeId);
     }
 
-    node.groupId = groupId;
-    node.parentId = groupId;
+    node.parentId = targetGroupNodeId;
     node.depth = groupDepth + 1;
     this.updateChildrenDepth(node);
 
@@ -1977,12 +1970,11 @@ export class TreeStateManager {
     const node = viewState.nodes[nodeId];
     if (!node) return;
 
-    if (node.groupId && viewState.nodes[node.groupId]) {
-      const groupNode = viewState.nodes[node.groupId];
-      groupNode.children = groupNode.children.filter(child => child.id !== nodeId);
+    if (node.parentId && viewState.nodes[node.parentId]) {
+      const parentNode = viewState.nodes[node.parentId];
+      parentNode.children = parentNode.children.filter(child => child.id !== nodeId);
     }
 
-    node.groupId = undefined;
     node.parentId = null;
     node.depth = 0;
     this.updateChildrenDepth(node);

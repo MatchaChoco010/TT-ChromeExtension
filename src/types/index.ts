@@ -1,3 +1,8 @@
+export interface GroupInfo {
+  name: string;
+  color: string;
+}
+
 export interface TabNode {
   id: string;
   tabId: number;
@@ -5,7 +10,7 @@ export interface TabNode {
   children: TabNode[];
   isExpanded: boolean;
   depth: number;
-  groupId?: string;
+  groupInfo?: GroupInfo;
 }
 
 export interface ViewState {
@@ -77,6 +82,7 @@ export interface TreeStructureEntry {
   index: number;
   viewId: string;
   isExpanded: boolean;
+  groupInfo?: GroupInfo;
 }
 
 export interface TreeState {
@@ -206,8 +212,9 @@ export type MessageType =
   | { type: 'SYNC_TABS' }
   | { type: 'REFRESH_TREE_STRUCTURE' }
   | { type: 'STATE_UPDATED' }
-  | { type: 'CREATE_GROUP'; payload: { tabIds: number[] } }
+  | { type: 'CREATE_GROUP'; payload: { tabIds: number[]; groupName?: string } }
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
+  | { type: 'UPDATE_GROUP_NAME'; payload: { nodeId: string; name: string } }
   | { type: 'CREATE_SNAPSHOT' }
   | {
       type: 'RESTORE_SNAPSHOT';
@@ -281,11 +288,11 @@ export type MessageType =
     }
   | {
       type: 'DELETE_TREE_GROUP';
-      payload: { groupId: string; viewId: string };
+      payload: { nodeId: string; viewId: string };
     }
   | {
       type: 'ADD_TAB_TO_TREE_GROUP';
-      payload: { nodeId: string; groupId: string; viewId: string };
+      payload: { nodeId: string; targetGroupNodeId: string; viewId: string };
     }
   | {
       type: 'REMOVE_TAB_FROM_TREE_GROUP';
@@ -377,8 +384,6 @@ export interface TabTreeViewProps {
   getSelectedTabIds?: () => number[];
   clearSelection?: () => void;
   onSnapshot?: () => Promise<void>;
-  groups?: Record<string, Group>;
-  onGroupToggle?: (groupId: string) => void;
   views?: View[];
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
   currentWindowId?: number;
@@ -387,6 +392,7 @@ export interface TabTreeViewProps {
   onExternalDrop?: (tabId: number) => void;
   onOutsideTreeChange?: (isOutside: boolean) => void;
   sidePanelRef?: React.RefObject<HTMLElement | null>;
+  onGroupRequest?: (tabIds: number[]) => void;
 }
 
 export type MenuAction =
@@ -400,6 +406,7 @@ export type MenuAction =
   | 'moveToWindow'
   | 'group'
   | 'ungroup'
+  | 'editGroupTitle'
   | 'reload'
   | 'discard'
   | 'copyUrl'
@@ -418,6 +425,7 @@ export interface ContextMenuProps {
   onClose: () => void;
   isPinned?: boolean;
   isGrouped?: boolean;
+  isGroupTab?: boolean;
   hasChildren?: boolean;
   tabUrl?: string;
   views?: View[];

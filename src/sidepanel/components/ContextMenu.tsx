@@ -11,6 +11,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
   isPinned = false,
   isGrouped = false,
+  isGroupTab = false,
   hasChildren: _hasChildren = false,
   tabUrl,
   views,
@@ -339,6 +340,18 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           onMouseEnter={handleRegularItemMouseEnter}
         >
           タブをグループ化
+        </button>
+      )}
+
+      {isGroupTab && !isMultipleSelection && (
+        <button
+          role="menuitem"
+          data-testid="context-menu-edit-group-title"
+          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100"
+          onClick={() => handleMenuItemClick('editGroupTitle')}
+          onMouseEnter={handleRegularItemMouseEnter}
+        >
+          タイトルを編集
         </button>
       )}
 

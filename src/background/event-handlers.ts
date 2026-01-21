@@ -993,11 +993,15 @@ function handleMessage(
         break;
 
       case 'CREATE_GROUP':
-        trackHandler(() => handleCreateGroup(message.payload.tabIds, sendResponse));
+        trackHandler(() => handleCreateGroup(message.payload.tabIds, message.payload.groupName, sendResponse));
         break;
 
       case 'DISSOLVE_GROUP':
         trackHandler(() => handleDissolveGroup(message.payload.tabIds, sendResponse));
+        break;
+
+      case 'UPDATE_GROUP_NAME':
+        trackHandler(() => handleUpdateGroupName(message.payload.nodeId, message.payload.name, sendResponse));
         break;
 
       case 'REGISTER_DUPLICATE_SOURCE':
@@ -1121,7 +1125,7 @@ function handleMessage(
 
       case 'DELETE_TREE_GROUP':
         trackHandler(() => handleDeleteTreeGroup(
-          message.payload.groupId,
+          message.payload.nodeId,
           message.payload.viewId,
           sendResponse
         ));
@@ -1130,7 +1134,7 @@ function handleMessage(
       case 'ADD_TAB_TO_TREE_GROUP':
         trackHandler(() => handleAddTabToTreeGroup(
           message.payload.nodeId,
-          message.payload.groupId,
+          message.payload.targetGroupNodeId,
           message.payload.viewId,
           sendResponse
         ));
@@ -1505,6 +1509,7 @@ async function handleRefreshTreeStructure(
  */
 async function handleCreateGroup(
   tabIds: number[],
+  groupName: string | undefined,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
@@ -1556,7 +1561,7 @@ async function handleCreateGroup(
     const groupPageUrl = `chrome-extension://${chrome.runtime.id}/group.html?tabId=${groupTab.id}`;
     await chrome.tabs.update(groupTab.id, { url: groupPageUrl });
 
-    const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, '新しいグループ');
+    const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, groupName ?? 'グループ');
 
     await chrome.tabs.update(groupTab.id, { active: true });
 
@@ -1589,6 +1594,35 @@ async function handleDissolveGroup(
     }
 
     await treeStateManager.dissolveGroup(tabIds[0]);
+
+    treeStateManager.notifyStateChanged();
+
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * グループ名更新
+ */
+async function handleUpdateGroupName(
+  nodeId: string,
+  name: string,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    const updated = await treeStateManager.updateGroupName(nodeId, name || 'グループ');
+    if (!updated) {
+      sendResponse({
+        success: false,
+        error: 'Group not found',
+      });
+      return;
+    }
 
     treeStateManager.notifyStateChanged();
 
@@ -2355,15 +2389,15 @@ async function handleMoveTabsToView(
 }
 
 /**
- * ツリーグループを削除（ノードのgroupIdをクリア）
+ * ツリーグループを削除
  */
 async function handleDeleteTreeGroup(
-  groupId: string,
+  nodeId: string,
   viewId: string,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.deleteTreeGroup(groupId, viewId);
+    await treeStateManager.deleteTreeGroup(nodeId, viewId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2379,12 +2413,12 @@ async function handleDeleteTreeGroup(
  */
 async function handleAddTabToTreeGroup(
   nodeId: string,
-  groupId: string,
+  targetGroupNodeId: string,
   viewId: string,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.addTabToTreeGroup(nodeId, groupId, viewId);
+    await treeStateManager.addTabToTreeGroup(nodeId, targetGroupNodeId, viewId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {

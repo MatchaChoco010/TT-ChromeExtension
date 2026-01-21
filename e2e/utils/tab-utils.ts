@@ -533,3 +533,18 @@ export async function expandNode(page: Page, tabId: number): Promise<void> {
   await expandButton.click();
 }
 
+/**
+ * グループ名モーダルを確認する
+ *
+ * グループ化操作後に表示されるモーダルで、デフォルトの名前を受け入れて保存ボタンをクリックする。
+ *
+ * @param page - サイドパネルページ
+ */
+export async function confirmGroupNameModal(page: Page): Promise<void> {
+  const modal = page.locator('[data-testid="group-name-modal"]');
+  await modal.waitFor({ state: 'visible', timeout: 5000 });
+  const saveButton = page.locator('[data-testid="group-name-save-button"]');
+  await saveButton.click({ force: true, noWaitAfter: true });
+  await modal.waitFor({ state: 'hidden', timeout: 3000 });
+}
+

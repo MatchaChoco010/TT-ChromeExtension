@@ -228,7 +228,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         data-node-id={node.id}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
-        data-parent-group={node.groupId || ''}
         className={`relative flex items-center p-2 hover:bg-gray-100 cursor-pointer select-none ${
           isActive ? 'bg-gray-200' : ''
         }`}

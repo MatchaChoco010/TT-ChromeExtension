@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
-import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, Group, View, WindowInfo } from '@/types';
+import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, View, WindowInfo } from '@/types';
 import { useDragDrop, type DropTarget, DropTargetType } from '../hooks/useDragDrop';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { DragOverlay } from './DragOverlay';
@@ -155,10 +155,10 @@ interface TreeNodeItemProps {
   views?: View[];
   currentViewId?: string;
   onMoveToView?: (viewId: string, tabIds: number[]) => void;
-  groups?: Record<string, Group>;
   currentWindowId?: number;
   otherWindows?: WindowInfo[];
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
+  onGroupRequest?: (tabIds: number[]) => void;
   dragItemProps?: {
     onMouseDown: (e: React.MouseEvent) => void;
     style: React.CSSProperties;
@@ -193,10 +193,10 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   views,
   currentViewId,
   onMoveToView,
-  groups: _groups,
   currentWindowId,
   otherWindows,
   onMoveToWindow,
+  onGroupRequest,
   dragItemProps,
   isDragging: isDraggingProp,
   getItemPropsForNode,
@@ -210,6 +210,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingSubtreeCount, setPendingSubtreeCount] = useState(0);
   const [pendingCloseAction, setPendingCloseAction] = useState<{ type: 'subtree' | 'tabs'; tabIds: number[] } | null>(null);
+  const [isEditingGroupTitle, setIsEditingGroupTitle] = useState(false);
+  const [editedGroupTitle, setEditedGroupTitle] = useState('');
+  const groupTitleInputRef = useRef<HTMLInputElement>(null);
   const { executeAction } = useMenuActions();
   const { settings } = useTheme();
 
@@ -311,6 +314,20 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       }
     }
 
+    if (action === 'group' && onGroupRequest) {
+      onGroupRequest(targetTabIds);
+      if (clearSelection) {
+        clearSelection();
+      }
+      return;
+    }
+
+    if (action === 'editGroupTitle' && node.groupInfo) {
+      setEditedGroupTitle(node.groupInfo.name);
+      setIsEditingGroupTitle(true);
+      return;
+    }
+
     executeAction(action, targetTabIds, {
       url: tabInfo?.url || 'about:blank',
       onSnapshot,
@@ -321,6 +338,31 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       clearSelection();
     }
   };
+
+  const handleGroupTitleSave = useCallback(() => {
+    if (node.id.startsWith('group-') && editedGroupTitle.trim()) {
+      chrome.runtime.sendMessage({
+        type: 'UPDATE_GROUP_NAME',
+        payload: { nodeId: node.id, name: editedGroupTitle.trim() },
+      });
+    }
+    setIsEditingGroupTitle(false);
+  }, [node.id, editedGroupTitle]);
+
+  const handleGroupTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleGroupTitleSave();
+    } else if (e.key === 'Escape') {
+      setIsEditingGroupTitle(false);
+    }
+  }, [handleGroupTitleSave]);
+
+  useEffect(() => {
+    if (isEditingGroupTitle && groupTitleInputRef.current) {
+      groupTitleInputRef.current.focus();
+      groupTitleInputRef.current.select();
+    }
+  }, [isEditingGroupTitle]);
 
   const handleNodeClick = (e: React.MouseEvent) => {
     // 注: stopPropagationは不要。SidePanelRootのonClickは
@@ -423,12 +465,26 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           className="flex-1 flex items-center justify-between min-w-0"
         >
           <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
-            <span
-              className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
-              data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
-            >
-              {getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`}
-            </span>
+            {isEditingGroupTitle ? (
+              <input
+                ref={groupTitleInputRef}
+                type="text"
+                value={editedGroupTitle}
+                onChange={(e) => setEditedGroupTitle(e.target.value)}
+                onBlur={handleGroupTitleSave}
+                onKeyDown={handleGroupTitleKeyDown}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full bg-gray-700 text-gray-100 px-1 py-0.5 rounded border border-gray-500 focus:outline-none focus:border-blue-500"
+                data-testid="group-title-input"
+              />
+            ) : (
+              <span
+                className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
+                data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
+              >
+                {node.groupInfo?.name ?? (getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`)}
+              </span>
+            )}
           </div>
           <div
             data-testid="right-actions-container"
@@ -451,6 +507,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
+          isGroupTab={node.id.startsWith('group-')}
           tabUrl={tabInfo?.url || 'about:blank'}
           views={views}
           currentViewId={currentViewId}
@@ -496,6 +553,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               currentWindowId={currentWindowId}
               otherWindows={otherWindows}
               onMoveToWindow={onMoveToWindow}
+              onGroupRequest={onGroupRequest}
               dragItemProps={getItemPropsForNode?.(child.id, child.tabId)}
               isDragging={isNodeDragging?.(child.id)}
               getItemPropsForNode={getItemPropsForNode}
@@ -524,10 +582,10 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   views,
   currentViewId,
   onMoveToView,
-  groups: _groups,
   currentWindowId,
   otherWindows,
   onMoveToWindow,
+  onGroupRequest,
 }) => {
   const hasChildren = node.children && node.children.length > 0;
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -537,6 +595,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingSubtreeCount, setPendingSubtreeCount] = useState(0);
   const [pendingCloseAction, setPendingCloseAction] = useState<{ type: 'subtree' | 'tabs'; tabIds: number[] } | null>(null);
+  const [isEditingGroupTitle, setIsEditingGroupTitle] = useState(false);
+  const [editedGroupTitle, setEditedGroupTitle] = useState('');
+  const groupTitleInputRef = useRef<HTMLInputElement>(null);
   const { executeAction } = useMenuActions();
   const { settings } = useTheme();
 
@@ -632,6 +693,20 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       }
     }
 
+    if (action === 'group' && onGroupRequest) {
+      onGroupRequest(targetTabIds);
+      if (clearSelection) {
+        clearSelection();
+      }
+      return;
+    }
+
+    if (action === 'editGroupTitle' && node.groupInfo) {
+      setEditedGroupTitle(node.groupInfo.name);
+      setIsEditingGroupTitle(true);
+      return;
+    }
+
     executeAction(action, targetTabIds, {
       url: tabInfo?.url || 'about:blank',
       onSnapshot,
@@ -642,6 +717,31 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       clearSelection();
     }
   };
+
+  const handleGroupTitleSave = useCallback(() => {
+    if (node.id.startsWith('group-') && editedGroupTitle.trim()) {
+      chrome.runtime.sendMessage({
+        type: 'UPDATE_GROUP_NAME',
+        payload: { nodeId: node.id, name: editedGroupTitle.trim() },
+      });
+    }
+    setIsEditingGroupTitle(false);
+  }, [node.id, editedGroupTitle]);
+
+  const handleGroupTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleGroupTitleSave();
+    } else if (e.key === 'Escape') {
+      setIsEditingGroupTitle(false);
+    }
+  }, [handleGroupTitleSave]);
+
+  useEffect(() => {
+    if (isEditingGroupTitle && groupTitleInputRef.current) {
+      groupTitleInputRef.current.focus();
+      groupTitleInputRef.current.select();
+    }
+  }, [isEditingGroupTitle]);
 
   const handleNodeClick = (e: React.MouseEvent) => {
     // 注: stopPropagationは不要。SidePanelRootのonClickは
@@ -731,12 +831,26 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           className="flex-1 flex items-center justify-between min-w-0"
         >
           <div data-testid="title-area" className="flex items-center min-w-0 flex-1">
-            <span
-              className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
-              data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
-            >
-              {getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`}
-            </span>
+            {isEditingGroupTitle ? (
+              <input
+                ref={groupTitleInputRef}
+                type="text"
+                value={editedGroupTitle}
+                onChange={(e) => setEditedGroupTitle(e.target.value)}
+                onBlur={handleGroupTitleSave}
+                onKeyDown={handleGroupTitleKeyDown}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full bg-gray-700 text-gray-100 px-1 py-0.5 rounded border border-gray-500 focus:outline-none focus:border-blue-500"
+                data-testid="group-title-input"
+              />
+            ) : (
+              <span
+                className={`truncate ${tabInfo?.discarded ? 'text-gray-500' : ''}`}
+                data-testid={tabInfo?.discarded ? 'discarded-tab-title' : 'tab-title'}
+              >
+                {node.groupInfo?.name ?? (getTabInfo ? (tabInfo ? getDisplayTitle({ title: tabInfo.title, url: tabInfo.url || '', status: tabInfo.status }) : 'Loading...') : `Tab ${node.tabId}`)}
+              </span>
+            )}
           </div>
           <div
             data-testid="right-actions-container"
@@ -759,6 +873,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
+          isGroupTab={node.id.startsWith('group-')}
           tabUrl={tabInfo?.url || 'about:blank'}
           views={views}
           currentViewId={currentViewId}
@@ -802,6 +917,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               currentWindowId={currentWindowId}
               otherWindows={otherWindows}
               onMoveToWindow={onMoveToWindow}
+              onGroupRequest={onGroupRequest}
             />
           ))}
         </div>
@@ -828,7 +944,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   getSelectedTabIds,
   clearSelection,
   onSnapshot,
-  groups,
   views,
   onMoveToView,
   currentWindowId,
@@ -837,6 +952,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   onExternalDrop,
   onOutsideTreeChange,
   sidePanelRef,
+  onGroupRequest,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
@@ -1214,6 +1330,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           currentWindowId={currentWindowId}
           otherWindows={otherWindows}
           onMoveToWindow={onMoveToWindow}
+          onGroupRequest={onGroupRequest}
           dragItemProps={getItemPropsForNode(node.id, node.tabId)}
           isDragging={isNodeDragging(node.id)}
           getItemPropsForNode={getItemPropsForNode}
@@ -1243,7 +1360,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         currentWindowId={currentWindowId}
         otherWindows={otherWindows}
         onMoveToWindow={onMoveToWindow}
-        groups={groups}
+        onGroupRequest={onGroupRequest}
       />
     );
   };

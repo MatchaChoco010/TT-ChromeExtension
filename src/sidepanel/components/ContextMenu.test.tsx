@@ -716,4 +716,96 @@ describe('ContextMenu', () => {
     });
 
   });
+
+  describe('グループタブのタイトル編集', () => {
+    it('isGroupTab=trueの場合「タイトルを編集」が表示される', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          isGroupTab={true}
+        />
+      );
+
+      expect(screen.getByTestId('context-menu-edit-group-title')).toBeInTheDocument();
+      expect(screen.getByText('タイトルを編集')).toBeInTheDocument();
+    });
+
+    it('isGroupTab=falseの場合「タイトルを編集」が表示されない', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          isGroupTab={false}
+        />
+      );
+
+      expect(screen.queryByTestId('context-menu-edit-group-title')).not.toBeInTheDocument();
+    });
+
+    it('isGroupTabが未指定の場合「タイトルを編集」が表示されない', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+        />
+      );
+
+      expect(screen.queryByTestId('context-menu-edit-group-title')).not.toBeInTheDocument();
+    });
+
+    it('複数タブ選択時はisGroupTab=trueでも「タイトルを編集」が表示されない', () => {
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1, 2, 3]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          isGroupTab={true}
+        />
+      );
+
+      expect(screen.queryByTestId('context-menu-edit-group-title')).not.toBeInTheDocument();
+    });
+
+    it('「タイトルを編集」をクリックするとeditGroupTitleアクションが実行される', async () => {
+      const user = userEvent.setup();
+      const onAction = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ContextMenu
+          targetTabIds={[1]}
+          position={{ x: 100, y: 200 }}
+          onAction={onAction}
+          onClose={onClose}
+          isGroupTab={true}
+        />
+      );
+
+      const editTitleItem = screen.getByTestId('context-menu-edit-group-title');
+      await user.click(editTitleItem);
+
+      expect(onAction).toHaveBeenCalledWith('editGroupTitle');
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
 });

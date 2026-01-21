@@ -447,39 +447,20 @@ describe('TreeStateManager', () => {
       expect(groupResult?.node.depth).toBe(0);
     });
 
-    it('グループ情報がストレージに保存される', async () => {
+    it('グループ情報がノードに直接埋め込まれる', async () => {
       const viewId = 'view-1';
       const childTab = { id: 1, url: 'https://example.com/1', title: 'Child' } as chrome.tabs.Tab;
       await manager.addTab(childTab, null, viewId);
 
-      const mockGroups: Record<string, unknown> = {};
-      vi.stubGlobal('chrome', {
-        ...globalThis.chrome,
-        storage: {
-          local: {
-            get: vi.fn().mockImplementation((key: string) => {
-              if (key === 'groups') {
-                return Promise.resolve({ groups: mockGroups });
-              }
-              return Promise.resolve({});
-            }),
-            set: vi.fn().mockImplementation((data: Record<string, unknown>) => {
-              if (data.groups) {
-                Object.assign(mockGroups, data.groups);
-              }
-              return Promise.resolve();
-            }),
-          },
-        },
-        tabs: {
-          query: vi.fn().mockResolvedValue([]),
-        },
-      });
-
       const groupTabId = 100;
-      await manager.createGroupWithRealTab(groupTabId, [1], 'テストグループ');
+      const groupNodeId = await manager.createGroupWithRealTab(groupTabId, [1], 'テストグループ');
 
-      expect(chrome.storage.local.set).toHaveBeenCalled();
+      const groupNode = manager.getNodeByTabId(groupTabId);
+      expect(groupNode).not.toBeNull();
+      expect(groupNode!.node.groupInfo).toBeDefined();
+      expect(groupNode!.node.groupInfo!.name).toBe('テストグループ');
+      expect(groupNode!.node.groupInfo!.color).toBeDefined();
+      expect(groupNodeId).toMatch(/^group-/);
     });
 
     it('子タブが既に別の親を持つ場合、その親から削除されてグループに移動する', async () => {

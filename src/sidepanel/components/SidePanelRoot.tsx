@@ -7,6 +7,7 @@ import ViewSwitcher from './ViewSwitcher';
 import PinnedTabsSection from './PinnedTabsSection';
 import NewTabButton from './NewTabButton';
 import { ContextMenu } from './ContextMenu';
+import { GroupNameModal } from './GroupNameModal';
 import { useMenuActions } from '../hooks/useMenuActions';
 import { downloadService } from '@/storage/DownloadService';
 import { storageService } from '@/storage/StorageService';
@@ -26,8 +27,6 @@ const TreeViewContent: React.FC = () => {
     createView,
     deleteView,
     updateView,
-    groups,
-    toggleGroupExpanded,
     isTabUnread,
     getUnreadChildCount,
     activeTabId,
@@ -262,6 +261,36 @@ const TreeViewContent: React.FC = () => {
     return orderedViews;
   }, [treeState]);
 
+  const [groupNameModalOpen, setGroupNameModalOpen] = useState(false);
+  const [pendingGroupTabIds, setPendingGroupTabIds] = useState<number[]>([]);
+
+  const handleGroupRequest = useCallback((tabIds: number[]) => {
+    setPendingGroupTabIds(tabIds);
+    setGroupNameModalOpen(true);
+  }, []);
+
+  const handleGroupNameSave = useCallback(async (groupName: string) => {
+    setGroupNameModalOpen(false);
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'CREATE_GROUP',
+        payload: { tabIds: pendingGroupTabIds, groupName },
+      });
+    } catch {
+      // グループ化APIのエラーは無視（タブが存在しない場合など）
+    }
+    setPendingGroupTabIds([]);
+  }, [pendingGroupTabIds]);
+
+  const handleGroupNameClose = useCallback(() => {
+    setGroupNameModalOpen(false);
+    setPendingGroupTabIds([]);
+  }, []);
+
+  const pendingGroupTabTitles = useMemo(() => {
+    return pendingGroupTabIds.map((tabId) => tabInfoMap[tabId]?.title || '').filter(Boolean);
+  }, [pendingGroupTabIds, tabInfoMap]);
+
   return (
     <div
       className="flex flex-col h-full bg-gray-900"
@@ -328,8 +357,6 @@ const TreeViewContent: React.FC = () => {
             getSelectedTabIds={getSelectedTabIds}
             clearSelection={clearSelection}
             onSnapshot={handleSnapshot}
-            groups={groups}
-            onGroupToggle={toggleGroupExpanded}
             views={viewsArray}
             onMoveToView={moveTabsToView}
             currentWindowId={currentWindowId ?? undefined}
@@ -337,9 +364,16 @@ const TreeViewContent: React.FC = () => {
             onMoveToWindow={handleMoveToWindow}
             onExternalDrop={handleExternalDrop}
             sidePanelRef={sidePanelRef}
+            onGroupRequest={handleGroupRequest}
           />
           <NewTabButton />
         </div>
+        <GroupNameModal
+          isOpen={groupNameModalOpen}
+          tabTitles={pendingGroupTabTitles}
+          onSave={handleGroupNameSave}
+          onClose={handleGroupNameClose}
+        />
       </div>
   );
 };

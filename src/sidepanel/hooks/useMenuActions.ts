@@ -5,6 +5,7 @@ export interface MenuActionOptions {
   url?: string;
   onSnapshot?: () => Promise<void>;
   isCollapsedParent?: boolean;
+  groupName?: string;
 }
 
 export const useMenuActions = () => {
@@ -98,7 +99,7 @@ export const useMenuActions = () => {
           try {
             await chrome.runtime.sendMessage({
               type: 'CREATE_GROUP',
-              payload: { tabIds },
+              payload: { tabIds, groupName: options?.groupName },
             });
           } catch {
             // グループ化APIのエラーは無視（タブが存在しない場合など）

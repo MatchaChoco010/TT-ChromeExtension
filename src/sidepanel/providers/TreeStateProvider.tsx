@@ -14,12 +14,12 @@ interface TreeStateContextType {
   updateView: (viewId: string, updates: Partial<View>) => void;
   groups: Record<string, Group>;
   createGroup: (name: string, color: string) => string;
-  deleteGroup: (groupId: string) => void;
-  updateGroup: (groupId: string, updates: Partial<Group>) => void;
-  toggleGroupExpanded: (groupId: string) => void;
-  addTabToGroup: (nodeId: string, groupId: string) => void;
+  deleteGroup: (nodeId: string) => void;
+  updateGroup: (nodeId: string, updates: Partial<Group>) => void;
+  toggleGroupExpanded: (nodeId: string) => void;
+  addTabToGroup: (nodeId: string, targetGroupNodeId: string) => void;
   removeTabFromGroup: (nodeId: string) => void;
-  getGroupTabCount: (groupId: string) => number;
+  getGroupTabCount: (nodeId: string) => number;
   unreadTabIds: Set<number>;
   isTabUnread: (tabId: number) => boolean;
   getUnreadCount: () => number;
@@ -601,39 +601,39 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return newGroupId;
   }, [groups, saveGroups]);
 
-  const deleteGroup = useCallback(async (groupId: string) => {
+  const deleteGroup = useCallback(async (nodeId: string) => {
     const newGroups = { ...groups };
-    delete newGroups[groupId];
+    delete newGroups[nodeId];
     saveGroups(newGroups);
 
     await chrome.runtime.sendMessage({
       type: 'DELETE_TREE_GROUP',
-      payload: { groupId, viewId: currentViewId },
+      payload: { nodeId, viewId: currentViewId },
     });
   }, [groups, saveGroups, currentViewId]);
 
-  const updateGroupFn = useCallback((groupId: string, updates: Partial<Group>) => {
-    const group = groups[groupId];
+  const updateGroupFn = useCallback((nodeId: string, updates: Partial<Group>) => {
+    const group = groups[nodeId];
     if (!group) return;
 
     const updatedGroup = { ...group, ...updates };
-    const newGroups = { ...groups, [groupId]: updatedGroup };
+    const newGroups = { ...groups, [nodeId]: updatedGroup };
     saveGroups(newGroups);
   }, [groups, saveGroups]);
 
-  const toggleGroupExpanded = useCallback((groupId: string) => {
-    const group = groups[groupId];
+  const toggleGroupExpanded = useCallback((nodeId: string) => {
+    const group = groups[nodeId];
     if (!group) return;
 
     const updatedGroup = { ...group, isExpanded: !group.isExpanded };
-    const newGroups = { ...groups, [groupId]: updatedGroup };
+    const newGroups = { ...groups, [nodeId]: updatedGroup };
     saveGroups(newGroups);
   }, [groups, saveGroups]);
 
-  const addTabToGroup = useCallback(async (nodeId: string, groupId: string) => {
+  const addTabToGroup = useCallback(async (nodeId: string, targetGroupNodeId: string) => {
     await chrome.runtime.sendMessage({
       type: 'ADD_TAB_TO_TREE_GROUP',
-      payload: { nodeId, groupId, viewId: currentViewId },
+      payload: { nodeId, targetGroupNodeId, viewId: currentViewId },
     });
   }, [currentViewId]);
 
@@ -644,11 +644,11 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     });
   }, [currentViewId]);
 
-  const getGroupTabCount = useCallback((groupId: string): number => {
+  const getGroupTabCount = useCallback((nodeId: string): number => {
     if (!currentViewState) return 0;
 
     return Object.values(currentViewState.nodes).filter(
-      (node) => node.groupId === groupId
+      (node) => node.parentId === nodeId
     ).length;
   }, [currentViewState]);
 

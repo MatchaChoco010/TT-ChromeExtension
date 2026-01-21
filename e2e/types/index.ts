@@ -25,7 +25,10 @@ export interface E2ETabNode {
   children: E2ETabNode[];
   isExpanded: boolean;
   depth: number;
-  groupId?: string;
+  groupInfo?: {
+    name: string;
+    color: string;
+  };
 }
 
 export interface E2EGroup {

@@ -1282,19 +1282,11 @@ describe('TabTreeView', () => {
       mockGetTabInfo.mockReset();
     });
 
-    const createMockGroups = (groupId: string) => ({
-      [groupId]: {
-        id: groupId,
-        name: 'テストグループ',
-        color: '#f59e0b',
-        isExpanded: true,
-      },
-    });
-
     /**
      * グループノードを模擬するヘルパー関数
      * グループノードは実タブIDを持ち、idが'group-'で始まる
      * グループノードは通常のタブノードと同じように表示される
+     * グループ情報はnode.groupInfoに埋め込まれる
      */
     const createMockGroupNode = (
       id: string,
@@ -1308,7 +1300,10 @@ describe('TabTreeView', () => {
       children,
       isExpanded: true,
       depth: 0,
-      groupId: id,
+      groupInfo: {
+        name: 'テストグループ',
+        color: '#f59e0b',
+      },
     });
 
     it('グループノード（group-で始まるID）が通常のタブノードと同じ形式で表示されること', () => {
@@ -1316,12 +1311,10 @@ describe('TabTreeView', () => {
       const childNode1: TabNode = {
         ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-100',
       };
       const childNode2: TabNode = {
         ...createMockNode('node-2', 2, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-100',
       };
       groupNode.children = [childNode1, childNode2];
 
@@ -1339,7 +1332,6 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
-          groups={createMockGroups('group-100')}
         />
       );
 
@@ -1356,7 +1348,6 @@ describe('TabTreeView', () => {
       const childNode: TabNode = {
         ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-100',
       };
       groupNode.children = [childNode];
 
@@ -1373,7 +1364,6 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
-          groups={createMockGroups('group-100')}
         />
       );
 
@@ -1395,7 +1385,6 @@ describe('TabTreeView', () => {
       const childNode: TabNode = {
         ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-100',
       };
       groupNode.children = [childNode];
 
@@ -1405,16 +1394,6 @@ describe('TabTreeView', () => {
         return undefined;
       });
 
-      // 折りたたまれた状態のグループ
-      const collapsedGroups = {
-        'group-100': {
-          id: 'group-100',
-          name: 'テストグループ',
-          color: '#f59e0b',
-          isExpanded: false,
-        },
-      };
-
       render(
         <TabTreeView
           nodes={[groupNode]}
@@ -1422,7 +1401,6 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
-          groups={collapsedGroups}
         />
       );
 
@@ -1437,7 +1415,6 @@ describe('TabTreeView', () => {
       const groupChildNode: TabNode = {
         ...createMockNode('node-1', 1, 'default', 'group-100'),
         depth: 1,
-        groupId: 'group-100',
       };
       groupNode.children = [groupChildNode];
 
@@ -1457,7 +1434,6 @@ describe('TabTreeView', () => {
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
-          groups={createMockGroups('group-100')}
         />
       );
 
