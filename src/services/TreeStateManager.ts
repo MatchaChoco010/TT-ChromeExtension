@@ -723,6 +723,9 @@ export class TreeStateManager {
     for (const wid of windowIds) {
       await this.syncTabOrderForWindow(wid, pinnedSet);
     }
+
+    // 空ウィンドウを閉じる（最後のウィンドウは除く）
+    await this.closeEmptyWindows();
   }
 
   /**
@@ -768,6 +771,32 @@ export class TreeStateManager {
       } catch {
         // タブが存在しない場合は無視
       }
+    }
+  }
+
+  /**
+   * 空ウィンドウを閉じる（最後のウィンドウは除く）
+   * syncTreeStateToChromeTabs内で呼び出され、タブ移動後に空になったウィンドウを自動クローズする
+   */
+  private async closeEmptyWindows(): Promise<void> {
+    try {
+      const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+      if (allWindows.length <= 1) {
+        return;
+      }
+
+      for (const window of allWindows) {
+        if (window.id === undefined) continue;
+        const tabs = await chrome.tabs.query({ windowId: window.id });
+        if (tabs.length === 0) {
+          const currentWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+          if (currentWindows.length > 1) {
+            await chrome.windows.remove(window.id);
+          }
+        }
+      }
+    } catch {
+      // ウィンドウクローズ失敗は無視
     }
   }
 

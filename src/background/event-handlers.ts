@@ -637,35 +637,11 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
   }
 }
 
-/**
- * 空ウィンドウ自動クローズ
- *
- * ウィンドウ内のタブ数を確認し、タブが残っていなければ自動的に閉じる
- * 最後のウィンドウは閉じない（ブラウザ終了防止）
- */
-async function tryCloseEmptyWindow(windowId: number): Promise<void> {
-  try {
-    const tabs = await chrome.tabs.query({ windowId });
-    if (tabs.length > 0) {
-      return;
-    }
-
-    const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-    if (allWindows.length <= 1) {
-      return;
-    }
-
-    await chrome.windows.remove(windowId);
-  } catch {
-    // ウィンドウクローズ失敗は無視
-  }
-}
-
 export async function handleTabRemoved(
   tabId: number,
   removeInfo: chrome.tabs.OnRemovedInfo,
 ): Promise<void> {
-  const { windowId, isWindowClosing } = removeInfo;
+  const { isWindowClosing } = removeInfo;
 
   // ウィンドウが閉じられる場合はツリー状態を保持する
   // これにより、ブラウザ再起動時にtreeStructureからビュー情報を含む状態を復元できる
@@ -695,11 +671,10 @@ export async function handleTabRemoved(
   // 同じURLの別のタブがある場合にファビコンが消えてしまう問題を防ぐ
   // また、ブラウザ再起動後の復元にも使用されるため、キャッシュとして保持する
 
+  // syncTreeStateToChromeTabs内でcloseEmptyWindowsが呼ばれ、空ウィンドウが自動クローズされる
   await treeStateManager.syncTreeStateToChromeTabs();
 
   treeStateManager.notifyStateChanged();
-
-  await tryCloseEmptyWindow(windowId);
 }
 
 export async function handleTabMoved(
@@ -986,7 +961,7 @@ function handleMessage(
         break;
 
       case 'CREATE_WINDOW_WITH_SUBTREE':
-        trackHandler(() => handleCreateWindowWithSubtree(message.payload.tabId, message.payload.sourceWindowId, sendResponse));
+        trackHandler(() => handleCreateWindowWithSubtree(message.payload.tabId, sendResponse));
         break;
 
       case 'MOVE_SUBTREE_TO_WINDOW':
@@ -1377,11 +1352,10 @@ async function handleCreateWindowWithTab(
 /**
  * サブツリー全体で新しいウィンドウを作成
  * パネル外へのドロップで新しいウィンドウを作成し、サブツリー全体を移動
- * ドラッグアウト後の空ウィンドウ自動クローズ
+ * createWindowWithSubtree内でsyncTreeStateToChromeTabs→closeEmptyWindowsが呼ばれ、空ウィンドウが自動クローズされる
  */
 async function handleCreateWindowWithSubtree(
   tabId: number,
-  sourceWindowId: number | undefined,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
@@ -1394,7 +1368,6 @@ async function handleCreateWindowWithSubtree(
       return;
     }
 
-    const tabIds = subtree.map((node) => node.tabId);
     const newWindowId = await treeStateManager.createWindowWithSubtree(tabId);
 
     if (newWindowId === undefined) {
@@ -1403,22 +1376,6 @@ async function handleCreateWindowWithSubtree(
         error: 'Failed to create window',
       });
       return;
-    }
-
-    // 元ウィンドウが空になった場合は自動クローズ
-    if (sourceWindowId !== undefined) {
-      try {
-        const movedTabIds = new Set(tabIds);
-        const remainingTabs = await chrome.tabs.query({ windowId: sourceWindowId });
-        const actualRemainingTabs = remainingTabs.filter(
-          (tab) => tab.id !== undefined && !movedTabIds.has(tab.id)
-        );
-        if (actualRemainingTabs.length === 0) {
-          await chrome.windows.remove(sourceWindowId);
-        }
-      } catch {
-        // ウィンドウクローズ失敗は無視
-      }
     }
 
     treeStateManager.notifyStateChanged();

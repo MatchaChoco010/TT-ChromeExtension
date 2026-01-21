@@ -719,14 +719,30 @@ describe('空ウィンドウの自動クローズ', () => {
 
     const sourceWindowId = 100;
     const tabId = 1001;
+    const newWindowId = 200;
 
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
+    // closeEmptyWindows内でchrome.windows.getAllが呼ばれるためモックを設定
+    (chromeMock.windows.getAll as ReturnType<typeof vi.fn>).mockImplementation(
+      async () => {
+        return [
+          { id: sourceWindowId } as chrome.windows.Window,
+          { id: newWindowId } as chrome.windows.Window,
+        ];
+      }
+    );
+
     (chromeMock.tabs.query as ReturnType<typeof vi.fn>).mockImplementation(
       async (queryInfo: chrome.tabs.QueryInfo) => {
+        // 元ウィンドウはタブが空（全て移動済み）
         if (queryInfo.windowId === sourceWindowId) {
           return [];
+        }
+        // 新ウィンドウには移動したタブがある
+        if (queryInfo.windowId === newWindowId) {
+          return [{ id: tabId, index: 0, windowId: newWindowId }];
         }
         return [];
       }
@@ -735,7 +751,6 @@ describe('空ウィンドウの自動クローズ', () => {
     const windowsRemoveSpy = vi.fn(() => Promise.resolve());
     chromeMock.windows.remove = windowsRemoveSpy;
 
-    const newWindowId = 200;
     (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockImplementation(
       (_createData: chrome.windows.CreateData, callback?: (window: chrome.windows.Window) => void) => {
         if (callback) {
@@ -757,7 +772,7 @@ describe('空ウィンドウの自動クローズ', () => {
 
     const message = {
       type: 'CREATE_WINDOW_WITH_SUBTREE',
-      payload: { tabId, sourceWindowId },
+      payload: { tabId },
     };
     const sendResponse = vi.fn();
 
@@ -779,14 +794,30 @@ describe('空ウィンドウの自動クローズ', () => {
     const sourceWindowId = 100;
     const tabId = 1001;
     const remainingTabId = 1002;
+    const newWindowId = 200;
 
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
+    // closeEmptyWindows内でchrome.windows.getAllが呼ばれるためモックを設定
+    (chromeMock.windows.getAll as ReturnType<typeof vi.fn>).mockImplementation(
+      async () => {
+        return [
+          { id: sourceWindowId } as chrome.windows.Window,
+          { id: newWindowId } as chrome.windows.Window,
+        ];
+      }
+    );
+
     (chromeMock.tabs.query as ReturnType<typeof vi.fn>).mockImplementation(
       async (queryInfo: chrome.tabs.QueryInfo) => {
+        // 元ウィンドウには残りのタブがある
         if (queryInfo.windowId === sourceWindowId) {
           return [{ id: remainingTabId, index: 0, windowId: sourceWindowId }];
+        }
+        // 新ウィンドウには移動したタブがある
+        if (queryInfo.windowId === newWindowId) {
+          return [{ id: tabId, index: 0, windowId: newWindowId }];
         }
         return [];
       }
@@ -795,7 +826,6 @@ describe('空ウィンドウの自動クローズ', () => {
     const windowsRemoveSpy = vi.fn(() => Promise.resolve());
     chromeMock.windows.remove = windowsRemoveSpy;
 
-    const newWindowId = 200;
     (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockImplementation(
       (_createData: chrome.windows.CreateData, callback?: (window: chrome.windows.Window) => void) => {
         if (callback) {
@@ -825,7 +855,7 @@ describe('空ウィンドウの自動クローズ', () => {
 
     const message = {
       type: 'CREATE_WINDOW_WITH_SUBTREE',
-      payload: { tabId, sourceWindowId },
+      payload: { tabId },
     };
     const sendResponse = vi.fn();
 
