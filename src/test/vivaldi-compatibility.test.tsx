@@ -401,7 +401,7 @@ describe('Vivaldi互換性テスト', () => {
         fontSize: 18,
         fontFamily: 'Courier New, monospace',
         customCSS: 'body { line-height: 1.6; }',
-        newTabPosition: 'sibling',
+        newTabPosition: 'nextSibling',
         closeWarningThreshold: 5,
         showUnreadIndicator: true,
         autoSnapshotInterval: 10,

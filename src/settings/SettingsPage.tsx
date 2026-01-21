@@ -10,7 +10,7 @@ const defaultSettings: UserSettings = {
   newTabPosition: 'child',
   newTabPositionFromLink: 'child',
   newTabPositionManual: 'end',
-  duplicateTabPosition: 'sibling',
+  duplicateTabPosition: 'nextSibling',
   closeWarningThreshold: 10,
   showUnreadIndicator: true,
   autoSnapshotInterval: 0,

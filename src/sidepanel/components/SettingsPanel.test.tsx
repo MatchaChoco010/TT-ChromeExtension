@@ -229,7 +229,7 @@ describe('SettingsPanel', () => {
       });
     });
 
-    it('should display all three options for both settings', () => {
+    it('should display all four options for both settings', () => {
       render(
         <SettingsPanel
           settings={defaultSettings}
@@ -238,7 +238,8 @@ describe('SettingsPanel', () => {
       );
 
       expect(screen.getAllByText(/現在のタブの子/i).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/現在のタブの隣/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/現在のタブの直後/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/現在のタブの兄弟の最後/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/ツリーの最後/i).length).toBeGreaterThan(0);
     });
 

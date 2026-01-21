@@ -289,13 +289,13 @@ describe('新規タブ位置の統合テスト', () => {
   });
 
   describe('エッジケース', () => {
-    it('設定が「sibling」の場合、兄弟として配置される', async () => {
+    it('設定が「nextSibling」の場合、直後に配置される', async () => {
       const settings: UserSettings = {
         fontSize: 14,
         fontFamily: 'system-ui',
         customCSS: '',
-        newTabPosition: 'sibling',
-        newTabPositionFromLink: 'sibling',
+        newTabPosition: 'nextSibling',
+        newTabPositionFromLink: 'nextSibling',
         closeWarningThreshold: 3,
         showUnreadIndicator: true,
         autoSnapshotInterval: 0,

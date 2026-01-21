@@ -111,7 +111,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleNewTabPositionFromLinkChange = (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
-    const value = e.target.value as 'child' | 'sibling' | 'end';
+    const value = e.target.value as 'child' | 'nextSibling' | 'lastSibling' | 'end';
     onSettingsChange({
       ...settings,
       newTabPositionFromLink: value,
@@ -121,7 +121,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleNewTabPositionManualChange = (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
-    const value = e.target.value as 'child' | 'sibling' | 'end';
+    const value = e.target.value as 'child' | 'nextSibling' | 'lastSibling' | 'end';
     onSettingsChange({
       ...settings,
       newTabPositionManual: value,
@@ -199,7 +199,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleDuplicateTabPositionChange = (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
-    const value = e.target.value as 'sibling' | 'end';
+    const value = e.target.value as 'nextSibling' | 'end';
     onSettingsChange({
       ...settings,
       duplicateTabPosition: value,
@@ -312,7 +312,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
           >
             <option value="child">元のタブの子</option>
-            <option value="sibling">元のタブの隣</option>
+            <option value="nextSibling">元のタブの直後</option>
+            <option value="lastSibling">元のタブの兄弟の最後</option>
             <option value="end">ツリーの最後</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
@@ -334,7 +335,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
           >
             <option value="child">現在のタブの子</option>
-            <option value="sibling">現在のタブの隣</option>
+            <option value="nextSibling">現在のタブの直後</option>
+            <option value="lastSibling">現在のタブの兄弟の最後</option>
             <option value="end">ツリーの最後</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
@@ -351,11 +353,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </label>
           <select
             id="duplicateTabPosition"
-            value={settings.duplicateTabPosition ?? 'sibling'}
+            value={settings.duplicateTabPosition ?? 'nextSibling'}
             onChange={handleDuplicateTabPositionChange}
             className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100"
           >
-            <option value="sibling">元のタブの直後</option>
+            <option value="nextSibling">元のタブの直後</option>
             <option value="end">ツリーの最後</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">

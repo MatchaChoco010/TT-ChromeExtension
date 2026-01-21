@@ -20,7 +20,7 @@ async function openSettingsPage(
 async function changeTabPositionSetting(
   settingsPage: Page,
   settingType: 'link' | 'manual',
-  value: 'child' | 'sibling' | 'end'
+  value: 'child' | 'nextSibling' | 'lastSibling' | 'end'
 ): Promise<void> {
   const selectId = settingType === 'link' ? '#newTabPositionFromLink' : '#newTabPositionManual';
   const select = settingsPage.locator(selectId);
@@ -31,7 +31,7 @@ async function changeTabPositionSetting(
 async function waitForSettingsSaved(
   serviceWorker: PlaywrightWorker,
   settingKey: 'newTabPositionFromLink' | 'newTabPositionManual',
-  expectedValue: 'child' | 'sibling' | 'end'
+  expectedValue: 'child' | 'nextSibling' | 'lastSibling' | 'end'
 ): Promise<void> {
   await waitForCondition(
     async () => {
@@ -132,7 +132,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       ], 0);
     });
 
-    test('手動で開かれたタブが「手動で開かれたタブの位置」設定に従って配置される（sibling設定）', async ({
+    test('手動で開かれたタブが「手動で開かれたタブの位置」設定に従って配置される（nextSibling設定）', async ({
       extensionContext,
       serviceWorker,
       extensionId,
@@ -147,9 +147,9 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
-      await changeTabPositionSetting(settingsPage, 'manual', 'sibling');
+      await changeTabPositionSetting(settingsPage, 'manual', 'nextSibling');
       await settingsPage.close();
-      await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'sibling');
+      await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'nextSibling');
 
       const firstTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
@@ -253,7 +253,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       ], 0);
     });
 
-    test('「兄弟として配置」設定でリンクから開いたタブが兄弟として配置される（sibling設定）', async ({
+    test('「直後に配置」設定でリンクから開いたタブが直後に配置される（nextSibling設定）', async ({
       extensionContext,
       serviceWorker,
       extensionId,
@@ -268,9 +268,9 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
-      await changeTabPositionSetting(settingsPage, 'link', 'sibling');
+      await changeTabPositionSetting(settingsPage, 'link', 'nextSibling');
       await settingsPage.close();
-      await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'sibling');
+      await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'nextSibling');
 
       const linkPageUrl = getTestServerUrl('/link-with-target-blank');
       const parentPage = await extensionContext.newPage();
@@ -302,7 +302,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       ], 0);
     });
 
-    test('ネストした親タブから開いたリンクタブが兄弟として配置される（sibling設定）', async ({
+    test('ネストした親タブから開いたリンクタブが直後に配置される（nextSibling設定）', async ({
       extensionContext,
       serviceWorker,
       extensionId,
@@ -349,9 +349,9 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       ], 0);
 
       const settingsPage2 = await openSettingsPage(extensionContext, extensionId);
-      await changeTabPositionSetting(settingsPage2, 'link', 'sibling');
+      await changeTabPositionSetting(settingsPage2, 'link', 'nextSibling');
       await settingsPage2.close();
-      await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'sibling');
+      await waitForSettingsSaved(serviceWorker, 'newTabPositionFromLink', 'nextSibling');
 
       await serviceWorker.evaluate(async ({ tabId, url }) => {
         await chrome.tabs.update(tabId, { url });

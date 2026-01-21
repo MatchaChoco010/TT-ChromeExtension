@@ -51,15 +51,15 @@ export interface UserSettings {
   fontSize: number;
   fontFamily: string;
   customCSS: string;
-  newTabPosition: 'child' | 'sibling' | 'end';
+  newTabPosition: 'child' | 'nextSibling' | 'lastSibling' | 'end';
   closeWarningThreshold: number;
   showUnreadIndicator: boolean;
   autoSnapshotInterval: number;
   childTabBehavior: 'promote' | 'close_all';
-  newTabPositionFromLink?: 'child' | 'sibling' | 'end';
-  newTabPositionManual?: 'child' | 'sibling' | 'end';
+  newTabPositionFromLink?: 'child' | 'nextSibling' | 'lastSibling' | 'end';
+  newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end';
   maxSnapshots?: number;
-  duplicateTabPosition?: 'sibling' | 'end';
+  duplicateTabPosition?: 'nextSibling' | 'end';
   snapshotSubfolder: string;
 }
 

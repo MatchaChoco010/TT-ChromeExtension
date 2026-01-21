@@ -13,7 +13,7 @@ import { downloadService } from '@/storage/DownloadService';
 const TAB_POSITION_DEFAULTS = {
   newTabPositionFromLink: 'child' as const,
   newTabPositionManual: 'end' as const,
-  duplicateTabPosition: 'sibling' as const,
+  duplicateTabPosition: 'nextSibling' as const,
 };
 
 /**
@@ -21,15 +21,21 @@ const TAB_POSITION_DEFAULTS = {
  * Chrome再起動後に古い設定（新フィールドがない）が読み込まれた場合に対応
  */
 function getSettingsWithDefaults(settings: UserSettings | null): {
-  newTabPositionFromLink: 'child' | 'sibling' | 'end';
-  newTabPositionManual: 'child' | 'sibling' | 'end';
-  duplicateTabPosition: 'sibling' | 'end';
+  newTabPositionFromLink: 'child' | 'nextSibling' | 'lastSibling' | 'end';
+  newTabPositionManual: 'child' | 'nextSibling' | 'lastSibling' | 'end';
+  duplicateTabPosition: 'nextSibling' | 'end';
   childTabBehavior: 'promote' | 'close_all';
 } {
+  // 古い設定からのマイグレーション: 'sibling' -> 'nextSibling'
+  const migratePosition = (pos: string | undefined, defaultValue: string): string => {
+    if (pos === 'sibling') return 'nextSibling';
+    return pos ?? defaultValue;
+  };
+
   return {
-    newTabPositionFromLink: settings?.newTabPositionFromLink ?? TAB_POSITION_DEFAULTS.newTabPositionFromLink,
-    newTabPositionManual: settings?.newTabPositionManual ?? TAB_POSITION_DEFAULTS.newTabPositionManual,
-    duplicateTabPosition: settings?.duplicateTabPosition ?? TAB_POSITION_DEFAULTS.duplicateTabPosition,
+    newTabPositionFromLink: migratePosition(settings?.newTabPositionFromLink, TAB_POSITION_DEFAULTS.newTabPositionFromLink) as 'child' | 'nextSibling' | 'lastSibling' | 'end',
+    newTabPositionManual: migratePosition(settings?.newTabPositionManual, TAB_POSITION_DEFAULTS.newTabPositionManual) as 'child' | 'nextSibling' | 'lastSibling' | 'end',
+    duplicateTabPosition: migratePosition(settings?.duplicateTabPosition, TAB_POSITION_DEFAULTS.duplicateTabPosition) as 'nextSibling' | 'end',
     childTabBehavior: settings?.childTabBehavior ?? 'promote',
   };
 }
@@ -474,7 +480,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     const pendingOpenerTabId = pendingTabParents.get(tab.id);
 
-    let newTabPosition: 'child' | 'sibling' | 'end';
+    let newTabPosition: 'child' | 'nextSibling' | 'lastSibling' | 'end';
 
     // chrome.webNavigation.onCreatedNavigationTargetで検出されたタブをリンククリックとして扱う
     // このAPIはリンククリック/window.open()でのみ発火し、
@@ -519,7 +525,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     let insertAfterNodeId: string | undefined;
     if (isDuplicatedTab && duplicateSourceTabId !== null) {
-      if (duplicateTabPosition === 'sibling') {
+      if (duplicateTabPosition === 'nextSibling') {
         const openerResult = treeStateManager.getNodeByTabId(duplicateSourceTabId);
         if (openerResult) {
           parentId = openerResult.node.parentId;
@@ -532,11 +538,17 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       if (parentResult) {
         parentId = parentResult.node.id;
       }
-    } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'sibling') {
+    } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'nextSibling') {
       const openerResult = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (openerResult) {
         parentId = openerResult.node.parentId;
         insertAfterNodeId = openerResult.node.id;
+      }
+    } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'lastSibling') {
+      const openerResult = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
+      if (openerResult) {
+        parentId = openerResult.node.parentId;
+        insertAfterNodeId = treeStateManager.getLastSiblingNodeId(effectiveOpenerTabId);
       }
     } else if (!isLinkClick && pendingOpenerTabId) {
       // pendingOpenerTabIdが明示的に設定されている場合は、それを親として使用
@@ -553,13 +565,22 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
           parentId = lastActiveResult.node.id;
         }
       }
-    } else if (!isLinkClick && newTabPosition === 'sibling') {
-      // 手動で開かれたタブで'sibling'設定の場合、最後のアクティブタブの兄弟として配置
+    } else if (!isLinkClick && newTabPosition === 'nextSibling') {
+      // 手動で開かれたタブで'nextSibling'設定の場合、最後のアクティブタブの直後に配置
       if (capturedLastActiveTabId !== undefined && capturedLastActiveTabId !== tab.id) {
         const lastActiveResult = treeStateManager.getNodeByTabId(capturedLastActiveTabId);
         if (lastActiveResult) {
           parentId = lastActiveResult.node.parentId;
           insertAfterNodeId = lastActiveResult.node.id;
+        }
+      }
+    } else if (!isLinkClick && newTabPosition === 'lastSibling') {
+      // 手動で開かれたタブで'lastSibling'設定の場合、兄弟の最後に配置
+      if (capturedLastActiveTabId !== undefined && capturedLastActiveTabId !== tab.id) {
+        const lastActiveResult = treeStateManager.getNodeByTabId(capturedLastActiveTabId);
+        if (lastActiveResult) {
+          parentId = lastActiveResult.node.parentId;
+          insertAfterNodeId = treeStateManager.getLastSiblingNodeId(capturedLastActiveTabId);
         }
       }
     }

@@ -155,6 +155,29 @@ export class TreeStateManager {
   }
 
   /**
+   * 指定されたタブの最後の兄弟ノードIDを取得
+   * - 親タブがある場合: 同じ親を持つ最後の子のID
+   * - ルートレベルの場合: 最後のルートノードのID
+   */
+  getLastSiblingNodeId(tabId: number): string | undefined {
+    const result = this.getNodeByTabId(tabId);
+    if (!result) return undefined;
+
+    const { viewId, node } = result;
+    const viewState = this.views.get(viewId);
+    if (!viewState) return undefined;
+
+    if (node.parentId) {
+      const parentNode = viewState.nodes[node.parentId];
+      if (!parentNode || parentNode.children.length === 0) return undefined;
+      return parentNode.children[parentNode.children.length - 1].id;
+    } else {
+      if (viewState.rootNodeIds.length === 0) return undefined;
+      return viewState.rootNodeIds[viewState.rootNodeIds.length - 1];
+    }
+  }
+
+  /**
    * ビューを作成
    */
   createView(info: View): void {
@@ -592,7 +615,7 @@ export class TreeStateManager {
    * chrome.tabs APIと同期
    */
   async syncWithChromeTabs(userSettings?: {
-    newTabPositionManual?: 'child' | 'sibling' | 'end';
+    newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end';
   }): Promise<void> {
     if (this.syncInProgress || this.syncCompleted) {
       return;
@@ -904,7 +927,7 @@ export class TreeStateManager {
     tabs: chrome.tabs.Tab[],
     treeStructure: TreeStructureEntry[],
     defaultViewId: string,
-    userSettings?: { newTabPositionManual?: 'child' | 'sibling' | 'end' },
+    userSettings?: { newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end' },
   ): Promise<void> {
     const currentTabIds = new Set(tabs.filter(t => t.id).map(t => t.id!));
 
@@ -1071,7 +1094,7 @@ export class TreeStateManager {
   private async syncWithOpenerTabId(
     tabs: chrome.tabs.Tab[],
     defaultViewId: string,
-    userSettings?: { newTabPositionManual?: 'child' | 'sibling' | 'end' },
+    userSettings?: { newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end' },
   ): Promise<void> {
     const tabsMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
     const processedTabs = new Set<number>();
