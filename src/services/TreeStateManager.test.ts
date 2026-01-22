@@ -599,6 +599,39 @@ describe('TreeStateManager', () => {
         expect(groupResult?.node.parentId).toBeNull();
         expect(groupResult?.node.depth).toBe(0);
       });
+
+      it('サブツリーをグループ化した際に親子関係が維持される', async () => {
+        const viewId = 'view-1';
+
+        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent' } as chrome.tabs.Tab;
+        await manager.addTab(parentTab, null, viewId);
+        const parentResult = manager.getNodeByTabId(1);
+
+        const child1Tab = { id: 2, url: 'https://example.com/child1', title: 'Child1' } as chrome.tabs.Tab;
+        const child2Tab = { id: 3, url: 'https://example.com/child2', title: 'Child2' } as chrome.tabs.Tab;
+        await manager.addTab(child1Tab, parentResult!.node.id, viewId);
+        await manager.addTab(child2Tab, parentResult!.node.id, viewId);
+
+        const groupTabId = 100;
+        await manager.createGroupWithRealTab(groupTabId, [1, 2, 3], 'グループ');
+
+        const groupResult = manager.getNodeByTabId(groupTabId);
+        expect(groupResult?.node.parentId).toBeNull();
+        expect(groupResult?.node.depth).toBe(0);
+        expect(groupResult?.node.children.length).toBe(1);
+
+        const parentAfter = manager.getNodeByTabId(1);
+        expect(parentAfter?.node.parentId).toBe(groupResult?.node.id);
+        expect(parentAfter?.node.depth).toBe(1);
+        expect(parentAfter?.node.children.length).toBe(2);
+
+        const child1 = manager.getNodeByTabId(2);
+        const child2 = manager.getNodeByTabId(3);
+        expect(child1?.node.parentId).toBe(parentAfter?.node.id);
+        expect(child2?.node.parentId).toBe(parentAfter?.node.id);
+        expect(child1?.node.depth).toBe(2);
+        expect(child2?.node.depth).toBe(2);
+      });
     });
   });
 

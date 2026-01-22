@@ -3,6 +3,7 @@ import { createTab, closeTab, getCurrentWindowId, getTestServerUrl, confirmGroup
 import { waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
+import { moveTabToParent } from './utils/drag-drop-utils';
 
 test.describe('タブグループ化機能', () => {
   test.describe('複数タブのグループ化', () => {
@@ -1504,6 +1505,199 @@ test.describe('タブグループ化機能', () => {
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+    });
+  });
+
+  test.describe('サブツリーのグループ化', () => {
+    test('サブツリーをグループ化した際に親子関係が維持される', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
+
+      const child1TabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: child1TabId, depth: 0 },
+      ], 0);
+
+      const child2TabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+        { tabId: child1TabId, depth: 0 },
+        { tabId: child2TabId, depth: 0 },
+      ], 0);
+
+      await moveTabToParent(sidePanelPage, child1TabId, parentTabId, serviceWorker);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: child1TabId, depth: 1 },
+        { tabId: child2TabId, depth: 0 },
+      ], 0);
+
+      await moveTabToParent(sidePanelPage, child2TabId, parentTabId, serviceWorker);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: child1TabId, depth: 1 },
+        { tabId: child2TabId, depth: 1 },
+      ], 0);
+
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
+      await parentNode.click({ force: true, noWaitAfter: true });
+      await expect(parentNode).toHaveClass(/bg-gray-500/);
+
+      const child1Node = sidePanelPage.locator(`[data-testid="tree-node-${child1TabId}"]`);
+      await child1Node.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
+      await expect(child1Node).toHaveClass(/bg-gray-500/);
+
+      const child2Node = sidePanelPage.locator(`[data-testid="tree-node-${child2TabId}"]`);
+      await child2Node.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
+      await expect(child2Node).toHaveClass(/bg-gray-500/);
+
+      await sidePanelPage.waitForFunction(
+        (tabId) => {
+          const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+          if (!node) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        },
+        child2TabId,
+        { timeout: 5000 }
+      );
+
+      await child2Node.click({ button: 'right', force: true, noWaitAfter: true });
+
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
+      await expect(groupMenuItem).toBeVisible();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
+
+      await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+
+      await confirmGroupNameModal(sidePanelPage);
+
+      let groupTabId: number | undefined;
+      await waitForCondition(
+        async () => {
+          const treeState = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('tree_state');
+            return result.tree_state as {
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
+            } | undefined;
+          });
+          if (!treeState?.views) return false;
+          for (const view of Object.values(treeState.views)) {
+            const groupNode = Object.values(view.nodes).find(
+              (node) => node.groupInfo !== undefined && node.tabId > 0
+            );
+            if (groupNode) {
+              groupTabId = groupNode.tabId;
+              return true;
+            }
+          }
+          return false;
+        },
+        { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
+      );
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: parentTabId, depth: 1, expanded: true },
+        { tabId: child1TabId, depth: 2 },
+        { tabId: child2TabId, depth: 2 },
+      ], 0);
+
+      const verifyResult = await serviceWorker.evaluate(async (tabIds) => {
+        const storage = await chrome.storage.local.get('tree_state');
+        const treeState = storage.tree_state as {
+          views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; children: { id: string }[] }> }>;
+          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
+        } | undefined;
+        if (!treeState?.views || !treeState?.tabToNode) return { verified: false };
+
+        const [parentTabId, child1TabId, child2TabId] = tabIds;
+
+        const parentNodeInfo = treeState.tabToNode[parentTabId];
+        const child1NodeInfo = treeState.tabToNode[child1TabId];
+        const child2NodeInfo = treeState.tabToNode[child2TabId];
+        if (!parentNodeInfo || !child1NodeInfo || !child2NodeInfo) return { verified: false };
+
+        const viewState = treeState.views[parentNodeInfo.viewId];
+        if (!viewState) return { verified: false };
+
+        const parentNode = viewState.nodes[parentNodeInfo.nodeId];
+        const child1Node = viewState.nodes[child1NodeInfo.nodeId];
+        const child2Node = viewState.nodes[child2NodeInfo.nodeId];
+        if (!parentNode || !child1Node || !child2Node) return { verified: false };
+
+        const child1IsChildOfParent = child1Node.parentId === parentNode.id;
+        const child2IsChildOfParent = child2Node.parentId === parentNode.id;
+        const parentHasTwoChildren = parentNode.children.length === 2;
+
+        return {
+          verified: child1IsChildOfParent && child2IsChildOfParent && parentHasTwoChildren,
+          child1IsChildOfParent,
+          child2IsChildOfParent,
+          parentHasTwoChildren,
+          parentChildrenCount: parentNode.children.length
+        };
+      }, [parentTabId, child1TabId, child2TabId]);
+
+      expect(verifyResult.verified).toBe(true);
+
+      await closeTab(serviceWorker, child1TabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: parentTabId, depth: 1, expanded: true },
+        { tabId: child2TabId, depth: 2 },
+      ], 0);
+
+      await closeTab(serviceWorker, child2TabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: parentTabId, depth: 1 },
+      ], 0);
+
+      await closeTab(serviceWorker, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: pseudoSidePanelTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, groupTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: pseudoSidePanelTabId, depth: 0 },

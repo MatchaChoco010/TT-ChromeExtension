@@ -1295,6 +1295,17 @@ export class TreeStateManager {
       }
     }
 
+    // 選択されたnodeIdのSetを構築
+    const selectedNodeIds = new Set<string>();
+    for (const tabId of tabIds) {
+      const mapping = this.tabToNode.get(tabId);
+      if (mapping && mapping.viewId === viewId) {
+        selectedNodeIds.add(mapping.nodeId);
+      }
+    }
+
+    // ルートノードを特定: 親が選択されていないノード
+    const rootNodesOfSelection: TabNode[] = [];
     for (const tabId of tabIds) {
       const mapping = this.tabToNode.get(tabId);
       if (!mapping || mapping.viewId !== viewId) continue;
@@ -1302,6 +1313,14 @@ export class TreeStateManager {
       const node = viewState.nodes[mapping.nodeId];
       if (!node) continue;
 
+      const parentIsSelected = node.parentId && selectedNodeIds.has(node.parentId);
+      if (!parentIsSelected) {
+        rootNodesOfSelection.push(node);
+      }
+    }
+
+    // ルートノードのみをグループに追加
+    for (const node of rootNodesOfSelection) {
       if (node.parentId) {
         const oldParent = viewState.nodes[node.parentId];
         if (oldParent) {
