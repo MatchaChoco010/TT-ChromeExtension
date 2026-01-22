@@ -460,7 +460,7 @@ describe('TreeStateManager', () => {
       expect(groupNode!.node.groupInfo).toBeDefined();
       expect(groupNode!.node.groupInfo!.name).toBe('テストグループ');
       expect(groupNode!.node.groupInfo!.color).toBeDefined();
-      expect(groupNodeId).toMatch(/^group-/);
+      expect(groupNodeId).toMatch(/^node-/);
     });
 
     it('子タブが既に別の親を持つ場合、その親から削除されてグループに移動する', async () => {

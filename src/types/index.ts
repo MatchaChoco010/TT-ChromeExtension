@@ -143,6 +143,7 @@ export interface TabSnapshot {
   isExpanded: boolean;
   pinned: boolean;
   windowIndex: number;
+  groupInfo?: GroupInfo;
 }
 
 export interface SnapshotData {

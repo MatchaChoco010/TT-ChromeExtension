@@ -578,7 +578,7 @@ describe('複数タブのグループ化機能', () => {
       id: groupTabId,
       index: 3,
       windowId: 1,
-      url: `chrome-extension://test-id/group.html?tabId=${groupTabId}`,
+      url: `chrome-extension://test-id/group.html`,
     } as chrome.tabs.Tab);
 
     const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
@@ -613,7 +613,7 @@ describe('複数タブのグループ化機能', () => {
       for (const viewState of Object.values(savedTreeState.views) as { nodes: Record<string, TabNode> }[]) {
         allNodes.push(...Object.values(viewState.nodes));
       }
-      const groupNode = allNodes.find((node) => node.id.startsWith('group-'));
+      const groupNode = allNodes.find((node) => node.groupInfo !== undefined);
 
       expect(groupNode).toBeDefined();
 
@@ -647,7 +647,7 @@ describe('複数タブのグループ化機能', () => {
       id: groupTabId,
       index: 2,
       windowId: 1,
-      url: `chrome-extension://test-id/group.html?tabId=${groupTabId}`,
+      url: `chrome-extension://test-id/group.html`,
     } as chrome.tabs.Tab);
 
     const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
@@ -677,7 +677,7 @@ describe('複数タブのグループ化機能', () => {
             allNodes.push(...Object.values(viewState.nodes));
           }
         }
-        const groupNode = allNodes.find((node) => node.id.startsWith('group-'));
+        const groupNode = allNodes.find((node) => node.groupInfo !== undefined);
         if (groupNode) {
           foundGroupTabId = groupNode.tabId;
           break;

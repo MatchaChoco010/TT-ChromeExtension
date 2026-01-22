@@ -19,14 +19,6 @@ type PageState =
 
 const POLLING_INTERVAL_MS = 2000;
 
-function getTabIdFromQuery(): number | null {
-  const params = new URLSearchParams(window.location.search);
-  const tabIdStr = params.get('tabId');
-  if (!tabIdStr) return null;
-  const tabId = parseInt(tabIdStr, 10);
-  return isNaN(tabId) ? null : tabId;
-}
-
 async function fetchGroupInfo(tabId: number): Promise<GroupInfo> {
   const response = await chrome.runtime.sendMessage({
     type: 'GET_GROUP_INFO',
@@ -42,14 +34,21 @@ async function fetchGroupInfo(tabId: number): Promise<GroupInfo> {
 
 export const GroupPage: React.FC = () => {
   const [state, setState] = useState<PageState>({ status: 'loading' });
-  const [tabId] = useState<number | null>(() => getTabIdFromQuery());
+  const [tabId, setTabId] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    chrome.tabs.getCurrent().then((tab) => {
+      if (tab?.id) {
+        setTabId(tab.id);
+      }
+    });
+  }, []);
+
   const loadGroupInfo = useCallback(async () => {
     if (!tabId) {
-      setState({ status: 'error', message: 'タブIDが指定されていません' });
       return;
     }
 

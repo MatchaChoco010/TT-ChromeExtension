@@ -3,6 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import { GroupPage } from './GroupPage';
 
 const mockSendMessage = vi.fn();
+const mockGetCurrent = vi.fn();
 vi.mock('@/types', () => ({}));
 
 beforeEach(() => {
@@ -10,12 +11,12 @@ beforeEach(() => {
     runtime: {
       sendMessage: mockSendMessage,
     },
+    tabs: {
+      getCurrent: mockGetCurrent,
+    },
   } as unknown as typeof chrome;
 
-  Object.defineProperty(window, 'location', {
-    value: { search: '?tabId=123' },
-    writable: true,
-  });
+  mockGetCurrent.mockResolvedValue({ id: 123 });
 });
 
 afterEach(() => {

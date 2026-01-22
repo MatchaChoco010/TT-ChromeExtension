@@ -144,7 +144,7 @@ export class SnapshotManager {
           ? windowIdToIndex.get(tab.windowId) ?? 0
           : 0;
 
-        tabSnapshots.push({
+        const snapshot: TabSnapshot = {
           index,
           url: tab.url,
           title: tab.title || '',
@@ -153,7 +153,11 @@ export class SnapshotManager {
           isExpanded: node.isExpanded,
           pinned: tab.pinned || false,
           windowIndex,
-        });
+        };
+        if (node.groupInfo) {
+          snapshot.groupInfo = node.groupInfo;
+        }
+        tabSnapshots.push(snapshot);
       }
     }
 

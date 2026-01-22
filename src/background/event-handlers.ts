@@ -1558,7 +1558,7 @@ async function handleCreateGroup(
     pendingGroupTabIds.add(groupTab.id);
     isCreatingGroupTab = false;
 
-    const groupPageUrl = `chrome-extension://${chrome.runtime.id}/group.html?tabId=${groupTab.id}`;
+    const groupPageUrl = `chrome-extension://${chrome.runtime.id}/group.html`;
     await chrome.tabs.update(groupTab.id, { url: groupPageUrl });
 
     const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, groupName ?? 'グループ');

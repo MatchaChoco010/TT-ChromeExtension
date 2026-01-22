@@ -75,7 +75,7 @@ test.describe('タブグループ化機能', () => {
           if (!treeState?.views) return false;
           for (const view of Object.values(treeState.views)) {
             if (Object.values(view.nodes).some(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
+              (node) => node.groupInfo !== undefined && node.tabId > 0
             )) return true;
           }
           return false;
@@ -91,7 +91,7 @@ test.describe('タブグループ化機能', () => {
         if (!treeState?.views) return null;
         for (const view of Object.values(treeState.views)) {
           const groupNode = Object.values(view.nodes).find(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
+            (node) => node.groupInfo !== undefined && node.tabId > 0
           );
           if (groupNode) return groupNode.tabId;
         }
@@ -194,7 +194,7 @@ test.describe('タブグループ化機能', () => {
           if (!treeState?.views) return false;
           for (const view of Object.values(treeState.views)) {
             const groupNode = Object.values(view.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
+              (node) => node.groupInfo !== undefined && node.tabId > 0
             );
             if (groupNode) {
               groupTabId = groupNode.tabId;
@@ -219,7 +219,7 @@ test.describe('タブグループ化機能', () => {
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
             return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; groupId?: string }> }>;
+              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; groupInfo?: unknown }> }>;
               tabToNode?: Record<number, { viewId: string; nodeId: string }>;
             } | undefined;
           });
@@ -230,10 +230,10 @@ test.describe('タブグループ化機能', () => {
 
           const viewState = treeState.views[tabNodeInfo.viewId];
           const tabNodeState = viewState?.nodes[tabNodeInfo.nodeId];
-          if (!tabNodeState) return false;
+          if (!tabNodeState || !tabNodeState.parentId) return false;
 
-          return (tabNodeState.parentId !== null && tabNodeState.parentId.startsWith('group-')) ||
-                 (tabNodeState.groupId !== undefined && tabNodeState.groupId.startsWith('group-'));
+          const parentNode = viewState?.nodes[tabNodeState.parentId];
+          return parentNode?.groupInfo !== undefined;
         },
         { timeout: 10000, timeoutMessage: 'Tab was not added as child of group' }
       );
@@ -323,7 +323,7 @@ test.describe('タブグループ化機能', () => {
 
             for (const view of Object.values(treeState.views)) {
               const groupNode = Object.values(view.nodes).find(
-                (node) => node.id.startsWith('group-') && node.groupInfo?.name === 'グループ'
+                (node) => node.groupInfo !== undefined && node.groupInfo?.name === 'グループ'
               );
               if (groupNode) return true;
             }
@@ -342,7 +342,7 @@ test.describe('タブグループ化機能', () => {
         if (!treeState?.views) return null;
         for (const view of Object.values(treeState.views)) {
           const groupNode = Object.values(view.nodes).find(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
+            (node) => node.groupInfo !== undefined && node.tabId > 0
           );
           if (groupNode) return groupNode.tabId;
         }
@@ -443,7 +443,7 @@ test.describe('タブグループ化機能', () => {
             let groupNode: { id: string; tabId: number } | undefined;
             for (const view of Object.values(treeState.views)) {
               groupNode = Object.values(view.nodes).find(
-                (node) => node.id.startsWith('group-') && node.tabId > 0
+                (node) => node.groupInfo !== undefined && node.tabId > 0
               );
               if (groupNode) break;
             }
@@ -565,7 +565,7 @@ test.describe('タブグループ化機能', () => {
 
           for (const view of Object.values(treeState.views)) {
             const groupNode = Object.values(view.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
+              (node) => node.groupInfo !== undefined && node.tabId > 0
             );
             if (groupNode) {
               groupTabId = groupNode.tabId;
@@ -690,7 +690,7 @@ test.describe('タブグループ化機能', () => {
             let groupViewId: string | undefined;
             for (const [viewId, view] of Object.entries(treeState.views)) {
               groupNode = Object.values(view.nodes).find(
-                (node) => node.id.startsWith('group-') && node.tabId > 0
+                (node) => node.groupInfo !== undefined && node.tabId > 0
               );
               if (groupNode) {
                 groupViewId = viewId;
@@ -821,7 +821,7 @@ test.describe('タブグループ化機能', () => {
 
           for (const view of Object.values(treeState.views)) {
             const groupNode = Object.values(view.nodes).find(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
+              (node) => node.groupInfo !== undefined && node.tabId > 0
             );
             if (groupNode) {
               groupTabId = groupNode.tabId;
@@ -939,7 +939,7 @@ test.describe('タブグループ化機能', () => {
 
             for (const view of Object.values(treeState.views)) {
               const groupNode = Object.values(view.nodes).find(
-                (node) => node.id.startsWith('group-') && node.tabId > 0
+                (node) => node.groupInfo !== undefined && node.tabId > 0
               );
               if (groupNode) {
                 return {
@@ -1055,7 +1055,7 @@ test.describe('タブグループ化機能', () => {
           if (!treeState?.views) return false;
           for (const view of Object.values(treeState.views)) {
             if (Object.values(view.nodes).some(
-              (node) => node.id.startsWith('group-') && node.tabId > 0
+              (node) => node.groupInfo !== undefined && node.tabId > 0
             )) return true;
           }
           return false;
@@ -1071,7 +1071,7 @@ test.describe('タブグループ化機能', () => {
         if (!treeState?.views) return null;
         for (const view of Object.values(treeState.views)) {
           const groupNode = Object.values(view.nodes).find(
-            (node) => node.id.startsWith('group-') && node.tabId > 0
+            (node) => node.groupInfo !== undefined && node.tabId > 0
           );
           if (groupNode) return groupNode.tabId;
         }
@@ -1156,7 +1156,7 @@ test.describe('タブグループ化機能', () => {
 
             for (const view of Object.values(treeState.views)) {
               const groupNode = Object.values(view.nodes).find(
-                (node) => node.id.startsWith('group-') && node.tabId > 0
+                (node) => node.groupInfo !== undefined && node.tabId > 0
               );
               if (groupNode) {
                 return {
@@ -1290,7 +1290,7 @@ test.describe('タブグループ化機能', () => {
             let groupViewId: string | undefined;
             for (const [viewId, view] of Object.entries(treeState.views)) {
               groupNode = Object.values(view.nodes).find(
-                (node) => node.id.startsWith('group-') && node.tabId > 0
+                (node) => node.groupInfo !== undefined && node.tabId > 0
               );
               if (groupNode) {
                 groupViewId = viewId;
@@ -1439,7 +1439,7 @@ test.describe('タブグループ化機能', () => {
             let groupViewId: string | undefined;
             for (const [viewId, view] of Object.entries(treeState.views)) {
               groupNode = Object.values(view.nodes).find(
-                (node) => node.id.startsWith('group-') && node.tabId > 0
+                (node) => node.groupInfo !== undefined && node.tabId > 0
               );
               if (groupNode) {
                 groupViewId = viewId;

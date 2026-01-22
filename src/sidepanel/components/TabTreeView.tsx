@@ -340,14 +340,14 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   };
 
   const handleGroupTitleSave = useCallback(() => {
-    if (node.id.startsWith('group-') && editedGroupTitle.trim()) {
+    if (node.groupInfo !== undefined && editedGroupTitle.trim()) {
       chrome.runtime.sendMessage({
         type: 'UPDATE_GROUP_NAME',
         payload: { nodeId: node.id, name: editedGroupTitle.trim() },
       });
     }
     setIsEditingGroupTitle(false);
-  }, [node.id, editedGroupTitle]);
+  }, [node.id, node.groupInfo, editedGroupTitle]);
 
   const handleGroupTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -507,7 +507,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
-          isGroupTab={node.id.startsWith('group-')}
+          isGroupTab={node.groupInfo !== undefined}
           tabUrl={tabInfo?.url || 'about:blank'}
           views={views}
           currentViewId={currentViewId}
@@ -719,14 +719,14 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   };
 
   const handleGroupTitleSave = useCallback(() => {
-    if (node.id.startsWith('group-') && editedGroupTitle.trim()) {
+    if (node.groupInfo !== undefined && editedGroupTitle.trim()) {
       chrome.runtime.sendMessage({
         type: 'UPDATE_GROUP_NAME',
         payload: { nodeId: node.id, name: editedGroupTitle.trim() },
       });
     }
     setIsEditingGroupTitle(false);
-  }, [node.id, editedGroupTitle]);
+  }, [node.id, node.groupInfo, editedGroupTitle]);
 
   const handleGroupTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -873,7 +873,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           onAction={handleContextMenuAction}
           onClose={() => setContextMenuOpen(false)}
           hasChildren={hasChildren}
-          isGroupTab={node.id.startsWith('group-')}
+          isGroupTab={node.groupInfo !== undefined}
           tabUrl={tabInfo?.url || 'about:blank'}
           views={views}
           currentViewId={currentViewId}

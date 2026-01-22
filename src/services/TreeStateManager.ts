@@ -1,4 +1,4 @@
-import type { TabNode, TreeState, TreeStructureEntry, IStorageService, ViewState, View } from '@/types';
+import type { TabNode, TreeState, TreeStructureEntry, IStorageService, ViewState, View, GroupInfo } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
 /**
@@ -1237,7 +1237,7 @@ export class TreeStateManager {
       throw new Error('View not found');
     }
 
-    const groupNodeId = `group-${groupTabId}`;
+    const groupNodeId = `node-${groupTabId}`;
 
     const parentIds = new Set<string | null>();
     for (const tabId of tabIds) {
@@ -1340,10 +1340,13 @@ export class TreeStateManager {
 
     let groupNode: TabNode | null = null;
 
-    if (node.id.startsWith('group-')) {
+    if (node.groupInfo) {
       groupNode = node;
-    } else if (node.parentId && node.parentId.startsWith('group-')) {
-      groupNode = viewState.nodes[node.parentId] || null;
+    } else if (node.parentId) {
+      const parentNode = viewState.nodes[node.parentId];
+      if (parentNode?.groupInfo) {
+        groupNode = parentNode;
+      }
     }
 
     if (!groupNode) {
@@ -1385,7 +1388,7 @@ export class TreeStateManager {
       throw new Error('Group not found');
     }
 
-    if (!result.node.id.startsWith('group-')) {
+    if (!result.node.groupInfo) {
       throw new Error('Not a group tab');
     }
 
@@ -1415,12 +1418,8 @@ export class TreeStateManager {
   async updateGroupName(nodeId: string, name: string): Promise<boolean> {
     for (const [, viewState] of this.views) {
       const node = viewState.nodes[nodeId];
-      if (node && node.id.startsWith('group-')) {
-        if (!node.groupInfo) {
-          node.groupInfo = { name, color: '#f59e0b' };
-        } else {
-          node.groupInfo.name = name;
-        }
+      if (node && node.groupInfo) {
+        node.groupInfo.name = name;
         await this.persistState();
         return true;
       }
@@ -2333,6 +2332,7 @@ export class TreeStateManager {
       isExpanded: boolean;
       pinned: boolean;
       windowIndex?: number;
+      groupInfo?: GroupInfo;
     }>,
     closeCurrentTabs: boolean
   ): Promise<void> {
@@ -2400,6 +2400,9 @@ export class TreeStateManager {
         isExpanded: snapshot.isExpanded,
         depth,
       };
+      if (snapshot.groupInfo) {
+        newNode.groupInfo = snapshot.groupInfo;
+      }
 
       allNewNodes.set(nodeId, newNode);
       nodeIdToViewId.set(nodeId, snapshot.viewId);
