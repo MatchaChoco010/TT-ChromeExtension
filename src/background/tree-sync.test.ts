@@ -17,9 +17,14 @@ const mockChrome = {
     onActivated: { addListener: vi.fn() },
     remove: vi.fn(),
     move: vi.fn(),
+    update: vi.fn(),
+  },
+  windows: {
+    getAll: vi.fn().mockResolvedValue([{ id: 1 }]),
   },
   runtime: {
     sendMessage: vi.fn(),
+    id: 'test-extension-id',
   },
   storage: {
     local: {
@@ -41,56 +46,91 @@ describe('ツリー同期とリアルタイム更新', () => {
   });
 
   describe('chrome.tabs API との同期', () => {
-    it('syncWithChromeTabs: 既存タブをツリー状態に同期できる', async () => {
+    it('restoreStateAfterRestart: 保存された状態をロードしてtabIdを再構築できる', async () => {
       const tabs: chrome.tabs.Tab[] = [
-        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
-        { id: 2, url: 'https://example.com/2', title: 'Tab 2', index: 1, openerTabId: 1, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
-        { id: 3, url: 'https://example.com/3', title: 'Tab 3', index: 2, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        { id: 101, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        { id: 102, url: 'https://example.com/2', title: 'Tab 2', index: 1, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        { id: 103, url: 'https://example.com/3', title: 'Tab 3', index: 2, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
       ];
 
+      // 保存された状態（古いtabId）
+      const savedState = {
+        windows: [{
+          windowId: 1,
+          views: [{
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: [
+              { tabId: 1, isExpanded: true, children: [{ tabId: 2, isExpanded: true, children: [] }] },
+              { tabId: 3, isExpanded: true, children: [] },
+            ],
+            pinnedTabIds: [],
+          }],
+          activeViewIndex: 0,
+        }],
+      };
+
       mockChrome.tabs.query.mockResolvedValue(tabs);
+      mockStorageService.get.mockResolvedValue(savedState);
       mockStorageService.set.mockResolvedValue(undefined);
 
       const { TreeStateManager } = await import('@/services/TreeStateManager');
       const manager = new TreeStateManager(mockStorageService);
 
-      // openerTabIdを使用して親子関係を設定するには、newTabPositionManualを'child'に設定
-      await manager.syncWithChromeTabs({ newTabPositionManual: 'child' });
+      await manager.restoreStateAfterRestart();
 
-      const result1 = manager.getNodeByTabId(1);
-      const result2 = manager.getNodeByTabId(2);
-      const result3 = manager.getNodeByTabId(3);
+      // tabIdが新しい値（101, 102, 103）に再構築されていることを確認
+      const result1 = manager.getNodeByTabId(101);
+      const result2 = manager.getNodeByTabId(102);
+      const result3 = manager.getNodeByTabId(103);
 
       expect(result1).not.toBeNull();
       expect(result2).not.toBeNull();
       expect(result3).not.toBeNull();
 
-      expect(result2?.node.parentId).toBe(result1?.node.id);
-      expect(result2?.node.depth).toBe(1);
+      // 親子関係が維持されていることを確認
+      expect(result1?.node.children.some(c => c.tabId === 102)).toBe(true);
 
-      expect(result1?.node.parentId).toBeNull();
-      expect(result3?.node.parentId).toBeNull();
+      // ルートノードの確認
+      const tree = manager.getTree(1);
+      expect(tree.some(n => n.tabId === 101)).toBe(true);
+      expect(tree.some(n => n.tabId === 103)).toBe(true);
     });
 
-    it('syncWithChromeTabs: 既にツリーに存在するタブは重複追加されない', async () => {
+    it('restoreStateAfterRestart: 2回呼び出しても2回目は何もしない', async () => {
       const tabs: chrome.tabs.Tab[] = [
-        { id: 1, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        { id: 101, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
       ];
 
+      const savedState = {
+        windows: [{
+          windowId: 1,
+          views: [{
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: [{ tabId: 1, isExpanded: true, children: [] }],
+            pinnedTabIds: [],
+          }],
+          activeViewIndex: 0,
+        }],
+      };
+
       mockChrome.tabs.query.mockResolvedValue(tabs);
+      mockStorageService.get.mockResolvedValue(savedState);
       mockStorageService.set.mockResolvedValue(undefined);
 
       const { TreeStateManager } = await import('@/services/TreeStateManager');
       const manager = new TreeStateManager(mockStorageService);
 
-      await manager.syncWithChromeTabs();
-      const result1 = manager.getNodeByTabId(1);
-      const firstNodeId = result1?.node.id;
+      await manager.restoreStateAfterRestart();
+      const result1 = manager.getNodeByTabId(101);
+      const firstTabId = result1?.node.tabId;
 
-      await manager.syncWithChromeTabs();
-      const result1Again = manager.getNodeByTabId(1);
+      // 2回目の呼び出し（initializedフラグにより何もしない）
+      await manager.restoreStateAfterRestart();
+      const result1Again = manager.getNodeByTabId(101);
 
-      expect(result1Again?.node.id).toBe(firstNodeId);
+      expect(result1Again?.node.tabId).toBe(firstTabId);
     });
   });
 
@@ -181,7 +221,7 @@ describe('ツリー同期とリアルタイム更新', () => {
         groupId: -1,
         frozen: false,
       };
-      await manager.addTab(tab, null, 'default-view');
+      await manager.addTab(tab, null, 1);
 
       await manager.removeTab(1);
 

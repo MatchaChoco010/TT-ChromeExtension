@@ -54,15 +54,14 @@ describe('エラーハンドリングとエッジケース', () => {
         frozen: false,
       };
 
-      await treeStateManager.addTab(tab, null, 'view-1');
+      await treeStateManager.addTab(tab, null, 1, 0);
 
       const nodeBeforeMove = treeStateManager.getNodeByTabId(1);
       expect(nodeBeforeMove).not.toBeNull();
 
       try {
-        await treeStateManager.moveNode('node-1', null, 0);
+        await treeStateManager.moveNode(1, null, 0);
       } catch (error) {
-        // エラーをキャッチして処理継続
         expect(error).toBeDefined();
       }
 
@@ -106,22 +105,17 @@ describe('エラーハンドリングとエッジケース', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.storage.local.set).mockRejectedValue(quotaError);
 
-      const largeViews: Record<string, { info: { id: string; name: string; color: string }; rootNodeIds: string[]; nodes: Record<string, never> }> = {};
-      const viewOrder: string[] = [];
-      for (let i = 0; i < 1000; i++) {
-        largeViews[`view-${i}`] = {
-          info: { id: `view-${i}`, name: 'Test View', color: '#ff0000' },
-          rootNodeIds: [],
-          nodes: {},
-        };
-        viewOrder.push(`view-${i}`);
-      }
       const largeData = {
-        views: largeViews,
-        viewOrder,
-        currentViewId: 'view-1',
-        tabToNode: {},
-        treeStructure: [],
+        windows: Array.from({ length: 1000 }, (_, i) => ({
+          windowId: i,
+          views: [{
+            name: 'Test View',
+            color: '#ff0000',
+            rootNodes: [],
+            pinnedTabIds: [],
+          }],
+          activeViewIndex: 0,
+        })),
       };
 
       await expect(
@@ -190,26 +184,23 @@ describe('エラーハンドリングとエッジケース', () => {
         frozen: false,
       };
 
-      await treeStateManager.addTab(tabA, null, 'view-1');
-      await treeStateManager.addTab(tabB, 'node-1', 'view-1');
-      await treeStateManager.addTab(tabC, 'node-2', 'view-1');
+      await treeStateManager.addTab(tabA, null, 1, 0);
+      await treeStateManager.addTab(tabB, 1, 1, 0);
+      await treeStateManager.addTab(tabC, 2, 1, 0);
 
-      const nodeA = treeStateManager.getNodeByTabId(1);
-      const nodeB = treeStateManager.getNodeByTabId(2);
-      const nodeC = treeStateManager.getNodeByTabId(3);
+      expect(treeStateManager.getNodeByTabId(1)).not.toBeNull();
+      expect(treeStateManager.getNodeByTabId(2)).not.toBeNull();
+      expect(treeStateManager.getNodeByTabId(3)).not.toBeNull();
 
-      expect(nodeA?.node.parentId).toBeNull();
-      expect(nodeB?.node.parentId).toBe('node-1');
-      expect(nodeC?.node.parentId).toBe('node-2');
+      expect(treeStateManager.getParentTabId(1)).toBeNull();
+      expect(treeStateManager.getParentTabId(2)).toBe(1);
+      expect(treeStateManager.getParentTabId(3)).toBe(2);
 
-      await treeStateManager.moveNode('node-1', 'node-3', 0);
+      await treeStateManager.moveNodeToParent(1, 3, [1]);
 
-      const nodeAAfter = treeStateManager.getNodeByTabId(1);
-      expect(nodeAAfter?.node.parentId).toBeNull();
-      const nodeBAfter = treeStateManager.getNodeByTabId(2);
-      expect(nodeBAfter?.node.parentId).toBe('node-1');
-      const nodeCAfter = treeStateManager.getNodeByTabId(3);
-      expect(nodeCAfter?.node.parentId).toBe('node-2');
+      expect(treeStateManager.getParentTabId(1)).toBeNull();
+      expect(treeStateManager.getParentTabId(2)).toBe(1);
+      expect(treeStateManager.getParentTabId(3)).toBe(2);
     });
 
     it('ノードを自分自身の親にしようとした場合、操作をキャンセル', async () => {
@@ -228,12 +219,11 @@ describe('エラーハンドリングとエッジケース', () => {
         frozen: false,
       };
 
-      await treeStateManager.addTab(tab, null, 'view-1');
+      await treeStateManager.addTab(tab, null, 1, 0);
 
-      await treeStateManager.moveNode('node-1', 'node-1', 0);
+      await treeStateManager.moveNodeToParent(1, 1, [1]);
 
-      const node = treeStateManager.getNodeByTabId(1);
-      expect(node?.node.parentId).toBeNull();
+      expect(treeStateManager.getParentTabId(1)).toBeNull();
     });
 
     it('TreeStateManagerに循環参照検出機能が実装されていることを確認', () => {
@@ -254,7 +244,6 @@ describe('エラーハンドリングとエッジケース', () => {
     });
 
     it('無効なカスタムCSSが入力された場合、エラー通知を表示', async () => {
-      // 括弧が一致しないCSS（確実に検出される）
       const invalidCSS = `
         .test {
           color: red;
@@ -273,7 +262,6 @@ describe('エラーハンドリングとエッジケース', () => {
         snapshotSubfolder: 'TT-Snapshots',
       };
 
-      // モックストレージに設定を保存
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.storage.local.get).mockResolvedValue({ user_settings: settings });
       vi.mocked(mockChrome.storage.local.set).mockResolvedValue(undefined);
@@ -471,7 +459,7 @@ describe('エラーハンドリングとエッジケース', () => {
       const storageService = new StorageService();
       const treeStateManager = new TreeStateManager(storageService);
 
-      const tree = treeStateManager.getTree('nonexistent-view');
+      const tree = treeStateManager.getTree(99999);
       expect(tree).toEqual([]);
     });
 
@@ -482,7 +470,7 @@ describe('エラーハンドリングとエッジケース', () => {
       const invalidTab = { id: undefined, frozen: false } as chrome.tabs.Tab;
 
       await expect(
-        treeStateManager.addTab(invalidTab, null, 'view-1')
+        treeStateManager.addTab(invalidTab, null, 1, 0)
       ).rejects.toThrow('Tab ID is required');
     });
   });

@@ -2,23 +2,30 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { TreeStateProvider, useTreeState } from './TreeStateProvider';
-import type { TreeState, StorageChanges, SiblingDropInfo } from '@/types';
+import type { TreeState, StorageChanges, SiblingDropInfo, TabNode } from '@/types';
 import type { MockChrome, MessageListener } from '@/test/test-types';
 
 function TestComponent() {
-  const { treeState, isLoading, error } = useTreeState();
+  const { treeState, isLoading, error, currentViewIndex, currentWindowState } = useTreeState();
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
   if (!treeState) return <div>No state</div>;
 
-  // Get nodes from the current view
-  const currentViewState = treeState.views[treeState.currentViewId];
-  const nodeCount = currentViewState ? Object.keys(currentViewState.nodes).length : 0;
+  const currentViewState = currentWindowState?.views[currentViewIndex];
+  const countNodes = (nodes: { tabId: number; children: unknown[] }[]): number => {
+    let count = 0;
+    for (const node of nodes) {
+      count += 1;
+      count += countNodes(node.children as { tabId: number; children: unknown[] }[]);
+    }
+    return count;
+  };
+  const nodeCount = currentViewState ? countNodes(currentViewState.rootNodes) : 0;
 
   return (
     <div>
-      <div data-testid="current-view">{treeState.currentViewId}</div>
+      <div data-testid="current-view">{currentViewIndex}</div>
       <div data-testid="node-count">{nodeCount}</div>
     </div>
   );
@@ -38,17 +45,16 @@ describe('TreeStateProvider リアルタイム更新', () => {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
             tree_state: {
-              views: {
-                'default': {
-                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                  rootNodeIds: [],
-                  nodes: {},
-                },
-              },
-              viewOrder: ['default'],
-              currentViewId: 'default',
-              tabToNode: {},
-              treeStructure: [],
+              windows: [{
+                windowId: 1,
+                views: [{
+                  name: 'Default',
+                  color: '#3b82f6',
+                  rootNodes: [],
+                  pinnedTabIds: [],
+                }],
+                activeViewIndex: 0,
+              }],
             },
           }),
           set: vi.fn<(items: Record<string, unknown>) => Promise<void>>().mockResolvedValue(undefined),
@@ -77,7 +83,26 @@ describe('TreeStateProvider リアルタイム更新', () => {
             );
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: {
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
+              },
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -119,7 +144,7 @@ describe('TreeStateProvider リアルタイム更新', () => {
     vi.clearAllMocks();
   });
 
-  it('初期ロード時にストレージからツリー状態を読み込む', async () => {
+  it('初期ロード時にService Workerからツリー状態を読み込む', async () => {
     await act(async () => {
       render(
         <TreeStateProvider>
@@ -128,56 +153,30 @@ describe('TreeStateProvider リアルタイム更新', () => {
       );
     });
 
-    // ストレージから読み込まれた状態が表示されるのを待つ
     await waitFor(() => {
-      expect(screen.getByTestId('current-view')).toHaveTextContent('default');
+      expect(screen.getByTestId('current-view')).toHaveTextContent('0');
     });
 
-    expect(chrome.storage.local.get).toHaveBeenCalledWith('tree_state');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'GET_STATE' });
   });
 
   it('STATE_UPDATED メッセージのペイロードから状態を取得する', async () => {
-    const initialState: TreeState = {
-      views: {
-        'default': {
-          info: { id: 'default', name: 'Default', color: '#3b82f6' },
-          rootNodeIds: [],
-          nodes: {},
-        },
-      },
-      viewOrder: ['default'],
-      currentViewId: 'default',
-      tabToNode: {},
-      treeStructure: [],
-    };
-
     const updatedState: TreeState = {
-      views: {
-        'default': {
-          info: { id: 'default', name: 'Default', color: '#3b82f6' },
-          rootNodeIds: ['node-1'],
-          nodes: {
-            'node-1': {
-              id: 'node-1',
-              tabId: 1,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-          },
-        },
-      },
-      viewOrder: ['default'],
-      currentViewId: 'default',
-      tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
-      treeStructure: [],
+      windows: [{
+        windowId: 1,
+        views: [{
+          name: 'Default',
+          color: '#3b82f6',
+          rootNodes: [{
+            tabId: 1,
+            isExpanded: true,
+            children: [],
+          }],
+          pinnedTabIds: [],
+        }],
+        activeViewIndex: 0,
+      }],
     };
-
-    // 最初の読み込みは初期状態
-    mockChrome.storage.local.get.mockResolvedValueOnce({
-      tree_state: initialState,
-    });
 
     await act(async () => {
       render(
@@ -187,19 +186,16 @@ describe('TreeStateProvider リアルタイム更新', () => {
       );
     });
 
-    // 初期状態が表示されるのを待つ
     await waitFor(() => {
       expect(screen.getByTestId('node-count')).toHaveTextContent('0');
     });
 
-    // STATE_UPDATED メッセージをペイロード付きで送信
     await act(async () => {
       mockMessageListeners.forEach((listener) => {
         listener({ type: 'STATE_UPDATED', payload: updatedState }, {} as chrome.runtime.MessageSender, () => {});
       });
     });
 
-    // ペイロードから取得した状態が表示されるのを待つ
     await waitFor(() => {
       expect(screen.getByTestId('node-count')).toHaveTextContent('1');
     });
@@ -242,17 +238,16 @@ describe('TreeStateProvider TabInfoMap管理', () => {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
             tree_state: {
-              views: {
-                'default': {
-                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                  rootNodeIds: [],
-                  nodes: {},
-                },
-              },
-              viewOrder: ['default'],
-              currentViewId: 'default',
-              tabToNode: {},
-              treeStructure: [],
+              windows: [{
+                windowId: 1,
+                views: [{
+                  name: 'Default',
+                  color: '#3b82f6',
+                  rootNodes: [],
+                  pinnedTabIds: [],
+                }],
+                activeViewIndex: 0,
+              }],
             },
           }),
           set: vi.fn<(items: Record<string, unknown>) => Promise<void>>().mockResolvedValue(undefined),
@@ -277,7 +272,26 @@ describe('TreeStateProvider TabInfoMap管理', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: {
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
+              },
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -443,17 +457,16 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
             tree_state: {
-              views: {
-                'default': {
-                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                  rootNodeIds: [],
-                  nodes: {},
-                },
-              },
-              viewOrder: ['default'],
-              currentViewId: 'default',
-              tabToNode: {},
-              treeStructure: [],
+              windows: [{
+                windowId: 1,
+                views: [{
+                  name: 'Default',
+                  color: '#3b82f6',
+                  rootNodes: [],
+                  pinnedTabIds: [],
+                }],
+                activeViewIndex: 0,
+              }],
             },
           }),
           set: vi.fn<(items: Record<string, unknown>) => Promise<void>>().mockResolvedValue(undefined),
@@ -478,7 +491,26 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: {
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
+              },
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -561,7 +593,23 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
     vi.clearAllMocks();
   });
 
-  it('tabInfoMapからピン留め状態のタブIDをフィルタリングしてpinnedTabIds配列を算出する', async () => {
+  it('WindowStateからpinnedTabIds配列を取得する', async () => {
+    mockChrome.runtime.sendMessage.mockImplementation((message: unknown) => {
+      if ((message as { type: string }).type === 'GET_STATE') {
+        return Promise.resolve({
+          success: true,
+          data: {
+            windows: [{
+              windowId: 1,
+              views: [{ name: 'Default', color: '#3b82f6', rootNodes: [], pinnedTabIds: [2, 3] }],
+              activeViewIndex: 0,
+            }],
+          },
+        });
+      }
+      return Promise.resolve({ success: true, data: null });
+    });
+
     await act(async () => {
       render(
         <TreeStateProvider>
@@ -570,7 +618,6 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
       );
     });
 
-    // ピン留めタブ（id: 2, 3）がpinnedTabIdsに含まれることを確認
     await waitFor(() => {
       expect(screen.getByTestId('pinned-count')).toHaveTextContent('2');
     });
@@ -582,20 +629,6 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
   });
 
   it('ピン留めタブが0件の場合は空配列を返す', async () => {
-    // ピン留めタブなしの状態をモック
-    mockChrome.tabs.query = vi.fn().mockResolvedValue([
-      {
-        id: 1,
-        title: 'Normal Page',
-        url: 'https://example.com',
-        favIconUrl: 'https://example.com/favicon.ico',
-        status: 'complete',
-        pinned: false,
-        active: true,
-        windowId: 1,
-      },
-    ]);
-
     await act(async () => {
       render(
         <TreeStateProvider>
@@ -621,13 +654,12 @@ describe('TreeStateProvider 複数選択状態管理', () => {
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
   let mockChrome: MockChrome;
 
-  // 選択状態を表示・操作するテストコンポーネント
   function SelectionTestComponent() {
     const {
       treeState,
       isLoading,
-      selectedNodeIds,
-      lastSelectedNodeId,
+      selectedTabIds,
+      lastSelectedTabId,
       selectNode,
       clearSelection,
       isNodeSelected,
@@ -638,33 +670,33 @@ describe('TreeStateProvider 複数選択状態管理', () => {
 
     return (
       <div>
-        <div data-testid="selected-count">{selectedNodeIds.size}</div>
-        <div data-testid="selected-ids">{JSON.stringify(Array.from(selectedNodeIds).sort())}</div>
-        <div data-testid="last-selected">{lastSelectedNodeId || 'null'}</div>
-        <div data-testid="node-1-selected">{isNodeSelected('node-1') ? 'true' : 'false'}</div>
-        <div data-testid="node-2-selected">{isNodeSelected('node-2') ? 'true' : 'false'}</div>
-        <div data-testid="node-3-selected">{isNodeSelected('node-3') ? 'true' : 'false'}</div>
+        <div data-testid="selected-count">{selectedTabIds.size}</div>
+        <div data-testid="selected-ids">{JSON.stringify(Array.from(selectedTabIds).sort())}</div>
+        <div data-testid="last-selected">{lastSelectedTabId || 'null'}</div>
+        <div data-testid="node-1-selected">{isNodeSelected(1) ? 'true' : 'false'}</div>
+        <div data-testid="node-2-selected">{isNodeSelected(2) ? 'true' : 'false'}</div>
+        <div data-testid="node-3-selected">{isNodeSelected(3) ? 'true' : 'false'}</div>
         <button
           data-testid="select-node-1"
-          onClick={() => selectNode('node-1', { shift: false, ctrl: false })}
+          onClick={() => selectNode(1, { shift: false, ctrl: false })}
         >
           Select Node 1
         </button>
         <button
           data-testid="select-node-2"
-          onClick={() => selectNode('node-2', { shift: false, ctrl: false })}
+          onClick={() => selectNode(2, { shift: false, ctrl: false })}
         >
           Select Node 2
         </button>
         <button
           data-testid="select-node-2-ctrl"
-          onClick={() => selectNode('node-2', { shift: false, ctrl: true })}
+          onClick={() => selectNode(2, { shift: false, ctrl: true })}
         >
           Ctrl+Select Node 2
         </button>
         <button
           data-testid="select-node-3-shift"
-          onClick={() => selectNode('node-3', { shift: true, ctrl: false })}
+          onClick={() => selectNode(3, { shift: true, ctrl: false })}
         >
           Shift+Select Node 3
         </button>
@@ -683,46 +715,20 @@ describe('TreeStateProvider 複数選択状態管理', () => {
     mockStorageListeners = [];
 
     const treeStateWithNodes: TreeState = {
-      views: {
-        'default': {
-          info: { id: 'default', name: 'Default', color: '#3b82f6' },
-          rootNodeIds: ['node-1', 'node-2', 'node-3'],
-          nodes: {
-            'node-1': {
-              id: 'node-1',
-              tabId: 1,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            'node-2': {
-              id: 'node-2',
-              tabId: 2,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            'node-3': {
-              id: 'node-3',
-              tabId: 3,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-          },
-        },
-      },
-      viewOrder: ['default'],
-      currentViewId: 'default',
-      tabToNode: {
-        1: { viewId: 'default', nodeId: 'node-1' },
-        2: { viewId: 'default', nodeId: 'node-2' },
-        3: { viewId: 'default', nodeId: 'node-3' },
-      },
-      treeStructure: [],
+      windows: [{
+        windowId: 1,
+        views: [{
+          name: 'Default',
+          color: '#3b82f6',
+          rootNodes: [
+            { tabId: 1, isExpanded: true, children: [] },
+            { tabId: 2, isExpanded: true, children: [] },
+            { tabId: 3, isExpanded: true, children: [] },
+          ],
+          pinnedTabIds: [],
+        }],
+        activeViewIndex: 0,
+      }],
     };
 
     mockChrome = {
@@ -753,7 +759,15 @@ describe('TreeStateProvider 複数選択状態管理', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: treeStateWithNodes,
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -799,7 +813,7 @@ describe('TreeStateProvider 複数選択状態管理', () => {
     vi.clearAllMocks();
   });
 
-  it('selectedNodeIds、lastSelectedNodeIdステートを提供する', async () => {
+  it('selectedTabIds、lastSelectedTabIdステートを提供する', async () => {
     await act(async () => {
       render(
         <TreeStateProvider>
@@ -835,7 +849,7 @@ describe('TreeStateProvider 複数選択状態管理', () => {
     await waitFor(() => {
       expect(screen.getByTestId('selected-count')).toHaveTextContent('1');
       expect(screen.getByTestId('node-1-selected')).toHaveTextContent('true');
-      expect(screen.getByTestId('last-selected')).toHaveTextContent('node-1');
+      expect(screen.getByTestId('last-selected')).toHaveTextContent('1');
     });
   });
 
@@ -866,7 +880,7 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('selected-count')).toHaveTextContent('1');
       expect(screen.getByTestId('node-1-selected')).toHaveTextContent('false');
       expect(screen.getByTestId('node-2-selected')).toHaveTextContent('true');
-      expect(screen.getByTestId('last-selected')).toHaveTextContent('node-2');
+      expect(screen.getByTestId('last-selected')).toHaveTextContent('2');
     });
   });
 
@@ -1033,7 +1047,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
   // handleSiblingDropを呼び出すテストコンポーネント
   function SiblingDropTestComponent({ onReady }: { onReady?: (handleSiblingDrop: (info: SiblingDropInfo) => Promise<void>) => void }) {
-    const { treeState, isLoading, handleSiblingDrop } = useTreeState();
+    const { treeState, isLoading, handleSiblingDrop, currentWindowId } = useTreeState();
 
     React.useEffect(() => {
       if (!isLoading && treeState && onReady) {
@@ -1044,36 +1058,32 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     if (isLoading) return <div>Loading...</div>;
     if (!treeState) return <div>No state</div>;
 
-    // Get nodes from the current view
-    const currentViewState = treeState.views[treeState.currentViewId];
-    const nodes = currentViewState ? currentViewState.nodes : {};
+    // Get nodes from the current window's current view
+    const currentWindowState = treeState.windows.find(w => w.windowId === currentWindowId);
+    const currentViewState = currentWindowState?.views[currentWindowState.activeViewIndex];
+    const rootNodes = currentViewState?.rootNodes ?? [];
 
-    // ノードの親子関係を表示
-    const nodeInfos = Object.values(nodes).map((node) => ({
-      id: node.id,
-      parentId: node.parentId,
-      depth: node.depth,
-    }));
-
-    // parentId -> [childNodeId1, childNodeId2, ...] の形式でグループ化
-    const siblingGroups: Record<string, string[]> = {};
-    Object.values(nodes).forEach((node) => {
-      const parentKey = node.parentId || 'root';
-      if (!siblingGroups[parentKey]) {
-        siblingGroups[parentKey] = [];
+    // Flatten tree to get all nodes with their info
+    const flattenNodes = (nodes: TabNode[], depth = 0): Array<{ tabId: number; depth: number; children: TabNode[] }> => {
+      const result: Array<{ tabId: number; depth: number; children: TabNode[] }> = [];
+      for (const node of nodes) {
+        result.push({ tabId: node.tabId, depth, children: node.children });
+        if (node.children.length > 0) {
+          result.push(...flattenNodes(node.children, depth + 1));
+        }
       }
-      siblingGroups[parentKey].push(node.id);
-    });
+      return result;
+    };
+
+    const allNodes = flattenNodes(rootNodes);
 
     return (
       <div>
-        <div data-testid="node-count">{Object.keys(nodes).length}</div>
-        <div data-testid="node-infos">{JSON.stringify(nodeInfos)}</div>
-        {Object.values(nodes).map((node) => (
-          <div key={node.id} data-testid={`node-${node.id}-parent`}>{node.parentId || 'null'}</div>
+        <div data-testid="node-count">{allNodes.length}</div>
+        <div data-testid="node-infos">{JSON.stringify(allNodes.map(n => ({ tabId: n.tabId, depth: n.depth })))}</div>
+        {allNodes.map((node) => (
+          <div key={node.tabId} data-testid={`node-${node.tabId}`}>{node.tabId}</div>
         ))}
-        <div data-testid="sibling-groups">{JSON.stringify(siblingGroups)}</div>
-        <div data-testid="root-siblings">{JSON.stringify(siblingGroups['root'] || [])}</div>
       </div>
     );
   }
@@ -1084,47 +1094,27 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     mockStorageListeners = [];
 
     // 3つのノードを持つツリー状態
+    // Structure: tab1 (with child tab2), tab3
     const treeStateWithNodes: TreeState = {
-      views: {
-        'default': {
-          info: { id: 'default', name: 'Default', color: '#3b82f6' },
-          rootNodeIds: ['node-1', 'node-3'],
-          nodes: {
-            'node-1': {
-              id: 'node-1',
+      windows: [{
+        windowId: 1,
+        views: [{
+          name: 'Default',
+          color: '#3b82f6',
+          rootNodes: [
+            {
               tabId: 1,
-              parentId: null,
-              children: [],
               isExpanded: true,
-              depth: 0,
+              children: [
+                { tabId: 2, isExpanded: true, children: [] },
+              ],
             },
-            'node-2': {
-              id: 'node-2',
-              tabId: 2,
-              parentId: 'node-1', // node-1の子
-              children: [],
-              isExpanded: true,
-              depth: 1,
-            },
-            'node-3': {
-              id: 'node-3',
-              tabId: 3,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-          },
-        },
-      },
-      viewOrder: ['default'],
-      currentViewId: 'default',
-      tabToNode: {
-        1: { viewId: 'default', nodeId: 'node-1' },
-        2: { viewId: 'default', nodeId: 'node-2' },
-        3: { viewId: 'default', nodeId: 'node-3' },
-      },
-      treeStructure: [],
+            { tabId: 3, isExpanded: true, children: [] },
+          ],
+          pinnedTabIds: [],
+        }],
+        activeViewIndex: 0,
+      }],
     };
 
     mockChrome = {
@@ -1155,7 +1145,15 @@ describe('TreeStateProvider handleSiblingDrop', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: treeStateWithNodes,
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -1240,14 +1238,14 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-2をnode-3の上（兄弟として）にドロップ
+    // tab2をtab3の上（兄弟として）にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-2',
+          activeTabId: 2,
           insertIndex: 1,
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
+          aboveTabId: 1,
+          belowTabId: 3,
         });
       }
     });
@@ -1257,11 +1255,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-2',
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          aboveTabId: 1,
+          belowTabId: 3,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1286,14 +1285,14 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-2をリストの最初にドロップ（node-1の上）
+    // tab2をリストの最初にドロップ（tab1の上）
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-2',
+          activeTabId: 2,
           insertIndex: 0,
-          aboveNodeId: undefined,
-          belowNodeId: 'node-1',
+          aboveTabId: undefined,
+          belowTabId: 1,
         });
       }
     });
@@ -1303,11 +1302,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-2',
-          aboveNodeId: undefined,
-          belowNodeId: 'node-1',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          aboveTabId: undefined,
+          belowTabId: 1,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1316,57 +1316,39 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   it('自分自身の子孫への移動でもMOVE_NODE_AS_SIBLINGメッセージが送信される（検証はServiceWorker側で行う）', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
-    // node-1 → node-2 (子) → node-4 (孫) の構造を持つツリー状態
+    // tab1 → tab2 (子) → tab4 (孫) の構造を持つツリー状態
     const treeStateWithGrandchild: TreeState = {
-      views: {
-        'default': {
-          info: { id: 'default', name: 'Default', color: '#3b82f6' },
-          rootNodeIds: ['node-1'],
-          nodes: {
-            'node-1': {
-              id: 'node-1',
-              tabId: 1,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            'node-2': {
-              id: 'node-2',
+      windows: [{
+        windowId: 1,
+        views: [{
+          name: 'Default',
+          color: '#3b82f6',
+          rootNodes: [{
+            tabId: 1,
+            isExpanded: true,
+            children: [{
               tabId: 2,
-              parentId: 'node-1',
-              children: [],
               isExpanded: true,
-              depth: 1,
-            },
-            'node-4': {
-              id: 'node-4',
-              tabId: 4,
-              parentId: 'node-2',
-              children: [],
-              isExpanded: true,
-              depth: 2,
-            },
-          },
-        },
-      },
-      viewOrder: ['default'],
-      currentViewId: 'default',
-      tabToNode: {
-        1: { viewId: 'default', nodeId: 'node-1' },
-        2: { viewId: 'default', nodeId: 'node-2' },
-        4: { viewId: 'default', nodeId: 'node-4' },
-      },
-      treeStructure: [],
+              children: [{
+                tabId: 4,
+                isExpanded: true,
+                children: [],
+              }],
+            }],
+          }],
+          pinnedTabIds: [],
+        }],
+        activeViewIndex: 0,
+      }],
     };
 
     mockChrome.storage.local.get = vi.fn().mockResolvedValue({
       tree_state: treeStateWithGrandchild,
     });
     mockChrome.tabs.query = vi.fn().mockResolvedValue([
-      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, frozen: false, active: true },
-      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, frozen: false, active: false },
-      { id: 4, title: 'Tab 4', url: 'https://tab4.com', pinned: false, frozen: false, active: false },
+      { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, frozen: false, active: true, windowId: 1, index: 0 },
+      { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: false, frozen: false, active: false, windowId: 1, index: 1 },
+      { id: 4, title: 'Tab 4', url: 'https://tab4.com', pinned: false, frozen: false, active: false, windowId: 1, index: 2 },
     ]);
 
     await act(async () => {
@@ -1385,14 +1367,14 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-1をnode-4の隣に移動しようとする（自分の孫の隣 = 無効な操作だが、メッセージは送信される）
+    // tab1をtab4の隣に移動しようとする（自分の孫の隣 = 無効な操作だが、メッセージは送信される）
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-1',
+          activeTabId: 1,
           insertIndex: 2,
-          aboveNodeId: 'node-4',
-          belowNodeId: undefined,
+          aboveTabId: 4,
+          belowTabId: undefined,
         });
       }
     });
@@ -1402,11 +1384,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-1',
-          aboveNodeId: 'node-4',
-          belowNodeId: undefined,
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 1,
+          aboveTabId: 4,
+          belowTabId: undefined,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1435,14 +1418,14 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-2をnode-1とnode-3の間にドロップ
+    // tab2をtab1とtab3の間にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-2',
+          activeTabId: 2,
           insertIndex: 1,
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
+          aboveTabId: 1,
+          belowTabId: 3,
         });
       }
     });
@@ -1452,11 +1435,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-2',
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          aboveTabId: 1,
+          belowTabId: 3,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1485,14 +1469,14 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-2をnode-1とnode-3の間にドロップ
+    // tab2をtab1とtab3の間にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-2',
+          activeTabId: 2,
           insertIndex: 2,
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
+          aboveTabId: 1,
+          belowTabId: 3,
         });
       }
     });
@@ -1502,11 +1486,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-2',
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          aboveTabId: 1,
+          belowTabId: 3,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1535,14 +1520,13 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-2をnode-1の下、node-3の上にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-2',
+          activeTabId: 2,
           insertIndex: 2,
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
+          aboveTabId: 1,
+          belowTabId: 3,
         });
       }
     });
@@ -1552,11 +1536,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-2',
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          aboveTabId: 1,
+          belowTabId: 3,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1564,7 +1549,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
 
   /**
    * リスト先頭へのドロップテスト
-   * belowNodeIdのみ指定された場合（aboveNodeIdがundefined）のメッセージを検証
+   * belowTabIdのみ指定された場合（aboveTabIdがundefined）のメッセージを検証
    */
   it('リスト先頭にドロップした場合、MOVE_NODE_AS_SIBLINGメッセージが送信される', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
@@ -1585,14 +1570,13 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-2をリスト先頭にドロップ（node-1の上）
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-2',
+          activeTabId: 2,
           insertIndex: 0,
-          aboveNodeId: undefined,
-          belowNodeId: 'node-1',
+          aboveTabId: undefined,
+          belowTabId: 1,
         });
       }
     });
@@ -1602,11 +1586,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-2',
-          aboveNodeId: undefined,
-          belowNodeId: 'node-1',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          aboveTabId: undefined,
+          belowTabId: 1,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1639,10 +1624,10 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-2',
+          activeTabId: 2,
           insertIndex: 1,
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
+          aboveTabId: 1,
+          belowTabId: 3,
         });
       }
     });
@@ -1652,11 +1637,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-2',
-          aboveNodeId: 'node-1',
-          belowNodeId: 'node-3',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          aboveTabId: 1,
+          belowTabId: 3,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1685,14 +1671,13 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-1をリスト末尾にドロップ（node-3の下）
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
-          activeNodeId: 'node-1',
+          activeTabId: 1,
           insertIndex: 2,
-          aboveNodeId: 'node-3',
-          belowNodeId: undefined,
+          aboveTabId: 3,
+          belowTabId: undefined,
         });
       }
     });
@@ -1702,11 +1687,12 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: 'node-1',
-          aboveNodeId: 'node-3',
-          belowNodeId: undefined,
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 1,
+          aboveTabId: 3,
+          belowTabId: undefined,
+          windowId: 1,
+          viewIndex: 0,
+          selectedTabIds: [],
         },
       });
     });
@@ -1740,23 +1726,36 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
     mockMessageListeners = [];
     mockStorageListeners = [];
 
+    const multiWindowTreeState = {
+      windows: [
+        {
+          windowId: 1,
+          views: [{
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: [],
+            pinnedTabIds: [2],
+          }],
+          activeViewIndex: 0,
+        },
+        {
+          windowId: 2,
+          views: [{
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: [],
+            pinnedTabIds: [4],
+          }],
+          activeViewIndex: 0,
+        },
+      ],
+    };
+
     mockChrome = {
       storage: {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockResolvedValue({
-            tree_state: {
-              views: {
-                'default': {
-                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                  rootNodeIds: [],
-                  nodes: {},
-                },
-              },
-              viewOrder: ['default'],
-              currentViewId: 'default',
-              tabToNode: {},
-              treeStructure: [],
-            },
+            tree_state: multiWindowTreeState,
           }),
           set: vi.fn<(items: Record<string, unknown>) => Promise<void>>().mockResolvedValue(undefined),
           remove: vi.fn<(keys: string | string[]) => Promise<void>>(),
@@ -1780,7 +1779,15 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: multiWindowTreeState,
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -1953,27 +1960,24 @@ describe('TreeStateProvider ファビコン永続化', () => {
       storage: {
         local: {
           get: vi.fn<(keys?: string | string[] | null) => Promise<Record<string, unknown>>>().mockImplementation((keys) => {
-            // tab_faviconsキーのリクエストには空のオブジェクトを返す
             if (keys === 'tab_favicons') {
               return Promise.resolve({ tab_favicons: {} });
             }
-            // tab_titlesキーのリクエストには空のオブジェクトを返す
             if (keys === 'tab_titles') {
               return Promise.resolve({ tab_titles: {} });
             }
-            // tree_stateキーのリクエスト
             return Promise.resolve({
               tree_state: {
-                views: {
-                  'default': {
-                    info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                    rootNodeIds: [],
-                    nodes: {},
-                  },
-                },
-                viewOrder: ['default'],
-                currentViewId: 'default',
-                tabToNode: {},
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
               },
             });
           }),
@@ -1999,7 +2003,26 @@ describe('TreeStateProvider ファビコン永続化', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: {
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
+              },
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -2140,14 +2163,22 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
   let mockTabsUpdatedListeners: Array<(tabId: number, changeInfo: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => void> = [];
   let mockChrome: MockChrome;
 
-  // タブ数を表示するテストコンポーネント
   function TabCountTestComponent() {
-    const { isLoading, tabInfoMap, treeState } = useTreeState();
+    const { isLoading, tabInfoMap, currentWindowState, currentViewIndex } = useTreeState();
 
     if (isLoading) return <div>Loading...</div>;
 
-    const currentViewState = treeState?.views[treeState.currentViewId];
-    const nodeCount = currentViewState ? Object.keys(currentViewState.nodes).length : 0;
+    const countNodes = (nodes: { tabId: number; children: unknown[] }[]): number => {
+      let count = 0;
+      for (const node of nodes) {
+        count += 1;
+        count += countNodes(node.children as { tabId: number; children: unknown[] }[]);
+      }
+      return count;
+    };
+
+    const currentViewState = currentWindowState?.views[currentViewIndex];
+    const nodeCount = currentViewState ? countNodes(currentViewState.rootNodes) : 0;
 
     return (
       <div>
@@ -2175,16 +2206,16 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
             }
             return Promise.resolve({
               tree_state: {
-                views: {
-                  'default': {
-                    info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                    rootNodeIds: [],
-                    nodes: {},
-                  },
-                },
-                viewOrder: ['default'],
-                currentViewId: 'default',
-                tabToNode: {},
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
               },
             });
           }),
@@ -2210,7 +2241,26 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: {
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
+              },
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -2433,16 +2483,16 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
             }
             return Promise.resolve({
               tree_state: {
-                views: {
-                  'default': {
-                    info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                    rootNodeIds: [],
-                    nodes: {},
-                  },
-                },
-                viewOrder: ['default'],
-                currentViewId: 'default',
-                tabToNode: {},
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
               },
             });
           }),
@@ -2468,7 +2518,26 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
             mockMessageListeners = mockMessageListeners.filter((l) => l !== listener);
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: {
+                windows: [{
+                  windowId: 1,
+                  views: [{
+                    name: 'Default',
+                    color: '#3b82f6',
+                    rootNodes: [],
+                    pinnedTabIds: [],
+                  }],
+                  activeViewIndex: 0,
+                }],
+              },
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -2660,18 +2729,25 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
   let mockChrome: MockChrome;
 
-  // viewTabCountsを表示するテストコンポーネント
   function ViewTabCountsTestComponent() {
-    const { treeState, isLoading, viewTabCounts, tabInfoMap } = useTreeState();
+    const { treeState, isLoading, viewTabCounts, tabInfoMap, currentWindowState } = useTreeState();
 
     if (isLoading) return <div>Loading...</div>;
     if (!treeState) return <div>No state</div>;
 
-    // Count nodes across all views
-    const totalNodes = Object.values(treeState.views).reduce(
-      (sum, view) => sum + Object.keys(view.nodes).length,
+    const countNodes = (nodes: { tabId: number; children: unknown[] }[]): number => {
+      let count = 0;
+      for (const node of nodes) {
+        count += 1;
+        count += countNodes(node.children as { tabId: number; children: unknown[] }[]);
+      }
+      return count;
+    };
+
+    const totalNodes = currentWindowState?.views.reduce(
+      (sum, view) => sum + countNodes(view.rootNodes),
       0
-    );
+    ) ?? 0;
 
     return (
       <div>
@@ -2686,63 +2762,29 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
     mockMessageListeners = [];
     mockStorageListeners = [];
 
-    // ツリー状態: タブ1, 2, 3がnodes内にあるが、タブ3は実際には存在しない（不整合タブ）
     const treeStateWithInconsistentTabs: TreeState = {
-      views: {
-        'default': {
-          info: { id: 'default', name: 'Default', color: '#3b82f6' },
-          rootNodeIds: ['node-1', 'node-2', 'node-3'],
-          nodes: {
-            'node-1': {
-              id: 'node-1',
-              tabId: 1,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            'node-2': {
-              id: 'node-2',
-              tabId: 2,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            'node-3': {
-              id: 'node-3',
-              tabId: 3, // このタブは実際には存在しない（不整合）
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
+      windows: [{
+        windowId: 1,
+        views: [
+          {
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: [
+              { tabId: 1, isExpanded: true, children: [] },
+              { tabId: 2, isExpanded: true, children: [] },
+              { tabId: 3, isExpanded: true, children: [] },
+            ],
+            pinnedTabIds: [],
           },
-        },
-        'view-2': {
-          info: { id: 'view-2', name: 'View 2', color: '#10b981' },
-          rootNodeIds: ['node-4'],
-          nodes: {
-            'node-4': {
-              id: 'node-4',
-              tabId: 4,
-              parentId: null,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
+          {
+            name: 'View 2',
+            color: '#10b981',
+            rootNodes: [{ tabId: 4, isExpanded: true, children: [] }],
+            pinnedTabIds: [],
           },
-        },
-      },
-      viewOrder: ['default', 'view-2'],
-      currentViewId: 'default',
-      tabToNode: {
-        1: { viewId: 'default', nodeId: 'node-1' },
-        2: { viewId: 'default', nodeId: 'node-2' },
-        3: { viewId: 'default', nodeId: 'node-3' },
-        4: { viewId: 'view-2', nodeId: 'node-4' },
-      },
-      treeStructure: [],
+        ],
+        activeViewIndex: 0,
+      }],
     };
 
     mockChrome = {
@@ -2792,7 +2834,15 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
             );
           }),
         },
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn().mockImplementation((message) => {
+          if (message.type === 'GET_STATE') {
+            return Promise.resolve({
+              success: true,
+              data: treeStateWithInconsistentTabs,
+            });
+          }
+          return Promise.resolve({ success: true, data: null });
+        }),
         getURL: vi.fn(),
       },
       tabs: {
@@ -2860,20 +2910,13 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
       expect(tabInfoMapKeys).toEqual([1, 2, 4]);
     });
 
-    // viewTabCountsは実際に存在するタブのみをカウント
-    // default: node-1(tab 1), node-2(tab 2) -> 2 (node-3のtab 3は存在しないので除外)
-    // view-2: node-4(tab 4) -> 1
     await waitFor(() => {
-      const viewTabCounts = JSON.parse(screen.getByTestId('view-tab-counts').textContent || '{}');
-      expect(viewTabCounts).toEqual({
-        'default': 2,  // タブ3は実際に存在しないのでカウントしない
-        'view-2': 1,
-      });
+      const viewTabCounts = JSON.parse(screen.getByTestId('view-tab-counts').textContent || '[]');
+      expect(viewTabCounts).toEqual([2, 1]);
     });
   });
 
   it('すべてのタブが存在する場合は全ノードをカウントする', async () => {
-    // タブ3も存在するようにモックを更新
     mockChrome.tabs.query.mockResolvedValue([
       { id: 1, title: 'Tab 1', url: 'https://example.com/1', pinned: false, windowId: 1, status: 'complete', index: 0, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
       { id: 2, title: 'Tab 2', url: 'https://example.com/2', pinned: false, windowId: 1, status: 'complete', index: 1, highlighted: false, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
@@ -2893,20 +2936,14 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
       expect(screen.getByTestId('node-count')).toHaveTextContent('4');
     });
 
-    // tabInfoMapには全タブが含まれる
     await waitFor(() => {
       const tabInfoMapKeys = JSON.parse(screen.getByTestId('tab-info-map-keys').textContent || '[]');
       expect(tabInfoMapKeys.sort()).toEqual([1, 2, 3, 4]);
     });
 
-    // すべてのタブが存在するので、全ノードがカウントされる
-    // default: 3, view-2: 1
     await waitFor(() => {
-      const viewTabCounts = JSON.parse(screen.getByTestId('view-tab-counts').textContent || '{}');
-      expect(viewTabCounts).toEqual({
-        'default': 3,
-        'view-2': 1,
-      });
+      const viewTabCounts = JSON.parse(screen.getByTestId('view-tab-counts').textContent || '[]');
+      expect(viewTabCounts).toEqual([3, 1]);
     });
   });
 });

@@ -1,6 +1,3 @@
-/**
- * ドラッグ&ドロップによるツリー再構成のテスト
- */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
@@ -16,44 +13,24 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
         local: {
           get: vi.fn().mockResolvedValue({
             tree_state: {
-              views: {
-                default: {
-                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                  rootNodeIds: ['node-1', 'node-2', 'node-3'],
-                  nodes: {
-                    'node-1': {
-                      id: 'node-1',
-                      tabId: 1,
-                      parentId: null,
-                      children: [],
-                      isExpanded: true,
-                      depth: 0,
+              windows: [
+                {
+                  windowId: 1,
+                  views: [
+                    {
+                      name: 'Default',
+                      color: '#3b82f6',
+                      rootNodes: [
+                        { tabId: 1, isExpanded: true, children: [] },
+                        { tabId: 2, isExpanded: true, children: [] },
+                        { tabId: 3, isExpanded: true, children: [] },
+                      ],
                     },
-                    'node-2': {
-                      id: 'node-2',
-                      tabId: 2,
-                      parentId: null,
-                      children: [],
-                      isExpanded: true,
-                      depth: 0,
-                    },
-                    'node-3': {
-                      id: 'node-3',
-                      tabId: 3,
-                      parentId: null,
-                      children: [],
-                      isExpanded: true,
-                      depth: 0,
-                    },
-                  },
+                  ],
+                  activeViewIndex: 0,
+                  pinnedTabIds: [],
                 },
-              },
-              currentViewId: 'default',
-              tabToNode: {
-                '1': { viewId: 'default', nodeId: 'node-1' },
-                '2': { viewId: 'default', nodeId: 'node-2' },
-                '3': { viewId: 'default', nodeId: 'node-3' },
-              },
+              ],
             },
           }),
           set: vi.fn().mockResolvedValue(undefined),
@@ -136,12 +113,12 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
 
     const dragEndEvent = {
       active: {
-        id: 'node-2',
+        id: '2',
         data: { current: undefined },
         rect: { current: { initial: null, translated: null } },
       },
       over: {
-        id: 'node-1',
+        id: '1',
         data: { current: undefined },
         rect: null,
         disabled: false,
@@ -160,10 +137,11 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE',
         payload: {
-          nodeId: 'node-2',
-          targetParentId: 'node-1',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 2,
+          targetParentTabId: 1,
+          viewIndex: 0,
+          windowId: 1,
+          selectedTabIds: [],
         },
       });
     });
@@ -194,12 +172,12 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
 
     const dragEndEvent = {
       active: {
-        id: 'node-3',
+        id: '3',
         data: { current: undefined },
         rect: { current: { initial: null, translated: null } },
       },
       over: {
-        id: 'node-2',
+        id: '2',
         data: { current: undefined },
         rect: null,
         disabled: false,
@@ -218,10 +196,11 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE',
         payload: {
-          nodeId: 'node-3',
-          targetParentId: 'node-2',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 3,
+          targetParentTabId: 2,
+          viewIndex: 0,
+          windowId: 1,
+          selectedTabIds: [],
         },
       });
     });
@@ -231,44 +210,28 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
     const mockChrome = getMockChrome();
     mockChrome.storage.local.get.mockResolvedValue({
       tree_state: {
-        views: {
-          default: {
-            info: { id: 'default', name: 'Default', color: '#3b82f6' },
-            rootNodeIds: ['node-1'],
-            nodes: {
-              'node-1': {
-                id: 'node-1',
-                tabId: 1,
-                parentId: null,
-                children: [
+        windows: [
+          {
+            windowId: 1,
+            views: [
+              {
+                name: 'Default',
+                color: '#3b82f6',
+                rootNodes: [
                   {
-                    id: 'node-2',
-                    tabId: 2,
-                    parentId: 'node-1',
-                    children: [],
+                    tabId: 1,
                     isExpanded: true,
-                    depth: 1,
+                    children: [
+                      { tabId: 2, isExpanded: true, children: [] },
+                    ],
                   },
                 ],
-                isExpanded: true,
-                depth: 0,
               },
-              'node-2': {
-                id: 'node-2',
-                tabId: 2,
-                parentId: 'node-1',
-                children: [],
-                isExpanded: true,
-                depth: 1,
-              },
-            },
+            ],
+            activeViewIndex: 0,
+            pinnedTabIds: [],
           },
-        },
-        currentViewId: 'default',
-        tabToNode: {
-          '1': { viewId: 'default', nodeId: 'node-1' },
-          '2': { viewId: 'default', nodeId: 'node-2' },
-        },
+        ],
       },
     });
 
@@ -298,12 +261,12 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
 
     const dragEndEvent = {
       active: {
-        id: 'node-1',
+        id: '1',
         data: { current: undefined },
         rect: { current: { initial: null, translated: null } },
       },
       over: {
-        id: 'node-2',
+        id: '2',
         data: { current: undefined },
         rect: null,
         disabled: false,
@@ -317,15 +280,15 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
       await testHandleDragEnd!(dragEndEvent);
     });
 
-    // 循環参照チェックはServiceWorker側で行われるため、メッセージは送信される
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE',
         payload: {
-          nodeId: 'node-1',
-          targetParentId: 'node-2',
-          viewId: 'default',
-          selectedNodeIds: [],
+          tabId: 1,
+          targetParentTabId: 2,
+          viewIndex: 0,
+          windowId: 1,
+          selectedTabIds: [],
         },
       });
     });

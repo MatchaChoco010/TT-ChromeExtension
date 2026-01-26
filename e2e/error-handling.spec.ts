@@ -8,7 +8,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
     '長いタブタイトルがある場合、タブノードが正常に表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const longTitle = 'これは非常に長いタブタイトルです。'.repeat(10);
@@ -18,7 +18,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -26,7 +25,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -35,7 +33,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
     '無効なURLのタブがある場合、タブノードが正常に表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const dataUrl = 'data:text/html,<html><head><title>No Favicon</title></head><body>No favicon test</body></html>';
@@ -43,7 +41,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -51,7 +48,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -60,7 +56,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
     'data URLのタブでもツリーに正常に表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const dataUrl = 'data:text/html,<html><head><title>Test Page</title></head><body>Content</body></html>';
@@ -68,7 +64,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -76,7 +71,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -85,14 +79,13 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
     'タブがロード中の場合、ローディングインジケータが表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -100,7 +93,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -129,7 +121,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
     '特殊文字を含むタブタイトルが正しく表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const specialTitle = '<script>alert("XSS")</script>&amp;&lt;&gt;"\'';
@@ -139,7 +131,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -147,7 +138,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -156,7 +146,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
     '空のタイトルを持つタブでもツリーに表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const dataUrl = 'data:text/html,<html><head><title></title></head><body>Empty title</body></html>';
@@ -165,7 +155,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -173,7 +162,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -182,7 +170,7 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
     'Unicode文字を含むタブタイトルが正しく表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const unicodeTitle = '日本語 中文 한국어 🎉🚀💻';
@@ -192,7 +180,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -200,7 +187,6 @@ extensionTest.describe('エラーハンドリングとエッジケース', () =>
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );

@@ -6,6 +6,8 @@ import type {
   View,
   TabNode,
   TreeState,
+  ViewState,
+  WindowState,
 } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
@@ -44,7 +46,21 @@ export class SnapshotManager {
       throw new Error('Tree state not found');
     }
 
-    const views: View[] = Object.values(treeState.views).map(vs => vs.info);
+    // 新構造: treeState.windows[].views からビュー情報を収集
+    // ビューIDはviewIdとして保存（タブのviewIdと一致させるため）
+    const views: View[] = [];
+    for (let windowIndex = 0; windowIndex < treeState.windows.length; windowIndex++) {
+      const windowState = treeState.windows[windowIndex];
+      for (let viewIndex = 0; viewIndex < windowState.views.length; viewIndex++) {
+        const viewState = windowState.views[viewIndex];
+        views.push({
+          id: viewState.name,
+          name: viewState.name,
+          color: viewState.color,
+          icon: viewState.icon,
+        });
+      }
+    }
     const tabs: TabSnapshot[] = await this.createTabSnapshots(treeState);
 
     const snapshot: Snapshot = {
@@ -94,8 +110,8 @@ export class SnapshotManager {
   /**
    * タブノードからタブスナップショットを作成
    *
-   * 各タブにindexを割り当て、parentIdをparentIndexに変換する
-   * マルチウィンドウ対応のため、windowIdをwindowIndexに変換して保存
+   * 新構造: treeState.windows[] → views[] → rootNodes[] の階層を走査
+   * 各タブにindexを割り当て、親子関係はparentIndexで表現
    *
    * @param treeState - ツリー状態
    * @returns タブスナップショット配列
@@ -107,51 +123,94 @@ export class SnapshotManager {
     const tabs = await chrome.tabs.query({});
     const tabMap = new Map(tabs.map((tab) => [tab.id, tab]));
 
-    const nodeWithViewId: Array<{ node: TabNode; viewId: string }> = [];
-    for (const [viewId, viewState] of Object.entries(treeState.views)) {
-      for (const node of Object.values(viewState.nodes)) {
-        nodeWithViewId.push({ node, viewId });
+    // ノード情報を収集（親情報も含む）
+    interface NodeInfo {
+      node: TabNode;
+      viewName: string;
+      windowIndex: number;
+      parent: TabNode | null;
+    }
+
+    const nodeInfos: NodeInfo[] = [];
+    // ピン留めタブ情報を収集（tabId -> { viewName, windowIndex }）
+    const pinnedTabInfos: Array<{
+      tabId: number;
+      viewName: string;
+      windowIndex: number;
+    }> = [];
+
+    for (let windowIndex = 0; windowIndex < treeState.windows.length; windowIndex++) {
+      const windowState = treeState.windows[windowIndex];
+      for (const viewState of windowState.views) {
+        // ピン留めタブを収集
+        for (const tabId of viewState.pinnedTabIds) {
+          pinnedTabInfos.push({
+            tabId,
+            viewName: viewState.name,
+            windowIndex,
+          });
+        }
+
+        // 通常タブを収集
+        const collectNodes = (nodes: TabNode[], parent: TabNode | null) => {
+          for (const node of nodes) {
+            nodeInfos.push({
+              node,
+              viewName: viewState.name,
+              windowIndex,
+              parent,
+            });
+            collectNodes(node.children, node);
+          }
+        };
+        collectNodes(viewState.rootNodes, null);
       }
     }
 
-    const nodeIdToIndex = new Map<string, number>();
-    nodeWithViewId.forEach(({ node }, index) => {
-      nodeIdToIndex.set(node.id, index);
-    });
-
-    const windowIdSet = new Set<number>();
-    for (const { node } of nodeWithViewId) {
-      const tab = tabMap.get(node.tabId);
-      if (tab && tab.windowId !== undefined) {
-        windowIdSet.add(tab.windowId);
+    // ピン留めタブのスナップショットを先に作成（index 0から開始）
+    let currentIndex = 0;
+    for (const pinnedInfo of pinnedTabInfos) {
+      const tab = tabMap.get(pinnedInfo.tabId);
+      if (tab && tab.url) {
+        const snapshot: TabSnapshot = {
+          index: currentIndex,
+          url: tab.url,
+          title: tab.title || '',
+          parentIndex: null,
+          viewId: pinnedInfo.viewName,
+          isExpanded: true,
+          pinned: true,
+          windowIndex: pinnedInfo.windowIndex,
+        };
+        tabSnapshots.push(snapshot);
+        currentIndex++;
       }
     }
-    const windowIds = Array.from(windowIdSet).sort((a, b) => a - b);
-    const windowIdToIndex = new Map<number, number>();
-    windowIds.forEach((windowId, index) => {
-      windowIdToIndex.set(windowId, index);
+
+    // 通常タブのindexマッピング（ピン留めタブの後から開始）
+    const tabIdToIndex = new Map<number, number>();
+    nodeInfos.forEach((info, i) => {
+      tabIdToIndex.set(info.node.tabId, currentIndex + i);
     });
 
-    for (let index = 0; index < nodeWithViewId.length; index++) {
-      const { node, viewId } = nodeWithViewId[index];
+    // 通常タブのスナップショットを作成
+    for (let i = 0; i < nodeInfos.length; i++) {
+      const { node, viewName, windowIndex, parent } = nodeInfos[i];
       const tab = tabMap.get(node.tabId);
 
       if (tab && tab.url) {
-        const parentIndex = node.parentId
-          ? nodeIdToIndex.get(node.parentId) ?? null
+        const parentIndex = parent !== null
+          ? tabIdToIndex.get(parent.tabId) ?? null
           : null;
-        const windowIndex = tab.windowId !== undefined
-          ? windowIdToIndex.get(tab.windowId) ?? 0
-          : 0;
 
         const snapshot: TabSnapshot = {
-          index,
+          index: currentIndex + i,
           url: tab.url,
           title: tab.title || '',
           parentIndex,
-          viewId,
+          viewId: viewName,
           isExpanded: node.isExpanded,
-          pinned: tab.pinned || false,
+          pinned: false,
           windowIndex,
         };
         if (node.groupInfo) {
@@ -167,11 +226,11 @@ export class SnapshotManager {
   /**
    * スナップショットからタブを復元
    *
-   * マルチウィンドウ対応の復元アルゴリズム:
+   * 新構造対応の復元アルゴリズム:
    * 1. windowIndexごとに新しいウィンドウを作成
    * 2. 各ウィンドウ内で親を持たないタブ（ルートタブ）を先に作成
    * 3. 子タブを親の順に作成
-   * 4. 全タブ作成後、ツリー状態を更新して親子関係と展開状態を反映
+   * 4. 全タブ作成後、新構造のWindowState[]を構築してTreeStateに追加
    *
    * @param tabs - タブスナップショット配列
    * @param views - ビュー配列
@@ -211,9 +270,7 @@ export class SnapshotManager {
             const blankTabId = newWindow.tabs[0].id;
             if (blankTabId !== undefined) {
               setTimeout(() => {
-                chrome.tabs.remove(blankTabId).catch(() => {
-                  // 空白タブの削除失敗は無視（既に閉じられている可能性がある）
-                });
+                chrome.tabs.remove(blankTabId).catch(() => {});
               }, 1000);
             }
           }
@@ -246,100 +303,119 @@ export class SnapshotManager {
     const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
     if (!treeState) return;
 
-    const updatedViews: Record<string, { info: View; rootNodeIds: string[]; nodes: Record<string, TabNode> }> = {};
-    for (const [viewId, viewState] of Object.entries(treeState.views)) {
-      updatedViews[viewId] = {
-        info: { ...viewState.info },
-        rootNodeIds: [...viewState.rootNodeIds],
-        nodes: { ...viewState.nodes },
-      };
-    }
+    // 新しいウィンドウ用のWindowStateを構築
+    const newWindows: WindowState[] = [];
 
-    for (const view of views) {
-      if (!updatedViews[view.id]) {
-        updatedViews[view.id] = {
-          info: { id: view.id, name: view.name, color: view.color },
-          rootNodeIds: [],
-          nodes: {},
-        };
+    for (const windowIndex of windowIndices) {
+      const newWindowId = windowIndexToNewWindowId.get(windowIndex);
+      if (newWindowId === undefined) continue;
+
+      // このウィンドウのタブを収集
+      const windowTabs = sortedTabs.filter(t => (t.windowIndex ?? 0) === windowIndex);
+
+      // このウィンドウに存在するビュー名を収集
+      const viewNamesInThisWindow = new Set<string>();
+      for (const tab of windowTabs) {
+        viewNamesInThisWindow.add(tab.viewId);
       }
-    }
 
-    if (!updatedViews['default']) {
-      updatedViews['default'] = {
-        info: { id: 'default', name: 'Default', color: '#3B82F6' },
-        rootNodeIds: [],
-        nodes: {},
-      };
-    }
+      // views配列の順序でビューを構築（スナップショットのビュー順序を維持）
+      const orderedViewNames: string[] = [];
+      for (const view of views) {
+        if (viewNamesInThisWindow.has(view.name)) {
+          orderedViewNames.push(view.name);
+        }
+      }
 
-    const allNewNodes: Map<string, TabNode> = new Map();
-    const nodeIdToViewId: Map<string, string> = new Map();
-    const updatedTabToNode: Record<number, { viewId: string; nodeId: string }> = { ...treeState.tabToNode };
+      // 各ビューのViewStateを構築
+      const viewStates: ViewState[] = [];
+      for (const viewName of orderedViewNames) {
+        const viewInfo = views.find(v => v.name === viewName);
+        const viewTabs = windowTabs.filter(t => t.viewId === viewName);
 
-    for (const [index, newTabId] of indexToNewTabId) {
-      const snapshot = indexToSnapshot.get(index);
-      if (!snapshot) continue;
+        // TabNodeを構築
+        const tabIdToNode = new Map<number, TabNode>();
+        const rootNodes: TabNode[] = [];
 
-      const nodeId = `tab-${newTabId}`;
-      let parentId: string | null = null;
-      let depth = 0;
+        for (const tabSnapshot of viewTabs) {
+          const newTabId = indexToNewTabId.get(tabSnapshot.index);
+          if (newTabId === undefined) continue;
 
-      if (snapshot.parentIndex !== null) {
-        const parentTabId = indexToNewTabId.get(snapshot.parentIndex);
-        if (parentTabId !== undefined) {
-          parentId = `tab-${parentTabId}`;
-          const parentNode = allNewNodes.get(parentId);
-          if (parentNode) {
-            depth = parentNode.depth + 1;
+          const node: TabNode = {
+            tabId: newTabId,
+            isExpanded: tabSnapshot.isExpanded,
+            children: [],
+          };
+          if (tabSnapshot.groupInfo) {
+            node.groupInfo = tabSnapshot.groupInfo;
+          }
+          tabIdToNode.set(newTabId, node);
+        }
+
+        // 親子関係を構築
+        for (const tabSnapshot of viewTabs) {
+          const newTabId = indexToNewTabId.get(tabSnapshot.index);
+          if (newTabId === undefined) continue;
+          const node = tabIdToNode.get(newTabId);
+          if (!node) continue;
+
+          if (tabSnapshot.parentIndex !== null) {
+            const parentTabId = indexToNewTabId.get(tabSnapshot.parentIndex);
+            if (parentTabId !== undefined) {
+              const parent = tabIdToNode.get(parentTabId);
+              if (parent) {
+                parent.children.push(node);
+              } else {
+                rootNodes.push(node);
+              }
+            } else {
+              rootNodes.push(node);
+            }
+          } else {
+            rootNodes.push(node);
           }
         }
-      }
 
-      const newNode: TabNode = {
-        id: nodeId,
-        tabId: newTabId,
-        parentId,
-        children: [],
-        isExpanded: snapshot.isExpanded,
-        depth,
-      };
-
-      allNewNodes.set(nodeId, newNode);
-      nodeIdToViewId.set(nodeId, snapshot.viewId);
-      updatedTabToNode[newTabId] = { viewId: snapshot.viewId, nodeId };
-    }
-
-    for (const [nodeId, node] of allNewNodes) {
-      if (node.parentId && allNewNodes.has(node.parentId)) {
-        const parent = allNewNodes.get(node.parentId)!;
-        const childExists = parent.children.some((c) => c.id === nodeId);
-        if (!childExists) {
-          parent.children = [...parent.children, node];
+        // ビュー内のピン留めタブを収集
+        const viewPinnedTabIds: number[] = [];
+        for (const tabSnapshot of viewTabs) {
+          if (tabSnapshot.pinned) {
+            const newTabId = indexToNewTabId.get(tabSnapshot.index);
+            if (newTabId !== undefined) {
+              viewPinnedTabIds.push(newTabId);
+            }
+          }
         }
+
+        viewStates.push({
+          name: viewInfo?.name ?? viewName,
+          color: viewInfo?.color ?? '#3B82F6',
+          icon: viewInfo?.icon,
+          rootNodes,
+          pinnedTabIds: viewPinnedTabIds,
+        });
       }
+
+      // デフォルトビューを追加（ビューが空の場合）
+      if (viewStates.length === 0) {
+        viewStates.push({
+          name: 'Default',
+          color: '#3B82F6',
+          rootNodes: [],
+          pinnedTabIds: [],
+        });
+      }
+
+      newWindows.push({
+        windowId: newWindowId,
+        views: viewStates,
+        activeViewIndex: 0,
+      });
     }
 
-    for (const [nodeId, node] of allNewNodes) {
-      const viewId = nodeIdToViewId.get(nodeId) || 'default';
-      if (!updatedViews[viewId]) {
-        updatedViews[viewId] = {
-          info: { id: viewId, name: viewId === 'default' ? 'Default' : 'View', color: '#3B82F6' },
-          rootNodeIds: [],
-          nodes: {},
-        };
-      }
-      updatedViews[viewId].nodes[nodeId] = node;
-
-      if (!node.parentId) {
-        updatedViews[viewId].rootNodeIds.push(nodeId);
-      }
-    }
-
+    // TreeStateを更新（既存ウィンドウに追加）
     const updatedTreeState: TreeState = {
-      ...treeState,
-      views: updatedViews,
-      tabToNode: updatedTabToNode,
+      windows: [...treeState.windows, ...newWindows],
     };
 
     await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);

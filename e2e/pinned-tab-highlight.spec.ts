@@ -15,25 +15,22 @@ test.describe('ピン留めタブと通常タブのアクティブ状態のハ�
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page?normal'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: normalTabId, depth: 0 },
     ], 0);
 
     await activateTab(serviceWorker, normalTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: normalTabId, depth: 0 },
     ], 0);
 
@@ -42,12 +39,15 @@ test.describe('ピン留めタブと通常タブのアクティブ状態のハ�
 
     await pinTab(serviceWorker, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: normalTabId, depth: 0 },
     ], 0);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: initialBrowserTabId }], 0);
 
     await activateTab(serviceWorker, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: normalTabId, depth: 0 },
+    ], 0);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: initialBrowserTabId }], 0);
 
     const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${initialBrowserTabId}"]`);
     await expect(pinnedTab).toHaveClass(/bg-gray-600/);
@@ -60,34 +60,39 @@ test.describe('ピン留めタブと通常タブのアクティブ状態のハ�
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page?normal'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: normalTabId, depth: 0 },
     ], 0);
 
     await pinTab(serviceWorker, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: normalTabId, depth: 0 },
     ], 0);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: initialBrowserTabId }], 0);
 
     await activateTab(serviceWorker, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: normalTabId, depth: 0 },
+    ], 0);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: initialBrowserTabId }], 0);
 
     const pinnedTab = sidePanelPage.locator(`[data-testid="pinned-tab-${initialBrowserTabId}"]`);
     await expect(pinnedTab).toHaveClass(/bg-gray-600/);
 
     await activateTab(serviceWorker, normalTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: normalTabId, depth: 0 },
+    ], 0);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: initialBrowserTabId }], 0);
 
     const normalTabNode = sidePanelPage.locator(`[data-testid="tree-node-${normalTabId}"]`);
     await expect(normalTabNode).toHaveClass(/bg-gray-600/);

@@ -69,53 +69,66 @@ export async function moveTabToWindow(
   const tabIdsToMove = await serviceWorker.evaluate(
     async ({ tabId }) => {
       interface TabNode {
-        id: string;
         tabId: number;
-        parentId: string | null;
+        isExpanded: boolean;
+        children: TabNode[];
       }
       interface ViewState {
-        info: { id: string; name: string; color: string };
-        rootNodeIds: string[];
-        nodes: Record<string, TabNode>;
+        name: string;
+        color: string;
+        rootNodes: TabNode[];
+      }
+      interface WindowState {
+        windowId: number;
+        views: ViewState[];
+        activeViewIndex: number;
+        pinnedTabIds: number[];
       }
       interface TreeState {
-        views: Record<string, ViewState>;
-        tabToNode: Record<number, { viewId: string; nodeId: string }>;
+        windows: WindowState[];
       }
 
       const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as TreeState | undefined;
 
-      if (!treeState?.views || !treeState?.tabToNode) {
+      if (!treeState?.windows) {
         return [tabId];
       }
 
-      const nodeInfo = treeState.tabToNode[tabId];
-      if (!nodeInfo) {
-        return [tabId];
-      }
-
-      const viewState = treeState.views[nodeInfo.viewId];
-      if (!viewState) {
-        return [tabId];
-      }
-
-      const collectDescendants = (parentNodeId: string): number[] => {
-        const parentNode = viewState.nodes[parentNodeId];
-        if (!parentNode) return [];
-
-        const tabIds: number[] = [parentNode.tabId];
-
-        for (const [childNodeId, childNode] of Object.entries(viewState.nodes)) {
-          if (childNode.parentId === parentNodeId) {
-            tabIds.push(...collectDescendants(childNodeId));
+      // Find the node with the given tabId by traversing the tree
+      const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+        for (const node of nodes) {
+          if (node.tabId === targetTabId) {
+            return node;
+          }
+          const found = findNode(node.children, targetTabId);
+          if (found) {
+            return found;
           }
         }
+        return null;
+      };
 
+      // Collect all descendant tabIds from a node (including the node itself)
+      const collectDescendants = (node: TabNode): number[] => {
+        const tabIds: number[] = [node.tabId];
+        for (const child of node.children) {
+          tabIds.push(...collectDescendants(child));
+        }
         return tabIds;
       };
 
-      return collectDescendants(nodeInfo.nodeId);
+      // Search in all windows and views
+      for (const windowState of treeState.windows) {
+        for (const view of windowState.views) {
+          const node = findNode(view.rootNodes, tabId);
+          if (node) {
+            return collectDescendants(node);
+          }
+        }
+      }
+
+      return [tabId];
     },
     { tabId }
   );
@@ -170,21 +183,66 @@ export async function assertWindowTreeSync(
   const serviceWorker = await getServiceWorker(context);
 
   await serviceWorker.evaluate(async (windowId: number) => {
+    interface TabNode {
+      tabId: number;
+      isExpanded: boolean;
+      children: TabNode[];
+    }
+    interface ViewState {
+      name: string;
+      color: string;
+      rootNodes: TabNode[];
+    }
+    interface WindowState {
+      windowId: number;
+      views: ViewState[];
+      activeViewIndex: number;
+      pinnedTabIds: number[];
+    }
+    interface TreeState {
+      windows: WindowState[];
+    }
+
+    // Collect all tabIds from a tree
+    const collectAllTabIds = (nodes: TabNode[]): Set<number> => {
+      const tabIds = new Set<number>();
+      for (const node of nodes) {
+        tabIds.add(node.tabId);
+        for (const childTabId of collectAllTabIds(node.children)) {
+          tabIds.add(childTabId);
+        }
+      }
+      return tabIds;
+    };
+
     for (let i = 0; i < 50; i++) {
       try {
         const tabs = await chrome.tabs.query({ windowId });
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
+        const treeState = result.tree_state as TreeState | undefined;
 
-        const tabToNode = treeState?.tabToNode;
-        if (tabToNode && tabs.length > 0) {
-          const allTabsSynced = tabs.every(
-            (tab: chrome.tabs.Tab) => tab.id && tabToNode[tab.id]
-          );
-          if (allTabsSynced) {
-            return;
+        if (treeState?.windows && tabs.length > 0) {
+          // Find the window state for this windowId
+          const windowState = treeState.windows.find(w => w.windowId === windowId);
+          if (windowState) {
+            // Collect all tabIds from all views in this window
+            const allTreeTabIds = new Set<number>();
+            for (const view of windowState.views) {
+              for (const tabId of collectAllTabIds(view.rootNodes)) {
+                allTreeTabIds.add(tabId);
+              }
+            }
+            // Also include pinned tabs
+            for (const pinnedTabId of windowState.pinnedTabIds) {
+              allTreeTabIds.add(pinnedTabId);
+            }
+
+            const allTabsSynced = tabs.every(
+              (tab: chrome.tabs.Tab) => tab.id && allTreeTabIds.has(tab.id)
+            );
+            if (allTabsSynced) {
+              return;
+            }
           }
         }
       } catch {

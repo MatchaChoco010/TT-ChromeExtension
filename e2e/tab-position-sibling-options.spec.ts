@@ -53,12 +53,11 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
@@ -80,25 +79,27 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
       ], 0);
 
       const siblingTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
         { tabId: siblingTabId, depth: 0 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0 },
+        { tabId: siblingTabId, depth: 0 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, parentPage);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
         { tabId: siblingTabId, depth: 0 },
         { tabId: newTabId, depth: 0 },
@@ -111,12 +112,11 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
@@ -138,26 +138,32 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0 },
+      ], 0);
 
       const childTabId1 = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId1, depth: 1 },
+      ], 0);
 
       const childTabId2 = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
         { tabId: childTabId2, depth: 1 },
@@ -188,12 +194,17 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       }
 
       await activateTab(serviceWorker, childTabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId1, depth: 1 },
+        { tabId: childTabId2, depth: 1 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, childPageForClick);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
         { tabId: childTabId2, depth: 1 },
@@ -209,12 +220,11 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
@@ -225,25 +235,27 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       const firstTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstTabId, depth: 0 },
       ], 0);
 
       const secondTabId = await createTab(serviceWorker, getTestServerUrl('/page?second'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstTabId, depth: 0 },
         { tabId: secondTabId, depth: 0 },
       ], 0);
 
       await activateTab(serviceWorker, firstTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: firstTabId, depth: 0 },
+        { tabId: secondTabId, depth: 0 },
+      ], 0);
 
       const thirdTabId = await createTab(serviceWorker, getTestServerUrl('/page?third'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstTabId, depth: 0 },
         { tabId: secondTabId, depth: 0 },
         { tabId: thirdTabId, depth: 0 },
@@ -256,12 +268,11 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
@@ -283,26 +294,32 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0 },
+      ], 0);
 
       const childTabId1 = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId1, depth: 1 },
+      ], 0);
 
       const childTabId2 = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
         { tabId: childTabId2, depth: 1 },
@@ -314,12 +331,17 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'lastSibling');
 
       await activateTab(serviceWorker, childTabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId1, depth: 1 },
+        { tabId: childTabId2, depth: 1 },
+      ], 0);
 
       const newTabId = await createTab(serviceWorker, getTestServerUrl('/page?manual'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
         { tabId: childTabId2, depth: 1 },
@@ -335,12 +357,11 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
@@ -362,26 +383,32 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0 },
+      ], 0);
 
       const childTabId1 = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId1, depth: 1 },
+      ], 0);
 
       const childTabId2 = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
         { tabId: childTabId2, depth: 1 },
@@ -393,12 +420,17 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'nextSibling');
 
       await activateTab(serviceWorker, childTabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId1, depth: 1 },
+        { tabId: childTabId2, depth: 1 },
+      ], 0);
 
       const newTabId = await createTab(serviceWorker, getTestServerUrl('/page?manual'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId1, depth: 1 },
         { tabId: newTabId, depth: 1 },
@@ -414,18 +446,16 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -435,12 +465,15 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'child');
 
       await activateTab(serviceWorker, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
 
       const childTabId = await createTab(serviceWorker, getTestServerUrl('/page?child'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -452,18 +485,16 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -473,22 +504,29 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       await waitForSettingsSaved(serviceWorker, 'newTabPositionManual', 'child');
 
       await activateTab(serviceWorker, parentTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0 },
+      ], 0);
 
       const childTabId = await createTab(serviceWorker, getTestServerUrl('/page?child'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
 
       await activateTab(serviceWorker, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       const grandchildTabId = await createTab(serviceWorker, getTestServerUrl('/page?grandchild'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1, expanded: true },
         { tabId: grandchildTabId, depth: 2 },
@@ -503,12 +541,11 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
@@ -530,16 +567,18 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0 },
+      ], 0);
 
       const childTabId = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -569,12 +608,16 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       }
 
       await activateTab(serviceWorker, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, childPageForClick);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
         { tabId: newTabId, depth: 0 },
@@ -587,12 +630,11 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const settingsPage = await openSettingsPage(extensionContext, extensionId);
@@ -616,27 +658,33 @@ test.describe('lastSiblingタブ位置設定のE2Eテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0 },
       ], 0);
 
       await activateTab(serviceWorker, parentTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0 },
+      ], 0);
 
       const childTabId = await clickLinkToOpenTab(serviceWorker, parentPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
 
       await activateTab(serviceWorker, childTabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTabId!, depth: 0, expanded: true },
+        { tabId: childTabId, depth: 1 },
+      ], 0);
 
       const newTabId = await createTab(serviceWorker, getTestServerUrl('/page?manual'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId!, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
         { tabId: newTabId, depth: 0 },

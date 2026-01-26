@@ -6,15 +6,9 @@ import {
   readSnapshotFile,
   cleanupDownloadDir,
 } from './utils/download-utils';
-import { waitForCondition } from './utils/polling-utils';
-import type { Worker } from '@playwright/test';
-
-async function getTreeState(serviceWorker: Worker) {
-  return await serviceWorker.evaluate(async () => {
-    const result = await chrome.storage.local.get('tree_state');
-    return result.tree_state;
-  });
-}
+import { waitForCondition, waitForTabInTreeState, waitForSidePanelReady, waitForInitialized } from './utils/polling-utils';
+import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
+import { openSidePanelForWindow } from './utils/window-utils';
 
 test.describe('スナップショット機能', () => {
   test('手動スナップショット作成でファイルがダウンロードされる', async ({
@@ -23,7 +17,11 @@ test.describe('スナップショット機能', () => {
     downloadDir,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
 
     await sidePanelPage.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
@@ -53,7 +51,11 @@ test.describe('スナップショット機能', () => {
     downloadDir,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
 
     await sidePanelPage.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
@@ -79,27 +81,28 @@ test.describe('スナップショット機能', () => {
     downloadDir,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
 
     const testUrl = getTestServerUrl('/page');
     const newPage = await extensionContext.newPage();
     await newPage.goto(testUrl);
     await newPage.waitForLoadState('domcontentloaded');
 
-    await waitForCondition(
-      async () => {
-        const treeState = await getTreeState(serviceWorker) as {
-          views?: Record<string, { nodes: Record<string, { tabId: number }> }>;
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        if (!treeState?.views || !treeState?.tabToNode) return false;
-        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
-        const testTab = tabs.find(t => t.url?.includes('/page'));
-        if (!testTab) return false;
-        return treeState.tabToNode[testTab.id] !== undefined;
-      },
-      { timeout: 5000, timeoutMessage: 'Test tab did not appear in tree state' }
-    );
+    const newPageTabId = await serviceWorker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({});
+      const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
+      return tab?.id;
+    }, testUrl);
+    await waitForTabInTreeState(serviceWorker, newPageTabId!);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: newPageTabId!, depth: 0 },
+    ], 0);
 
     await sidePanelPage.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
@@ -131,7 +134,11 @@ test.describe('スナップショット復元機能', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
 
     const snapshotData = {
       id: 'snapshot-test-1',
@@ -170,49 +177,45 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    interface NodeInfo {
-      id: string;
-      tabId: number;
-      parentId: string | null;
-    }
-    let parentTab: chrome.tabs.Tab | undefined;
-    let childTab: chrome.tabs.Tab | undefined;
-    let parentNode: NodeInfo | undefined;
-    let childNode: NodeInfo | undefined;
-
+    // タブが復元されるのを待つ
     await waitForCondition(
       async () => {
         const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
-        parentTab = tabs.find(t => t.url?.includes('/parent'));
-        childTab = tabs.find(t => t.url?.includes('/child'));
-        if (!parentTab || !childTab) return false;
-
-        const treeState = await getTreeState(serviceWorker) as {
-          views?: Record<string, { nodes: Record<string, NodeInfo> }>;
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        if (!treeState?.views || !treeState?.tabToNode) return false;
-
-        const parentNodeInfo = treeState.tabToNode[parentTab!.id];
-        const childNodeInfo = treeState.tabToNode[childTab!.id];
-        if (!parentNodeInfo || !childNodeInfo) return false;
-
-        const parentViewState = treeState.views[parentNodeInfo.viewId];
-        const childViewState = treeState.views[childNodeInfo.viewId];
-        if (!parentViewState || !childViewState) return false;
-
-        parentNode = parentViewState.nodes[parentNodeInfo.nodeId];
-        childNode = childViewState.nodes[childNodeInfo.nodeId];
-
-        return parentNode !== undefined && childNode !== undefined && childNode.parentId === parentNode.id;
+        const parentTab = tabs.find(t => t.url?.includes('/parent'));
+        const childTab = tabs.find(t => t.url?.includes('/child'));
+        return !!parentTab?.id && !!childTab?.id;
       },
-      { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with parent-child relationship did not appear' }
+      { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
     );
 
-    expect(parentNode).toBeDefined();
-    expect(childNode).toBeDefined();
-    expect(childNode?.parentId).toBe(parentNode?.id);
+    // 復元されたタブのウィンドウIDを取得（新しいウィンドウ）
+    const { newWindowId, parentTabId, childTabId } = await serviceWorker.evaluate(async () => {
+      const tabs = await chrome.tabs.query({});
+      const parentTab = tabs.find(t => t.url?.includes('/parent'));
+      const childTab = tabs.find(t => t.url?.includes('/child'));
+      return {
+        newWindowId: parentTab?.windowId,
+        parentTabId: parentTab?.id,
+        childTabId: childTab?.id,
+      };
+    });
 
+    expect(newWindowId).toBeDefined();
+    expect(parentTabId).toBeDefined();
+    expect(childTabId).toBeDefined();
+
+    // 新しいウィンドウ用のサイドパネルを直接開く（setupWindowは使わない）
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId!);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await waitForInitialized(serviceWorker);
+
+    // 新しいウィンドウでタブ構造を検証
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: parentTabId!, depth: 0, expanded: true },
+      { tabId: childTabId!, depth: 1 },
+    ], 0);
+
+    await newWindowSidePanel.close();
     await sidePanelPage.close();
   });
 
@@ -221,7 +224,11 @@ test.describe('スナップショット復元機能', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
 
     const snapshotData = {
       id: 'snapshot-test-2',
@@ -263,42 +270,53 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
-    interface ViewNodeInfo {
-      id: string;
-      tabId: number;
-    }
-    let workTab: chrome.tabs.Tab | undefined;
-    let personalTab: chrome.tabs.Tab | undefined;
-    let workNodeInfo: { viewId: string; nodeId: string } | undefined;
-    let personalNodeInfo: { viewId: string; nodeId: string } | undefined;
-
+    // タブが復元されるのを待つ
     await waitForCondition(
       async () => {
         const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
-        workTab = tabs.find(t => t.url?.includes('/work-tab'));
-        personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
-        if (!workTab || !personalTab) return false;
-
-        const treeState = await getTreeState(serviceWorker) as {
-          views?: Record<string, { nodes: Record<string, ViewNodeInfo> }>;
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        if (!treeState?.views || !treeState?.tabToNode) return false;
-
-        workNodeInfo = treeState.tabToNode[workTab!.id];
-        personalNodeInfo = treeState.tabToNode[personalTab!.id];
-
-        return workNodeInfo !== undefined && personalNodeInfo !== undefined &&
-               workNodeInfo.viewId === 'view-work' && personalNodeInfo.viewId === 'view-personal';
+        const workTab = tabs.find(t => t.url?.includes('/work-tab'));
+        const personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
+        return !!workTab?.id && !!personalTab?.id;
       },
-      { timeout: 5000, timeoutMessage: 'Restored tabs/nodes with correct viewId did not appear' }
+      { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
     );
 
-    expect(workNodeInfo).toBeDefined();
-    expect(personalNodeInfo).toBeDefined();
-    expect(workNodeInfo?.viewId).toBe('view-work');
-    expect(personalNodeInfo?.viewId).toBe('view-personal');
+    // 復元されたタブのウィンドウIDを取得（新しいウィンドウ）
+    const { newWindowId, workTabId, personalTabId } = await serviceWorker.evaluate(async () => {
+      const tabs = await chrome.tabs.query({});
+      const workTab = tabs.find(t => t.url?.includes('/work-tab'));
+      const personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
+      return {
+        newWindowId: workTab?.windowId,
+        workTabId: workTab?.id,
+        personalTabId: personalTab?.id,
+      };
+    });
 
+    expect(newWindowId).toBeDefined();
+    expect(workTabId).toBeDefined();
+    expect(personalTabId).toBeDefined();
+
+    // 新しいウィンドウ用のサイドパネルを直接開く（setupWindowは使わない）
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId!);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await waitForInitialized(serviceWorker);
+
+    // View 0 (Work) のタブ構造を検証（新しいウィンドウ）
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: workTabId!, depth: 0 },
+    ], 0);
+
+    // View 1 (Personal) に切り替えてタブ構造を検証
+    const viewSwitcher = newWindowSidePanel.locator('[data-testid="view-switcher-container"]');
+    const viewButtons = viewSwitcher.locator('button[data-color]');
+    await viewButtons.nth(1).click();
+
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: personalTabId!, depth: 0 },
+    ], 1);
+
+    await newWindowSidePanel.close();
     await sidePanelPage.close();
   });
 
@@ -307,26 +325,28 @@ test.describe('スナップショット復元機能', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
 
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+
+    const existingUrl = getTestServerUrl('/existing');
     const existingPage = await extensionContext.newPage();
-    await existingPage.goto(getTestServerUrl('/existing'));
+    await existingPage.goto(existingUrl);
     await existingPage.waitForLoadState('domcontentloaded');
 
-    await waitForCondition(
-      async () => {
-        const treeState = await getTreeState(serviceWorker) as {
-          views?: Record<string, { nodes: Record<string, { tabId: number }> }>;
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        if (!treeState?.views || !treeState?.tabToNode) return false;
-        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
-        const existingTab = tabs.find(t => t.url?.includes('/existing'));
-        if (!existingTab) return false;
-        return treeState.tabToNode[existingTab.id] !== undefined;
-      },
-      { timeout: 5000, timeoutMessage: 'Existing tab did not appear in tree state' }
-    );
+    const existingTabId = await serviceWorker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({});
+      const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(url));
+      return tab?.id;
+    }, existingUrl);
+    await waitForTabInTreeState(serviceWorker, existingTabId!);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: existingTabId!, depth: 0 },
+    ], 0);
 
     const tabsBeforeRestore = await serviceWorker.evaluate(async () => {
       return await chrome.tabs.query({});
@@ -371,6 +391,7 @@ test.describe('スナップショット復元機能', () => {
       });
     }, JSON.stringify(snapshotData));
 
+    // タブが復元されるのを待つ
     await waitForCondition(
       async () => {
         const tabs = await serviceWorker.evaluate(async () => {
@@ -383,18 +404,283 @@ test.describe('スナップショット復元機能', () => {
       { timeout: 5000, timeoutMessage: 'Restored tabs did not appear' }
     );
 
+    // 復元されたタブのウィンドウIDを取得（新しいウィンドウ）
+    const { newWindowId, restoredTab1Id, restoredTab2Id } = await serviceWorker.evaluate(async () => {
+      const tabs = await chrome.tabs.query({});
+      const restoredTab1 = tabs.find(t => t.url?.includes('/restored-tab-1'));
+      const restoredTab2 = tabs.find(t => t.url?.includes('/restored-tab-2'));
+      return {
+        newWindowId: restoredTab1?.windowId,
+        restoredTab1Id: restoredTab1?.id,
+        restoredTab2Id: restoredTab2?.id,
+      };
+    });
+
+    expect(newWindowId).toBeDefined();
+    expect(restoredTab1Id).toBeDefined();
+    expect(restoredTab2Id).toBeDefined();
+
+    // 新しいウィンドウ用のサイドパネルを直接開く（setupWindowは使わない）
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId!);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await waitForInitialized(serviceWorker);
+
+    // 新しいウィンドウで復元されたタブのみが存在することを検証
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: restoredTab1Id!, depth: 0 },
+      { tabId: restoredTab2Id!, depth: 0 },
+    ], 0);
+
+    // 追加の検証: 既存タブが存在しないことを確認
     const tabsAfterRestore = await serviceWorker.evaluate(async () => {
       return await chrome.tabs.query({});
     });
-
     const hasExistingTab = tabsAfterRestore.some(t => t.url?.includes('/existing'));
     expect(hasExistingTab).toBe(false);
 
-    const hasRestoredTab1 = tabsAfterRestore.some(t => t.url?.includes('/restored-tab-1'));
-    const hasRestoredTab2 = tabsAfterRestore.some(t => t.url?.includes('/restored-tab-2'));
-    expect(hasRestoredTab1).toBe(true);
-    expect(hasRestoredTab2).toBe(true);
+    await newWindowSidePanel.close();
+    await sidePanelPage.close();
+  });
 
+  test('スナップショット復元時にビューの順序が維持される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // ビューの順序: Default (0) -> Work (1) -> Personal (2)
+    // タブは親を持たないものを先にソートするが、ビューの順序は元のviews配列順を維持すべき
+    const snapshotData = {
+      id: 'snapshot-test-view-order',
+      createdAt: new Date().toISOString(),
+      name: 'Test Snapshot View Order',
+      isAutoSave: false,
+      data: {
+        views: [
+          { id: 'view-default', name: 'Default', color: '#3B82F6' },
+          { id: 'view-work', name: 'Work', color: '#10B981' },
+          { id: 'view-personal', name: 'Personal', color: '#EF4444' },
+        ],
+        tabs: [
+          {
+            index: 0,
+            url: getTestServerUrl('/default-tab'),
+            title: 'Default Tab',
+            parentIndex: null,
+            viewId: 'view-default',
+            isExpanded: false,
+            pinned: false,
+            windowIndex: 0,
+          },
+          {
+            index: 1,
+            url: getTestServerUrl('/work-tab'),
+            title: 'Work Tab',
+            parentIndex: null,
+            viewId: 'view-work',
+            isExpanded: false,
+            pinned: false,
+            windowIndex: 0,
+          },
+          {
+            index: 2,
+            url: getTestServerUrl('/personal-tab'),
+            title: 'Personal Tab',
+            parentIndex: null,
+            viewId: 'view-personal',
+            isExpanded: false,
+            pinned: false,
+            windowIndex: 0,
+          },
+        ],
+      },
+    };
+
+    await sidePanelPage.evaluate(async (jsonData: string) => {
+      await chrome.runtime.sendMessage({
+        type: 'RESTORE_SNAPSHOT',
+        payload: { jsonData, closeCurrentTabs: false },
+      });
+    }, JSON.stringify(snapshotData));
+
+    // タブが復元されるのを待つ
+    await waitForCondition(
+      async () => {
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        const defaultTab = tabs.find(t => t.url?.includes('/default-tab'));
+        const workTab = tabs.find(t => t.url?.includes('/work-tab'));
+        const personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
+        return !!defaultTab?.id && !!workTab?.id && !!personalTab?.id;
+      },
+      { timeout: 10000, timeoutMessage: 'Restored tabs did not appear' }
+    );
+
+    // 復元されたタブのウィンドウIDを取得（新しいウィンドウ）
+    const { newWindowId, defaultTabId, workTabId, personalTabId } = await serviceWorker.evaluate(async () => {
+      const tabs = await chrome.tabs.query({});
+      const defaultTab = tabs.find(t => t.url?.includes('/default-tab'));
+      const workTab = tabs.find(t => t.url?.includes('/work-tab'));
+      const personalTab = tabs.find(t => t.url?.includes('/personal-tab'));
+      return {
+        newWindowId: defaultTab?.windowId,
+        defaultTabId: defaultTab?.id,
+        workTabId: workTab?.id,
+        personalTabId: personalTab?.id,
+      };
+    });
+
+    expect(newWindowId).toBeDefined();
+    expect(defaultTabId).toBeDefined();
+    expect(workTabId).toBeDefined();
+    expect(personalTabId).toBeDefined();
+
+    // 新しいウィンドウ用のサイドパネルを直接開く（setupWindowは使わない）
+    const newWindowSidePanel = await openSidePanelForWindow(extensionContext, newWindowId!);
+    await waitForSidePanelReady(newWindowSidePanel, serviceWorker);
+    await waitForInitialized(serviceWorker);
+
+    // View 0 (Default) のタブ構造を検証（新しいウィンドウ）
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: defaultTabId!, depth: 0 },
+    ], 0);
+
+    // View 1 (Work) に切り替えてタブ構造を検証
+    const viewSwitcher = newWindowSidePanel.locator('[data-testid="view-switcher-container"]');
+    const viewButtons = viewSwitcher.locator('button[data-color]');
+    await viewButtons.nth(1).click();
+
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: workTabId!, depth: 0 },
+    ], 1);
+
+    // View 2 (Personal) に切り替えてタブ構造を検証
+    await viewButtons.nth(2).click();
+
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: personalTabId!, depth: 0 },
+    ], 2);
+
+    await newWindowSidePanel.close();
+    await sidePanelPage.close();
+  });
+
+  test('スナップショット復元時にピン留めタブが正しく復元される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+
+    const snapshotData = {
+      id: 'snapshot-test-pinned',
+      createdAt: new Date().toISOString(),
+      name: 'Test Snapshot with Pinned Tabs',
+      isAutoSave: false,
+      data: {
+        views: [{ id: 'default', name: 'Default', color: '#3B82F6' }],
+        tabs: [
+          {
+            index: 0,
+            url: getTestServerUrl('/pinned-tab-1'),
+            title: 'Pinned Tab 1',
+            parentIndex: null,
+            viewId: 'default',
+            isExpanded: false,
+            pinned: true,
+            windowIndex: 0,
+          },
+          {
+            index: 1,
+            url: getTestServerUrl('/pinned-tab-2'),
+            title: 'Pinned Tab 2',
+            parentIndex: null,
+            viewId: 'default',
+            isExpanded: false,
+            pinned: true,
+            windowIndex: 0,
+          },
+          {
+            index: 2,
+            url: getTestServerUrl('/normal-tab'),
+            title: 'Normal Tab',
+            parentIndex: null,
+            viewId: 'default',
+            isExpanded: false,
+            pinned: false,
+            windowIndex: 0,
+          },
+        ],
+      },
+    };
+
+    await sidePanelPage.evaluate(async (jsonData: string) => {
+      await chrome.runtime.sendMessage({
+        type: 'RESTORE_SNAPSHOT',
+        payload: { jsonData, closeCurrentTabs: false },
+      });
+    }, JSON.stringify(snapshotData));
+
+    // タブが復元されるのを待つ
+    await waitForCondition(
+      async () => {
+        const tabs = await serviceWorker.evaluate(async () => chrome.tabs.query({}));
+        const pinnedTab1 = tabs.find(t => t.url?.includes('/pinned-tab-1'));
+        const pinnedTab2 = tabs.find(t => t.url?.includes('/pinned-tab-2'));
+        const normalTab = tabs.find(t => t.url?.includes('/normal-tab'));
+        // タブが存在し、ピン留め状態も正しいことを確認
+        return !!pinnedTab1?.id && !!pinnedTab2?.id && !!normalTab?.id &&
+               pinnedTab1.pinned === true && pinnedTab2.pinned === true && normalTab.pinned === false;
+      },
+      { timeout: 10000, timeoutMessage: 'Pinned tabs were not restored correctly' }
+    );
+
+    // 復元されたタブのウィンドウIDを取得（新しいウィンドウ）
+    const { newWindowId, pinnedTab1Id, pinnedTab2Id, normalTabId } = await serviceWorker.evaluate(async () => {
+      const tabs = await chrome.tabs.query({});
+      const pinnedTab1 = tabs.find(t => t.url?.includes('/pinned-tab-1'));
+      const pinnedTab2 = tabs.find(t => t.url?.includes('/pinned-tab-2'));
+      const normalTab = tabs.find(t => t.url?.includes('/normal-tab'));
+      return {
+        newWindowId: pinnedTab1?.windowId,
+        pinnedTab1Id: pinnedTab1?.id,
+        pinnedTab2Id: pinnedTab2?.id,
+        normalTabId: normalTab?.id,
+      };
+    });
+
+    expect(newWindowId).toBeDefined();
+    expect(pinnedTab1Id).toBeDefined();
+    expect(pinnedTab2Id).toBeDefined();
+    expect(normalTabId).toBeDefined();
+
+    // 新しいウィンドウ用のサイドパネルをセットアップ
+    const { sidePanelPage: newWindowSidePanel } = await setupWindow(
+      extensionContext,
+      serviceWorker,
+      newWindowId!
+    );
+
+    // assertPinnedTabStructureでピン留めタブの構造を検証（新しいウィンドウ）
+    await assertPinnedTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: pinnedTab1Id! },
+      { tabId: pinnedTab2Id! },
+    ], 0);
+
+    // assertTabStructureで通常タブの構造を検証（新しいウィンドウ）
+    await assertTabStructure(newWindowSidePanel, newWindowId!, [
+      { tabId: normalTabId!, depth: 0 },
+    ], 0);
+
+    await newWindowSidePanel.close();
     await sidePanelPage.close();
   });
 });

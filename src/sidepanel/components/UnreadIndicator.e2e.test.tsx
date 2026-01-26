@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import TreeNode from './TreeNode';
 import { UnreadTracker } from '@/services/UnreadTracker';
 import { StorageService } from '@/storage/StorageService';
-import type { TabNode, TabInfo } from '@/types';
+import type { UITabNode, TabInfo } from '@/types';
 import type { MockChrome, MockStorageLocal, MockStorage, MockRuntimeOnMessage } from '@/test/test-types';
 
 describe('未読インジケータ E2Eテスト', () => {
@@ -50,13 +50,10 @@ describe('未読インジケータ E2Eテスト', () => {
   });
 
   const createMockNode = (
-    id: string,
     tabId: number,
     depth: number = 0,
-  ): TabNode => ({
-    id,
+  ): UITabNode => ({
     tabId,
-    parentId: null,
     children: [],
     isExpanded: true,
     depth,
@@ -73,7 +70,7 @@ describe('未読インジケータ E2Eテスト', () => {
   describe('新規タブに未読インジケータが表示される', () => {
     it('新しいタブが作成されると未読バッジが表示される', async () => {
       const tabId = 101;
-      const node = createMockNode('node-101', tabId);
+      const node = createMockNode(tabId);
       const tab = createMockTab(tabId, '新しいタブ');
 
       await unreadTracker.markAsUnread(tabId);
@@ -122,7 +119,7 @@ describe('未読インジケータ E2Eテスト', () => {
           {tabs.map((tab) => (
             <TreeNode
               key={tab.id}
-              node={createMockNode(`node-${tab.id}`, tab.id)}
+              node={createMockNode(tab.id)}
               tab={createMockTab(tab.id, tab.title)}
               isUnread={unreadTracker.isUnread(tab.id)}
               isActive={false}
@@ -146,7 +143,7 @@ describe('未読インジケータ E2Eテスト', () => {
     it('タブをクリックしてアクティブ化すると未読バッジが削除される', async () => {
       const user = userEvent.setup();
       const tabId = 301;
-      const node = createMockNode('node-301', tabId);
+      const node = createMockNode(tabId);
       const tab = createMockTab(tabId, 'アクティブ化するタブ');
 
       await unreadTracker.markAsUnread(tabId);
@@ -223,7 +220,7 @@ describe('未読インジケータ E2Eテスト', () => {
           {tabs.map((tab) => (
             <TreeNode
               key={tab.id}
-              node={createMockNode(`node-${tab.id}`, tab.id)}
+              node={createMockNode(tab.id)}
               tab={createMockTab(tab.id, tab.title)}
               isUnread={unreadTracker.isUnread(tab.id)}
               isActive={false}
@@ -251,7 +248,7 @@ describe('未読インジケータ E2Eテスト', () => {
           {tabs.map((tab) => (
             <TreeNode
               key={tab.id}
-              node={createMockNode(`node-${tab.id}`, tab.id)}
+              node={createMockNode(tab.id)}
               tab={createMockTab(tab.id, tab.title)}
               isUnread={unreadTracker.isUnread(tab.id)}
               isActive={tab.id === 402}
@@ -300,7 +297,7 @@ describe('未読インジケータ E2Eテスト', () => {
       const { container } = render(
         <>
           <TreeNode
-            node={createMockNode('node-501', 501)}
+            node={createMockNode(501)}
             tab={createMockTab(501, '復元されたタブ1')}
             isUnread={newUnreadTracker.isUnread(501)}
             isActive={false}
@@ -310,7 +307,7 @@ describe('未読インジケータ E2Eテスト', () => {
             onClose={vi.fn()}
           />
           <TreeNode
-            node={createMockNode('node-502', 502)}
+            node={createMockNode(502)}
             tab={createMockTab(502, '復元されたタブ2')}
             isUnread={newUnreadTracker.isUnread(502)}
             isActive={false}

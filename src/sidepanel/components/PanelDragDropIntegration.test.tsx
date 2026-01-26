@@ -3,28 +3,35 @@ import { render, screen, waitFor } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
 import { TreeStateProvider, useTreeState } from '../providers/TreeStateProvider';
 import { act } from 'react';
-import type { DragEndEvent } from '@/types';
+import type { DragEndEvent, UITabNode, TreeState } from '@/types';
 import { getMockChrome } from '@/test/test-types';
 
 function IntegrationTestComponent() {
-  const { treeState, handleDragEnd } = useTreeState();
+  const { currentWindowState, handleDragEnd, currentViewIndex } = useTreeState();
 
   const handleNodeClick = vi.fn();
   const handleToggleExpand = vi.fn();
 
-  if (!treeState) {
+  if (!currentWindowState) {
     return <div>Loading...</div>;
   }
 
-  const currentView = treeState.views[treeState.currentViewId];
-  const rootNodes = currentView
-    ? Object.values(currentView.nodes).filter((node) => node.parentId === null)
+  const currentView = currentWindowState.views[currentViewIndex];
+  const addDepth = (nodes: UITabNode[], depth: number): UITabNode[] => {
+    return nodes.map((node) => ({
+      ...node,
+      depth,
+      children: addDepth(node.children as UITabNode[], depth + 1),
+    }));
+  };
+  const rootNodes: UITabNode[] = currentView
+    ? addDepth(currentView.rootNodes as UITabNode[], 0)
     : [];
 
   return (
     <TabTreeView
       nodes={rootNodes}
-      currentViewId={treeState.currentViewId}
+      currentViewIndex={currentViewIndex}
       onNodeClick={handleNodeClick}
       onToggleExpand={handleToggleExpand}
       onDragEnd={handleDragEnd}
@@ -38,71 +45,56 @@ describe('パネル内D&Dの統合テスト', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    sendMessageMock = vi.fn().mockResolvedValue(undefined);
+    const mockTreeState: TreeState = {
+      windows: [
+        {
+          windowId: 1,
+          views: [
+            {
+              name: 'Default',
+              color: '#3b82f6',
+              rootNodes: [
+                {
+                  tabId: 1,
+                  children: [],
+                  isExpanded: true,
+                },
+                {
+                  tabId: 2,
+                  children: [],
+                  isExpanded: true,
+                },
+                {
+                  tabId: 3,
+                  children: [
+                    {
+                      tabId: 4,
+                      children: [],
+                      isExpanded: true,
+                    },
+                  ],
+                  isExpanded: false,
+                },
+              ],
+              pinnedTabIds: [],
+            },
+          ],
+          activeViewIndex: 0,
+        },
+      ],
+    };
+
+    sendMessageMock = vi.fn().mockImplementation((message) => {
+      if (message.type === 'GET_STATE') {
+        return Promise.resolve({ success: true, data: mockTreeState });
+      }
+      return Promise.resolve({ success: true });
+    });
 
     global.chrome = {
       storage: {
         local: {
-          get: vi.fn().mockResolvedValue({
-            tree_state: {
-              views: {
-                default: {
-                  info: { id: 'default', name: 'Default', color: '#3b82f6' },
-                  rootNodeIds: ['node-1', 'node-2', 'node-3'],
-                  nodes: {
-                    'node-1': {
-                      id: 'node-1',
-                      tabId: 1,
-                      parentId: null,
-                      children: [],
-                      isExpanded: true,
-                      depth: 0,
-                    },
-                    'node-2': {
-                      id: 'node-2',
-                      tabId: 2,
-                      parentId: null,
-                      children: [],
-                      isExpanded: true,
-                      depth: 0,
-                    },
-                    'node-3': {
-                      id: 'node-3',
-                      tabId: 3,
-                      parentId: null,
-                      children: [
-                        {
-                          id: 'node-4',
-                          tabId: 4,
-                          parentId: 'node-3',
-                          children: [],
-                          isExpanded: true,
-                          depth: 1,
-                        },
-                      ],
-                      isExpanded: false,
-                      depth: 0,
-                    },
-                    'node-4': {
-                      id: 'node-4',
-                      tabId: 4,
-                      parentId: 'node-3',
-                      children: [],
-                      isExpanded: true,
-                      depth: 1,
-                    },
-                  },
-                },
-              },
-              currentViewId: 'default',
-              tabToNode: {
-                '1': { viewId: 'default', nodeId: 'node-1' },
-                '2': { viewId: 'default', nodeId: 'node-2' },
-                '3': { viewId: 'default', nodeId: 'node-3' },
-                '4': { viewId: 'default', nodeId: 'node-4' },
-              },
-            },
-          }),
+          get: vi.fn().mockResolvedValue({}),
           set: vi.fn().mockResolvedValue(undefined),
         },
         onChanged: {
@@ -174,7 +166,6 @@ describe('パネル内D&Dの統合テスト', () => {
         </TreeStateProvider>
       );
 
-      // Note: data-testid is tree-node-{tabId} (not tree-node-{nodeId})
       await waitFor(() => {
         expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
         expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
@@ -188,12 +179,12 @@ describe('パネル内D&Dの統合テスト', () => {
       // Step 1: Place tab as child of another tab
       const dragEndEvent1 = {
         active: {
-          id: 'node-2',
+          id: 2,
           data: { current: undefined },
           rect: { current: { initial: null, translated: null } },
         },
         over: {
-          id: 'node-1',
+          id: 1,
           data: { current: undefined },
           rect: null,
           disabled: false,
@@ -212,10 +203,11 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
           type: 'MOVE_NODE',
           payload: {
-            nodeId: 'node-2',
-            targetParentId: 'node-1',
-            viewId: 'default',
-            selectedNodeIds: [],
+            tabId: 2,
+            targetParentTabId: 1,
+            windowId: 1,
+            viewIndex: 0,
+            selectedTabIds: [],
           },
         });
       });
@@ -225,12 +217,12 @@ describe('パネル内D&Dの統合テスト', () => {
       // Step 2: Reorder tabs within same level
       const dragEndEvent2 = {
         active: {
-          id: 'node-3',
+          id: 3,
           data: { current: undefined },
           rect: { current: { initial: null, translated: null } },
         },
         over: {
-          id: 'node-1',
+          id: 1,
           data: { current: undefined },
           rect: null,
           disabled: false,
@@ -248,10 +240,11 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(sendMessageMock).toHaveBeenCalledWith({
           type: 'MOVE_NODE',
           payload: {
-            nodeId: 'node-3',
-            targetParentId: 'node-1',
-            viewId: 'default',
-            selectedNodeIds: [],
+            tabId: 3,
+            targetParentTabId: 1,
+            windowId: 1,
+            viewIndex: 0,
+            selectedTabIds: [],
           },
         });
       });
@@ -279,12 +272,12 @@ describe('パネル内D&Dの統合テスト', () => {
 
       const dragEndEvent = {
         active: {
-          id: 'node-2',
+          id: 2,
           data: { current: undefined },
           rect: { current: { initial: null, translated: null } },
         },
         over: {
-          id: 'node-1',
+          id: 1,
           data: { current: undefined },
           rect: null,
           disabled: false,
@@ -302,10 +295,11 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(sendMessageMock).toHaveBeenCalledWith({
           type: 'MOVE_NODE',
           payload: {
-            nodeId: 'node-2',
-            targetParentId: 'node-1',
-            viewId: 'default',
-            selectedNodeIds: [],
+            tabId: 2,
+            targetParentTabId: 1,
+            windowId: 1,
+            viewIndex: 0,
+            selectedTabIds: [],
           },
         });
       });
@@ -333,12 +327,12 @@ describe('パネル内D&Dの統合テスト', () => {
 
       const dragEndEvent = {
         active: {
-          id: 'node-2',
+          id: 2,
           data: { current: undefined },
           rect: { current: { initial: null, translated: null } },
         },
         over: {
-          id: 'node-1',
+          id: 1,
           data: { current: undefined },
           rect: null,
           disabled: false,
@@ -356,10 +350,11 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(sendMessageMock).toHaveBeenCalledWith({
           type: 'MOVE_NODE',
           payload: {
-            nodeId: 'node-2',
-            targetParentId: 'node-1',
-            viewId: 'default',
-            selectedNodeIds: [],
+            tabId: 2,
+            targetParentTabId: 1,
+            windowId: 1,
+            viewIndex: 0,
+            selectedTabIds: [],
           },
         });
       });
@@ -372,7 +367,6 @@ describe('パネル内D&Dの統合テスト', () => {
         </TreeStateProvider>
       );
 
-      // Note: data-testid is tree-node-{tabId} (not tree-node-{nodeId})
       await waitFor(() => {
         expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
         expect(screen.getByTestId('tree-node-3')).toBeInTheDocument();
@@ -390,47 +384,40 @@ describe('パネル内D&Dの統合テスト', () => {
   describe('エラーケースとエッジケース', () => {
     it('循環参照を防ぐ', async () => {
       const mockChrome = getMockChrome();
-      mockChrome.storage.local.get.mockResolvedValue({
-        tree_state: {
-          views: {
-            default: {
-              info: { id: 'default', name: 'Default', color: '#3b82f6' },
-              rootNodeIds: ['node-1'],
-              nodes: {
-                'node-1': {
-                  id: 'node-1',
-                  tabId: 1,
-                  parentId: null,
-                  children: [
-                    {
-                      id: 'node-2',
-                      tabId: 2,
-                      parentId: 'node-1',
-                      children: [],
-                      isExpanded: true,
-                      depth: 1,
-                    },
-                  ],
-                  isExpanded: true,
-                  depth: 0,
-                },
-                'node-2': {
-                  id: 'node-2',
-                  tabId: 2,
-                  parentId: 'node-1',
-                  children: [],
-                  isExpanded: true,
-                  depth: 1,
-                },
+      const mockTreeStateForCircular: TreeState = {
+        windows: [
+          {
+            windowId: 1,
+            views: [
+              {
+                name: 'Default',
+                color: '#3b82f6',
+                rootNodes: [
+                  {
+                    tabId: 1,
+                    children: [
+                      {
+                        tabId: 2,
+                        children: [],
+                        isExpanded: true,
+                      },
+                    ],
+                    isExpanded: true,
+                  },
+                ],
+                pinnedTabIds: [],
               },
-            },
+            ],
+            activeViewIndex: 0,
           },
-          currentViewId: 'default',
-          tabToNode: {
-            '1': { viewId: 'default', nodeId: 'node-1' },
-            '2': { viewId: 'default', nodeId: 'node-2' },
-          },
-        },
+        ],
+      };
+
+      mockChrome.runtime.sendMessage.mockImplementation((message: unknown) => {
+        if ((message as { type: string }).type === 'GET_STATE') {
+          return Promise.resolve({ success: true, data: mockTreeStateForCircular });
+        }
+        return Promise.resolve({ success: true });
       });
 
       let testHandleDragEnd: ((event: DragEndEvent) => void) | undefined;
@@ -453,12 +440,12 @@ describe('パネル内D&Dの統合テスト', () => {
 
       const dragEndEvent = {
         active: {
-          id: 'node-1',
+          id: 1,
           data: { current: undefined },
           rect: { current: { initial: null, translated: null } },
         },
         over: {
-          id: 'node-2',
+          id: 2,
           data: { current: undefined },
           rect: null,
           disabled: false,
@@ -472,15 +459,15 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
-      // 循環参照チェックはServiceWorker側で行われるため、メッセージは送信される
       await waitFor(() => {
         expect(sendMessageMock).toHaveBeenCalledWith({
           type: 'MOVE_NODE',
           payload: {
-            nodeId: 'node-1',
-            targetParentId: 'node-2',
-            viewId: 'default',
-            selectedNodeIds: [],
+            tabId: 1,
+            targetParentTabId: 2,
+            windowId: 1,
+            viewIndex: 0,
+            selectedTabIds: [],
           },
         });
       });
@@ -505,14 +492,17 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
+      // Clear mock calls before the drag event to check MOVE_NODE is not called
+      sendMessageMock.mockClear();
+
       const dragEndEvent = {
         active: {
-          id: 'node-1',
+          id: 1,
           data: { current: undefined },
           rect: { current: { initial: null, translated: null } },
         },
         over: {
-          id: 'node-1',
+          id: 1,
           data: { current: undefined },
           rect: null,
           disabled: false,
@@ -526,7 +516,9 @@ describe('パネル内D&Dの統合テスト', () => {
         await testHandleDragEnd!(dragEndEvent);
       });
 
-      expect(sendMessageMock).not.toHaveBeenCalled();
+      expect(sendMessageMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'MOVE_NODE' })
+      );
     });
   });
 });

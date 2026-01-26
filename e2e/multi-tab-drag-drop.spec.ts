@@ -13,18 +13,42 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
-
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
+    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+    ], 0);
+
+    const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
       { tabId: tabId3, depth: 0 },
@@ -64,7 +88,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId4, depth: 0 },
       { tabId: tabId5, depth: 0 },
       { tabId: tabId1, depth: 0 },
@@ -73,10 +96,39 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     await closeTab(serviceWorker, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId4);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId5);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
   });
 
   test('Ctrl+クリックで飛び飛びに選択したタブをドラッグ&ドロップすると全てが移動する', async ({
@@ -86,18 +138,42 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
-
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
+    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+    ], 0);
+
+    const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
       { tabId: tabId3, depth: 0 },
@@ -135,7 +211,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId3, depth: 0 },
       { tabId: tabId5, depth: 0 },
@@ -144,10 +219,39 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     await closeTab(serviceWorker, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId4);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId5, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId5);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
   });
 
   test('選択されていないタブをドラッグするとそのタブだけが移動する', async ({
@@ -157,17 +261,33 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
-
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
+    const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
       { tabId: tabId3, depth: 0 },
@@ -198,7 +318,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
       { tabId: tabId4, depth: 0 },
@@ -206,9 +325,30 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     await closeTab(serviceWorker, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+      { tabId: tabId3, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId4, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId4);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
   });
 
   test('複数選択したタブを別のタブの子としてドロップすると全て子になる', async ({
@@ -218,17 +358,33 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
-    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
-
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
+
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
+    const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
@@ -261,7 +417,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: tabId1, depth: 1 },
       { tabId: tabId2, depth: 1 },
@@ -269,9 +424,30 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     await closeTab(serviceWorker, tabId1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
+      { tabId: tabId2, depth: 1 },
+      { tabId: tabId3, depth: 1 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0, expanded: true },
+      { tabId: tabId3, depth: 1 },
+    ], 0);
+
     await closeTab(serviceWorker, tabId3);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
   });
 
   test('親タブと子タブを同時に選択してドラッグするとサブツリー構造が保持される', async ({
@@ -281,20 +457,18 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentA = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentA, depth: 0 },
     ], 0);
 
     const childA1 = await createTab(serviceWorker, getTestServerUrl('/page'), parentA);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentA, depth: 0, expanded: true },
       { tabId: childA1, depth: 1 },
     ], 0);
@@ -302,7 +476,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const childA2 = await createTab(serviceWorker, getTestServerUrl('/page'), parentA);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentA, depth: 0, expanded: true },
       { tabId: childA1, depth: 1 },
       { tabId: childA2, depth: 1 },
@@ -311,7 +484,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const targetTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentA, depth: 0, expanded: true },
       { tabId: childA1, depth: 1 },
       { tabId: childA2, depth: 1 },
@@ -346,7 +518,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: targetTab, depth: 0, expanded: true },
       { tabId: parentA, depth: 1, expanded: true },
       { tabId: childA1, depth: 2 },
@@ -354,9 +525,30 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     await closeTab(serviceWorker, childA1);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: targetTab, depth: 0, expanded: true },
+      { tabId: parentA, depth: 1, expanded: true },
+      { tabId: childA2, depth: 2 },
+    ], 0);
+
     await closeTab(serviceWorker, childA2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: targetTab, depth: 0, expanded: true },
+      { tabId: parentA, depth: 1 },
+    ], 0);
+
     await closeTab(serviceWorker, parentA);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: targetTab, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, targetTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
   });
 
   test('深いネストのサブツリーを複数選択してドラッグしても構造が保持される', async ({
@@ -366,20 +558,18 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     await setUserSettings(extensionContext, { newTabPositionManual: 'end' });
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const grandparent = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: grandparent, depth: 0 },
     ], 0);
 
     const parent = await createTab(serviceWorker, getTestServerUrl('/page'), grandparent);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: grandparent, depth: 0, expanded: true },
       { tabId: parent, depth: 1 },
     ], 0);
@@ -387,7 +577,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const child = await createTab(serviceWorker, getTestServerUrl('/page'), parent);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: grandparent, depth: 0, expanded: true },
       { tabId: parent, depth: 1, expanded: true },
       { tabId: child, depth: 2 },
@@ -396,7 +585,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const grandchild = await createTab(serviceWorker, getTestServerUrl('/page'), child);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: grandparent, depth: 0, expanded: true },
       { tabId: parent, depth: 1, expanded: true },
       { tabId: child, depth: 2, expanded: true },
@@ -406,7 +594,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     const targetTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: grandparent, depth: 0, expanded: true },
       { tabId: parent, depth: 1, expanded: true },
       { tabId: child, depth: 2, expanded: true },
@@ -442,7 +629,6 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: grandparent, depth: 0 },
       { tabId: targetTab, depth: 0 },
       { tabId: parent, depth: 0, expanded: true },
@@ -451,9 +637,38 @@ test.describe('複数タブのドラッグ&ドロップ', () => {
     ], 0);
 
     await closeTab(serviceWorker, grandchild);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: grandparent, depth: 0 },
+      { tabId: targetTab, depth: 0 },
+      { tabId: parent, depth: 0, expanded: true },
+      { tabId: child, depth: 1 },
+    ], 0);
+
     await closeTab(serviceWorker, child);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: grandparent, depth: 0 },
+      { tabId: targetTab, depth: 0 },
+      { tabId: parent, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, parent);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: grandparent, depth: 0 },
+      { tabId: targetTab, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, grandparent);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: targetTab, depth: 0 },
+    ], 0);
+
     await closeTab(serviceWorker, targetTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
   });
 });

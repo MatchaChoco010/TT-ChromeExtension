@@ -114,6 +114,9 @@ describe('SidePanelRoot', () => {
   });
 
   it('ローディング状態が表示されること', async () => {
+    // sendMessageを保留状態にしてローディング状態を維持する
+    mockRuntimeSendMessage.mockImplementation(() => new Promise(() => {}));
+
     await act(async () => {
       render(<SidePanelRoot />);
     });

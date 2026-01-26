@@ -82,20 +82,18 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
     ], 0);
 
     const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
     ], 0);
@@ -103,7 +101,6 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
       { tabId: tab3, depth: 0 },
@@ -125,7 +122,18 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     const finalScrollLeft = await container.evaluate((el) => el.scrollLeft);
     expect(finalScrollLeft).toBe(initialScrollLeft);
 
+    // マウスをコンテナ内に戻してからドロップ（ドラッグアウトを防ぐ）
+    if (box) {
+      await sidePanelPage.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 1 });
+    }
+
     await dropTab(sidePanelPage);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+      { tabId: tab2, depth: 0 },
+      { tabId: tab3, depth: 0 },
+    ], 0);
   });
 
   test('ドラッグ中にツリービューが必要以上に縦スクロールしないことを検証する', async ({
@@ -133,20 +141,18 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
     ], 0);
 
     const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
     ], 0);
@@ -154,7 +160,6 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
       { tabId: tab3, depth: 0 },
@@ -187,7 +192,18 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       expect(finalScrollTop).toBeLessThanOrEqual(maxScroll);
     }
 
+    // マウスをコンテナ内に戻してからドロップ（ドラッグアウトを防ぐ）
+    if (box) {
+      await sidePanelPage.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 1 });
+    }
+
     await dropTab(sidePanelPage);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tab1, depth: 0 },
+      { tabId: tab2, depth: 0 },
+      { tabId: tab3, depth: 0 },
+    ], 0);
   });
 
   test('コンテンツがビューポートを超えている場合のみスクロールが許可されることを検証する', async ({
@@ -195,19 +211,18 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabs: number[] = [];
     for (let i = 1; i <= 12; i++) {
       const tab = await createTab(serviceWorker, getTestServerUrl(`/page${i}`));
       tabs.push(tab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        ...tabs.map(t => ({ tabId: t, depth: 0 })),
+      ], 0);
     }
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      ...tabs.map(t => ({ tabId: t, depth: 0 })),
-    ], 0);
 
     const container = sidePanelPage.locator('[data-testid="tab-tree-view"]');
     await expect(container).toBeVisible();
@@ -236,6 +251,10 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       expect(scrolledTop).toBeGreaterThanOrEqual(0);
 
       await dropTab(sidePanelPage);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        ...tabs.map(t => ({ tabId: t, depth: 0 })),
+      ], 0);
     } else {
       test.info().annotations.push({
         type: 'limitation',
@@ -249,19 +268,18 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabs: number[] = [];
     for (let i = 1; i <= 8; i++) {
       const tab = await createTab(serviceWorker, getTestServerUrl(`/page${i}`));
       tabs.push(tab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        ...tabs.map(t => ({ tabId: t, depth: 0 })),
+      ], 0);
     }
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      ...tabs.map(t => ({ tabId: t, depth: 0 })),
-    ], 0);
 
     const container = sidePanelPage.locator('[data-testid="tab-tree-view"]');
     await expect(container).toBeVisible();
@@ -298,6 +316,10 @@ test.describe('ドラッグ＆ドロップ中のスクロール制限', () => {
       }
 
       await dropTab(sidePanelPage);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        ...tabs.map(t => ({ tabId: t, depth: 0 })),
+      ], 0);
     } else {
       test.info().annotations.push({
         type: 'limitation',

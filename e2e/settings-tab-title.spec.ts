@@ -20,7 +20,7 @@ test.describe('設定タブのタイトル表示', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
@@ -40,7 +40,6 @@ test.describe('設定タブのタイトル表示', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: settingsTabId, depth: 0 },
     ], 0);
 
@@ -78,7 +77,6 @@ test.describe('設定タブのタイトル表示', () => {
     await closeTab(serviceWorker, settingsTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
@@ -102,7 +100,7 @@ test.describe('内部ページのタイトル表示', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
@@ -122,7 +120,6 @@ test.describe('内部ページのタイトル表示', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
 
@@ -155,7 +152,6 @@ test.describe('内部ページのタイトル表示', () => {
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
@@ -164,7 +160,7 @@ test.describe('内部ページのタイトル表示', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
@@ -184,7 +180,6 @@ test.describe('内部ページのタイトル表示', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
 
@@ -222,7 +217,6 @@ test.describe('内部ページのタイトル表示', () => {
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
@@ -231,7 +225,7 @@ test.describe('内部ページのタイトル表示', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
@@ -251,7 +245,6 @@ test.describe('内部ページのタイトル表示', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabId, depth: 0 },
     ], 0);
 
@@ -274,7 +267,6 @@ test.describe('内部ページのタイトル表示', () => {
     await closeTab(serviceWorker, tabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 });
@@ -286,7 +278,7 @@ test.describe('タイトル表示の安定性テスト', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     await expect(sidePanelPage.locator(COMMON_SELECTORS.sidePanelRoot)).toBeVisible({
@@ -309,7 +301,6 @@ test.describe('タイトル表示の安定性テスト', () => {
 
       const expectedStructure = [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         ...tabIds.map(id => ({ tabId: id, depth: 0 })),
       ];
       await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);
@@ -352,7 +343,6 @@ test.describe('タイトル表示の安定性テスト', () => {
       const remainingTabs = tabIds.slice(0, i);
       const expectedStructure = [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         ...remainingTabs.map(id => ({ tabId: id, depth: 0 })),
       ];
       await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);

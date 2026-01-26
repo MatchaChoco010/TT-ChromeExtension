@@ -18,27 +18,28 @@ describe('SnapshotManager', () => {
   let storageService: IStorageService;
   let snapshotManager: SnapshotManager;
 
+  // New hierarchical TreeState structure
   const mockTreeState: TreeState = {
-    views: {
-      'default': {
-        info: { id: 'default', name: 'Default', color: '#3B82F6' },
-        rootNodeIds: ['node-1'],
-        nodes: {
-          'node-1': {
-            id: 'node-1',
-            tabId: 1,
-            parentId: null,
-            children: [],
-            isExpanded: true,
-            depth: 0,
+    windows: [
+      {
+        windowId: 1,
+        views: [
+          {
+            name: 'Default',
+            color: '#3B82F6',
+            rootNodes: [
+              {
+                tabId: 1,
+                isExpanded: true,
+                children: [],
+              },
+            ],
+            pinnedTabIds: [],
           },
-        },
+        ],
+        activeViewIndex: 0,
       },
-    },
-    viewOrder: ['default'],
-    currentViewId: 'default',
-    tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
-    treeStructure: [],
+    ],
   };
 
   const mockSettings: UserSettings = {
@@ -69,9 +70,12 @@ describe('SnapshotManager', () => {
     vi.stubGlobal('chrome', {
       tabs: {
         query: vi.fn().mockResolvedValue([
-          { id: 1, url: 'https://example.com', title: 'Example' },
+          { id: 1, url: 'https://example.com', title: 'Example', windowId: 1 },
         ]),
         create: vi.fn().mockResolvedValue({ id: 2 }),
+      },
+      windows: {
+        create: vi.fn().mockResolvedValue({ id: 2, tabs: [{ id: 100 }] }),
       },
       alarms: {
         create: vi.fn(),
@@ -131,17 +135,29 @@ describe('SnapshotManager', () => {
         data: {
           views: [{ id: 'default', name: 'Default', color: '#3B82F6' }],
           tabs: [
-            { url: 'https://example.com', title: 'Example', parentId: null, viewId: 'default' },
+            {
+              index: 0,
+              url: 'https://example.com',
+              title: 'Example',
+              parentIndex: null,
+              viewId: 'Default',
+              isExpanded: true,
+              pinned: false,
+              windowIndex: 0,
+            },
           ],
-          groups: [],
         },
       });
 
       await snapshotManager.restoreFromJson(snapshotJson);
 
+      // Should create a new window and a tab
+      expect(chrome.windows.create).toHaveBeenCalled();
       expect(chrome.tabs.create).toHaveBeenCalledWith({
         url: 'https://example.com',
         active: false,
+        pinned: false,
+        windowId: 2,
       });
     });
   });

@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import SidePanelRoot from '@/sidepanel/components/SidePanelRoot';
 import { chromeMock } from '@/test/chrome-mock';
-import type { TabNode } from '@/types';
+import type { TabNode, WindowState } from '@/types';
 
 function measurePerformance(fn: () => void | Promise<void>): number {
   const start = performance.now();
@@ -25,16 +25,31 @@ async function measureAsyncPerformance(fn: () => Promise<void>): Promise<number>
 function generateMockTabs(count: number): TabNode[] {
   const tabs: TabNode[] = [];
   for (let i = 0; i < count; i++) {
-    tabs.push({
-      id: `node-${i}`,
-      tabId: i + 1,
-      parentId: i > 0 && i % 5 === 0 ? `node-${i - 1}` : null,
-      children: [],
-      isExpanded: true,
-      depth: i % 5 === 0 ? 1 : 0,
-    });
+    const isParent = i > 0 && i % 5 === 0;
+    if (isParent && tabs.length > 0) {
+      const parentTab = tabs[tabs.length - 1];
+      parentTab.children.push({
+        tabId: i + 1,
+        isExpanded: true,
+        children: [],
+      });
+    } else {
+      tabs.push({
+        tabId: i + 1,
+        isExpanded: true,
+        children: [],
+      });
+    }
   }
   return tabs;
+}
+
+function generateMockWindowState(tabs: TabNode[]): WindowState {
+  return {
+    windowId: 1,
+    views: [{ name: 'Default', color: '#000000', rootNodes: tabs, pinnedTabIds: [] }],
+    activeViewIndex: 0,
+  };
 }
 
 describe('パフォーマンステスト', () => {
@@ -46,13 +61,14 @@ describe('パフォーマンステスト', () => {
   describe('100タブ以上でのレンダリング性能', () => {
     it('100タブのレンダリングが500ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(100);
+      const windowState = generateMockWindowState(mockTabs);
 
       chromeMock.runtime.sendMessage.mockResolvedValue({
         success: true,
         data: {
-          nodes: mockTabs,
-          currentViewId: 'default-view',
-          views: [{ id: 'default-view', name: 'Default', color: '#000000' }],
+          windows: [windowState],
+          currentViewIndex: 0,
+          viewTabCounts: [100],
         },
       });
 
@@ -67,13 +83,14 @@ describe('パフォーマンステスト', () => {
 
     it('200タブのレンダリングが1000ms以内に完了すること', async () => {
       const mockTabs = generateMockTabs(200);
+      const windowState = generateMockWindowState(mockTabs);
 
       chromeMock.runtime.sendMessage.mockResolvedValue({
         success: true,
         data: {
-          nodes: mockTabs,
-          currentViewId: 'default-view',
-          views: [{ id: 'default-view', name: 'Default', color: '#000000' }],
+          windows: [windowState],
+          currentViewIndex: 0,
+          viewTabCounts: [200],
         },
       });
 
@@ -96,14 +113,31 @@ describe('パフォーマンステスト', () => {
 
       for (let i = 0; i < 60; i++) {
         const frameTime = measurePerformance(() => {
-          const draggedNodeId = `node-${i % 100}`;
-          const hoveredNodeId = `node-${(i + 1) % 100}`;
+          const draggedTabId = (i % 100) + 1;
+          const hoveredTabId = ((i + 1) % 100) + 1;
 
-          mockTabs.find((tab) => tab.id === draggedNodeId);
-          mockTabs.find((tab) => tab.id === hoveredNodeId);
+          const findTab = (nodes: TabNode[], targetId: number): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.tabId === targetId) return node;
+              const found = findTab(node.children, targetId);
+              if (found) return found;
+            }
+            return undefined;
+          };
 
-          const newTree = [...mockTabs];
-          newTree.sort((a, b) => a.depth - b.depth);
+          findTab(mockTabs, draggedTabId);
+          findTab(mockTabs, hoveredTabId);
+
+          const flattenTabs = (nodes: TabNode[]): TabNode[] => {
+            const result: TabNode[] = [];
+            for (const node of nodes) {
+              result.push(node);
+              result.push(...flattenTabs(node.children));
+            }
+            return result;
+          };
+
+          flattenTabs(mockTabs);
         });
 
         totalFrameTime += frameTime;

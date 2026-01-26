@@ -3,20 +3,47 @@ export interface GroupInfo {
   color: string;
 }
 
+/**
+ * タブノード（ツリー構造）
+ * 階層構造は children 配列で直接表現
+ */
 export interface TabNode {
-  id: string;
   tabId: number;
-  parentId: string | null;
-  children: TabNode[];
   isExpanded: boolean;
-  depth: number;
   groupInfo?: GroupInfo;
+  children: TabNode[];
 }
 
+/**
+ * UI表示用のタブノード
+ * TabNodeにdepth（UI表示用のインデント深さ）を追加
+ */
+export interface UITabNode {
+  tabId: number;
+  isExpanded: boolean;
+  groupInfo?: GroupInfo;
+  children: UITabNode[];
+  depth: number;
+}
+
+/**
+ * ビュー（タブツリーのコンテナ）
+ */
 export interface ViewState {
-  info: View;
-  rootNodeIds: string[];
-  nodes: Record<string, TabNode>;
+  name: string;
+  color: string;
+  icon?: string;
+  rootNodes: TabNode[];
+  pinnedTabIds: number[];
+}
+
+/**
+ * ウィンドウ（ビューのコンテナ）
+ */
+export interface WindowState {
+  windowId: number;
+  views: ViewState[];
+  activeViewIndex: number;
 }
 
 export interface TabInfo {
@@ -83,31 +110,16 @@ export interface TreeStructureEntry {
   viewId: string;
   isExpanded: boolean;
   groupInfo?: GroupInfo;
+  windowId?: number;
 }
 
+/**
+ * ツリー状態（新アーキテクチャ）
+ * Window → View → Tab の階層構造を直接反映
+ */
 export interface TreeState {
-  /** ビューID -> ViewState のマップ。ビュー毎にタブツリーを管理 */
-  views: Record<string, ViewState>;
-  /** ビューの表示順序（ビューIDの配列） */
-  viewOrder: string[];
-  currentViewId: string;
-  /**
-   * ウィンドウごとの現在のビューID
-   * 各ウィンドウが独立したビューを表示できるようにする
-   */
-  currentViewByWindowId?: Record<number, string>;
-  /** タブID -> { viewId, nodeId } のマップ */
-  tabToNode: Record<number, { viewId: string; nodeId: string }>;
-  /**
-   * ツリー構造（順序付き）
-   * ブラウザ再起動時にタブIDが変わっても親子関係を復元するために使用
-   */
-  treeStructure: TreeStructureEntry[];
-  /**
-   * ウィンドウ毎のピン留めタブIDリスト（順序付き）
-   * TreeStateManagerがピン留め状態のSingle Source of Truth
-   */
-  pinnedTabIdsByWindow?: Record<number, number[]>;
+  /** ウィンドウの配列（順序を持つ） */
+  windows: WindowState[];
 }
 
 /** タブタイトルマップ (tabId -> title) */
@@ -213,9 +225,9 @@ export type MessageType =
   | { type: 'SYNC_TABS' }
   | { type: 'REFRESH_TREE_STRUCTURE' }
   | { type: 'STATE_UPDATED' }
-  | { type: 'CREATE_GROUP'; payload: { tabIds: number[]; groupName?: string } }
+  | { type: 'CREATE_GROUP'; payload: { tabIds: number[]; groupName?: string; contextMenuTabId?: number } }
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
-  | { type: 'UPDATE_GROUP_NAME'; payload: { nodeId: string; name: string } }
+  | { type: 'UPDATE_GROUP_NAME'; payload: { tabId: number; name: string } }
   | { type: 'CREATE_SNAPSHOT' }
   | {
       type: 'RESTORE_SNAPSHOT';
@@ -248,56 +260,56 @@ export type MessageType =
   | {
       type: 'MOVE_NODE';
       payload: {
-        nodeId: string;
-        targetParentId: string;
-        viewId: string;
-        selectedNodeIds: string[];
+        tabId: number;
+        targetParentTabId: number | null;
+        windowId: number;
+        selectedTabIds: number[];
       };
     }
   | {
       type: 'MOVE_NODE_AS_SIBLING';
       payload: {
-        nodeId: string;
-        aboveNodeId?: string;
-        belowNodeId?: string;
-        viewId: string;
-        selectedNodeIds: string[];
+        tabId: number;
+        aboveTabId?: number;
+        belowTabId?: number;
+        windowId: number;
+        selectedTabIds: number[];
       };
     }
   | {
       type: 'SWITCH_VIEW';
       payload: {
-        viewId: string;
+        viewIndex: number;
         windowId: number;
-        previousViewId: string;
+        previousViewIndex: number;
         activeTabId: number | null;
       };
     }
-  | { type: 'CREATE_VIEW' }
-  | { type: 'DELETE_VIEW'; payload: { viewId: string } }
+  | { type: 'CREATE_VIEW'; payload: { windowId: number } }
+  | { type: 'DELETE_VIEW'; payload: { windowId: number; viewIndex: number } }
   | {
       type: 'UPDATE_VIEW';
-      payload: { viewId: string; updates: Partial<View> };
+      payload: { windowId: number; viewIndex: number; updates: Partial<View> };
     }
   | {
       type: 'TOGGLE_NODE_EXPAND';
-      payload: { nodeId: string; viewId: string };
+      payload: { tabId: number; windowId: number };
     }
   | {
       type: 'MOVE_TABS_TO_VIEW';
-      payload: { targetViewId: string; tabIds: number[] };
+      payload: { targetViewIndex: number; tabIds: number[]; windowId: number };
     }
   | {
       type: 'DELETE_TREE_GROUP';
-      payload: { nodeId: string; viewId: string };
+      payload: { tabId: number; windowId: number };
     }
   | {
       type: 'ADD_TAB_TO_TREE_GROUP';
-      payload: { nodeId: string; targetGroupNodeId: string; viewId: string };
+      payload: { tabId: number; targetGroupTabId: number; windowId: number };
     }
   | {
       type: 'REMOVE_TAB_FROM_TREE_GROUP';
-      payload: { nodeId: string; viewId: string };
+      payload: { tabId: number; windowId: number };
     }
   | {
       type: 'SAVE_GROUPS';
@@ -352,48 +364,48 @@ export interface DragEndResult {
  * タブ上へのドロップ（子として配置）はDropTargetType.Tab + onDragEndで別途処理。
  *
  * ドロップ位置の判定:
- * - aboveNodeId === undefined: リスト先頭（最初のタブの上）
- * - belowNodeId === undefined: リスト末尾（最後のタブの下）
+ * - aboveTabId === undefined: リスト先頭（最初のタブの上）
+ * - belowTabId === undefined: リスト末尾（最後のタブの下）
  * - 両方存在: タブ間の隙間
  */
 export interface SiblingDropInfo {
-  /** ドラッグ中のノードID */
-  activeNodeId: string;
+  /** ドラッグ中のタブID */
+  activeTabId: number;
   insertIndex: number;
-  /** 上のノードのID（リスト先頭の場合はundefined） */
-  aboveNodeId?: string;
-  /** 下のノードのID（リスト末尾の場合はundefined） */
-  belowNodeId?: string;
+  /** 上のタブID（リスト先頭の場合はundefined） */
+  aboveTabId?: number;
+  /** 下のタブID（リスト末尾の場合はundefined） */
+  belowTabId?: number;
 }
 
 export interface TabTreeViewProps {
-  nodes: TabNode[];
-  currentViewId: string;
+  nodes: UITabNode[];
+  currentViewIndex: number;
   onNodeClick: (tabId: number) => void;
-  onToggleExpand: (nodeId: string) => void;
+  onToggleExpand: (tabId: number) => void;
   onDragEnd?: (event: DragEndEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
   onDragStart?: (event: DragStartEvent) => void;
   onDragCancel?: () => void;
   onSiblingDrop?: (info: SiblingDropInfo) => Promise<void>;
   isTabUnread?: (tabId: number) => boolean;
-  getUnreadChildCount?: (nodeId: string) => number;
+  getUnreadChildCount?: (tabId: number) => number;
   activeTabId?: number;
   getTabInfo?: (tabId: number) => ExtendedTabInfo | undefined;
-  isNodeSelected?: (nodeId: string) => boolean;
-  onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
+  isNodeSelected?: (tabId: number) => boolean;
+  onSelect?: (tabId: number, modifiers: { shift: boolean; ctrl: boolean }) => void;
   getSelectedTabIds?: () => number[];
   clearSelection?: () => void;
   onSnapshot?: () => Promise<void>;
   views?: View[];
-  onMoveToView?: (viewId: string, tabIds: number[]) => void;
+  onMoveToView?: (viewIndex: number, tabIds: number[]) => void;
   currentWindowId?: number;
   otherWindows?: WindowInfo[];
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
   onExternalDrop?: (tabId: number) => void;
   onOutsideTreeChange?: (isOutside: boolean) => void;
   sidePanelRef?: React.RefObject<HTMLElement | null>;
-  onGroupRequest?: (tabIds: number[]) => void;
+  onGroupRequest?: (tabIds: number[], contextMenuTabId: number) => void;
 }
 
 export type MenuAction =
@@ -430,8 +442,8 @@ export interface ContextMenuProps {
   hasChildren?: boolean;
   tabUrl?: string;
   views?: View[];
-  currentViewId?: string;
-  onMoveToView?: (viewId: string, tabIds: number[]) => void;
+  currentViewIndex?: number;
+  onMoveToView?: (viewIndex: number, tabIds: number[]) => void;
   currentWindowId?: number;
   otherWindows?: WindowInfo[];
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;

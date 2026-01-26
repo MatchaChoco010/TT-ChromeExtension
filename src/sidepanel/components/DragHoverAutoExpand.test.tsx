@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
+import type { UITabNode } from '@/types';
 
 describe('ドラッグホバー時のブランチ自動展開', () => {
   beforeEach(() => {
@@ -20,22 +21,19 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
     const handleDragEnd = vi.fn();
     const handleDragOver = vi.fn();
 
-    const testNodes = [
+    const testNodes: UITabNode[] = [
       {
-        id: 'node-1',
         tabId: 1,
-        parentId: null,
         children: [],
         isExpanded: true,
         depth: 0,
-        viewId: 'default',
       },
     ];
 
     const { container } = render(
       <TabTreeView
         nodes={testNodes}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={vi.fn()}
         onToggleExpand={handleToggleExpand}
         onDragEnd={handleDragEnd}
@@ -52,32 +50,26 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
     const handleToggleExpand = vi.fn();
     const handleDragEnd = vi.fn();
 
-    const testNodes = [
+    const testNodes: UITabNode[] = [
       {
-        id: 'node-3',
         tabId: 3,
-        parentId: null,
         children: [
           {
-            id: 'node-4',
             tabId: 4,
-            parentId: 'node-3',
             children: [],
             isExpanded: false,
             depth: 1,
-            viewId: 'default',
           },
         ],
         isExpanded: false,
         depth: 0,
-        viewId: 'default',
       },
     ];
 
     render(
       <TabTreeView
         nodes={testNodes}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={vi.fn()}
         onToggleExpand={handleToggleExpand}
         onDragEnd={handleDragEnd}
@@ -99,22 +91,19 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
     const handleToggleExpand = vi.fn();
     const handleDragEnd = vi.fn();
 
-    const testNodes = [
+    const testNodes: UITabNode[] = [
       {
-        id: 'node-1',
         tabId: 1,
-        parentId: null,
         children: [],
         isExpanded: true,
         depth: 0,
-        viewId: 'default',
       },
     ];
 
     const { container } = render(
       <TabTreeView
         nodes={testNodes}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={vi.fn()}
         onToggleExpand={handleToggleExpand}
         onDragEnd={handleDragEnd}

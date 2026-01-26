@@ -325,11 +325,31 @@ export async function assertTabStructure(
         const { expectedTabIds: _expectedTabIds, windowId } = args;
         const treeState = globalThis.treeStateManager;
 
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
+        }
+        interface TreeStateJson {
+          windows: { windowId: number; views: { rootNodes: TabNode[] }[] }[];
+        }
+
+        const collectTabIds = (nodes: TabNode[]): number[] => {
+          let ids: number[] = [];
+          for (const node of nodes) {
+            ids.push(node.tabId);
+            ids = ids.concat(collectTabIds(node.children));
+          }
+          return ids;
+        };
+
         const treeTabIds: number[] = [];
         if (treeState) {
-          const json = treeState.toJSON();
-          for (const tabIdStr of Object.keys(json.tabToNode)) {
-            treeTabIds.push(parseInt(tabIdStr, 10));
+          const json = treeState.toJSON() as TreeStateJson;
+          const windowState = json.windows.find(w => w.windowId === windowId);
+          if (windowState) {
+            for (const view of windowState.views) {
+              treeTabIds.push(...collectTabIds(view.rootNodes));
+            }
           }
         }
 
@@ -338,43 +358,22 @@ export async function assertTabStructure(
 
         const missingTabIds = chromeTabIds.filter(id => !treeTabIds.includes(id));
 
-        type TabCreationLog = { tabId: number; timestamp: number; message: string };
-        const getTabCreationLogs = globalThis.getTabCreationLogs as ((tabId?: number) => TabCreationLog[]) | undefined;
-        const missingTabLogs: Record<number, TabCreationLog[]> = {};
-        if (getTabCreationLogs) {
-          for (const tabId of missingTabIds) {
-            missingTabLogs[tabId] = getTabCreationLogs(tabId);
-          }
-        }
-
         return {
           treeTabIds,
           chromeTabIds,
-          syncCompleted: treeState?.isSyncCompleted?.() ?? 'unknown',
-          syncInProgress: treeState?.isSyncInProgress?.() ?? 'unknown',
+          initialized: treeState?.isInitialized?.() ?? 'unknown',
+          initializationInProgress: treeState?.isInitializationInProgress?.() ?? 'unknown',
           missingTabIds,
-          missingTabLogs,
         };
       }, { expectedTabIds: expectedStructure.map(e => e.tabId), windowId });
 
       errorMessage += `  TreeState tabs: [${swDebug.treeTabIds.join(', ')}]\n`;
       errorMessage += `  Chrome tabs: [${swDebug.chromeTabIds.join(', ')}]\n`;
-      errorMessage += `  Sync completed: ${swDebug.syncCompleted}\n`;
-      errorMessage += `  Sync in progress: ${swDebug.syncInProgress}\n`;
+      errorMessage += `  Initialized: ${swDebug.initialized}\n`;
+      errorMessage += `  Initialization in progress: ${swDebug.initializationInProgress}\n`;
 
       if (swDebug.missingTabIds.length > 0) {
         errorMessage += `  Missing tabs (in Chrome but not in TreeState): [${swDebug.missingTabIds.join(', ')}]\n`;
-        for (const tabId of swDebug.missingTabIds) {
-          const logs = swDebug.missingTabLogs[tabId] || [];
-          if (logs.length > 0) {
-            errorMessage += `    Tab ${tabId} creation logs:\n`;
-            for (const log of logs) {
-              errorMessage += `      - ${log.message}\n`;
-            }
-          } else {
-            errorMessage += `    Tab ${tabId}: NO CREATION LOGS (handleTabCreated never called?)\n`;
-          }
-        }
       }
     }
   } catch (e) {

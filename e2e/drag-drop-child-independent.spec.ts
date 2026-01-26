@@ -14,7 +14,7 @@ test.describe('子タブの独立ドラッグ操作', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -23,14 +23,12 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -38,7 +36,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const otherParentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: otherParentTab, depth: 0 },
@@ -47,7 +44,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: otherParentTab, depth: 0 },
@@ -57,7 +53,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: otherParentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -69,7 +64,7 @@ test.describe('子タブの独立ドラッグ操作', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -78,14 +73,12 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const parentTab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
     ], 0);
 
     const childTab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: childTab1, depth: 0 },
     ], 0);
@@ -93,7 +86,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const parentTab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: childTab1, depth: 0 },
       { tabId: parentTab2, depth: 0 },
@@ -102,7 +94,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const childTab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: childTab1, depth: 0 },
       { tabId: parentTab2, depth: 0 },
@@ -113,7 +104,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0, expanded: true },
       { tabId: childTab1, depth: 1 },
       { tabId: parentTab2, depth: 0 },
@@ -124,7 +114,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0, expanded: true },
       { tabId: childTab1, depth: 1 },
       { tabId: parentTab2, depth: 0, expanded: true },
@@ -135,7 +124,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: parentTab2, depth: 0, expanded: true },
       { tabId: childTab2, depth: 1 },
@@ -148,7 +136,7 @@ test.describe('子タブの独立ドラッグ操作', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -157,14 +145,12 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const rootTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
     ], 0);
 
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
@@ -172,7 +158,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const grandchildTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: grandchildTab, depth: 0 },
@@ -181,7 +166,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const otherRootTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: grandchildTab, depth: 0 },
@@ -192,7 +176,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab, depth: 1 },
       { tabId: grandchildTab, depth: 0 },
@@ -203,7 +186,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab, depth: 1, expanded: true },
       { tabId: grandchildTab, depth: 2 },
@@ -214,7 +196,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootTab, depth: 0, expanded: true },
       { tabId: parentTab, depth: 1 },
       { tabId: otherRootTab, depth: 0, expanded: true },
@@ -227,7 +208,7 @@ test.describe('子タブの独立ドラッグ操作', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -236,14 +217,12 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab1, depth: 0 },
     ], 0);
@@ -251,7 +230,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const childTab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab1, depth: 0 },
       { tabId: childTab2, depth: 0 },
@@ -260,7 +238,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
     const otherParentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab1, depth: 0 },
       { tabId: childTab2, depth: 0 },
@@ -271,7 +248,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab1, depth: 1 },
       { tabId: childTab2, depth: 0 },
@@ -282,7 +258,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab1, depth: 1 },
       { tabId: childTab2, depth: 1 },
@@ -293,7 +268,6 @@ test.describe('子タブの独立ドラッグ操作', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab2, depth: 1 },
       { tabId: otherParentTab, depth: 0, expanded: true },
@@ -310,7 +284,7 @@ test.describe('親子関係解消の永続化', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -319,14 +293,12 @@ test.describe('親子関係解消の永続化', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -334,7 +306,6 @@ test.describe('親子関係解消の永続化', () => {
     const siblingTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -344,7 +315,6 @@ test.describe('親子関係解消の永続化', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: siblingTab, depth: 0 },
@@ -354,7 +324,6 @@ test.describe('親子関係解消の永続化', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -366,7 +335,7 @@ test.describe('親子関係解消の永続化', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -375,14 +344,12 @@ test.describe('親子関係解消の永続化', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -390,7 +357,6 @@ test.describe('親子関係解消の永続化', () => {
     const targetTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: targetTab, depth: 0 },
@@ -400,7 +366,6 @@ test.describe('親子関係解消の永続化', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: targetTab, depth: 0 },
@@ -410,7 +375,6 @@ test.describe('親子関係解消の永続化', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: targetTab, depth: 0 },
@@ -420,7 +384,6 @@ test.describe('親子関係解消の永続化', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: targetTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
@@ -432,7 +395,7 @@ test.describe('親子関係解消の永続化', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -441,14 +404,12 @@ test.describe('親子関係解消の永続化', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -456,7 +417,6 @@ test.describe('親子関係解消の永続化', () => {
     const siblingTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -466,7 +426,6 @@ test.describe('親子関係解消の永続化', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: siblingTab, depth: 0 },
@@ -476,7 +435,6 @@ test.describe('親子関係解消の永続化', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -492,31 +450,39 @@ test.describe('親子関係解消の永続化', () => {
 async function waitForStorageParentNull(serviceWorker: Worker, childTabId: number): Promise<void> {
   await waitForCondition(
     async () => {
-      interface TreeNode {
-        id: string;
+      interface TabNode {
         tabId: number;
-        parentId: string | null;
+        isExpanded: boolean;
+        children: TabNode[];
       }
       interface ViewState {
-        nodes: Record<string, TreeNode>;
+        rootNodes: TabNode[];
       }
-      interface LocalTreeState {
-        tabToNode: Record<number, { viewId: string; nodeId: string }>;
-        views: Record<string, ViewState>;
+      interface WindowState {
+        views: ViewState[];
       }
-      const treeState = await serviceWorker.evaluate(async (_childId) => {
-        const result = await chrome.storage.local.get('tree_state');
-        return result.tree_state as LocalTreeState | undefined;
-      }, childTabId);
-      if (treeState?.views && treeState?.tabToNode) {
-        const childNodeInfo = treeState.tabToNode[childTabId];
-        if (childNodeInfo) {
-          const viewState = treeState.views[childNodeInfo.viewId];
-          const childNode = viewState?.nodes[childNodeInfo.nodeId];
-          if (childNode && childNode.parentId === null) {
-            return true;
+      interface TreeState {
+        windows: WindowState[];
+      }
+
+      const isRootNode = (tabId: number, windows: WindowState[]): boolean => {
+        for (const window of windows) {
+          for (const view of window.views) {
+            if (view.rootNodes.some((node) => node.tabId === tabId)) {
+              return true;
+            }
           }
         }
+        return false;
+      };
+
+      const treeState = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        return result.tree_state as TreeState | undefined;
+      });
+
+      if (treeState?.windows) {
+        return isRootNode(childTabId, treeState.windows);
       }
       return false;
     },
@@ -532,7 +498,7 @@ test.describe('元子タブからの新規タブ作成', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -541,14 +507,12 @@ test.describe('元子タブからの新規タブ作成', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -556,7 +520,6 @@ test.describe('元子タブからの新規タブ作成', () => {
     const siblingTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -566,7 +529,6 @@ test.describe('元子タブからの新規タブ作成', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: siblingTab, depth: 0 },
@@ -575,7 +537,6 @@ test.describe('元子タブからの新規タブ作成', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -584,7 +545,6 @@ test.describe('元子タブからの新規タブ作成', () => {
     const newTab = await createTab(serviceWorker, getTestServerUrl('/page'), childTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0, expanded: true },
       { tabId: newTab, depth: 1 },
@@ -597,7 +557,7 @@ test.describe('元子タブからの新規タブ作成', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -606,14 +566,12 @@ test.describe('元子タブからの新規タブ作成', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -621,7 +579,6 @@ test.describe('元子タブからの新規タブ作成', () => {
     const siblingTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -631,7 +588,6 @@ test.describe('元子タブからの新規タブ作成', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: siblingTab, depth: 0 },
@@ -640,7 +596,6 @@ test.describe('元子タブからの新規タブ作成', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -649,7 +604,6 @@ test.describe('元子タブからの新規タブ作成', () => {
     const newTab1 = await createTab(serviceWorker, getTestServerUrl('/page'), childTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0, expanded: true },
       { tabId: newTab1, depth: 1 },
@@ -659,7 +613,6 @@ test.describe('元子タブからの新規タブ作成', () => {
     const newTab2 = await createTab(serviceWorker, getTestServerUrl('/page'), childTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0, expanded: true },
       { tabId: newTab1, depth: 1 },
@@ -677,7 +630,7 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -686,14 +639,12 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -701,7 +652,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const siblingTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -711,7 +661,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: siblingTab, depth: 0 },
@@ -720,7 +669,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -730,7 +678,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: siblingTab, depth: 0 },
@@ -739,7 +686,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -753,7 +699,7 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -762,14 +708,12 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
     ], 0);
@@ -777,7 +721,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const siblingTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -787,7 +730,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: siblingTab, depth: 0 },
@@ -796,7 +738,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0 },
       { tabId: siblingTab, depth: 0 },
@@ -805,7 +746,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const newTab1 = await createTab(serviceWorker, getTestServerUrl('/page'), childTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0, expanded: true },
       { tabId: newTab1, depth: 1 },
@@ -815,7 +755,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const grandchildTab = await createTab(serviceWorker, getTestServerUrl('/page'), newTab1);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: childTab, depth: 0, expanded: true },
       { tabId: newTab1, depth: 1, expanded: true },
@@ -829,7 +768,7 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -838,14 +777,12 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const parentTab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
     ], 0);
 
     const parentTab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: parentTab2, depth: 0 },
     ], 0);
@@ -853,7 +790,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const childTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: parentTab2, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -862,7 +798,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     const siblingTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: parentTab2, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -873,7 +808,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },
       { tabId: parentTab2, depth: 0 },
@@ -883,7 +817,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
     await moveTabToRoot(sidePanelPage, childTab, siblingTab);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: parentTab2, depth: 0 },
       { tabId: childTab, depth: 0 },
@@ -894,7 +827,6 @@ test.describe('親子関係解消の永続化（包括的テスト）', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab1, depth: 0 },
       { tabId: parentTab2, depth: 0, expanded: true },
       { tabId: childTab, depth: 1 },

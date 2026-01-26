@@ -55,9 +55,47 @@ export interface E2EViewState {
 }
 
 /**
+ * E2EタブノードType (新構造)
+ */
+export interface E2ENewTabNode {
+  tabId: number;
+  isExpanded: boolean;
+  groupInfo?: { name: string; color: string };
+  children: E2ENewTabNode[];
+}
+
+/**
+ * E2Eビュー State (新構造)
+ */
+export interface E2ENewViewState {
+  name: string;
+  color: string;
+  icon?: string;
+  rootNodes: E2ENewTabNode[];
+}
+
+/**
+ * E2Eウィンドウ State (新構造)
+ */
+export interface E2ENewWindowState {
+  windowId: number;
+  views: E2ENewViewState[];
+  activeViewIndex: number;
+  pinnedTabIds: number[];
+}
+
+/**
  * TreeState 型を再定義（evaluate 内で使用するため）
+ * 新アーキテクチャ: Window → View → Tab の階層構造
  */
 export interface E2ETreeState {
+  windows: E2ENewWindowState[];
+}
+
+/**
+ * @deprecated 旧構造用のインターフェース。互換性のため残存
+ */
+export interface E2ELegacyTreeState {
   views: Record<string, E2EViewState>;
   viewOrder: string[];
   currentViewId: string;
@@ -101,12 +139,7 @@ import type { TreeState } from '../../src/types';
 export function isTreeState(value: unknown): value is TreeState {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
-  return (
-    'views' in obj &&
-    'viewOrder' in obj &&
-    'tabToNode' in obj &&
-    'currentViewId' in obj
-  );
+  return 'windows' in obj && Array.isArray(obj.windows);
 }
 
 /**

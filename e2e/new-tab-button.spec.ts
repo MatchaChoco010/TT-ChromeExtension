@@ -56,7 +56,7 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
@@ -87,7 +87,6 @@ test.describe('新規タブ追加ボタン', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
       ], 0);
     });
@@ -97,7 +96,7 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
@@ -128,7 +127,6 @@ test.describe('新規タブ追加ボタン', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
       ], 0);
     });
@@ -140,14 +138,13 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const existingTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: existingTabId, depth: 0 },
       ], 0);
 
@@ -155,35 +152,41 @@ test.describe('新規タブ追加ボタン', () => {
       await newTabButton.click();
 
       let newTabId: number | undefined;
+      // TreeStateのタブ数が3になるまで待機し、新しいタブIDを取得
       await waitForCondition(
         async () => {
-          const tabs = await serviceWorker.evaluate(async (wId) => {
-            const extensionId = chrome.runtime.id;
-            const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
-            const allTabs = await chrome.tabs.query({ windowId: wId });
-            return allTabs.filter(t => {
-              const url = t.url || t.pendingUrl || '';
-              return !url.startsWith(sidePanelUrlPrefix);
-            });
-          }, windowId);
-          if (tabs.length > 2) {
-            const activeTab = await serviceWorker.evaluate(async () => {
-              const tabs = await chrome.tabs.query({ active: true });
-              return tabs[0];
-            });
-            newTabId = activeTab?.id;
-            return newTabId !== existingTabId && newTabId !== undefined;
+          const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; excludeTabIds: number[] }) => {
+            const treeState = (globalThis as unknown as { treeStateManager?: { toJSON: () => { windows: { windowId: number; views: { rootNodes: { tabId: number }[] }[] }[] } } }).treeStateManager?.toJSON();
+            if (!treeState) return [];
+            const windowState = treeState.windows.find(w => w.windowId === args.windowId);
+            if (!windowState) return [];
+            const collectTabIds = (nodes: { tabId: number; children?: unknown[] }[]): number[] => {
+              const ids: number[] = [];
+              for (const node of nodes) {
+                ids.push(node.tabId);
+                if (node.children && Array.isArray(node.children)) {
+                  ids.push(...collectTabIds(node.children as { tabId: number; children?: unknown[] }[]));
+                }
+              }
+              return ids;
+            };
+            const allTabIds: number[] = [];
+            for (const view of windowState.views) {
+              allTabIds.push(...collectTabIds(view.rootNodes));
+            }
+            return allTabIds.filter(id => !args.excludeTabIds.includes(id));
+          }, { windowId, excludeTabIds: [initialBrowserTabId, existingTabId] });
+          if (tabIds.length === 1) {
+            newTabId = tabIds[0];
+            return true;
           }
           return false;
         },
-        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not created' }
+        { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not added to TreeState' }
       );
-
-      await waitForTabInTreeState(serviceWorker, newTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: existingTabId, depth: 0 },
         { tabId: newTabId!, depth: 0 },
       ], 0);
@@ -194,7 +197,7 @@ test.describe('新規タブ追加ボタン', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const newTabButton = sidePanelPage.locator('[data-testid="new-tab-button"]');
@@ -225,42 +228,47 @@ test.describe('新規タブ追加ボタン', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstNewTabId!, depth: 0 },
       ], 0);
 
       await newTabButton.click();
 
+      // TreeStateのタブ数が3になるまで待機し、2番目の新しいタブIDを取得
       let secondNewTabId: number | undefined;
       await waitForCondition(
         async () => {
-          const tabs = await serviceWorker.evaluate(async (wId) => {
-            const extensionId = chrome.runtime.id;
-            const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
-            const allTabs = await chrome.tabs.query({ windowId: wId });
-            return allTabs.filter(t => {
-              const url = t.url || t.pendingUrl || '';
-              return !url.startsWith(sidePanelUrlPrefix);
-            });
-          }, windowId);
-          if (tabs.length > 2) {
-            const activeTab = await serviceWorker.evaluate(async () => {
-              const tabs = await chrome.tabs.query({ active: true });
-              return tabs[0];
-            });
-            secondNewTabId = activeTab?.id;
-            return secondNewTabId !== firstNewTabId && secondNewTabId !== undefined;
+          const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; excludeTabIds: number[] }) => {
+            const treeState = (globalThis as unknown as { treeStateManager?: { toJSON: () => { windows: { windowId: number; views: { rootNodes: { tabId: number }[] }[] }[] } } }).treeStateManager?.toJSON();
+            if (!treeState) return [];
+            const windowState = treeState.windows.find(w => w.windowId === args.windowId);
+            if (!windowState) return [];
+            const collectTabIds = (nodes: { tabId: number; children?: unknown[] }[]): number[] => {
+              const ids: number[] = [];
+              for (const node of nodes) {
+                ids.push(node.tabId);
+                if (node.children && Array.isArray(node.children)) {
+                  ids.push(...collectTabIds(node.children as { tabId: number; children?: unknown[] }[]));
+                }
+              }
+              return ids;
+            };
+            const allTabIds: number[] = [];
+            for (const view of windowState.views) {
+              allTabIds.push(...collectTabIds(view.rootNodes));
+            }
+            return allTabIds.filter(id => !args.excludeTabIds.includes(id));
+          }, { windowId, excludeTabIds: [initialBrowserTabId, firstNewTabId!] });
+          if (tabIds.length === 1) {
+            secondNewTabId = tabIds[0];
+            return true;
           }
           return false;
         },
-        { timeout: 5000, interval: 100, timeoutMessage: 'Second new tab was not created' }
+        { timeout: 5000, interval: 100, timeoutMessage: 'Second new tab was not added to TreeState' }
       );
-
-      await waitForTabInTreeState(serviceWorker, secondNewTabId!);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: firstNewTabId!, depth: 0 },
         { tabId: secondNewTabId!, depth: 0 },
       ], 0);

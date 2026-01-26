@@ -1,5 +1,4 @@
 import { test, expect } from './fixtures/extension';
-import { createWindow } from './utils/window-utils';
 import { createTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure, assertWindowClosed, assertWindowExists } from './utils/assertion-utils';
 import { setupWindow, createAndSetupWindow } from './utils/setup-utils';
@@ -15,9 +14,19 @@ test.describe('chrome.windows API統合', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const newWindowId = await createWindow(extensionContext);
+    const {
+      windowId: newWindowId,
+      initialBrowserTabId: newWindowInitialTabId,
+      sidePanelPage: newWindowSidePanel,
+    } = await createAndSetupWindow(extensionContext, serviceWorker);
 
     await assertWindowExists(extensionContext, newWindowId);
+
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newWindowInitialTabId, depth: 0 },
+    ], 0);
+
+    await newWindowSidePanel.close();
   });
 
   test('chrome.windows.remove()でウィンドウを閉じた場合、ウィンドウ内の全タブがツリーから削除される', async ({
@@ -34,27 +43,23 @@ test.describe('chrome.windows API統合', () => {
       windowId: newWindowId,
       initialBrowserTabId: newWindowInitialTabId,
       sidePanelPage: newWindowSidePanel,
-      pseudoSidePanelTabId: newWindowPseudoSidePanelTabId,
     } = await createAndSetupWindow(extensionContext, serviceWorker);
 
     await assertWindowExists(extensionContext, newWindowId);
 
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), { windowId: newWindowId, active: false });
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
     const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'), { windowId: newWindowId, active: false });
     await assertTabStructure(newWindowSidePanel, newWindowId, [
       { tabId: newWindowInitialTabId, depth: 0 },
-      { tabId: newWindowPseudoSidePanelTabId, depth: 0 },
       { tabId: tabId1, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
@@ -78,9 +83,17 @@ test.describe('chrome.windows API統合', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const newWindowId = await createWindow(extensionContext);
+    const {
+      windowId: newWindowId,
+      initialBrowserTabId: newWindowInitialTabId,
+      sidePanelPage: newWindowSidePanel,
+    } = await createAndSetupWindow(extensionContext, serviceWorker);
 
     await assertWindowExists(extensionContext, newWindowId);
+
+    await assertTabStructure(newWindowSidePanel, newWindowId, [
+      { tabId: newWindowInitialTabId, depth: 0 },
+    ], 0);
 
     await serviceWorker.evaluate((wId) => {
       return chrome.windows.update(wId, { focused: true });
@@ -113,11 +126,29 @@ test.describe('chrome.windows API統合', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible();
 
-    const windowId1 = await createWindow(extensionContext);
-    const windowId2 = await createWindow(extensionContext);
+    const {
+      windowId: windowId1,
+      initialBrowserTabId: initialTabId1,
+      sidePanelPage: sidePanel1,
+    } = await createAndSetupWindow(extensionContext, serviceWorker);
 
     await assertWindowExists(extensionContext, windowId1);
+
+    await assertTabStructure(sidePanel1, windowId1, [
+      { tabId: initialTabId1, depth: 0 },
+    ], 0);
+
+    const {
+      windowId: windowId2,
+      initialBrowserTabId: initialTabId2,
+      sidePanelPage: sidePanel2,
+    } = await createAndSetupWindow(extensionContext, serviceWorker);
+
     await assertWindowExists(extensionContext, windowId2);
+
+    await assertTabStructure(sidePanel2, windowId2, [
+      { tabId: initialTabId2, depth: 0 },
+    ], 0);
 
     const windows = await serviceWorker.evaluate(() => {
       return chrome.windows.getAll({ populate: true });
@@ -132,6 +163,9 @@ test.describe('chrome.windows API統合', () => {
 
     expect(Array.isArray(window1?.tabs)).toBe(true);
     expect(Array.isArray(window2?.tabs)).toBe(true);
+
+    await sidePanel1.close();
+    await sidePanel2.close();
   });
 
   test('複数ウィンドウが存在する場合、各ウィンドウのタブツリーが独立して管理される', async ({
@@ -148,14 +182,12 @@ test.describe('chrome.windows API統合', () => {
       windowId: windowId1,
       initialBrowserTabId: initialTabId1,
       sidePanelPage: sidePanel1,
-      pseudoSidePanelTabId: pseudoSidePanelTabId1,
     } = await createAndSetupWindow(extensionContext, serviceWorker);
 
     const {
       windowId: windowId2,
       initialBrowserTabId: initialTabId2,
       sidePanelPage: sidePanel2,
-      pseudoSidePanelTabId: pseudoSidePanelTabId2,
     } = await createAndSetupWindow(extensionContext, serviceWorker);
 
     await assertWindowExists(extensionContext, windowId1);
@@ -163,25 +195,21 @@ test.describe('chrome.windows API統合', () => {
 
     await assertTabStructure(sidePanel1, windowId1, [
       { tabId: initialTabId1, depth: 0 },
-      { tabId: pseudoSidePanelTabId1, depth: 0 },
     ], 0);
 
     await assertTabStructure(sidePanel2, windowId2, [
       { tabId: initialTabId2, depth: 0 },
-      { tabId: pseudoSidePanelTabId2, depth: 0 },
     ], 0);
 
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'), { windowId: windowId1, active: false });
     await assertTabStructure(sidePanel1, windowId1, [
       { tabId: initialTabId1, depth: 0 },
-      { tabId: pseudoSidePanelTabId1, depth: 0 },
       { tabId: tabId1, depth: 0 },
     ], 0);
 
     const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page2'), { windowId: windowId2, active: false });
     await assertTabStructure(sidePanel2, windowId2, [
       { tabId: initialTabId2, depth: 0 },
-      { tabId: pseudoSidePanelTabId2, depth: 0 },
       { tabId: tabId2, depth: 0 },
     ], 0);
 

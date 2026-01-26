@@ -3,6 +3,7 @@ import { test as extensionTest } from './fixtures/extension';
 import { waitForViewSwitcher } from './utils/polling-utils';
 import { getCurrentWindowId } from './utils/tab-utils';
 import { setupWindow } from './utils/setup-utils';
+import { assertViewStructure } from './utils/assertion-utils';
 
 extensionTest.describe('ビューアイコン選択即時反映', () => {
   extensionTest(
@@ -15,6 +16,11 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
+
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 0);
 
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to View view"]'
@@ -72,6 +78,11 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
+
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 0);
 
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to View view"]'
@@ -133,6 +144,11 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
       await expect(addButton).toBeVisible({ timeout: 5000 });
       await addButton.click();
 
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 0);
+
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to View view"]'
       );
@@ -181,6 +197,11 @@ extensionTest.describe('ビューアイコン選択即時反映', () => {
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
+
+      await assertViewStructure(sidePanelPage, windowId, [
+        { viewIdentifier: '#3B82F6' },
+        { viewIdentifier: '#10B981' },
+      ], 0);
 
       const newViewButton = sidePanelPage.locator(
         '[aria-label="Switch to View view"]'

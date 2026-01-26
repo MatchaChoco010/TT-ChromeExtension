@@ -59,7 +59,7 @@ export interface BrowserRestartResult {
  *
  * 現在のコンテキストを閉じ、同じuserDataDirで新しいコンテキストを作成する。
  * これにより、chrome.storage.localのデータは保持されたまま、
- * Service Workerが再起動され、syncWithChromeTabsが自動的に呼ばれる。
+ * Service Workerが再起動され、restoreStateAfterRestartが自動的に呼ばれる。
  *
  * @param currentContext - 現在のブラウザコンテキスト
  * @param userDataDir - ユーザーデータディレクトリ（ストレージを保持するため必須）

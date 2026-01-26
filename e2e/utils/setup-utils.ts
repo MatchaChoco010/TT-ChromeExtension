@@ -4,9 +4,9 @@
  * 各テストで一貫したウィンドウセットアップを行うためのヘルパー関数を提供する。
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
-import { getInitialBrowserTabId, getPseudoSidePanelTabId } from './tab-utils';
+import { getInitialBrowserTabId } from './tab-utils';
 import { openSidePanelForWindow } from './window-utils';
-import { waitForSidePanelReady, waitForSyncCompleted } from './polling-utils';
+import { waitForSidePanelReady, waitForInitialized } from './polling-utils';
 
 /**
  * ウィンドウセットアップ情報
@@ -18,8 +18,6 @@ export interface WindowSetup {
   initialBrowserTabId: number;
   /** サイドパネルのPage */
   sidePanelPage: Page;
-  /** 擬似サイドパネルタブID */
-  pseudoSidePanelTabId: number;
 }
 
 /**
@@ -38,11 +36,10 @@ export async function setupWindow(
   const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
   const sidePanelPage = await openSidePanelForWindow(context, windowId);
   await waitForSidePanelReady(sidePanelPage, serviceWorker);
-  // syncWithChromeTabsが完了するまで待機（handleTabCreatedがタブを処理できるようにするため）
-  await waitForSyncCompleted(serviceWorker);
-  const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+  // Service Workerの初期化が完了するまで待機（handleTabCreatedがタブを処理できるようにするため）
+  await waitForInitialized(serviceWorker);
 
-  return { windowId, initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId };
+  return { windowId, initialBrowserTabId, sidePanelPage };
 }
 
 /**

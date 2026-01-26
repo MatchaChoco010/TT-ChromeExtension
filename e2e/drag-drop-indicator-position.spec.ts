@@ -53,7 +53,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 親タブとサブツリーを持つタブを作成
@@ -66,14 +66,12 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabX = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
       ], 0);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
@@ -81,7 +79,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -90,7 +87,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -100,7 +96,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabY = await createTab(serviceWorker, getTestServerUrl('/page5'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
@@ -111,7 +106,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       await moveTabToParent(sidePanelPage, tabB, tabA, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1 },
@@ -122,7 +116,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       await moveTabToParent(sidePanelPage, tabC, tabB, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1, expanded: true },
@@ -163,7 +156,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       // ドロップ後のタブ構造を検証（元の位置に戻る or 変更がなかったことを確認）
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabX, depth: 0 },
         { tabId: tabA, depth: 0, expanded: true },
         { tabId: tabB, depth: 1, expanded: true },
@@ -179,7 +171,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 3つのタブを作成
@@ -190,14 +182,12 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
@@ -205,7 +195,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
         { tabId: tabC, depth: 0 },
@@ -248,7 +237,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
         { tabId: tabC, depth: 0 },
@@ -260,7 +248,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // 準備: 3つのタブを作成
@@ -271,14 +259,12 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
       ], 0);
 
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
       ], 0);
@@ -286,7 +272,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
         { tabId: tabC, depth: 0 },
@@ -328,7 +313,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabA, depth: 0 },
         { tabId: tabB, depth: 0 },
         { tabId: tabC, depth: 0 },
@@ -342,20 +326,18 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
@@ -363,7 +345,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
@@ -372,7 +353,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
       const tab4 = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
@@ -418,7 +398,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー位置精度'
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab4, depth: 0 },

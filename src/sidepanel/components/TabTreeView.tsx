@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
-import type { TabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, View, WindowInfo } from '@/types';
+import type { UITabNode, TabTreeViewProps, MenuAction, ExtendedTabInfo, View, WindowInfo } from '@/types';
 import { useDragDrop, type DropTarget, DropTargetType } from '../hooks/useDragDrop';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { DragOverlay } from './DragOverlay';
@@ -19,7 +19,7 @@ import { TREE_INDENT_WIDTH_PX } from '../utils';
 /**
  * ノードとその子孫の数を再帰的にカウント
  */
-const countSubtreeNodes = (node: TabNode): number => {
+const countSubtreeNodes = (node: UITabNode): number => {
   let count = 1;
   for (const child of node.children) {
     count += countSubtreeNodes(child);
@@ -136,41 +136,41 @@ const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): stri
 const INDENT_WIDTH = TREE_INDENT_WIDTH_PX;
 
 interface TreeNodeItemProps {
-  node: TabNode;
+  node: UITabNode;
   onNodeClick: (tabId: number) => void;
-  onToggleExpand: (nodeId: string) => void;
+  onToggleExpand: (tabId: number) => void;
   isDraggable: boolean;
   isTabUnread?: (tabId: number) => boolean;
-  getUnreadChildCount?: (nodeId: string) => number;
+  getUnreadChildCount?: (tabId: number) => number;
   activeTabId?: number;
   getTabInfo?: (tabId: number) => ExtendedTabInfo | undefined;
-  isNodeSelected?: (nodeId: string) => boolean;
-  onSelect?: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
+  isNodeSelected?: (tabId: number) => boolean;
+  onSelect?: (tabId: number, modifiers: { shift: boolean; ctrl: boolean }) => void;
   getSelectedTabIds?: () => number[];
   clearSelection?: () => void;
   isDragHighlighted?: boolean;
   globalIsDragging?: boolean;
-  activeNodeId?: string | null;
+  activeTabIdForDrag?: number | null;
   onSnapshot?: () => Promise<void>;
   views?: View[];
-  currentViewId?: string;
-  onMoveToView?: (viewId: string, tabIds: number[]) => void;
+  currentViewIndex?: number;
+  onMoveToView?: (viewIndex: number, tabIds: number[]) => void;
   currentWindowId?: number;
   otherWindows?: WindowInfo[];
   onMoveToWindow?: (windowId: number, tabIds: number[]) => void;
-  onGroupRequest?: (tabIds: number[]) => void;
+  onGroupRequest?: (tabIds: number[], contextMenuTabId: number) => void;
   dragItemProps?: {
     onMouseDown: (e: React.MouseEvent) => void;
     style: React.CSSProperties;
     'data-dragging': boolean;
   };
   isDragging?: boolean;
-  getItemPropsForNode?: (nodeId: string, tabId: number) => {
+  getItemPropsForNode?: (tabId: number) => {
     onMouseDown: (e: React.MouseEvent) => void;
     style: React.CSSProperties;
     'data-dragging': boolean;
   };
-  isNodeDragging?: (nodeId: string) => boolean;
+  isNodeDragging?: (tabId: number) => boolean;
 }
 
 const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
@@ -188,10 +188,10 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   clearSelection,
   isDragHighlighted,
   globalIsDragging,
-  activeNodeId,
+  activeTabIdForDrag,
   onSnapshot,
   views,
-  currentViewId,
+  currentViewIndex,
   onMoveToView,
   currentWindowId,
   otherWindows,
@@ -221,7 +221,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
   const isActive = activeTabId === node.tabId;
   const tabInfo = getTabInfo ? getTabInfo(node.tabId) : undefined;
-  const isSelected = isNodeSelected ? isNodeSelected(node.id) : false;
+  const isSelected = isNodeSelected ? isNodeSelected(node.tabId) : false;
   const isDragging = isDraggingProp ?? false;
 
   const handleMouseEnter = () => {
@@ -315,7 +315,23 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     }
 
     if (action === 'group' && onGroupRequest) {
-      onGroupRequest(targetTabIds);
+      const selectedIds = getSelectedTabIds ? getSelectedTabIds() : [];
+      const isRightClickedTabSelected = selectedIds.includes(node.tabId);
+
+      if (selectedIds.length > 1) {
+        // 複数選択時
+        if (isRightClickedTabSelected) {
+          // 右クリックしたタブが選択中 → 選択タブをグループ化、右クリック位置に挿入
+          onGroupRequest(selectedIds, node.tabId);
+        } else {
+          // 右クリックしたタブが選択中ではない → 選択タブをグループ化、選択タブの最後の位置に挿入
+          onGroupRequest(selectedIds, selectedIds[selectedIds.length - 1]);
+        }
+      } else {
+        // 単一選択または選択なし → 右クリックしたタブのみをグループ化、その位置に挿入
+        onGroupRequest([node.tabId], node.tabId);
+      }
+
       if (clearSelection) {
         clearSelection();
       }
@@ -343,11 +359,11 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     if (node.groupInfo !== undefined && editedGroupTitle.trim()) {
       chrome.runtime.sendMessage({
         type: 'UPDATE_GROUP_NAME',
-        payload: { nodeId: node.id, name: editedGroupTitle.trim() },
+        payload: { tabId: node.tabId, name: editedGroupTitle.trim() },
       });
     }
     setIsEditingGroupTitle(false);
-  }, [node.id, node.groupInfo, editedGroupTitle]);
+  }, [node.tabId, node.groupInfo, editedGroupTitle]);
 
   const handleGroupTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -366,9 +382,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
   const handleNodeClick = (e: React.MouseEvent) => {
     // 注: stopPropagationは不要。SidePanelRootのonClickは
-    // data-node-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
+    // data-tab-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
     if (onSelect) {
-      onSelect(node.id, {
+      onSelect(node.tabId, {
         shift: e.shiftKey,
         ctrl: e.ctrlKey || e.metaKey,
       });
@@ -391,8 +407,9 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
     <div style={style}>
       <div
         data-testid={`tree-node-${node.tabId}`}
-        data-node-id={node.id}
-        data-draggable-item={`draggable-item-${node.id}`}
+        data-tab-id={node.tabId}
+        data-node-id={node.tabId}
+        data-draggable-item={`draggable-item-${node.tabId}`}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
         className={`relative flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isDragging ? 'bg-gray-600 ring-2 ring-gray-500 ring-inset is-dragging' : ''} ${isActive && !isDragging ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''} ${isDragHighlighted && !isDragging ? 'bg-gray-500 ring-2 ring-gray-400 ring-inset' : ''}`}
@@ -409,7 +426,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
             data-testid="expand-button"
             onClick={(e) => {
               e.stopPropagation();
-              onToggleExpand(node.id);
+              onToggleExpand(node.tabId);
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
@@ -510,7 +527,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
           isGroupTab={node.groupInfo !== undefined}
           tabUrl={tabInfo?.url || 'about:blank'}
           views={views}
-          currentViewId={currentViewId}
+          currentViewIndex={currentViewIndex}
           onMoveToView={onMoveToView}
           currentWindowId={currentWindowId}
           otherWindows={otherWindows}
@@ -531,7 +548,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         <div>
           {node.children.map((child) => (
             <DraggableTreeNodeItem
-              key={child.id}
+              key={child.tabId}
               node={child}
               onNodeClick={onNodeClick}
               onToggleExpand={onToggleExpand}
@@ -545,17 +562,17 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
               getSelectedTabIds={getSelectedTabIds}
               clearSelection={clearSelection}
               globalIsDragging={globalIsDragging}
-              activeNodeId={activeNodeId}
+              activeTabIdForDrag={activeTabIdForDrag}
               onSnapshot={onSnapshot}
               views={views}
-              currentViewId={currentViewId}
+              currentViewIndex={currentViewIndex}
               onMoveToView={onMoveToView}
               currentWindowId={currentWindowId}
               otherWindows={otherWindows}
               onMoveToWindow={onMoveToWindow}
               onGroupRequest={onGroupRequest}
-              dragItemProps={getItemPropsForNode?.(child.id, child.tabId)}
-              isDragging={isNodeDragging?.(child.id)}
+              dragItemProps={getItemPropsForNode?.(child.tabId)}
+              isDragging={isNodeDragging?.(child.tabId)}
               getItemPropsForNode={getItemPropsForNode}
               isNodeDragging={isNodeDragging}
             />
@@ -580,7 +597,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   clearSelection,
   onSnapshot,
   views,
-  currentViewId,
+  currentViewIndex,
   onMoveToView,
   currentWindowId,
   otherWindows,
@@ -606,7 +623,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const isUnread = isTabUnread ? isTabUnread(node.tabId) : false;
   const isActive = activeTabId === node.tabId;
   const tabInfo = getTabInfo ? getTabInfo(node.tabId) : undefined;
-  const isSelected = isNodeSelected ? isNodeSelected(node.id) : false;
+  const isSelected = isNodeSelected ? isNodeSelected(node.tabId) : false;
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -694,7 +711,23 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
     }
 
     if (action === 'group' && onGroupRequest) {
-      onGroupRequest(targetTabIds);
+      const selectedIds = getSelectedTabIds ? getSelectedTabIds() : [];
+      const isRightClickedTabSelected = selectedIds.includes(node.tabId);
+
+      if (selectedIds.length > 1) {
+        // 複数選択時
+        if (isRightClickedTabSelected) {
+          // 右クリックしたタブが選択中 → 選択タブをグループ化、右クリック位置に挿入
+          onGroupRequest(selectedIds, node.tabId);
+        } else {
+          // 右クリックしたタブが選択中ではない → 選択タブをグループ化、選択タブの最後の位置に挿入
+          onGroupRequest(selectedIds, selectedIds[selectedIds.length - 1]);
+        }
+      } else {
+        // 単一選択または選択なし → 右クリックしたタブのみをグループ化、その位置に挿入
+        onGroupRequest([node.tabId], node.tabId);
+      }
+
       if (clearSelection) {
         clearSelection();
       }
@@ -722,11 +755,11 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
     if (node.groupInfo !== undefined && editedGroupTitle.trim()) {
       chrome.runtime.sendMessage({
         type: 'UPDATE_GROUP_NAME',
-        payload: { nodeId: node.id, name: editedGroupTitle.trim() },
+        payload: { tabId: node.tabId, name: editedGroupTitle.trim() },
       });
     }
     setIsEditingGroupTitle(false);
-  }, [node.id, node.groupInfo, editedGroupTitle]);
+  }, [node.tabId, node.groupInfo, editedGroupTitle]);
 
   const handleGroupTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -745,9 +778,9 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
   const handleNodeClick = (e: React.MouseEvent) => {
     // 注: stopPropagationは不要。SidePanelRootのonClickは
-    // data-node-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
+    // data-tab-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
     if (onSelect) {
-      onSelect(node.id, {
+      onSelect(node.tabId, {
         shift: e.shiftKey,
         ctrl: e.ctrlKey || e.metaKey,
       });
@@ -759,7 +792,8 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
     <div>
       <div
         data-testid={`tree-node-${node.tabId}`}
-        data-node-id={node.id}
+        data-tab-id={node.tabId}
+        data-node-id={node.tabId}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
         className={`relative flex items-center p-2 hover:bg-gray-700 cursor-pointer text-gray-100 select-none ${isActive ? 'bg-gray-600' : ''} ${isSelected ? 'bg-gray-500' : ''}`}
@@ -775,7 +809,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
             data-testid="expand-button"
             onClick={(e) => {
               e.stopPropagation();
-              onToggleExpand(node.id);
+              onToggleExpand(node.tabId);
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
@@ -876,7 +910,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
           isGroupTab={node.groupInfo !== undefined}
           tabUrl={tabInfo?.url || 'about:blank'}
           views={views}
-          currentViewId={currentViewId}
+          currentViewIndex={currentViewIndex}
           onMoveToView={onMoveToView}
           currentWindowId={currentWindowId}
           otherWindows={otherWindows}
@@ -897,7 +931,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         <div>
           {node.children.map((child) => (
             <TreeNodeItem
-              key={child.id}
+              key={child.tabId}
               node={child}
               onNodeClick={onNodeClick}
               onToggleExpand={onToggleExpand}
@@ -912,7 +946,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
               clearSelection={clearSelection}
               onSnapshot={onSnapshot}
               views={views}
-              currentViewId={currentViewId}
+              currentViewIndex={currentViewIndex}
               onMoveToView={onMoveToView}
               currentWindowId={currentWindowId}
               otherWindows={otherWindows}
@@ -928,7 +962,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
 const TabTreeView: React.FC<TabTreeViewProps> = ({
   nodes,
-  currentViewId,
+  currentViewIndex,
   onNodeClick,
   onToggleExpand,
   onDragEnd,
@@ -956,12 +990,12 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
-  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  const [activeTabIdForDrag, setActiveTabIdForDrag] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const tabPositionsRef = useRef<TabPosition[]>([]);
   const isOutsideTreeRef = useRef<boolean>(false);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastHoverNodeIdRef = useRef<string | null>(null);
+  const lastHoverTabIdRef = useRef<number | null>(null);
 
   // SidePanelRoot.buildTree() で既に現在のビューのノードのみがフィルタされているため、
   // ここでの追加フィルタリングは不要
@@ -986,9 +1020,9 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
   const items = useMemo(() => {
     const result: Array<{ id: string; tabId: number }> = [];
-    const collectItems = (nodeList: TabNode[]) => {
+    const collectItems = (nodeList: UITabNode[]) => {
       nodeList.forEach((node) => {
-        result.push({ id: node.id, tabId: node.tabId });
+        result.push({ id: node.tabId.toString(), tabId: node.tabId });
         if (node.children && node.children.length > 0 && node.isExpanded) {
           collectItems(node.children);
         }
@@ -998,14 +1032,14 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     return result;
   }, [filteredNodes]);
 
-  const getSubtreeNodeIds = useCallback((nodeId: string): string[] => {
-    const result: string[] = [];
+  const getSubtreeTabIds = useCallback((tabId: number): number[] => {
+    const result: number[] = [];
 
-    const findAndCollect = (nodeList: TabNode[]): boolean => {
+    const findAndCollect = (nodeList: UITabNode[]): boolean => {
       for (const node of nodeList) {
-        if (node.id === nodeId) {
-          const collectNodeAndDescendants = (n: TabNode) => {
-            result.push(n.id);
+        if (node.tabId === tabId) {
+          const collectNodeAndDescendants = (n: UITabNode) => {
+            result.push(n.tabId);
             for (const child of n.children) {
               collectNodeAndDescendants(child);
             }
@@ -1035,10 +1069,15 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     items,
     activationDistance: 8,
     direction: 'vertical',
-    getSubtreeNodeIds,
+    getSubtreeNodeIds: useCallback((nodeId: string) => {
+      const tabId = parseInt(nodeId, 10);
+      if (isNaN(tabId)) return [];
+      return getSubtreeTabIds(tabId).map(id => id.toString());
+    }, [getSubtreeTabIds]),
     onDragStart: useCallback((itemId: string, _tabId: number) => {
       setGlobalIsDragging(true);
-      setActiveNodeId(itemId);
+      const tabId = parseInt(itemId, 10);
+      setActiveTabIdForDrag(isNaN(tabId) ? null : tabId);
       if (onDragStartProp) {
         onDragStartProp({ active: { id: itemId } } as Parameters<typeof onDragStartProp>[0]);
       }
@@ -1064,19 +1103,19 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       }
 
       if (newDropTarget?.type === DropTargetType.Tab && newDropTarget.targetNodeId) {
-        const overId = newDropTarget.targetNodeId;
+        const overTabId = parseInt(newDropTarget.targetNodeId, 10);
 
-        if (overId !== lastHoverNodeIdRef.current) {
+        if (!isNaN(overTabId) && overTabId !== lastHoverTabIdRef.current) {
           if (hoverTimerRef.current) {
             clearTimeout(hoverTimerRef.current);
             hoverTimerRef.current = null;
           }
 
-          lastHoverNodeIdRef.current = overId;
+          lastHoverTabIdRef.current = overTabId;
 
-          const findNode = (nodeList: TabNode[]): TabNode | null => {
+          const findNode = (nodeList: UITabNode[]): UITabNode | null => {
             for (const n of nodeList) {
-              if (n.id === overId) return n;
+              if (n.tabId === overTabId) return n;
               if (n.children && n.children.length > 0) {
                 const found = findNode(n.children);
                 if (found) return found;
@@ -1088,9 +1127,9 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           const overNode = findNode(nodes);
           if (overNode && overNode.children && overNode.children.length > 0 && !overNode.isExpanded) {
             hoverTimerRef.current = setTimeout(() => {
-              onToggleExpand(overId);
+              onToggleExpand(overTabId);
               hoverTimerRef.current = null;
-              lastHoverNodeIdRef.current = null;
+              lastHoverTabIdRef.current = null;
             }, AUTO_EXPAND_HOVER_DELAY_MS);
           }
         }
@@ -1099,73 +1138,68 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           clearTimeout(hoverTimerRef.current);
           hoverTimerRef.current = null;
         }
-        lastHoverNodeIdRef.current = null;
+        lastHoverTabIdRef.current = null;
       }
     }, [nodes, onToggleExpand, handleDropTargetChange, onOutsideTreeChange, sidePanelRef]),
     onDragEnd: useCallback(async (itemId: string, finalDropTarget: DropTarget | null): Promise<void> => {
       // 非同期処理の完了前に状態をリセットしない（waitForDragEndがis-draggingクラスで待機するため）
-      setActiveNodeId(null);
+      setActiveTabIdForDrag(null);
 
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
         hoverTimerRef.current = null;
       }
-      lastHoverNodeIdRef.current = null;
+      lastHoverTabIdRef.current = null;
+
+      const draggedTabId = parseInt(itemId, 10);
+      if (isNaN(draggedTabId)) {
+        handleDropTargetChange(null);
+        setGlobalIsDragging(false);
+        return;
+      }
 
       if (isOutsideTreeRef.current && onExternalDrop) {
-        const findTabIdByNodeId = (nodeId: string): number | null => {
-          for (const node of nodes) {
-            if (node.id === nodeId) return node.tabId;
-            const findInChildren = (children: typeof nodes): number | null => {
-              for (const child of children) {
-                if (child.id === nodeId) return child.tabId;
-                const found = findInChildren(child.children);
-                if (found !== null) return found;
-              }
-              return null;
-            };
-            const found = findInChildren(node.children);
-            if (found !== null) return found;
-          }
-          return null;
-        };
-
-        const tabId = findTabIdByNodeId(itemId);
-        if (tabId !== null) {
-          isOutsideTreeRef.current = false;
-          onExternalDrop(tabId);
-          handleDropTargetChange(null);
-          setGlobalIsDragging(false);
-          return;
-        }
+        isOutsideTreeRef.current = false;
+        onExternalDrop(draggedTabId);
+        handleDropTargetChange(null);
+        setGlobalIsDragging(false);
+        return;
       }
 
       isOutsideTreeRef.current = false;
 
       // ドラッグ中のノードとそのサブツリーを除外したtabPositionsを使用
       // calculateDropTargetはドラッグノードを除外したeffectiveTabPositionsでgapIndexを計算するため、
-      // aboveNodeId/belowNodeIdの参照も同様に除外リストから取得する必要がある
+      // aboveTabId/belowTabIdの参照も同様に除外リストから取得する必要がある
       if (finalDropTarget && finalDropTarget.type === DropTargetType.Gap && onSiblingDrop) {
-        const subtreeIds = getSubtreeNodeIds(itemId);
-        const subtreeSet = new Set(subtreeIds);
+        const subtreeTabIds = getSubtreeTabIds(draggedTabId);
+        const subtreeSet = new Set(subtreeTabIds.map(id => id.toString()));
         const effectiveTabPositions = tabPositionsRef.current.filter(pos => !subtreeSet.has(pos.nodeId));
         const gapIndex = finalDropTarget.gapIndex ?? 0;
 
-        let aboveNodeId: string | undefined;
-        let belowNodeId: string | undefined;
+        let aboveTabId: number | undefined;
+        let belowTabId: number | undefined;
 
         if (gapIndex > 0 && gapIndex - 1 < effectiveTabPositions.length) {
-          aboveNodeId = effectiveTabPositions[gapIndex - 1]?.nodeId;
+          const aboveNodeId = effectiveTabPositions[gapIndex - 1]?.nodeId;
+          if (aboveNodeId) {
+            aboveTabId = parseInt(aboveNodeId, 10);
+            if (isNaN(aboveTabId)) aboveTabId = undefined;
+          }
         }
         if (gapIndex < effectiveTabPositions.length) {
-          belowNodeId = effectiveTabPositions[gapIndex]?.nodeId;
+          const belowNodeId = effectiveTabPositions[gapIndex]?.nodeId;
+          if (belowNodeId) {
+            belowTabId = parseInt(belowNodeId, 10);
+            if (isNaN(belowTabId)) belowTabId = undefined;
+          }
         }
 
         await onSiblingDrop({
-          activeNodeId: itemId,
+          activeTabId: draggedTabId,
           insertIndex: gapIndex,
-          aboveNodeId,
-          belowNodeId,
+          aboveTabId,
+          belowTabId,
         });
         handleDropTargetChange(null);
         setGlobalIsDragging(false);
@@ -1181,16 +1215,16 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
       handleDropTargetChange(null);
       setGlobalIsDragging(false);
-    }, [nodes, onDragEnd, onSiblingDrop, onExternalDrop, handleDropTargetChange, getSubtreeNodeIds]),
+    }, [onDragEnd, onSiblingDrop, onExternalDrop, handleDropTargetChange, getSubtreeTabIds]),
     onDragCancel: useCallback(() => {
       setGlobalIsDragging(false);
-      setActiveNodeId(null);
+      setActiveTabIdForDrag(null);
 
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
         hoverTimerRef.current = null;
       }
-      lastHoverNodeIdRef.current = null;
+      lastHoverTabIdRef.current = null;
       handleDropTargetChange(null);
 
       if (onDragCancelProp) {
@@ -1229,16 +1263,16 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         const rect = container.getBoundingClientRect();
         const scrollTop = container.scrollTop || 0;
         const tabPositions: TabPosition[] = [];
-        const nodeElements = container.querySelectorAll('[data-node-id]');
+        const nodeElements = container.querySelectorAll('[data-tab-id]');
 
         nodeElements.forEach((element) => {
-          const nodeId = element.getAttribute('data-node-id');
+          const tabIdStr = element.getAttribute('data-tab-id');
           const depth = parseInt(element.getAttribute('data-depth') || '0', 10);
           const elemRect = element.getBoundingClientRect();
 
-          if (nodeId) {
+          if (tabIdStr) {
             tabPositions.push({
-              nodeId,
+              nodeId: tabIdStr,
               top: elemRect.top - rect.top + scrollTop,
               bottom: elemRect.bottom - rect.top + scrollTop,
               depth,
@@ -1264,12 +1298,12 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     }
   }, [dragState.isDragging, cancelDrag]);
 
-  const getItemPropsForNode = useCallback((nodeId: string, tabId: number) => {
-    return getItemProps(nodeId, tabId);
+  const getItemPropsForNode = useCallback((tabId: number) => {
+    return getItemProps(tabId.toString(), tabId);
   }, [getItemProps]);
 
-  const isNodeDragging = useCallback((nodeId: string) => {
-    return dragState.isDragging && dragState.draggedItemId === nodeId;
+  const isNodeDragging = useCallback((tabId: number) => {
+    return dragState.isDragging && dragState.draggedItemId === tabId.toString();
   }, [dragState.isDragging, dragState.draggedItemId]);
 
   // adjacentNodeIdsを使って元のtabPositions（ドラッグ中ノード含む）での位置を計算
@@ -1300,11 +1334,11 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     return baseClass;
   }, [globalIsDragging]);
 
-  const renderTabNode = (node: TabNode): React.ReactNode => {
+  const renderTabNode = (node: UITabNode): React.ReactNode => {
     if (isDraggable) {
       return (
         <DraggableTreeNodeItem
-          key={node.id}
+          key={node.tabId}
           node={node}
           onNodeClick={onNodeClick}
           onToggleExpand={onToggleExpand}
@@ -1319,20 +1353,20 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           clearSelection={clearSelection}
           isDragHighlighted={
             dropTarget?.type === DropTargetType.Tab &&
-            dropTarget.targetNodeId === node.id
+            dropTarget.targetNodeId === node.tabId.toString()
           }
           globalIsDragging={globalIsDragging}
-          activeNodeId={activeNodeId}
+          activeTabIdForDrag={activeTabIdForDrag}
           onSnapshot={onSnapshot}
           views={views}
-          currentViewId={currentViewId}
+          currentViewIndex={currentViewIndex}
           onMoveToView={onMoveToView}
           currentWindowId={currentWindowId}
           otherWindows={otherWindows}
           onMoveToWindow={onMoveToWindow}
           onGroupRequest={onGroupRequest}
-          dragItemProps={getItemPropsForNode(node.id, node.tabId)}
-          isDragging={isNodeDragging(node.id)}
+          dragItemProps={getItemPropsForNode(node.tabId)}
+          isDragging={isNodeDragging(node.tabId)}
           getItemPropsForNode={getItemPropsForNode}
           isNodeDragging={isNodeDragging}
         />
@@ -1340,7 +1374,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     }
     return (
       <TreeNodeItem
-        key={node.id}
+        key={node.tabId}
         node={node}
         onNodeClick={onNodeClick}
         onToggleExpand={onToggleExpand}
@@ -1355,7 +1389,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         clearSelection={clearSelection}
         onSnapshot={onSnapshot}
         views={views}
-        currentViewId={currentViewId}
+        currentViewIndex={currentViewIndex}
         onMoveToView={onMoveToView}
         currentWindowId={currentWindowId}
         otherWindows={otherWindows}
@@ -1390,9 +1424,11 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
   const draggedNode = useMemo(() => {
     if (!dragState.isDragging || !dragState.draggedItemId) return null;
-    const findNode = (nodeList: TabNode[]): TabNode | null => {
+    const draggedTabId = parseInt(dragState.draggedItemId, 10);
+    if (isNaN(draggedTabId)) return null;
+    const findNode = (nodeList: UITabNode[]): UITabNode | null => {
       for (const n of nodeList) {
-        if (n.id === dragState.draggedItemId) return n;
+        if (n.tabId === draggedTabId) return n;
         if (n.children && n.children.length > 0) {
           const found = findNode(n.children);
           if (found) return found;

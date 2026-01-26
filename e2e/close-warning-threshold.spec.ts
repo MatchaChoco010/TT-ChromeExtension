@@ -35,12 +35,11 @@ test.describe('閉じる警告閾値', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       await setCloseWarningThreshold(serviceWorker, 3);
@@ -48,14 +47,12 @@ test.describe('閉じる警告閾値', () => {
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page?tab1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page?tab2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -63,7 +60,6 @@ test.describe('閉じる警告閾値', () => {
       const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page?tab3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -97,15 +93,28 @@ test.describe('閉じる警告閾値', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
       await closeTab(serviceWorker, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
       await closeTab(serviceWorker, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      ], 0);
     });
 
     test('複数タブ選択時に閾値未満のタブを閉じる場合は警告ダイアログなしで閉じられる', async ({
@@ -113,12 +122,11 @@ test.describe('閉じる警告閾値', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       await setCloseWarningThreshold(serviceWorker, 3);
@@ -126,14 +134,12 @@ test.describe('閉じる警告閾値', () => {
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page?tab1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page?tab2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -157,7 +163,6 @@ test.describe('閉じる警告閾値', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -166,12 +171,11 @@ test.describe('閉じる警告閾値', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       await setCloseWarningThreshold(serviceWorker, 0);
@@ -179,14 +183,12 @@ test.describe('閉じる警告閾値', () => {
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page?tab1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page?tab2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -194,7 +196,6 @@ test.describe('閉じる警告閾値', () => {
       const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page?tab3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -203,7 +204,6 @@ test.describe('閉じる警告閾値', () => {
       const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page?tab4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -213,7 +213,6 @@ test.describe('閉じる警告閾値', () => {
       const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page?tab5'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -246,7 +245,6 @@ test.describe('閉じる警告閾値', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });

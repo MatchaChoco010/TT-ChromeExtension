@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TreeNode from './TreeNode';
-import type { TabNode, TabInfo } from '@/types';
+import type { UITabNode, TabInfo } from '@/types';
 
 /**
  * タブ閉じる機能のテスト
@@ -20,18 +20,15 @@ describe('タブ閉じる機能の統合テスト', () => {
   });
 
   const createMockNode = (
-    id: string,
     tabId: number,
     depth: number = 0,
-    children: TabNode[] = [],
+    children: UITabNode[] = [],
     isExpanded: boolean = true,
-  ): TabNode => ({
-    id,
+  ): UITabNode => ({
     tabId,
-    parentId: null,
+    depth,
     children,
     isExpanded,
-    depth,
   });
 
   const createMockTab = (id: number, title: string = 'Test Tab'): TabInfo => ({
@@ -44,7 +41,7 @@ describe('タブ閉じる機能の統合テスト', () => {
 
   describe('マウスホバー時に閉じるボタンが表示される', () => {
     it('タブノードにマウスをホバーすると、閉じるボタンが表示される', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'ホバーするタブ');
       const onClose = vi.fn();
 
@@ -70,7 +67,7 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('タブノードからマウスを離すと、閉じるボタンが非表示になる', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'ホバー解除するタブ');
       const onClose = vi.fn();
 
@@ -97,7 +94,7 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('閉じるボタンをクリックすると、onCloseコールバックが呼ばれる', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, '閉じるタブ');
       const onClose = vi.fn();
 
@@ -127,10 +124,9 @@ describe('タブ閉じる機能の統合テスト', () => {
 
   describe('折りたたまれたブランチを持つ親タブ閉じ時に確認ダイアログが表示される', () => {
     it('折りたたまれた子タブを持つ親タブを閉じようとすると、確認ダイアログが表示される', () => {
-      const childNode1 = createMockNode('child-1', 2, 1);
-      const childNode2 = createMockNode('child-2', 3, 1);
+      const childNode1 = createMockNode(2, 1);
+      const childNode2 = createMockNode(3, 1);
       const parentNode = createMockNode(
-        'parent-1',
         1,
         0,
         [childNode1, childNode2],
@@ -169,9 +165,8 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('確認ダイアログでOKを選択すると、親タブとすべての子タブが閉じられる', async () => {
-      const childNode = createMockNode('child-1', 2, 1);
+      const childNode = createMockNode(2, 1);
       const parentNode = createMockNode(
-        'parent-1',
         1,
         0,
         [childNode],
@@ -212,9 +207,8 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('確認ダイアログでキャンセルを選択すると、タブは閉じられない', async () => {
-      const childNode = createMockNode('child-1', 2, 1);
+      const childNode = createMockNode(2, 1);
       const parentNode = createMockNode(
-        'parent-1',
         1,
         0,
         [childNode],
@@ -255,9 +249,8 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('展開された子タブを持つ親タブを閉じる場合、確認ダイアログは表示されない', () => {
-      const childNode = createMockNode('child-1', 2, 1);
+      const childNode = createMockNode(2, 1);
       const parentNode = createMockNode(
-        'parent-1',
         1,
         0,
         [childNode],
@@ -295,9 +288,8 @@ describe('タブ閉じる機能の統合テスト', () => {
 
   describe('警告閾値のカスタマイズ', () => {
     it('サブツリーのタブ数が閾値未満の場合、確認ダイアログは表示されない', () => {
-      const childNode = createMockNode('child-1', 2, 1);
+      const childNode = createMockNode(2, 1);
       const parentNode = createMockNode(
-        'parent-1',
         1,
         0,
         [childNode],
@@ -333,13 +325,12 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('サブツリーのタブ数が閾値以上の場合、確認ダイアログが表示される', () => {
-      const grandChild1 = createMockNode('grandchild-1', 4, 2);
-      const grandChild2 = createMockNode('grandchild-2', 5, 2);
-      const grandChild3 = createMockNode('grandchild-3', 6, 2);
-      const child1 = createMockNode('child-1', 2, 1, [grandChild1, grandChild2]);
-      const child2 = createMockNode('child-2', 3, 1, [grandChild3]);
+      const grandChild1 = createMockNode(4, 2);
+      const grandChild2 = createMockNode(5, 2);
+      const grandChild3 = createMockNode(6, 2);
+      const child1 = createMockNode(2, 1, [grandChild1, grandChild2]);
+      const child2 = createMockNode(3, 1, [grandChild3]);
       const parentNode = createMockNode(
-        'parent-1',
         1,
         0,
         [child1, child2],
@@ -377,9 +368,8 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('閾値が1の場合、単一の子タブでも確認ダイアログが表示される', () => {
-      const childNode = createMockNode('child-1', 2, 1);
+      const childNode = createMockNode(2, 1);
       const parentNode = createMockNode(
-        'parent-1',
         1,
         0,
         [childNode],
@@ -415,7 +405,7 @@ describe('タブ閉じる機能の統合テスト', () => {
 
   describe('エッジケース', () => {
     it('子タブを持たない単一のタブを閉じる場合、確認ダイアログは表示されない', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, '単一タブ');
       const onClose = vi.fn();
 
@@ -445,7 +435,7 @@ describe('タブ閉じる機能の統合テスト', () => {
     });
 
     it('閉じるボタンのクリックがノードのクリックイベントを伝播しない', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'クリック伝播テスト');
       const onActivate = vi.fn();
       const onClose = vi.fn();

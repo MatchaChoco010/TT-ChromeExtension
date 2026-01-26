@@ -3,8 +3,8 @@ import {
   waitForViewSwitcher,
   waitForCondition,
 } from './utils/polling-utils';
-import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
-import { assertTabStructure } from './utils/assertion-utils';
+import { createTab, closeTab, getTestServerUrl, getCurrentWindowId, pinTab, unpinTab } from './utils/tab-utils';
+import { assertTabStructure, assertPinnedTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 
 test.describe('ビューのタブカウント正確性', () => {
@@ -14,13 +14,13 @@ test.describe('ビューのタブカウント正確性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
-        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
           return parseInt(text || '0', 10);
@@ -33,7 +33,6 @@ test.describe('ビューのタブカウント正確性', () => {
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
@@ -52,7 +51,6 @@ test.describe('ビューのタブカウント正確性', () => {
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -61,7 +59,7 @@ test.describe('ビューのタブカウント正確性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
@@ -69,12 +67,11 @@ test.describe('ビューのタブカウント正確性', () => {
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
       const getTabCountBadge = async () => {
-        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
           return parseInt(text || '0', 10);
@@ -95,7 +92,6 @@ test.describe('ビューのタブカウント正確性', () => {
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       await waitForCondition(
@@ -116,13 +112,13 @@ test.describe('ビューのタブカウント正確性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
-        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
           return parseInt(text || '0', 10);
@@ -137,7 +133,6 @@ test.describe('ビューのタブカウント正確性', () => {
       tabIds.push(tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
@@ -145,7 +140,6 @@ test.describe('ビューのタブカウント正確性', () => {
       tabIds.push(tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
@@ -154,7 +148,6 @@ test.describe('ビューのタブカウント正確性', () => {
       tabIds.push(tab3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
@@ -175,7 +168,6 @@ test.describe('ビューのタブカウント正確性', () => {
       await closeTab(serviceWorker, tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
@@ -183,14 +175,12 @@ test.describe('ビューのタブカウント正確性', () => {
       await closeTab(serviceWorker, tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tab3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -201,7 +191,7 @@ test.describe('ビューのタブカウント正確性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
@@ -209,57 +199,81 @@ test.describe('ビューのタブカウント正確性', () => {
       const normalTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: normalTabId, depth: 0 },
       ], 0);
 
       const ghostTabId = 99998;
-      const ghostNodeId = `ghost-node-${ghostTabId}`;
 
       await serviceWorker.evaluate(
-        async ({ ghostTabId, ghostNodeId }) => {
+        async ({ ghostTabId, windowId }) => {
+          interface TabNode {
+            tabId: number;
+            isExpanded: boolean;
+            children: TabNode[];
+          }
           interface ViewState {
-            info: { id: string; name: string; color: string };
-            rootNodeIds: string[];
-            nodes: Record<string, unknown>;
+            name: string;
+            color: string;
+            rootNodes: TabNode[];
+          }
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+            activeViewIndex: number;
+            pinnedTabIds: number[];
           }
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as {
-            views: Record<string, ViewState>;
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            currentViewId: string;
-          };
+          const treeState = result.tree_state as { windows: WindowState[] };
 
-          const defaultViewId = 'default';
-
-          if (treeState.views[defaultViewId]) {
-            treeState.views[defaultViewId].nodes[ghostNodeId] = {
-              id: ghostNodeId,
+          const windowState = treeState.windows.find(w => w.windowId === windowId);
+          if (windowState && windowState.views.length > 0) {
+            const ghostNode: TabNode = {
               tabId: ghostTabId,
-              parentId: null,
-              children: [],
               isExpanded: true,
-              depth: 0,
+              children: [],
             };
-            treeState.tabToNode[ghostTabId] = { viewId: defaultViewId, nodeId: ghostNodeId };
+            windowState.views[0].rootNodes.push(ghostNode);
           }
 
           await chrome.storage.local.set({ tree_state: treeState });
         },
-        { ghostTabId, ghostNodeId }
+        { ghostTabId, windowId }
       );
 
       await waitForCondition(
         async () => {
           const hasGhost = await serviceWorker.evaluate(
-            async ({ ghostTabId }) => {
+            async ({ ghostTabId, windowId }) => {
+              interface TabNode {
+                tabId: number;
+                children: TabNode[];
+              }
+              interface ViewState {
+                rootNodes: TabNode[];
+              }
+              interface WindowState {
+                windowId: number;
+                views: ViewState[];
+              }
               const result = await chrome.storage.local.get('tree_state');
-              const treeState = result.tree_state as {
-                tabToNode: Record<number, { viewId: string; nodeId: string }>;
+              const treeState = result.tree_state as { windows: WindowState[] };
+              const windowState = treeState.windows.find(w => w.windowId === windowId);
+              if (!windowState) return false;
+
+              const findInNodes = (nodes: TabNode[]): boolean => {
+                for (const node of nodes) {
+                  if (node.tabId === ghostTabId) return true;
+                  if (findInNodes(node.children)) return true;
+                }
+                return false;
               };
-              return treeState.tabToNode[ghostTabId] !== undefined;
+
+              for (const view of windowState.views) {
+                if (findInNodes(view.rootNodes)) return true;
+              }
+              return false;
             },
-            { ghostTabId }
+            { ghostTabId, windowId }
           );
           return hasGhost;
         },
@@ -273,7 +287,7 @@ test.describe('ビューのタブカウント正確性', () => {
       // viewTabCountsはtabInfoMapに存在するタブのみをカウントするため、
       // ゴーストタブはカウントに含まれないはず
       const getTabCountBadge = async () => {
-        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
           return parseInt(text || '0', 10);
@@ -301,22 +315,32 @@ test.describe('ビューのタブカウント正確性', () => {
 
       await serviceWorker.evaluate(async () => {
         const tabs = await chrome.tabs.query({});
-        const existingTabIds = tabs.filter((t) => t.id).map((t) => t.id!);
+        const existingTabIds = new Set(tabs.filter((t) => t.id).map((t) => t.id!));
 
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          windowId: number;
+          views: ViewState[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          views: Record<string, { nodes: Record<string, unknown> }>;
-          tabToNode: Record<number, { viewId: string; nodeId: string }>;
+        const treeState = result.tree_state as { windows: WindowState[] };
+
+        const filterNodes = (nodes: TabNode[]): TabNode[] => {
+          return nodes.filter(node => existingTabIds.has(node.tabId)).map(node => ({
+            ...node,
+            children: filterNodes(node.children),
+          }));
         };
 
-        for (const tabIdStr of Object.keys(treeState.tabToNode)) {
-          const tabId = parseInt(tabIdStr);
-          if (!existingTabIds.includes(tabId)) {
-            const nodeInfo = treeState.tabToNode[tabId];
-            if (nodeInfo && treeState.views[nodeInfo.viewId]) {
-              delete treeState.views[nodeInfo.viewId].nodes[nodeInfo.nodeId];
-            }
-            delete treeState.tabToNode[tabId];
+        for (const windowState of treeState.windows) {
+          for (const view of windowState.views) {
+            view.rootNodes = filterNodes(view.rootNodes);
           }
         }
 
@@ -326,14 +350,37 @@ test.describe('ビューのタブカウント正確性', () => {
       await waitForCondition(
         async () => {
           const hasGhost = await serviceWorker.evaluate(
-            async ({ ghostTabId }) => {
+            async ({ ghostTabId, windowId }) => {
+              interface TabNode {
+                tabId: number;
+                children: TabNode[];
+              }
+              interface ViewState {
+                rootNodes: TabNode[];
+              }
+              interface WindowState {
+                windowId: number;
+                views: ViewState[];
+              }
               const result = await chrome.storage.local.get('tree_state');
-              const treeState = result.tree_state as {
-                tabToNode: Record<number, { viewId: string; nodeId: string }>;
+              const treeState = result.tree_state as { windows: WindowState[] };
+              const windowState = treeState.windows.find(w => w.windowId === windowId);
+              if (!windowState) return false;
+
+              const findInNodes = (nodes: TabNode[]): boolean => {
+                for (const node of nodes) {
+                  if (node.tabId === ghostTabId) return true;
+                  if (findInNodes(node.children)) return true;
+                }
+                return false;
               };
-              return treeState.tabToNode[ghostTabId] !== undefined;
+
+              for (const view of windowState.views) {
+                if (findInNodes(view.rootNodes)) return true;
+              }
+              return false;
             },
-            { ghostTabId }
+            { ghostTabId, windowId }
           );
           return !hasGhost;
         },
@@ -343,7 +390,6 @@ test.describe('ビューのタブカウント正確性', () => {
       await closeTab(serviceWorker, normalTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -352,7 +398,7 @@ test.describe('ビューのタブカウント正確性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
@@ -360,12 +406,11 @@ test.describe('ビューのタブカウント正確性', () => {
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
       const getTabCountBadge = async () => {
-        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
           return parseInt(text || '0', 10);
@@ -386,7 +431,6 @@ test.describe('ビューのタブカウント正確性', () => {
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       await waitForCondition(
@@ -412,13 +456,13 @@ test.describe('タブ数表示の視認性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
-        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
           return parseInt(text || '0', 10);
@@ -431,14 +475,12 @@ test.describe('タブ数表示の視認性', () => {
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
       ], 0);
 
       const tab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
       ], 0);
@@ -446,7 +488,6 @@ test.describe('タブ数表示の視認性', () => {
       const tab3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab1, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
@@ -454,7 +495,7 @@ test.describe('タブ数表示の視認性', () => {
 
       await waitForCondition(
         async () => {
-          const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+          const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
           if (!(await badge.isVisible())) return false;
           const count = await getTabCountBadge();
           return count === initialCount + 3;
@@ -469,7 +510,6 @@ test.describe('タブ数表示の視認性', () => {
       await closeTab(serviceWorker, tab1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab2, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
@@ -477,14 +517,12 @@ test.describe('タブ数表示の視認性', () => {
       await closeTab(serviceWorker, tab2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tab3, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tab3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -493,13 +531,13 @@ test.describe('タブ数表示の視認性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
 
       const getTabCountBadge = async () => {
-        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+        const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
           const text = await badge.textContent();
           return parseInt(text || '0', 10);
@@ -518,14 +556,13 @@ test.describe('タブ数表示の視認性', () => {
         tabIds.push(tabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-          { tabId: pseudoSidePanelTabId, depth: 0 },
           ...tabIds.map(id => ({ tabId: id, depth: 0 })),
         ], 0);
       }
 
       await waitForCondition(
         async () => {
-          const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+          const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
           const badgeText = await badge.textContent();
           const count = parseInt(badgeText || '0', 10);
           if (count < targetTotal) return false;
@@ -547,7 +584,6 @@ test.describe('タブ数表示の視認性', () => {
         const remainingTabIds = tabIds.slice(i + 1);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-          { tabId: pseudoSidePanelTabId, depth: 0 },
           ...remainingTabIds.map(id => ({ tabId: id, depth: 0 })),
         ], 0);
       }
@@ -560,7 +596,7 @@ test.describe('タブ数表示の視認性', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await waitForViewSwitcher(sidePanelPage);
@@ -568,13 +604,12 @@ test.describe('タブ数表示の視認性', () => {
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
       await waitForCondition(
         async () => {
-          const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+          const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
           if (!(await badge.isVisible())) return false;
 
           const badgeBox = await badge.boundingBox();
@@ -604,7 +639,6 @@ test.describe('タブ数表示の視認性', () => {
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -630,7 +664,7 @@ test.describe('タブ数表示の視認性', () => {
       if (tabs.length > 0) {
         await waitForCondition(
           async () => {
-            const badge = sidePanelPage.locator('[data-testid="tab-count-badge-default"]');
+            const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
             return await badge.isVisible();
           },
           {
@@ -641,5 +675,207 @@ test.describe('タブ数表示の視認性', () => {
         );
       }
     });
+  });
+});
+
+test.describe('ピン留めタブのカウント', () => {
+  test('ピン留めタブがビューのタブカウントに含まれる', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await waitForViewSwitcher(sidePanelPage);
+
+    const getTabCountBadge = async () => {
+      const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
+      if (await badge.isVisible()) {
+        const text = await badge.textContent();
+        return parseInt(text || '0', 10);
+      }
+      return 0;
+    };
+
+    const initialCount = await getTabCountBadge();
+
+    // 通常タブを2つ追加
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
+    await waitForCondition(
+      async () => {
+        const count = await getTabCountBadge();
+        return count === initialCount + 2;
+      },
+      {
+        timeout: 5000,
+        interval: 100,
+        timeoutMessage: 'Tab count did not reach expected value after adding 2 tabs',
+      }
+    );
+
+    const countBeforePin = await getTabCountBadge();
+
+    // 1つのタブをピン留め
+    await pinTab(serviceWorker, tabId1);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
+    // ピン留め後もタブカウントは変わらないことを確認
+    // （ピン留めタブもカウントに含まれるため）
+    await waitForCondition(
+      async () => {
+        const count = await getTabCountBadge();
+        return count === countBeforePin;
+      },
+      {
+        timeout: 5000,
+        interval: 100,
+        timeoutMessage: 'Tab count changed after pinning a tab (pinned tabs should be counted)',
+      }
+    );
+
+    // もう1つのタブもピン留め
+    await pinTab(serviceWorker, tabId2);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }, { tabId: tabId2 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // まだタブカウントは変わらない
+    await waitForCondition(
+      async () => {
+        const count = await getTabCountBadge();
+        return count === countBeforePin;
+      },
+      {
+        timeout: 5000,
+        interval: 100,
+        timeoutMessage: 'Tab count changed after pinning second tab',
+      }
+    );
+
+    // ピン留め解除
+    await unpinTab(serviceWorker, tabId1);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId2 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    // タブカウントは変わらない
+    await waitForCondition(
+      async () => {
+        const count = await getTabCountBadge();
+        return count === countBeforePin;
+      },
+      {
+        timeout: 5000,
+        interval: 100,
+        timeoutMessage: 'Tab count changed after unpinning a tab',
+      }
+    );
+
+    // クリーンアップ
+    await closeTab(serviceWorker, tabId1);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId2 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+
+    await unpinTab(serviceWorker, tabId2);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId2, depth: 0 },
+    ], 0);
+
+    await closeTab(serviceWorker, tabId2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+  });
+
+  test('ピン留めタブの追加・削除でタブカウントが正確に更新される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+
+    await waitForViewSwitcher(sidePanelPage);
+
+    const getTabCountBadge = async () => {
+      const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
+      if (await badge.isVisible()) {
+        const text = await badge.textContent();
+        return parseInt(text || '0', 10);
+      }
+      return 0;
+    };
+
+    const initialCount = await getTabCountBadge();
+
+    // ピン留めするタブを作成
+    const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: tabId1, depth: 0 },
+    ], 0);
+
+    await waitForCondition(
+      async () => {
+        const count = await getTabCountBadge();
+        return count === initialCount + 1;
+      },
+      {
+        timeout: 5000,
+        interval: 100,
+        timeoutMessage: 'Tab count did not increase after adding a tab',
+      }
+    );
+
+    // ピン留め
+    await pinTab(serviceWorker, tabId1);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // ピン留めタブを閉じる
+    await closeTab(serviceWorker, tabId1);
+    await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+
+    // タブカウントが元に戻ることを確認
+    await waitForCondition(
+      async () => {
+        const count = await getTabCountBadge();
+        return count === initialCount;
+      },
+      {
+        timeout: 5000,
+        interval: 100,
+        timeoutMessage: 'Tab count did not decrease after closing pinned tab',
+      }
+    );
   });
 });

@@ -14,7 +14,7 @@ test.describe('ツリー状態永続化', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -23,14 +23,12 @@ test.describe('ツリー状態永続化', () => {
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
@@ -38,40 +36,62 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
 
       const parentIdInStorage = await serviceWorker.evaluate(async ({ childId, parentId }) => {
-        interface TreeNode {
-          id: string;
+        interface TabNode {
           tabId: number;
-          parentId: string | null;
+          isExpanded: boolean;
+          children: TabNode[];
         }
         interface ViewState {
-          nodes: Record<string, TreeNode>;
+          rootNodes: TabNode[];
         }
-        interface LocalTreeState {
-          tabToNode: Record<number, { viewId: string; nodeId: string }>;
-          views: Record<string, ViewState>;
+        interface WindowState {
+          windowId: number;
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
         }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as LocalTreeState | undefined;
-        if (!treeState?.views || !treeState?.tabToNode) return { found: false, parentNodeId: null };
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return { found: false, isChildOfParent: false };
 
-        const childNodeInfo = treeState.tabToNode[childId];
-        const parentNodeInfo = treeState.tabToNode[parentId];
-        if (!childNodeInfo || !parentNodeInfo) return { found: false, parentNodeId: null };
+        // Recursively search for a node and its parent
+        const findNodeWithParent = (
+          nodes: TabNode[],
+          targetTabId: number,
+          parent: TabNode | null
+        ): { node: TabNode; parent: TabNode | null } | null => {
+          for (const node of nodes) {
+            if (node.tabId === targetTabId) {
+              return { node, parent };
+            }
+            const found = findNodeWithParent(node.children, targetTabId, node);
+            if (found) return found;
+          }
+          return null;
+        };
 
-        const viewState = treeState.views[childNodeInfo.viewId];
-        if (!viewState) return { found: false, parentNodeId: null };
-        const childNode = viewState.nodes[childNodeInfo.nodeId];
-        return { found: true, parentNodeId: childNode?.parentId, expectedParentNodeId: parentNodeInfo.nodeId };
+        // Search across all windows and views
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            const childResult = findNodeWithParent(viewState.rootNodes, childId, null);
+            if (childResult) {
+              // Check if the parent of the child is the expected parent
+              const isChildOfParent = childResult.parent?.tabId === parentId;
+              return { found: true, isChildOfParent };
+            }
+          }
+        }
+        return { found: false, isChildOfParent: false };
       }, { childId: childTab, parentId: parentTab });
 
       expect(parentIdInStorage.found).toBe(true);
-      expect(parentIdInStorage.parentNodeId).toBe(parentIdInStorage.expectedParentNodeId);
+      expect(parentIdInStorage.isChildOfParent).toBe(true);
     });
 
     test('サイドパネルリロード後に親子関係が復元されること', async ({
@@ -80,7 +100,7 @@ test.describe('ツリー状態永続化', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -89,14 +109,12 @@ test.describe('ツリー状態永続化', () => {
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
@@ -104,7 +122,6 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
@@ -120,7 +137,6 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
@@ -132,7 +148,7 @@ test.describe('ツリー状態永続化', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -141,14 +157,12 @@ test.describe('ツリー状態永続化', () => {
       const rootTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
@@ -156,7 +170,6 @@ test.describe('ツリー状態永続化', () => {
       const grandchildTab = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0 },
         { tabId: childTab, depth: 0 },
         { tabId: grandchildTab, depth: 0 },
@@ -165,7 +178,6 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, childTab, rootTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
         { tabId: grandchildTab, depth: 0 },
@@ -174,7 +186,6 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, grandchildTab, childTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1, expanded: true },
         { tabId: grandchildTab, depth: 2 },
@@ -191,7 +202,6 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1, expanded: true },
         { tabId: grandchildTab, depth: 2 },
@@ -205,7 +215,7 @@ test.describe('ツリー状態永続化', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -214,14 +224,12 @@ test.describe('ツリー状態永続化', () => {
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
@@ -229,36 +237,47 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
 
       await waitForCondition(async () => {
         const isExpandedInStorage = await serviceWorker.evaluate(async (parentId) => {
-          interface TreeNode {
-            id: string;
+          interface TabNode {
             tabId: number;
             isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.views || !treeState?.tabToNode) return null;
+          const treeState = result.tree_state as TreeState | undefined;
+          if (!treeState?.windows) return null;
 
-          const nodeInfo = treeState.tabToNode[parentId];
-          if (!nodeInfo) return null;
+          const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return node;
+              const found = findNode(node.children, targetTabId);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          const viewState = treeState.views[nodeInfo.viewId];
-          if (!viewState) return null;
-          const node = viewState.nodes[nodeInfo.nodeId];
-          return node?.isExpanded ?? null;
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              const node = findNode(viewState.rootNodes, parentId);
+              if (node) return node.isExpanded;
+            }
+          }
+          return null;
         }, parentTab);
         return isExpandedInStorage === true;
       }, { timeout: 5000, timeoutMessage: 'Expanded state was not saved to storage' });
@@ -269,35 +288,46 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: false },
       ], 0);
 
       await waitForCondition(async () => {
         const isExpandedInStorage = await serviceWorker.evaluate(async (parentId) => {
-          interface TreeNode {
-            id: string;
+          interface TabNode {
             tabId: number;
             isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.views || !treeState?.tabToNode) return null;
+          const treeState = result.tree_state as TreeState | undefined;
+          if (!treeState?.windows) return null;
 
-          const nodeInfo = treeState.tabToNode[parentId];
-          if (!nodeInfo) return null;
+          const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return node;
+              const found = findNode(node.children, targetTabId);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          const viewState = treeState.views[nodeInfo.viewId];
-          if (!viewState) return null;
-          const node = viewState.nodes[nodeInfo.nodeId];
-          return node?.isExpanded ?? null;
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              const node = findNode(viewState.rootNodes, parentId);
+              if (node) return node.isExpanded;
+            }
+          }
+          return null;
         }, parentTab);
         return isExpandedInStorage === false;
       }, { timeout: 5000, timeoutMessage: 'Collapsed state was not saved to storage' });
@@ -309,7 +339,7 @@ test.describe('ツリー状態永続化', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -318,14 +348,12 @@ test.describe('ツリー状態永続化', () => {
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
@@ -333,7 +361,6 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
@@ -344,35 +371,46 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: false },
       ], 0);
 
       await waitForCondition(async () => {
         const isExpandedInStorage = await serviceWorker.evaluate(async (parentId) => {
-          interface TreeNode {
-            id: string;
+          interface TabNode {
             tabId: number;
             isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.views || !treeState?.tabToNode) return null;
+          const treeState = result.tree_state as TreeState | undefined;
+          if (!treeState?.windows) return null;
 
-          const nodeInfo = treeState.tabToNode[parentId];
-          if (!nodeInfo) return null;
+          const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return node;
+              const found = findNode(node.children, targetTabId);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          const viewState = treeState.views[nodeInfo.viewId];
-          if (!viewState) return null;
-          const node = viewState.nodes[nodeInfo.nodeId];
-          return node?.isExpanded ?? null;
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              const node = findNode(viewState.rootNodes, parentId);
+              if (node) return node.isExpanded;
+            }
+          }
+          return null;
         }, parentTab);
         return isExpandedInStorage === false;
       }, { timeout: 5000, timeoutMessage: 'Collapsed state was not saved to storage' });
@@ -388,7 +426,6 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: false },
       ], 0);
     });
@@ -399,7 +436,7 @@ test.describe('ツリー状態永続化', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -408,14 +445,12 @@ test.describe('ツリー状態永続化', () => {
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
@@ -423,36 +458,47 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
 
       await waitForCondition(async () => {
         const isExpandedInStorage = await serviceWorker.evaluate(async (parentId) => {
-          interface TreeNode {
-            id: string;
+          interface TabNode {
             tabId: number;
             isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.views || !treeState?.tabToNode) return null;
+          const treeState = result.tree_state as TreeState | undefined;
+          if (!treeState?.windows) return null;
 
-          const nodeInfo = treeState.tabToNode[parentId];
-          if (!nodeInfo) return null;
+          const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return node;
+              const found = findNode(node.children, targetTabId);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          const viewState = treeState.views[nodeInfo.viewId];
-          if (!viewState) return null;
-          const node = viewState.nodes[nodeInfo.nodeId];
-          return node?.isExpanded ?? null;
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              const node = findNode(viewState.rootNodes, parentId);
+              if (node) return node.isExpanded;
+            }
+          }
+          return null;
         }, parentTab);
         return isExpandedInStorage === true;
       }, { timeout: 5000, timeoutMessage: 'Expanded state was not saved to storage' });
@@ -468,7 +514,6 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
@@ -482,7 +527,7 @@ test.describe('ツリー状態永続化', () => {
       extensionId,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, pseudoSidePanelTabId, sidePanelPage } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -491,14 +536,12 @@ test.describe('ツリー状態永続化', () => {
       const parent1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
       ], 0);
 
       const child1 = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
         { tabId: child1, depth: 0 },
       ], 0);
@@ -506,7 +549,6 @@ test.describe('ツリー状態永続化', () => {
       const parent2 = await createTab(serviceWorker, getTestServerUrl('/page3'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
         { tabId: child1, depth: 0 },
         { tabId: parent2, depth: 0 },
@@ -515,7 +557,6 @@ test.describe('ツリー状態永続化', () => {
       const child2 = await createTab(serviceWorker, getTestServerUrl('/page4'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0 },
         { tabId: child1, depth: 0 },
         { tabId: parent2, depth: 0 },
@@ -525,7 +566,6 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, child1, parent1, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0, expanded: true },
         { tabId: child1, depth: 1 },
         { tabId: parent2, depth: 0 },
@@ -535,7 +575,6 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, child2, parent2, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0, expanded: true },
         { tabId: child1, depth: 1 },
         { tabId: parent2, depth: 0, expanded: true },
@@ -548,7 +587,6 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0, expanded: true },
         { tabId: child1, depth: 1 },
         { tabId: parent2, depth: 0, expanded: false },
@@ -556,35 +594,48 @@ test.describe('ツリー状態永続化', () => {
 
       await waitForCondition(async () => {
         const states = await serviceWorker.evaluate(async ({ parent1Id, parent2Id }) => {
-          interface TreeNode {
-            id: string;
+          interface TabNode {
             tabId: number;
             isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.views || !treeState?.tabToNode) return null;
+          const treeState = result.tree_state as TreeState | undefined;
+          if (!treeState?.windows) return null;
 
-          const node1Info = treeState.tabToNode[parent1Id];
-          const node2Info = treeState.tabToNode[parent2Id];
-          if (!node1Info || !node2Info) return null;
+          const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return node;
+              const found = findNode(node.children, targetTabId);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          const viewState1 = treeState.views[node1Info.viewId];
-          const viewState2 = treeState.views[node2Info.viewId];
-          if (!viewState1 || !viewState2) return null;
+          let parent1Node: TabNode | null = null;
+          let parent2Node: TabNode | null = null;
 
-          const node1 = viewState1.nodes[node1Info.nodeId];
-          const node2 = viewState2.nodes[node2Info.nodeId];
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              if (!parent1Node) parent1Node = findNode(viewState.rootNodes, parent1Id);
+              if (!parent2Node) parent2Node = findNode(viewState.rootNodes, parent2Id);
+            }
+          }
+
+          if (!parent1Node || !parent2Node) return null;
           return {
-            parent1Expanded: node1?.isExpanded,
-            parent2Expanded: node2?.isExpanded,
+            parent1Expanded: parent1Node.isExpanded,
+            parent2Expanded: parent2Node.isExpanded,
           };
         }, { parent1Id: parent1, parent2Id: parent2 });
         return states?.parent1Expanded === true && states?.parent2Expanded === false;
@@ -602,7 +653,6 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0, expanded: true },
         { tabId: child1, depth: 1 },
         { tabId: parent2, depth: 0, expanded: false },
@@ -614,7 +664,6 @@ test.describe('ツリー状態永続化', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parent1, depth: 0, expanded: true },
         { tabId: child1, depth: 1 },
         { tabId: parent2, depth: 0, expanded: true },
@@ -627,7 +676,7 @@ test.describe('ツリー状態永続化', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -636,14 +685,12 @@ test.describe('ツリー状態永続化', () => {
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page2'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
         { tabId: childTab, depth: 0 },
       ], 0);
@@ -651,7 +698,6 @@ test.describe('ツリー状態永続化', () => {
       await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
@@ -661,29 +707,41 @@ test.describe('ツリー状態永続化', () => {
 
       const getExpandedFromStorage = async () => {
         return await serviceWorker.evaluate(async (parentId) => {
-          interface TreeNode {
-            id: string;
+          interface TabNode {
             tabId: number;
             isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
-          if (!treeState?.views || !treeState?.tabToNode) return null;
+          const treeState = result.tree_state as TreeState | undefined;
+          if (!treeState?.windows) return null;
 
-          const nodeInfo = treeState.tabToNode[parentId];
-          if (!nodeInfo) return null;
+          const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return node;
+              const found = findNode(node.children, targetTabId);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          const viewState = treeState.views[nodeInfo.viewId];
-          if (!viewState) return null;
-          const node = viewState.nodes[nodeInfo.nodeId];
-          return node?.isExpanded ?? null;
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              const node = findNode(viewState.rootNodes, parentId);
+              if (node) return node.isExpanded;
+            }
+          }
+          return null;
         }, parentTab);
       };
 
@@ -695,7 +753,6 @@ test.describe('ツリー状態永続化', () => {
       await expandButton.first().click();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: false },
       ], 0);
       await waitForCondition(async () => (await getExpandedFromStorage()) === false, {
@@ -706,7 +763,6 @@ test.describe('ツリー状態永続化', () => {
       await expandButton.first().click();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);

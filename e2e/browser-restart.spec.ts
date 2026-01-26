@@ -13,7 +13,14 @@ import {
   type BrowserRestartResult,
 } from './utils/browser-restart-utils';
 import { waitForCondition } from './utils/polling-utils';
-import { getTestServerUrl } from './utils/tab-utils';
+import {
+  closeTab,
+  createTab,
+  getCurrentWindowId,
+  getInitialBrowserTabId,
+  getTestServerUrl,
+} from './utils/tab-utils';
+import { assertTabStructure } from './utils/assertion-utils';
 
 test.describe('ブラウザ再起動時の状態復元', () => {
   let userDataDir: string;
@@ -42,67 +49,59 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible({ timeout: 10000 });
 
-    const parentPage = await context.newPage();
-    await parentPage.goto(getTestServerUrl('/parent'));
-    await parentPage.waitForLoadState('domcontentloaded');
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(serviceWorker, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
 
-    const parentTabId = await serviceWorker.evaluate(async (url) => {
-      const tabs = await chrome.tabs.query({ url });
-      return tabs[0]?.id;
-    }, getTestServerUrl('/parent'));
+    const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: parentTabId, depth: 0 },
+    ], 0);
 
-    expect(parentTabId).toBeDefined();
+    const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'), parentTabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: parentTabId, depth: 0, expanded: true },
+      { tabId: childTabId, depth: 1 },
+    ], 0);
 
+    // 永続化を待つ
     await waitForCondition(async () => {
-      const hasTab = await serviceWorker.evaluate(async (tabId) => {
+      const hasTabsInTree = await serviceWorker.evaluate(async () => {
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        return treeState?.tabToNode && tabId in treeState.tabToNode;
-      }, parentTabId);
-      return hasTab;
-    }, { timeout: 5000, timeoutMessage: 'Tab not added to tree' });
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return false;
 
-    const childPage = await context.newPage();
-    await childPage.goto(getTestServerUrl('/child'));
-    await childPage.waitForLoadState('domcontentloaded');
+        let tabCount = 0;
+        const countTabs = (nodes: TabNode[]): void => {
+          for (const node of nodes) {
+            tabCount++;
+            countTabs(node.children);
+          }
+        };
 
-    const childTabId = await serviceWorker.evaluate(async (url) => {
-      const tabs = await chrome.tabs.query({ url });
-      return tabs[0]?.id;
-    }, getTestServerUrl('/child'));
-
-    expect(childTabId).toBeDefined();
-
-    await waitForCondition(async () => {
-      const hasTab = await serviceWorker.evaluate(async (tabId) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        return treeState?.tabToNode && tabId in treeState.tabToNode;
-      }, childTabId);
-      return hasTab;
-    }, { timeout: 5000, timeoutMessage: 'Child tab not added to tree' });
-
-    const parentItem = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-    const childItem = sidePanelPage.locator(`[data-testid="tree-node-${childTabId}"]`);
-
-    if (await parentItem.isVisible() && await childItem.isVisible()) {
-      await childItem.dragTo(parentItem);
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    // 定期的なpersistState（15秒間隔）を待つ
-    await waitForCondition(async () => {
-      const hasTreeStructure = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: unknown[] } | undefined;
-        return treeState?.treeStructure && treeState.treeStructure.length >= 2;
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            countTabs(viewState.rootNodes);
+          }
+        }
+        return tabCount >= 2;
       });
-      return hasTreeStructure;
-    }, { timeout: 20000, timeoutMessage: 'treeStructure not saved' });
+      return hasTabsInTree;
+    }, { timeout: 20000, timeoutMessage: 'Tree state not saved' });
 
     const headless = process.env.HEADED !== 'true';
     const newBrowserResult = await restartBrowser(context, userDataDir, headless);
@@ -114,41 +113,64 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await expect(newSidePanelRoot).toBeVisible({ timeout: 10000 });
 
     await waitForCondition(async () => {
-      const hasParentUrl = await newServiceWorker.evaluate(async (url) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: { url: string }[] } | undefined;
-        return treeState?.treeStructure?.some(entry => entry.url === url);
-      }, getTestServerUrl('/parent'));
-      return hasParentUrl;
-    }, { timeout: 10000, timeoutMessage: 'Parent tab not restored after browser restart' });
-
-    // Assert
-    const tabsExist = await newServiceWorker.evaluate(async ({ parentUrl, childUrl }) => {
-      interface ViewState {
-        nodes: Record<string, { tabId: number }>;
-      }
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as {
-        treeStructure?: { url: string }[];
-        views?: Record<string, ViewState>;
-      } | undefined;
-
-      const hasParent = treeState?.treeStructure?.some(e => e.url === parentUrl);
-      const hasChild = treeState?.treeStructure?.some(e => e.url === childUrl);
-
-      let nodesCount = 0;
-      if (treeState?.views) {
-        for (const viewState of Object.values(treeState.views)) {
-          nodesCount += Object.keys(viewState.nodes || {}).length;
+      const hasTabsRestored = await newServiceWorker.evaluate(async () => {
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
         }
-      }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return false;
 
-      return { hasParent, hasChild, nodesCount };
-    }, { parentUrl: getTestServerUrl('/parent'), childUrl: getTestServerUrl('/child') });
+        let tabCount = 0;
+        const countTabs = (nodes: TabNode[]): void => {
+          for (const node of nodes) {
+            tabCount++;
+            countTabs(node.children);
+          }
+        };
 
-    expect(tabsExist.hasParent).toBe(true);
-    expect(tabsExist.hasChild).toBe(true);
-    expect(tabsExist.nodesCount).toBeGreaterThan(0);
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            countTabs(viewState.rootNodes);
+          }
+        }
+        return tabCount > 0;
+      });
+      return hasTabsRestored;
+    }, { timeout: 10000, timeoutMessage: 'Tabs not restored after browser restart' });
+
+    // 再起動後の初期化
+    const newWindowId = await getCurrentWindowId(newServiceWorker);
+
+    // URLから新しいタブIDを取得
+    const newParentTabId = await newServiceWorker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({ url });
+      return tabs[0]?.id;
+    }, getTestServerUrl('/parent'));
+
+    const newChildTabId = await newServiceWorker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({ url });
+      return tabs[0]?.id;
+    }, getTestServerUrl('/child'));
+
+    expect(newParentTabId).toBeDefined();
+    expect(newChildTabId).toBeDefined();
+
+    // assertTabStructureで全体構造を検証
+    await assertTabStructure(newSidePanelPage, newWindowId, [
+      { tabId: newParentTabId!, depth: 0, expanded: true },
+      { tabId: newChildTabId!, depth: 1 },
+    ], 0);
   });
 
   test('ブラウザ再起動後にviewIdが正しく復元される', async () => {
@@ -159,109 +181,85 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(sidePanelRoot).toBeVisible({ timeout: 10000 });
 
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(serviceWorker, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
+
+    // ビュー1を追加
     const addViewButton = sidePanelPage.locator('[aria-label="Add new view"]');
     await expect(addViewButton).toBeVisible({ timeout: 5000 });
     await addViewButton.click();
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const view1Button = sidePanelPage.locator('[aria-label="Switch to View view"]');
+    await expect(view1Button).toBeVisible({ timeout: 5000 });
 
-    await waitForCondition(async () => {
-      const viewCount = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { viewOrder?: string[] } | undefined;
-        return treeState?.viewOrder?.length ?? 0;
-      });
-      return viewCount >= 2;
-    }, { timeout: 5000, timeoutMessage: 'New view not created' });
+    // テストタブを作成（ビュー0）
+    const testTabId = await createTab(serviceWorker, getTestServerUrl('/view-test-page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: testTabId, depth: 0 },
+    ], 0);
 
-    const testPage = await context.newPage();
-    await testPage.goto(getTestServerUrl('/view-test-page'));
-    await testPage.waitForLoadState('domcontentloaded');
-
-    const testTabId = await serviceWorker.evaluate(async (url) => {
-      const tabs = await chrome.tabs.query({ url });
-      return tabs[0]?.id;
-    }, getTestServerUrl('/view-test-page'));
-
-    expect(testTabId).toBeDefined();
-
-    await waitForCondition(async () => {
-      const hasTab = await serviceWorker.evaluate(async (tabId) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        return treeState?.tabToNode && tabId in treeState.tabToNode;
-      }, testTabId);
-      return hasTab;
-    }, { timeout: 5000, timeoutMessage: 'Tab not added to tree' });
-
+    // タブをビュー1に移動
     const tabItem = sidePanelPage.locator(`[data-testid="tree-node-${testTabId}"]`);
-    await expect(tabItem).toBeVisible({ timeout: 5000 });
-
     await tabItem.click({ button: 'right' });
-    await new Promise(resolve => setTimeout(resolve, 300));
 
     const moveToViewOption = sidePanelPage.locator('text=別のビューへ移動');
-    if (await moveToViewOption.isVisible({ timeout: 2000 })) {
-      await moveToViewOption.hover();
-      await new Promise(resolve => setTimeout(resolve, 500));
+    await expect(moveToViewOption).toBeVisible({ timeout: 2000 });
+    await moveToViewOption.hover();
 
-      const viewButtons = sidePanelPage.locator('[data-testid="view-switcher-container"] button').filter({
-        hasNot: sidePanelPage.locator('[aria-label="Add new view"]')
-      });
+    const subMenu = sidePanelPage.locator('[data-testid="submenu"]');
+    await expect(subMenu).toBeVisible({ timeout: 2000 });
 
-      const secondViewButton = viewButtons.nth(1);
-      const viewTitle = await secondViewButton.getAttribute('title');
+    const viewMenuItem = subMenu.locator('button', { hasText: 'View' });
+    await viewMenuItem.click();
 
-      if (viewTitle) {
-        const viewMenuItem = sidePanelPage.locator(`text=${viewTitle}`).last();
-        if (await viewMenuItem.isVisible({ timeout: 2000 })) {
-          await viewMenuItem.click();
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-    }
+    // タブがビュー0から消えたことを確認
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
 
-    await waitForCondition(async () => {
-      const viewId = await serviceWorker.evaluate(async (tabId) => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
+    // ビュー1に切り替えてタブを確認
+    await view1Button.click();
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: testTabId, depth: 0 },
+    ], 1);
 
-        if (!treeState?.tabToNode) return null;
-        return treeState.tabToNode[tabId]?.viewId;
-      }, testTabId);
-      return viewId !== 'default' && viewId !== null;
-    }, { timeout: 10000, timeoutMessage: 'ViewId not updated from default' });
-
-    const currentViewId = await serviceWorker.evaluate(async (tabId) => {
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as {
-        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-      } | undefined;
-
-      if (!treeState?.tabToNode) return null;
-      return treeState.tabToNode[tabId]?.viewId;
-    }, testTabId);
-
-    expect(currentViewId).not.toBe('default');
-    expect(currentViewId).toBeDefined();
-
-    // 定期的なpersistState（15秒間隔）を待つ
+    // 永続化を待つ
     const testUrl = getTestServerUrl('/view-test-page');
     await waitForCondition(async () => {
-      const treeStructureViewId = await serviceWorker.evaluate(async (url) => {
+      const tabViewIndex = await serviceWorker.evaluate(async ({ tabId }) => {
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          treeStructure?: { url: string; viewId: string }[];
-        } | undefined;
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return null;
 
-        const entry = treeState?.treeStructure?.find(e => e.url === url);
-        return entry?.viewId;
-      }, testUrl);
-      return treeStructureViewId === currentViewId;
-    }, { timeout: 20000, timeoutMessage: 'treeStructure viewId not updated' });
+        const findTabInTree = (nodes: TabNode[], targetTabId: number): boolean => {
+          for (const node of nodes) {
+            if (node.tabId === targetTabId) return true;
+            if (findTabInTree(node.children, targetTabId)) return true;
+          }
+          return false;
+        };
+
+        for (const windowState of treeState.windows) {
+          for (let i = 0; i < windowState.views.length; i++) {
+            if (findTabInTree(windowState.views[i].rootNodes, tabId)) return i;
+          }
+        }
+        return null;
+      }, { tabId: testTabId });
+      return tabViewIndex === 1;
+    }, { timeout: 20000, timeoutMessage: 'Tab viewIndex not persisted correctly' });
 
     const headless = process.env.HEADED !== 'true';
     const newBrowserResult = await restartBrowser(context, userDataDir, headless);
@@ -273,20 +271,27 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await expect(newSidePanelRoot).toBeVisible({ timeout: 10000 });
 
     await waitForCondition(async () => {
-      interface ViewState {
-        nodes: Record<string, unknown>;
-      }
       const nodesExist = await newServiceWorker.evaluate(async () => {
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          views?: Record<string, ViewState>;
-        } | undefined;
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return false;
 
-        if (!treeState?.views) return false;
-
-        for (const viewState of Object.values(treeState.views)) {
-          if (viewState.nodes && Object.keys(viewState.nodes).length > 0) {
-            return true;
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            if (viewState.rootNodes.length > 0) return true;
           }
         }
         return false;
@@ -294,31 +299,160 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return nodesExist;
     }, { timeout: 10000, timeoutMessage: 'Nodes not restored after browser restart' });
 
-    // 再起動後はtabIdが変わるため、URLでタブを検索してviewIdを確認
-    const restoredViewId = await newServiceWorker.evaluate(async ({ url, expectedViewId }) => {
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as {
-        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-      } | undefined;
+    // 再起動後の初期化
+    const newWindowId = await getCurrentWindowId(newServiceWorker);
 
-      if (!treeState?.tabToNode) return null;
-
+    // 再起動後、URLから新しいタブIDを取得
+    const newTestTabId = await newServiceWorker.evaluate(async (url) => {
       const tabs = await chrome.tabs.query({ url });
-      if (tabs.length === 0) return null;
+      return tabs[0]?.id;
+    }, testUrl);
 
-      const tabId = tabs[0].id;
-      if (!tabId) return null;
+    expect(newTestTabId).toBeDefined();
 
-      const nodeInfo = treeState.tabToNode[tabId];
+    // ビュー1に切り替えてタブが表示されることを確認
+    const newView1Button = newSidePanelPage.locator('[aria-label="Switch to View view"]');
+    await newView1Button.click();
 
-      return {
-        actual: nodeInfo?.viewId,
-        expected: expectedViewId,
-        match: nodeInfo?.viewId === expectedViewId,
-      };
-    }, { url: testUrl, expectedViewId: currentViewId });
+    await assertTabStructure(
+      newSidePanelPage,
+      newWindowId,
+      [
+        { tabId: newTestTabId!, depth: 0 },
+      ],
+      1
+    );
+  });
 
-    expect(restoredViewId).not.toBeNull();
-    expect(restoredViewId?.match).toBe(true);
+  test('ブラウザ再起動後に複数ビューのタブが正しく復元される', async () => {
+    test.setTimeout(120000);
+
+    const { context, serviceWorker, sidePanelPage } = browserResult;
+
+    const windowId = await getCurrentWindowId(serviceWorker);
+
+    // 初期タブを閉じる（handleTabCreatedが呼ばれる前に作成されたタブはTreeStateに入っていない）
+    const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
+    await closeTab(serviceWorker, initialBrowserTabId);
+    await assertTabStructure(sidePanelPage, windowId, [], 0);
+
+    // タブAを作成（ビュー0）
+    const tabA = await createTab(serviceWorker, getTestServerUrl('/page-a'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: tabA, depth: 0 },
+    ], 0);
+
+    // タブBを作成（ビュー0）
+    const tabB = await createTab(serviceWorker, getTestServerUrl('/page-b'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+    ], 0);
+
+    // ビュー1を追加
+    const addViewButton = sidePanelPage.locator('[aria-label="Add new view"]');
+    await addViewButton.click();
+    const view1Button = sidePanelPage.locator('[aria-label="Switch to View view"]');
+    await expect(view1Button).toBeVisible({ timeout: 5000 });
+
+    // タブCを作成（まだビュー0にいる）
+    const tabC = await createTab(serviceWorker, getTestServerUrl('/page-c'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+      { tabId: tabC, depth: 0 },
+    ], 0);
+
+    // タブCをビュー1に移動
+    const tabCItem = sidePanelPage.locator(`[data-testid="tree-node-${tabC}"]`);
+    await tabCItem.click({ button: 'right' });
+    const moveToViewOption = sidePanelPage.locator('text=別のビューへ移動');
+    await moveToViewOption.hover();
+    const subMenu = sidePanelPage.locator('[data-testid="submenu"]');
+    await expect(subMenu).toBeVisible({ timeout: 5000 });
+    const viewMenuItem = subMenu.locator('button', { hasText: 'View' });
+    await viewMenuItem.click();
+
+    // タブCがビュー0から消えたことを確認
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+    ], 0);
+
+    // ビュー1に切り替えてタブCを確認
+    await view1Button.click();
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: tabC, depth: 0 },
+    ], 1);
+
+    // ビュー0に戻る
+    const defaultViewButton = sidePanelPage.locator('[aria-label="Switch to Default view"]');
+    await defaultViewButton.click();
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: tabA, depth: 0 },
+      { tabId: tabB, depth: 0 },
+    ], 0);
+
+    // 永続化を待つ
+    await waitForCondition(async () => {
+      const persisted = await serviceWorker.evaluate(async () => {
+        const result = await chrome.storage.local.get('tree_state');
+        return result.tree_state !== undefined;
+      });
+      return persisted;
+    }, { timeout: 20000, timeoutMessage: 'Tree state not persisted' });
+
+    // ======== Chrome再起動 ========
+    const headless = process.env.HEADED !== 'true';
+    const newBrowserResult = await restartBrowser(context, userDataDir, headless);
+    browserResult = newBrowserResult;
+
+    const { serviceWorker: newServiceWorker, sidePanelPage: newSidePanelPage } = newBrowserResult;
+
+    const newSidePanelRoot = newSidePanelPage.locator('[data-testid="side-panel-root"]');
+    await expect(newSidePanelRoot).toBeVisible({ timeout: 10000 });
+
+    // 再起動後の初期化
+    const newWindowId = await getCurrentWindowId(newServiceWorker);
+
+    // 再起動後、URLから新しいタブIDを取得
+    const newTabA = await newServiceWorker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({ url });
+      return tabs[0]?.id;
+    }, getTestServerUrl('/page-a'));
+
+    const newTabB = await newServiceWorker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({ url });
+      return tabs[0]?.id;
+    }, getTestServerUrl('/page-b'));
+
+    const newTabC = await newServiceWorker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({ url });
+      return tabs[0]?.id;
+    }, getTestServerUrl('/page-c'));
+
+    // ビュー0でタブA, Bが表示されることを確認（タブCはビュー1に残っているべき）
+    await assertTabStructure(
+      newSidePanelPage,
+      newWindowId,
+      [
+        { tabId: newTabA!, depth: 0 },
+        { tabId: newTabB!, depth: 0 },
+      ],
+      0
+    );
+
+    // ビュー1に切り替えてタブCが表示されることを確認
+    const newView1Button = newSidePanelPage.locator('[aria-label="Switch to View view"]');
+    await newView1Button.click();
+
+    await assertTabStructure(
+      newSidePanelPage,
+      newWindowId,
+      [
+        { tabId: newTabC!, depth: 0 },
+      ],
+      1
+    );
   });
 });

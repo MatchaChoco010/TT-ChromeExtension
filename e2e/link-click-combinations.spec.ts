@@ -12,7 +12,7 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
@@ -28,13 +28,23 @@ test.describe('リンククリック組み合わせテスト', () => {
         return tab?.id;
       }, linkPageUrl);
       await waitForTabInTreeState(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
+
       await activateTab(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, openerPage, '#test-link', 'normal');
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0, expanded: true },
         { tabId: newTabId, depth: 1 },
       ], 0);
@@ -45,7 +55,7 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
@@ -61,13 +71,23 @@ test.describe('リンククリック組み合わせテスト', () => {
         return tab?.id;
       }, linkPageUrl);
       await waitForTabInTreeState(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
+
       await activateTab(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, openerPage, '#test-link', 'middle');
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0, expanded: true },
         { tabId: newTabId, depth: 1 },
       ], 0);
@@ -78,7 +98,7 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
@@ -94,13 +114,23 @@ test.describe('リンククリック組み合わせテスト', () => {
         return tab?.id;
       }, linkPageUrl);
       await waitForTabInTreeState(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
+
       await activateTab(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, openerPage, '#test-link', 'ctrl');
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0, expanded: true },
         { tabId: newTabId, depth: 1 },
       ], 0);
@@ -113,7 +143,7 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const linkPageUrl = getTestServerUrl('/link-without-target');
@@ -130,7 +160,6 @@ test.describe('リンククリック組み合わせテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0 },
       ], 0);
 
@@ -138,7 +167,6 @@ test.describe('リンククリック組み合わせテスト', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0 },
       ], 0);
     });
@@ -148,7 +176,7 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
@@ -164,13 +192,23 @@ test.describe('リンククリック組み合わせテスト', () => {
         return tab?.id;
       }, linkPageUrl);
       await waitForTabInTreeState(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
+
       await activateTab(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, openerPage, '#test-link', 'middle');
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0, expanded: true },
         { tabId: newTabId, depth: 1 },
       ], 0);
@@ -181,7 +219,7 @@ test.describe('リンククリック組み合わせテスト', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await setUserSettings(extensionContext, { newTabPositionFromLink: 'child' });
@@ -197,13 +235,23 @@ test.describe('リンククリック組み合わせテスト', () => {
         return tab?.id;
       }, linkPageUrl);
       await waitForTabInTreeState(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
+
       await activateTab(serviceWorker, openerTabId!);
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: openerTabId!, depth: 0 },
+      ], 0);
 
       const newTabId = await clickLinkToOpenTab(serviceWorker, openerPage, '#test-link', 'ctrl');
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: openerTabId!, depth: 0, expanded: true },
         { tabId: newTabId, depth: 1 },
       ], 0);

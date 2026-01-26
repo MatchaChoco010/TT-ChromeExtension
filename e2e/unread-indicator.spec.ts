@@ -15,12 +15,11 @@ extensionTest.describe('未読インジケータ機能', () => {
     'タブがバックグラウンドで読み込まれた場合、未読バッジが表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
@@ -32,7 +31,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -42,7 +40,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -51,12 +48,11 @@ extensionTest.describe('未読インジケータ機能', () => {
     '未読タブをアクティブにした場合、未読バッジが消える',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
@@ -68,7 +64,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -78,7 +73,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -90,7 +84,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -99,12 +92,11 @@ extensionTest.describe('未読インジケータ機能', () => {
     '親タブの子に未読タブがあっても、親タブには未読子タブ数のバッジが表示されない',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(
@@ -116,7 +108,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -129,7 +120,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -146,7 +136,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -154,7 +143,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -163,12 +151,11 @@ extensionTest.describe('未読インジケータ機能', () => {
     '複数の未読タブがある場合、未読数がカウントされて表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId1 = await createTab(
@@ -180,7 +167,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
@@ -193,7 +179,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
         { tabId: bgTabId2, depth: 0 },
       ], 0);
@@ -207,7 +192,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
         { tabId: bgTabId2, depth: 0 },
         { tabId: bgTabId3, depth: 0 },
@@ -221,7 +205,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
         { tabId: bgTabId2, depth: 0 },
       ], 0);
@@ -230,7 +213,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
@@ -238,7 +220,6 @@ extensionTest.describe('未読インジケータ機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -249,12 +230,11 @@ extensionTest.describe('未読インジケーター位置', () => {
     '未読インジケーターがタブノード内の左下角に表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
@@ -266,7 +246,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -293,7 +272,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -302,12 +280,11 @@ extensionTest.describe('未読インジケーター位置', () => {
     '短いタイトルと長いタイトルの両方で未読インジケーターの相対位置が一定である',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const shortTitleTabId = await createTab(
@@ -319,7 +296,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
       ], 0);
 
@@ -332,7 +308,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
         { tabId: longTitleTabId, depth: 0 },
       ], 0);
@@ -375,7 +350,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
       ], 0);
 
@@ -383,7 +357,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -392,12 +365,11 @@ extensionTest.describe('未読インジケーター位置', () => {
     '未読バッジがタブノードの左下に三角形として表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
@@ -409,7 +381,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -434,7 +405,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -443,12 +413,11 @@ extensionTest.describe('未読インジケーター位置', () => {
     '未読インジケーターがタブの右端に固定されていること（タイトル長に依存しない）',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const shortTitleTabId = await createTab(
@@ -460,7 +429,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
       ], 0);
 
@@ -473,7 +441,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
         { tabId: longTitleTabId, depth: 0 },
       ], 0);
@@ -516,7 +483,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: shortTitleTabId, depth: 0 },
       ], 0);
 
@@ -524,7 +490,6 @@ extensionTest.describe('未読インジケーター位置', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -535,12 +500,11 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
     'ルートレベル（depth=0）の未読タブでインジケーターが左端に表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const rootTabId = await createTab(
@@ -552,7 +516,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTabId, depth: 0 },
       ], 0);
 
@@ -575,7 +538,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -584,12 +546,11 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
     'depth=1の未読タブでインジケーターがインデントされた位置に表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(
@@ -601,7 +562,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -614,7 +574,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -638,7 +597,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -646,7 +604,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -655,12 +612,11 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
     'depth=2の未読タブでインジケーターがさらにインデントされた位置に表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const parentTabId = await createTab(
@@ -672,7 +628,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -685,7 +640,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -699,7 +653,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1, expanded: true },
         { tabId: grandchildTabId, depth: 2 },
@@ -724,7 +677,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -733,7 +685,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -741,7 +692,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -750,12 +700,11 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
     '異なるdepthの未読タブでインジケーター位置が正しくスケールする',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const rootTabId = await createTab(
@@ -767,7 +716,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTabId, depth: 0 },
       ], 0);
 
@@ -780,7 +728,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
@@ -794,7 +741,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
@@ -826,7 +772,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
@@ -835,7 +780,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: rootTabId, depth: 0 },
       ], 0);
 
@@ -843,7 +787,6 @@ extensionTest.describe('未読インジケーターdepth対応', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -854,12 +797,11 @@ extensionTest.describe('未読インジケーターUI改善', () => {
     '未読インジケーターが左下三角形の形状で表示される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
@@ -871,7 +813,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -916,7 +857,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -925,12 +865,11 @@ extensionTest.describe('未読インジケーターUI改善', () => {
     '未読インジケーターがタブ要素に重なる形で配置される',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
@@ -942,7 +881,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -973,7 +911,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -982,12 +919,11 @@ extensionTest.describe('未読インジケーターUI改善', () => {
     '既読になったときに未読インジケーターが非表示になる',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId = await createTab(
@@ -999,7 +935,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -1009,7 +944,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
@@ -1021,7 +955,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );
@@ -1030,12 +963,11 @@ extensionTest.describe('未読インジケーターUI改善', () => {
     '複数タブで未読インジケーターの形状が一貫していること',
     async ({ extensionContext, serviceWorker }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
 
       const bgTabId1 = await createTab(
@@ -1047,7 +979,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
@@ -1060,7 +991,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
         { tabId: bgTabId2, depth: 0 },
       ], 0);
@@ -1114,7 +1044,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: bgTabId1, depth: 0 },
       ], 0);
 
@@ -1122,7 +1051,6 @@ extensionTest.describe('未読インジケーターUI改善', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     }
   );

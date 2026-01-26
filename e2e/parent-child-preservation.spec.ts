@@ -9,7 +9,7 @@ test.describe('新規タブ作成時の親子関係維持', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -19,7 +19,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
@@ -27,7 +26,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
@@ -36,7 +34,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
       { tabId: newTabId, depth: 0 },
@@ -50,7 +47,7 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     const windowId = await getCurrentWindowId(serviceWorker);
 
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -60,7 +57,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0 },
     ], 0);
 
@@ -68,7 +64,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
     ], 0);
@@ -77,7 +72,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
       { tabId: parent2TabId, depth: 0 },
@@ -87,7 +81,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
       { tabId: parent2TabId, depth: 0, expanded: true },
@@ -98,7 +91,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1TabId, depth: 0, expanded: true },
       { tabId: child1TabId, depth: 1 },
       { tabId: parent2TabId, depth: 0, expanded: true },
@@ -112,7 +104,7 @@ test.describe('新規タブ作成時の親子関係維持', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -122,7 +114,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
@@ -130,7 +121,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
@@ -139,7 +129,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1, expanded: true },
       { tabId: grandchildTabId, depth: 2 },
@@ -149,7 +138,6 @@ test.describe('新規タブ作成時の親子関係維持', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1, expanded: true },
       { tabId: grandchildTabId, depth: 2 },

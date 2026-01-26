@@ -15,7 +15,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   hasChildren: _hasChildren = false,
   tabUrl,
   views,
-  currentViewId,
+  currentViewIndex,
   onMoveToView,
   currentWindowId: _currentWindowId,
   otherWindows,
@@ -99,21 +99,25 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   };
 
   const availableViews = useMemo((): SubMenuItem[] => {
-    if (!views || !currentViewId) return [];
+    if (!views || currentViewIndex === undefined) return [];
     return views
-      .filter(v => v.id !== currentViewId)
-      .map(v => ({
-        id: v.id,
+      .map((v, index) => ({
+        id: `view-${index}`,
         label: v.name,
-      }));
-  }, [views, currentViewId]);
+        viewIndex: index,
+      }))
+      .filter((_, index) => index !== currentViewIndex);
+  }, [views, currentViewIndex]);
 
   const showMoveToViewMenu = availableViews.length > 0 && onMoveToView;
 
-  const handleViewSelect = useCallback((viewId: string) => {
-    if (onMoveToView) {
-      onMoveToView(viewId, targetTabIds);
-      onClose();
+  const handleViewSelect = useCallback((itemId: string) => {
+    if (onMoveToView && itemId.startsWith('view-')) {
+      const viewIndex = parseInt(itemId.replace('view-', ''), 10);
+      if (!isNaN(viewIndex)) {
+        onMoveToView(viewIndex, targetTabIds);
+        onClose();
+      }
     }
   }, [onMoveToView, targetTabIds, onClose]);
 

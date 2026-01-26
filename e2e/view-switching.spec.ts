@@ -395,13 +395,28 @@ test.describe('ビュー切り替え機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+      const { sidePanelPage, initialBrowserTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
+
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page?id=tabB'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
 
       await activateTab(serviceWorker, tabA);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
       await assertActiveTab(extensionContext, tabA, windowId);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -415,6 +430,9 @@ test.describe('ビュー切り替え機能', () => {
       await expect(newViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
       const tabC = await createTab(serviceWorker, getTestServerUrl('/page?id=tabC'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tabC, depth: 0 },
+      ], 1);
       await assertActiveTab(extensionContext, tabC, windowId);
 
       const defaultViewButton = sidePanelPage.locator('[aria-label="Switch to Default view"]');
@@ -430,13 +448,28 @@ test.describe('ビュー切り替え機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+      const { sidePanelPage, initialBrowserTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
-      const _tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      const tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
+
       const tabB = await createTab(serviceWorker, getTestServerUrl('/page?id=tabB'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
 
       await activateTab(serviceWorker, tabB);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+        { tabId: tabB, depth: 0 },
+      ], 0);
       await assertActiveTab(extensionContext, tabB, windowId);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -448,9 +481,22 @@ test.describe('ビュー切り替え機能', () => {
       await workViewButton.click({ force: true });
       await expect(workViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
 
-      const _tabC = await createTab(serviceWorker, getTestServerUrl('/page?id=tabC'));
+      const tabC = await createTab(serviceWorker, getTestServerUrl('/page?id=tabC'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tabC, depth: 0 },
+      ], 1);
+
       const tabD = await createTab(serviceWorker, getTestServerUrl('/page?id=tabD'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tabC, depth: 0 },
+        { tabId: tabD, depth: 0 },
+      ], 1);
+
       await activateTab(serviceWorker, tabD);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tabC, depth: 0 },
+        { tabId: tabD, depth: 0 },
+      ], 1);
       await assertActiveTab(extensionContext, tabD, windowId);
 
       const defaultViewButton = sidePanelPage.locator('[aria-label="Switch to Default view"]');
@@ -471,11 +517,20 @@ test.describe('ビュー切り替え機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
+      const { sidePanelPage, initialBrowserTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const tabA = await createTab(serviceWorker, getTestServerUrl('/page?id=tabA'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
+
       await activateTab(serviceWorker, tabA);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabA, depth: 0 },
+      ], 0);
       await assertActiveTab(extensionContext, tabA, windowId);
 
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
@@ -496,16 +551,24 @@ test.describe('ビュー切り替え機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
+      const { sidePanelPage, initialBrowserTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page?id=parent'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
+
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page?id=child'), parentTab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
       await closeTab(serviceWorker, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
@@ -541,7 +604,7 @@ test.describe('ビュー切り替え機能', () => {
         async () => {
           const treeNodes = sidePanelPage.locator('[data-testid^="tree-node-"]');
           const count = await treeNodes.count();
-          return count === 1;
+          return count === 0;
         },
         { timeout: 5000, timeoutMessage: 'Tabs did not move to the new view' }
       );
@@ -560,16 +623,24 @@ test.describe('ビュー切り替え機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { sidePanelPage, initialBrowserTabId, pseudoSidePanelTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
+      const { sidePanelPage, initialBrowserTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
       await waitForViewSwitcher(sidePanelPage);
 
       const parentTab = await createTab(serviceWorker, getTestServerUrl('/page?id=parent'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTab, depth: 0 },
+      ], 0);
+
       const childTab = await createTab(serviceWorker, getTestServerUrl('/page?id=child'), parentTab);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: parentTab, depth: 0, expanded: true },
+        { tabId: childTab, depth: 1 },
+      ], 0);
 
       await closeTab(serviceWorker, initialBrowserTabId);
-
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },
         { tabId: childTab, depth: 1 },
       ], 0);
@@ -602,7 +673,6 @@ test.describe('ビュー切り替え機能', () => {
       await viewOption.click({ force: true });
 
       await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTab, depth: 0 },
       ], 0);
 

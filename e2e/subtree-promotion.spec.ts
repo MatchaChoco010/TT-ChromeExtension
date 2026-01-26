@@ -10,7 +10,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -20,7 +20,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
@@ -28,7 +27,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
     ], 0);
@@ -37,7 +35,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -47,7 +44,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -57,7 +53,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await closeTab(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabBId, depth: 0, expanded: true },
       { tabId: tabCId, depth: 1 },
       { tabId: tabDId, depth: 1 },
@@ -69,7 +64,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -79,7 +74,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
@@ -87,7 +81,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
     ], 0);
@@ -96,7 +89,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -106,7 +98,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2, expanded: true },
@@ -116,7 +107,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await closeTab(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabBId, depth: 0, expanded: true },
       { tabId: tabCId, depth: 1, expanded: true },
       { tabId: tabDId, depth: 2 },
@@ -128,7 +118,7 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -138,7 +128,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
@@ -146,7 +135,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
     ], 0);
@@ -155,7 +143,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -165,7 +152,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -176,7 +162,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabEId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -188,7 +173,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabFId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -201,7 +185,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await waitForTabInTreeState(serviceWorker, tabGId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -214,7 +197,6 @@ test.describe('親タブ削除時のサブツリー親子関係維持', () => {
     await closeTab(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabBId, depth: 0, expanded: true },
       { tabId: tabCId, depth: 1 },
       { tabId: tabDId, depth: 1 },

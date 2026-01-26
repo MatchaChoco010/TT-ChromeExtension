@@ -66,40 +66,32 @@ export async function resetExtensionState(
     'clearStorage'
   );
 
-  // Step 3: メモリ上の状態をクリア
-  // prepareForSyncReset()を使用して同期待機中のウェイターを解決し、
-  // 同期フラグを適切にリセットする
+  // Step 3: メモリ上の状態をクリアし、initialized = trueにする
+  // resetForTesting()を使用することで、通常のイベントハンドリングが有効になり、
+  // 後続のウィンドウ/タブ作成時にhandleTabCreatedでTreeStateにタブが追加される
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
       const treeStateManager = (globalThis as unknown as { treeStateManager?: {
-        tabToNode: Map<unknown, unknown>;
-        views: Map<string, unknown>;
-        viewOrder: string[];
-        currentViewId: string;
-        prepareForSyncReset: () => void;
+        resetForTesting: () => void;
       } }).treeStateManager;
       if (treeStateManager) {
-        treeStateManager.tabToNode.clear();
-        treeStateManager.views.clear();
-        treeStateManager.viewOrder = [];
-        treeStateManager.currentViewId = 'default';
-        treeStateManager.prepareForSyncReset();
+        treeStateManager.resetForTesting();
       }
 
-      const g = globalThis as unknown as { pendingTabParents?: Map<unknown, unknown>; pendingDuplicateSources?: Map<unknown, unknown>; pendingGroupTabIds?: Map<unknown, unknown>; pendingLinkClicks?: Map<unknown, unknown>; clearTabCreationLogs?: () => void };
+      const g = globalThis as unknown as { pendingTabParents?: Map<unknown, unknown>; pendingDuplicateSources?: Map<unknown, unknown>; pendingGroupTabIds?: Map<unknown, unknown>; pendingLinkClicks?: Map<unknown, unknown> };
       g.pendingTabParents?.clear();
       g.pendingDuplicateSources?.clear();
       g.pendingGroupTabIds?.clear();
       g.pendingLinkClicks?.clear();
-      g.clearTabCreationLogs?.();
     },
     10000,
     'clearMemoryState'
   );
 
   // Step 4: 新しいクリーンなウィンドウを作成
-  // 前のテストの状態が残らないよう、完全に新しいウィンドウを作成する
+  // initialized = trueなので、handleWindowCreatedとhandleTabCreatedが通常通り動作し、
+  // TreeStateにウィンドウとタブが追加される
   const newWindowId = await evaluateWithTimeout(
     serviceWorker,
     async () => {
@@ -172,79 +164,29 @@ export async function resetExtensionState(
     'setDefaultSettings'
   );
 
-  // Step 8: tree_stateにデフォルトのviewsを明示的に設定
-  await evaluateWithTimeout(
+  // Step 8: initializedがtrueであることを検証
+  const initStatus = await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const defaultViewInfo = {
-        id: 'default',
-        name: 'Default',
-        color: '#3B82F6',
-      };
-      await chrome.storage.local.set({
-        tree_state: {
-          views: {
-            'default': {
-              info: defaultViewInfo,
-              rootNodeIds: [],
-              nodes: {},
-            },
-          },
-          viewOrder: ['default'],
-          currentViewId: 'default',
-          tabToNode: {},
-          treeStructure: [],
-        },
-      });
-    },
-    10000,
-    'setDefaultTreeState'
-  );
-
-  // Step 9: Chromeタブと同期
-  // prepareForSyncReset()を使用して同期状態を適切にリセットする:
-  // 1. 前のテストからの古いウェイターを解決（タイムアウト防止）
-  // 2. syncCompletedResolversをクリア
-  // 3. syncCompleted/syncInProgressをfalseにリセット
-  // これにより、次のsyncWithChromeTabsが確実に実行される
-  await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: { prepareForSyncReset: () => void; syncWithChromeTabs: () => Promise<void> } }).treeStateManager;
-      if (treeStateManager) {
-        treeStateManager.prepareForSyncReset();
-        await treeStateManager.syncWithChromeTabs();
-      }
-    },
-    10000,
-    'syncWithChromeTabs'
-  );
-
-  // Step 10: syncCompletedがtrueであることを検証
-  // syncWithChromeTabsが正常に完了していれば、syncCompleted = trueになる
-  // これがfalseの場合、handleTabCreatedがwaitForSyncCompleteでブロックされる
-  const syncStatus = await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: { isSyncCompleted: () => boolean; isSyncInProgress: () => boolean } }).treeStateManager;
+      const treeStateManager = (globalThis as unknown as { treeStateManager?: { isInitialized: () => boolean; isInitializationInProgress: () => boolean } }).treeStateManager;
       return {
-        syncCompleted: treeStateManager?.isSyncCompleted() ?? false,
-        syncInProgress: treeStateManager?.isSyncInProgress() ?? false,
+        initialized: treeStateManager?.isInitialized() ?? false,
+        initializationInProgress: treeStateManager?.isInitializationInProgress() ?? false,
       };
     },
     5000,
-    'verifySyncCompleted'
+    'verifyInitialized'
   );
 
-  if (!syncStatus.syncCompleted) {
+  if (!initStatus.initialized) {
     throw new Error(
-      `Reset failed: syncCompleted is false after syncWithChromeTabs. ` +
-      `syncInProgress: ${syncStatus.syncInProgress}. ` +
-      `This will cause handleTabCreated to timeout waiting for sync.`
+      `Reset failed: initialized is false. ` +
+      `initializationInProgress: ${initStatus.initializationInProgress}. ` +
+      `This will cause handleTabCreated to timeout waiting for initialization.`
     );
   }
 
-  // Step 11: リセット後の状態を検証（新しいウィンドウのタブのみ存在すること）
+  // Step 9: リセット後の状態を検証（新しいウィンドウのタブのみ存在すること）
   const remainingTabCount = await serviceWorker.evaluate(async () => {
     const tabs = await chrome.tabs.query({});
     return tabs.length;

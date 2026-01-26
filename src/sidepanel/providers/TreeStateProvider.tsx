@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, SiblingDropInfo, DragEndEvent, ViewState } from '@/types';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, SiblingDropInfo, DragEndEvent, ViewState, WindowState } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
 interface TreeStateContextType {
@@ -8,38 +8,39 @@ interface TreeStateContextType {
   error: Error | null;
   handleDragEnd: (event: DragEndEvent) => Promise<void>;
   handleSiblingDrop: (info: SiblingDropInfo) => Promise<void>;
-  switchView: (viewId: string) => void;
+  switchView: (viewIndex: number) => void;
   createView: () => void;
-  deleteView: (viewId: string) => void;
-  updateView: (viewId: string, updates: Partial<View>) => void;
+  deleteView: (viewIndex: number) => void;
+  updateView: (viewIndex: number, updates: Partial<View>) => void;
   groups: Record<string, Group>;
   createGroup: (name: string, color: string) => string;
-  deleteGroup: (nodeId: string) => void;
-  updateGroup: (nodeId: string, updates: Partial<Group>) => void;
-  toggleGroupExpanded: (nodeId: string) => void;
-  addTabToGroup: (nodeId: string, targetGroupNodeId: string) => void;
-  removeTabFromGroup: (nodeId: string) => void;
-  getGroupTabCount: (nodeId: string) => number;
+  deleteGroup: (tabId: number) => void;
+  updateGroup: (tabId: number, updates: Partial<Group>) => void;
+  toggleGroupExpanded: (tabId: number) => void;
+  addTabToGroup: (tabId: number, targetGroupTabId: number) => void;
+  removeTabFromGroup: (tabId: number) => void;
+  getGroupTabCount: (tabId: number) => number;
   unreadTabIds: Set<number>;
   isTabUnread: (tabId: number) => boolean;
   getUnreadCount: () => number;
-  getUnreadChildCount: (nodeId: string) => number;
+  getUnreadChildCount: (tabId: number) => number;
   activeTabId: number | null;
   tabInfoMap: TabInfoMap;
   getTabInfo: (tabId: number) => ExtendedTabInfo | undefined;
   pinnedTabIds: number[];
   handlePinnedTabReorder: (tabId: number, newIndex: number) => Promise<void>;
-  selectedNodeIds: Set<string>;
-  lastSelectedNodeId: string | null;
-  selectNode: (nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => void;
+  selectedTabIds: Set<number>;
+  lastSelectedTabId: number | null;
+  selectNode: (tabId: number, modifiers: { shift: boolean; ctrl: boolean }) => void;
   clearSelection: () => void;
-  isNodeSelected: (nodeId: string) => boolean;
+  isNodeSelected: (tabId: number) => boolean;
   getSelectedTabIds: () => number[];
-  viewTabCounts: Record<string, number>;
-  moveTabsToView: (viewId: string, tabIds: number[]) => Promise<void>;
+  viewTabCounts: number[];
+  moveTabsToView: (viewIndex: number, tabIds: number[]) => Promise<void>;
   currentWindowId: number | null;
-  /** 現在のウィンドウのcurrentViewId（ウィンドウ毎に独立） */
-  currentViewId: string;
+  currentViewIndex: number;
+  views: View[];
+  currentWindowState: WindowState | null;
 }
 
 const TreeStateContext = createContext<TreeStateContextType | undefined>(
@@ -53,110 +54,6 @@ export const useTreeState = () => {
   }
   return context;
 };
-
-/**
- * デフォルトのViewStateを作成
- */
-function createDefaultViewState(): ViewState {
-  return {
-    info: {
-      id: 'default',
-      name: 'Default',
-      color: '#3B82F6',
-    },
-    rootNodeIds: [],
-    nodes: {},
-  };
-}
-
-/**
- * ストレージから読み込んだツリー状態の children 参照を再構築
- * JSONシリアライズにより失われた参照関係を復元する
- * また、views が存在しない場合はデフォルトビューを追加する
- */
-function reconstructChildrenReferences(treeState: TreeState): TreeState {
-  if (!treeState.views || Object.keys(treeState.views).length === 0) {
-    return {
-      ...treeState,
-      views: { default: createDefaultViewState() },
-      currentViewId: 'default',
-      tabToNode: treeState.tabToNode || {},
-    };
-  }
-
-  const reconstructedViews: Record<string, ViewState> = {};
-
-  for (const [viewId, viewState] of Object.entries(treeState.views)) {
-    const reconstructedNodes: Record<string, TabNode> = {};
-
-    Object.entries(viewState.nodes).forEach(([id, node]) => {
-      reconstructedNodes[id] = {
-        ...node,
-        children: [],
-      };
-    });
-
-    // ストレージに保存されたchildren配列の順序を維持して再構築
-    const addedChildIds = new Set<string>();
-
-    Object.entries(viewState.nodes).forEach(([parentId, parentNode]) => {
-      const parent = reconstructedNodes[parentId];
-      if (!parent) return;
-
-      if (parentNode.children && Array.isArray(parentNode.children)) {
-        for (const storedChild of parentNode.children) {
-          if (!storedChild || typeof storedChild !== 'object') continue;
-          const childId = (storedChild as { id?: string }).id;
-          if (!childId) continue;
-          const child = reconstructedNodes[childId];
-          if (child && child.parentId === parentId) {
-            parent.children.push(child);
-            addedChildIds.add(childId);
-          }
-        }
-      }
-    });
-
-    // parentIdで関連付けられているが、まだ追加されていない子を追加（フォールバック）
-    Object.entries(reconstructedNodes).forEach(([id, node]) => {
-      if (addedChildIds.has(id)) return;
-      if (node.parentId && reconstructedNodes[node.parentId]) {
-        const parent = reconstructedNodes[node.parentId];
-        parent.children.push(node);
-      }
-    });
-
-    const recalculateDepth = (node: TabNode, depth: number): void => {
-      node.depth = depth;
-      for (const child of node.children) {
-        recalculateDepth(child, depth + 1);
-      }
-    };
-
-    for (const nodeId of viewState.rootNodeIds) {
-      const node = reconstructedNodes[nodeId];
-      if (node && !node.parentId) {
-        recalculateDepth(node, 0);
-      }
-    }
-
-    reconstructedViews[viewId] = {
-      info: viewState.info,
-      rootNodeIds: viewState.rootNodeIds || [],
-      nodes: reconstructedNodes,
-    };
-  }
-
-  const currentViewId = treeState.currentViewId || 'default';
-  const currentViewByWindowId = treeState.currentViewByWindowId;
-
-  return {
-    ...treeState,
-    views: reconstructedViews,
-    currentViewId,
-    currentViewByWindowId,
-  };
-}
 
 interface TreeStateProviderProps {
   children: React.ReactNode;
@@ -172,10 +69,10 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const [unreadTabIds, setUnreadTabIds] = useState<Set<number>>(new Set());
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   const [tabInfoMap, setTabInfoMap] = useState<TabInfoMap>({});
-  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
-  const [lastSelectedNodeId, setLastSelectedNodeId] = useState<string | null>(null);
+  const [selectedTabIds, setSelectedTabIds] = useState<Set<number>>(new Set());
+  const [lastSelectedTabId, setLastSelectedTabId] = useState<number | null>(null);
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
-  const [viewActiveTabIds, setViewActiveTabIds] = useState<Record<string, number>>({});
+  const viewActiveTabIdsRef = useRef<Record<number, number>>({});
 
   const loadGroups = React.useCallback(async () => {
     try {
@@ -212,7 +109,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   const loadCurrentWindowId = React.useCallback(async () => {
     try {
-      // URLパラメータからウィンドウIDを取得（別ウィンドウ用サイドパネルの場合）
       const urlParams = new URLSearchParams(window.location.search);
       const windowIdParam = urlParams.get('windowId');
       if (windowIdParam) {
@@ -241,13 +137,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       const newTabInfoMap: TabInfoMap = {};
       for (const tab of tabs) {
         if (tab.id !== undefined) {
-          // 永続化されたタイトルがあればそれを使用
-          // タブがローディング中でChromeからのタイトルが空の場合に特に有効
           const persistedTitle = persistedTitles[tab.id];
           const title = tab.title || persistedTitle || '';
 
-          // 永続化されたファビコンがあればそれを使用（ブラウザ再起動後に有効）
-          // URLをキーとして保存しているので、tabIdが変わっても復元可能
           const persistedFavicon = tab.url ? persistedFavicons[tab.url] : undefined;
           const favIconUrl = tab.favIconUrl || persistedFavicon;
 
@@ -285,42 +177,14 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   const loadTreeState = React.useCallback(async () => {
     try {
-      const result = await chrome.storage.local.get('tree_state');
-      const treeStateData = result.tree_state as TreeState | undefined;
-      if (treeStateData && treeStateData.views && Object.keys(treeStateData.views).length > 0) {
-        const reconstructedState = reconstructChildrenReferences(treeStateData);
-        setTreeState(reconstructedState);
+      const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
+      if (response?.success && response.data) {
+        setTreeState(response.data as TreeState);
       } else {
-        try {
-          await chrome.runtime.sendMessage({ type: 'SYNC_TABS' });
-
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          const syncedResult = await chrome.storage.local.get('tree_state');
-          const syncedTreeStateData = syncedResult.tree_state as TreeState | undefined;
-          if (syncedTreeStateData && syncedTreeStateData.views) {
-            const reconstructedState = reconstructChildrenReferences(syncedTreeStateData);
-            setTreeState(reconstructedState);
-          } else {
-            const initialState: TreeState = {
-              views: { default: createDefaultViewState() },
-              viewOrder: ['default'],
-              currentViewId: 'default',
-              tabToNode: {},
-              treeStructure: [],
-            };
-            setTreeState(initialState);
-          }
-        } catch {
-          const initialState: TreeState = {
-            views: { default: createDefaultViewState() },
-            viewOrder: ['default'],
-            currentViewId: 'default',
-            tabToNode: {},
-            treeStructure: [],
-          };
-          setTreeState(initialState);
-        }
+        const initialState: TreeState = {
+          windows: [],
+        };
+        setTreeState(initialState);
       }
     } catch (err) {
       setError(
@@ -340,13 +204,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [loadTreeState, loadGroups, loadUnreadTabs, loadActiveTab, loadTabInfoMap, loadCurrentWindowId]);
 
   useEffect(() => {
-    // STATE_UPDATEDメッセージのペイロードから直接状態を取得
-    // ストレージを共有メモリとして使わず、メッセージで状態を伝達する
-
     const messageListener = (message: { type: string; payload?: TreeState }) => {
       if (message.type === 'STATE_UPDATED' && message.payload) {
-        const reconstructedState = reconstructChildrenReferences(message.payload);
-        setTreeState(reconstructedState);
+        setTreeState(message.payload);
         loadTabInfoMap();
         loadUnreadTabs();
         loadGroups();
@@ -363,20 +223,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   useEffect(() => {
     const handleTabActivated = (activeInfo: chrome.tabs.OnActivatedInfo) => {
       setActiveTabId(activeInfo.tabId);
-      // Note: アクティブタブ変更時に選択状態を解除しない
-      // ツリー内でのタブクリックでもonActivatedが発火するため、
-      // クリック時の選択操作と競合してしまう
-      // 代わりに、新しいタブ作成時とタブ削除時にのみ選択を解除する
-
-      if (treeState) {
-        const mapping = treeState.tabToNode[activeInfo.tabId];
-        if (mapping) {
-          setViewActiveTabIds(prev => ({
-            ...prev,
-            [mapping.viewId]: activeInfo.tabId,
-          }));
-        }
-      }
     };
 
     chrome.tabs.onActivated.addListener(handleTabActivated);
@@ -384,14 +230,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return () => {
       chrome.tabs.onActivated.removeListener(handleTabActivated);
     };
-  }, [treeState]);
+  }, []);
 
   useEffect(() => {
-    // タブ作成時は選択状態のみクリア
-    // tabInfoMapの更新はSTATE_UPDATED経由のloadTabInfoMap()で行う（競合防止）
     const handleTabCreated = () => {
-      setSelectedNodeIds(new Set());
-      setLastSelectedNodeId(null);
+      setSelectedTabIds(new Set());
+      setLastSelectedTabId(null);
     };
 
     chrome.tabs.onCreated.addListener(handleTabCreated);
@@ -402,11 +246,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   useEffect(() => {
-    // タブ削除時は選択状態のみクリア
-    // tabInfoMapの更新はSTATE_UPDATED経由のloadTabInfoMap()で行う（競合防止）
     const handleTabRemoved = () => {
-      setSelectedNodeIds(new Set());
-      setLastSelectedNodeId(null);
+      setSelectedTabIds(new Set());
+      setLastSelectedTabId(null);
     };
 
     chrome.tabs.onRemoved.addListener(handleTabRemoved);
@@ -416,67 +258,55 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     };
   }, []);
 
-  /**
-   * 現在のウィンドウのcurrentViewIdを取得
-   * currentViewByWindowIdからウィンドウ固有のビューを取得し、
-   * なければグローバルなcurrentViewIdにフォールバック
-   */
-  const currentViewId = useMemo((): string => {
-    if (!treeState) return 'default';
-
-    if (currentWindowId !== null && treeState.currentViewByWindowId) {
-      const windowViewId = treeState.currentViewByWindowId[currentWindowId];
-      if (windowViewId) {
-        return windowViewId;
-      }
-    }
-
-    return treeState.currentViewId || 'default';
+  const currentWindowState = useMemo((): WindowState | null => {
+    if (!treeState || currentWindowId === null) return null;
+    return treeState.windows.find(w => w.windowId === currentWindowId) || null;
   }, [treeState, currentWindowId]);
 
-  const currentViewState = useMemo((): ViewState | null => {
-    if (!treeState) return null;
-    return treeState.views[currentViewId] || null;
-  }, [treeState, currentViewId]);
+  const currentViewIndex = useMemo((): number => {
+    return currentWindowState?.activeViewIndex ?? 0;
+  }, [currentWindowState]);
 
-  /**
-   * ビュー切り替え
-   * 現在のウィンドウのビューのみを切り替える（他のウィンドウには影響しない）
-   * 切り替え先ビューの最後にアクティブだったタブをChromeでアクティブにする
-   */
-  const switchView = useCallback(async (viewId: string) => {
+  const currentViewState = useMemo((): ViewState | null => {
+    if (!currentWindowState) return null;
+    return currentWindowState.views[currentViewIndex] || null;
+  }, [currentWindowState, currentViewIndex]);
+
+  const views = useMemo((): View[] => {
+    if (!currentWindowState) return [];
+    return currentWindowState.views.map((v, index) => ({
+      id: `${currentWindowId}-${index}`,
+      name: v.name,
+      color: v.color,
+      icon: v.icon,
+    }));
+  }, [currentWindowState, currentWindowId]);
+
+  const switchView = useCallback(async (viewIndex: number) => {
     if (!treeState || currentWindowId === null) return;
 
-    // 現在のビューのアクティブタブを記憶（切り替え前）
-    // React state更新が非同期のため、handleTabActivatedでの記憶が間に合わない場合の対策
+    // refから切り替え先ビューの最後のアクティブタブを取得
+    // （useStateのクロージャ問題を回避するためrefを使用）
+    const tabIdToActivate = viewActiveTabIdsRef.current[viewIndex];
+
     if (activeTabId !== null) {
-      const mapping = treeState.tabToNode[activeTabId];
-      if (mapping && mapping.viewId === currentViewId) {
-        setViewActiveTabIds(prev => ({
-          ...prev,
-          [currentViewId]: activeTabId,
-        }));
-      }
+      viewActiveTabIdsRef.current[currentViewIndex] = activeTabId;
     }
 
     await chrome.runtime.sendMessage({
       type: 'SWITCH_VIEW',
       payload: {
-        viewId,
+        viewIndex,
         windowId: currentWindowId,
-        previousViewId: currentViewId,
+        previousViewIndex: currentViewIndex,
         activeTabId,
       },
     });
 
-    // Note: setViewActiveTabIds は非同期なので、最新値を使うために直接計算
-    let tabIdToActivate = viewActiveTabIds[viewId];
-
     if (tabIdToActivate !== undefined) {
-      const mapping = treeState.tabToNode[tabIdToActivate];
       const tabInfo = tabInfoMap[tabIdToActivate];
-      const isInCurrentWindow = currentWindowId === null || (tabInfo && tabInfo.windowId === currentWindowId);
-      if (mapping && mapping.viewId === viewId && isInCurrentWindow) {
+      const isInCurrentWindow = tabInfo && tabInfo.windowId === currentWindowId;
+      if (isInCurrentWindow) {
         try {
           await chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId: tabIdToActivate } });
           return;
@@ -486,21 +316,24 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       }
     }
 
-    // 記憶されたタブがない、または既に別ビューに移動している場合は、
-    // そのビューの最初のタブをアクティブにする（現在のウィンドウのみ）
-    const targetViewState = treeState.views[viewId];
+    const windowState = treeState.windows.find(w => w.windowId === currentWindowId);
+    if (!windowState) return;
+    const targetViewState = windowState.views[viewIndex];
     if (!targetViewState) return;
 
-    const viewTabs: number[] = [];
-    for (const nodeId of Object.keys(targetViewState.nodes)) {
-      const node = targetViewState.nodes[nodeId];
-      if (!node) continue;
-      if (currentWindowId !== null) {
+    const collectTabIds = (nodes: TabNode[]): number[] => {
+      const result: number[] = [];
+      for (const node of nodes) {
         const tabInfo = tabInfoMap[node.tabId];
-        if (tabInfo && tabInfo.windowId !== currentWindowId) continue;
+        if (tabInfo && tabInfo.windowId === currentWindowId) {
+          result.push(node.tabId);
+        }
+        result.push(...collectTabIds(node.children));
       }
-      viewTabs.push(node.tabId);
-    }
+      return result;
+    };
+
+    const viewTabs = collectTabIds(targetViewState.rootNodes);
 
     if (viewTabs.length > 0) {
       try {
@@ -509,33 +342,32 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         // タブが存在しない場合は無視
       }
     }
-    // ビューにタブがない場合は何もしない（アクティブタブは変更しない）
-  }, [treeState, viewActiveTabIds, activeTabId, currentViewId, currentWindowId, tabInfoMap]);
+  }, [treeState, activeTabId, currentViewIndex, currentWindowId, tabInfoMap]);
 
   const createView = useCallback(async () => {
-    await chrome.runtime.sendMessage({ type: 'CREATE_VIEW' });
-  }, []);
+    if (currentWindowId === null) return;
+    await chrome.runtime.sendMessage({
+      type: 'CREATE_VIEW',
+      payload: { windowId: currentWindowId },
+    });
+  }, [currentWindowId]);
 
-  /**
-   * ビューを削除
-   * 削除されるビューのタブはviewOrder上の前のビューに移動
-   * 削除されるビューを表示していたウィンドウは移動先ビューに切り替え
-   */
-  const deleteView = useCallback(async (viewId: string) => {
-    if (viewId === 'default') return;
+  const deleteView = useCallback(async (viewIndex: number) => {
+    if (viewIndex === 0 || currentWindowId === null) return;
 
     await chrome.runtime.sendMessage({
       type: 'DELETE_VIEW',
-      payload: { viewId },
+      payload: { viewIndex, windowId: currentWindowId },
     });
-  }, []);
+  }, [currentWindowId]);
 
-  const updateView = useCallback(async (viewId: string, updates: Partial<View>) => {
+  const updateView = useCallback(async (viewIndex: number, updates: Partial<View>) => {
+    if (currentWindowId === null) return;
     await chrome.runtime.sendMessage({
       type: 'UPDATE_VIEW',
-      payload: { viewId, updates },
+      payload: { viewIndex, updates, windowId: currentWindowId },
     });
-  }, []);
+  }, [currentWindowId]);
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -545,48 +377,42 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         return;
       }
 
-      const activeId = active.id as string;
-      const overId = over.id as string;
+      const activeTabId = Number(active.id);
+      const overTabId = Number(over.id);
 
       await chrome.runtime.sendMessage({
         type: 'MOVE_NODE',
         payload: {
-          nodeId: activeId,
-          targetParentId: overId,
-          viewId: currentViewId,
-          selectedNodeIds: Array.from(selectedNodeIds),
+          tabId: activeTabId,
+          targetParentTabId: overTabId,
+          windowId: currentWindowId,
+          viewIndex: currentViewIndex,
+          selectedTabIds: Array.from(selectedTabIds),
         },
       });
     },
-    [selectedNodeIds, currentViewId]
+    [selectedTabIds, currentViewIndex, currentWindowId]
   );
 
-  /**
-   * 兄弟としてドロップ（Gapドロップ）時のハンドラ
-   * タブを兄弟として指定位置に挿入する
-   */
   const handleSiblingDrop = useCallback(
     async (info: SiblingDropInfo) => {
-      const { activeNodeId, aboveNodeId, belowNodeId } = info;
+      const { activeTabId, aboveTabId, belowTabId } = info;
 
       await chrome.runtime.sendMessage({
         type: 'MOVE_NODE_AS_SIBLING',
         payload: {
-          nodeId: activeNodeId,
-          aboveNodeId,
-          belowNodeId,
-          viewId: currentViewId,
-          selectedNodeIds: Array.from(selectedNodeIds),
+          tabId: activeTabId,
+          aboveTabId: aboveTabId,
+          belowTabId: belowTabId,
+          windowId: currentWindowId,
+          viewIndex: currentViewIndex,
+          selectedTabIds: Array.from(selectedTabIds),
         },
       });
     },
-    [selectedNodeIds, currentViewId]
+    [selectedTabIds, currentViewIndex, currentWindowId]
   );
 
-  /**
-   * 新しいグループを作成
-   * @returns 作成されたグループのID
-   */
   const createGroup = useCallback((name: string, color: string): string => {
     const newGroupId = `group_${Date.now()}`;
     const newGroup: Group = {
@@ -601,55 +427,65 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return newGroupId;
   }, [groups, saveGroups]);
 
-  const deleteGroup = useCallback(async (nodeId: string) => {
+  const deleteGroup = useCallback(async (tabId: number) => {
     const newGroups = { ...groups };
-    delete newGroups[nodeId];
+    delete newGroups[`group_${tabId}`];
     saveGroups(newGroups);
 
     await chrome.runtime.sendMessage({
       type: 'DELETE_TREE_GROUP',
-      payload: { nodeId, viewId: currentViewId },
+      payload: { tabId, windowId: currentWindowId, viewIndex: currentViewIndex },
     });
-  }, [groups, saveGroups, currentViewId]);
+  }, [groups, saveGroups, currentViewIndex, currentWindowId]);
 
-  const updateGroupFn = useCallback((nodeId: string, updates: Partial<Group>) => {
-    const group = groups[nodeId];
+  const updateGroupFn = useCallback((tabId: number, updates: Partial<Group>) => {
+    const groupKey = `group_${tabId}`;
+    const group = groups[groupKey];
     if (!group) return;
 
     const updatedGroup = { ...group, ...updates };
-    const newGroups = { ...groups, [nodeId]: updatedGroup };
+    const newGroups = { ...groups, [groupKey]: updatedGroup };
     saveGroups(newGroups);
   }, [groups, saveGroups]);
 
-  const toggleGroupExpanded = useCallback((nodeId: string) => {
-    const group = groups[nodeId];
+  const toggleGroupExpanded = useCallback((tabId: number) => {
+    const groupKey = `group_${tabId}`;
+    const group = groups[groupKey];
     if (!group) return;
 
     const updatedGroup = { ...group, isExpanded: !group.isExpanded };
-    const newGroups = { ...groups, [nodeId]: updatedGroup };
+    const newGroups = { ...groups, [groupKey]: updatedGroup };
     saveGroups(newGroups);
   }, [groups, saveGroups]);
 
-  const addTabToGroup = useCallback(async (nodeId: string, targetGroupNodeId: string) => {
+  const addTabToGroup = useCallback(async (tabId: number, targetGroupTabId: number) => {
     await chrome.runtime.sendMessage({
       type: 'ADD_TAB_TO_TREE_GROUP',
-      payload: { nodeId, targetGroupNodeId, viewId: currentViewId },
+      payload: { tabId, targetGroupTabId, windowId: currentWindowId, viewIndex: currentViewIndex },
     });
-  }, [currentViewId]);
+  }, [currentViewIndex, currentWindowId]);
 
-  const removeTabFromGroup = useCallback(async (nodeId: string) => {
+  const removeTabFromGroup = useCallback(async (tabId: number) => {
     await chrome.runtime.sendMessage({
       type: 'REMOVE_TAB_FROM_TREE_GROUP',
-      payload: { nodeId, viewId: currentViewId },
+      payload: { tabId, windowId: currentWindowId, viewIndex: currentViewIndex },
     });
-  }, [currentViewId]);
+  }, [currentViewIndex, currentWindowId]);
 
-  const getGroupTabCount = useCallback((nodeId: string): number => {
+  const getGroupTabCount = useCallback((tabId: number): number => {
     if (!currentViewState) return 0;
 
-    return Object.values(currentViewState.nodes).filter(
-      (node) => node.parentId === nodeId
-    ).length;
+    const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+      for (const node of nodes) {
+        if (node.tabId === targetTabId) return node;
+        const found = findNode(node.children, targetTabId);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const node = findNode(currentViewState.rootNodes, tabId);
+    return node?.children.length ?? 0;
   }, [currentViewState]);
 
   const isTabUnread = useCallback((tabId: number): boolean => {
@@ -660,10 +496,19 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return unreadTabIds.size;
   }, [unreadTabIds]);
 
-  const getUnreadChildCount = useCallback((nodeId: string): number => {
+  const getUnreadChildCount = useCallback((tabId: number): number => {
     if (!currentViewState) return 0;
 
-    const node = currentViewState.nodes[nodeId];
+    const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+      for (const node of nodes) {
+        if (node.tabId === targetTabId) return node;
+        const found = findNode(node.children, targetTabId);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const node = findNode(currentViewState.rootNodes, tabId);
     if (!node) return 0;
 
     const countUnreadInSubtree = (currentNode: TabNode): number => {
@@ -681,58 +526,49 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [currentViewState, unreadTabIds]);
 
   const pinnedTabIds = useMemo((): number[] => {
-    return Object.values(tabInfoMap)
-      .filter(tabInfo => {
-        if (currentWindowId !== null && tabInfo.windowId !== currentWindowId) {
-          return false;
-        }
-        if (!tabInfo.isPinned) {
-          return false;
-        }
-        // ビュー毎のピン留め独立: 現在のビューのピン留めタブのみ表示
-        if (treeState) {
-          const mapping = treeState.tabToNode[tabInfo.id];
-          if (mapping && mapping.viewId !== currentViewId) {
-            return false;
-          }
-        }
-        return true;
-      })
-      .sort((a, b) => a.index - b.index)
-      .map(tabInfo => tabInfo.id);
-  }, [tabInfoMap, currentWindowId, treeState, currentViewId]);
+    if (!currentWindowState) return [];
+    const currentView = currentWindowState.views[currentViewIndex];
+    return currentView?.pinnedTabIds ?? [];
+  }, [currentWindowState, currentViewIndex]);
 
   const handlePinnedTabReorder = useCallback(async (tabId: number, newIndex: number): Promise<void> => {
-    if (!currentWindowId) return;
+    if (currentWindowId === null) return;
 
     try {
       await chrome.runtime.sendMessage({
         type: 'REORDER_PINNED_TAB',
-        payload: { tabId, newIndex },
+        payload: { tabId, newIndex, windowId: currentWindowId },
       });
     } catch (error) {
       console.error('Failed to reorder pinned tab:', error);
     }
   }, [currentWindowId]);
 
-  const selectNode = useCallback((nodeId: string, modifiers: { shift: boolean; ctrl: boolean }) => {
-    if (!treeState || !currentViewState) return;
+  const selectNode = useCallback((tabId: number, modifiers: { shift: boolean; ctrl: boolean }) => {
+    if (!currentViewState) return;
 
-    if (!currentViewState.nodes[nodeId]) return;
+    const findNode = (nodes: TabNode[], targetTabId: number): boolean => {
+      for (const node of nodes) {
+        if (node.tabId === targetTabId) return true;
+        if (findNode(node.children, targetTabId)) return true;
+      }
+      return false;
+    };
+
+    if (!findNode(currentViewState.rootNodes, tabId)) return;
 
     if (modifiers.ctrl) {
-      setSelectedNodeIds(prev => {
+      setSelectedTabIds(prev => {
         const newSet = new Set(prev);
-        if (newSet.has(nodeId)) {
-          newSet.delete(nodeId);
+        if (newSet.has(tabId)) {
+          newSet.delete(tabId);
         } else {
-          newSet.add(nodeId);
+          newSet.add(tabId);
         }
         return newSet;
       });
-      setLastSelectedNodeId(nodeId);
-    } else if (modifiers.shift && lastSelectedNodeId) {
-      // Chromeのタブインデックスではなく、ツリー表示順（深さ優先探索順）を使用
+      setLastSelectedTabId(tabId);
+    } else if (modifiers.shift && lastSelectedTabId) {
       const pinnedTabIdSet = new Set(pinnedTabIds);
       const currentWindowTabIds = new Set<number>();
       if (currentWindowId !== null) {
@@ -743,108 +579,101 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         });
       }
 
-      const rootNodesInView = currentViewState.rootNodeIds
-        .map(id => currentViewState.nodes[id])
-        .filter((node): node is TabNode => {
-          if (!node) return false;
-          if (pinnedTabIdSet.has(node.tabId)) return false;
-          if (currentWindowId !== null && !currentWindowTabIds.has(node.tabId)) return false;
-          return true;
-        });
+      const tabIdsInDisplayOrder: number[] = [];
+      const collectNodesInOrder = (nodes: TabNode[]) => {
+        for (const node of nodes) {
+          if (pinnedTabIdSet.has(node.tabId)) continue;
+          if (currentWindowId !== null && !currentWindowTabIds.has(node.tabId)) continue;
+          if (!tabInfoMap[node.tabId]) continue;
 
-      const nodeIdsInDisplayOrder: string[] = [];
-      const collectNodesInOrder = (node: TabNode) => {
-        if (pinnedTabIdSet.has(node.tabId)) return;
-        if (currentWindowId !== null && !currentWindowTabIds.has(node.tabId)) return;
-        if (!tabInfoMap[node.tabId]) return;
+          tabIdsInDisplayOrder.push(node.tabId);
 
-        nodeIdsInDisplayOrder.push(node.id);
-
-        if (node.isExpanded && node.children) {
-          for (const child of node.children) {
-            const childNode = currentViewState.nodes[child.id];
-            if (childNode) {
-              collectNodesInOrder(childNode);
-            }
+          if (node.isExpanded && node.children) {
+            collectNodesInOrder(node.children);
           }
         }
       };
 
-      for (const rootNode of rootNodesInView) {
-        collectNodesInOrder(rootNode);
-      }
+      collectNodesInOrder(currentViewState.rootNodes);
 
-      const lastIndex = nodeIdsInDisplayOrder.indexOf(lastSelectedNodeId);
-      const currentIndex = nodeIdsInDisplayOrder.indexOf(nodeId);
+      const lastIndex = tabIdsInDisplayOrder.indexOf(lastSelectedTabId);
+      const currentIndex = tabIdsInDisplayOrder.indexOf(tabId);
 
       if (lastIndex !== -1 && currentIndex !== -1) {
         const startIndex = Math.min(lastIndex, currentIndex);
         const endIndex = Math.max(lastIndex, currentIndex);
-        const rangeNodeIds = nodeIdsInDisplayOrder.slice(startIndex, endIndex + 1);
-        setSelectedNodeIds(new Set(rangeNodeIds));
+        const rangeTabIds = tabIdsInDisplayOrder.slice(startIndex, endIndex + 1);
+        setSelectedTabIds(new Set(rangeTabIds));
       } else {
-        setSelectedNodeIds(new Set([nodeId]));
-        setLastSelectedNodeId(nodeId);
+        setSelectedTabIds(new Set([tabId]));
+        setLastSelectedTabId(tabId);
       }
     } else {
-      setSelectedNodeIds(new Set([nodeId]));
-      setLastSelectedNodeId(nodeId);
+      setSelectedTabIds(new Set([tabId]));
+      setLastSelectedTabId(tabId);
     }
-  }, [treeState, currentViewState, lastSelectedNodeId, tabInfoMap, pinnedTabIds, currentWindowId]);
+  }, [currentViewState, lastSelectedTabId, tabInfoMap, pinnedTabIds, currentWindowId]);
 
   const clearSelection = useCallback(() => {
-    setSelectedNodeIds(new Set());
-    setLastSelectedNodeId(null);
+    setSelectedTabIds(new Set());
+    setLastSelectedTabId(null);
   }, []);
 
-  const isNodeSelected = useCallback((nodeId: string): boolean => {
-    return selectedNodeIds.has(nodeId);
-  }, [selectedNodeIds]);
+  const isNodeSelected = useCallback((tabId: number): boolean => {
+    return selectedTabIds.has(tabId);
+  }, [selectedTabIds]);
 
   const getSelectedTabIds = useCallback((): number[] => {
-    if (!currentViewState) return [];
-
-    const tabIds: number[] = [];
-    for (const nodeId of selectedNodeIds) {
-      const node = currentViewState.nodes[nodeId];
-      if (node) {
-        tabIds.push(node.tabId);
-      }
+    if (!currentViewState || selectedTabIds.size === 0) {
+      return [];
     }
-    return tabIds;
-  }, [currentViewState, selectedNodeIds]);
 
-  /**
-   * 実際に存在するタブのみをカウント
-   * - currentWindowIdでフィルタリング（現在のウィンドウのタブのみ）
-   * - ピン留めタブも含む
-   */
-  const viewTabCounts = useMemo((): Record<string, number> => {
-    if (!treeState) return {};
+    // ツリーの深さ優先順序でソートされたタブIDリストを返す
+    const tabIdsInTreeOrder: number[] = [];
+    const collectNodesInOrder = (nodes: TabNode[]) => {
+      for (const node of nodes) {
+        if (selectedTabIds.has(node.tabId)) {
+          tabIdsInTreeOrder.push(node.tabId);
+        }
+        collectNodesInOrder(node.children);
+      }
+    };
+    collectNodesInOrder(currentViewState.rootNodes);
 
-    const counts: Record<string, number> = {};
+    return tabIdsInTreeOrder;
+  }, [selectedTabIds, currentViewState]);
 
-    for (const [viewId, viewState] of Object.entries(treeState.views)) {
+  const viewTabCounts = useMemo((): number[] => {
+    if (!currentWindowState) return [];
+
+    const countNodes = (nodes: TabNode[]): number => {
       let count = 0;
-      for (const node of Object.values(viewState.nodes)) {
+      for (const node of nodes) {
         const tabInfo = tabInfoMap[node.tabId];
-        if (tabInfo) {
-          if (currentWindowId !== null && tabInfo.windowId !== currentWindowId) continue;
+        if (tabInfo && (currentWindowId === null || tabInfo.windowId === currentWindowId)) {
           count++;
         }
+        count += countNodes(node.children);
       }
-      counts[viewId] = count;
-    }
+      return count;
+    };
 
-    return counts;
-  }, [treeState, tabInfoMap, currentWindowId]);
+    return currentWindowState.views.map((viewState) => {
+      const pinnedCount = viewState.pinnedTabIds.filter((tabId) => {
+        const tabInfo = tabInfoMap[tabId];
+        return tabInfo && (currentWindowId === null || tabInfo.windowId === currentWindowId);
+      }).length;
+      return countNodes(viewState.rootNodes) + pinnedCount;
+    });
+  }, [currentWindowState, tabInfoMap, currentWindowId]);
 
-  const moveTabsToView = useCallback(async (viewId: string, tabIds: number[]) => {
+  const moveTabsToView = useCallback(async (viewIndex: number, tabIds: number[]) => {
+    if (currentWindowId === null) return;
     await chrome.runtime.sendMessage({
       type: 'MOVE_TABS_TO_VIEW',
-      payload: { targetViewId: viewId, tabIds },
+      payload: { targetViewIndex: viewIndex, tabIds, windowId: currentWindowId },
     });
-  }, []);
+  }, [currentWindowId]);
 
   return (
     <TreeStateContext.Provider
@@ -875,8 +704,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         getTabInfo,
         pinnedTabIds,
         handlePinnedTabReorder,
-        selectedNodeIds,
-        lastSelectedNodeId,
+        selectedTabIds,
+        lastSelectedTabId,
         selectNode,
         clearSelection,
         isNodeSelected,
@@ -884,7 +713,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         viewTabCounts,
         moveTabsToView,
         currentWindowId,
-        currentViewId,
+        currentViewIndex,
+        views,
+        currentWindowState,
       }}
     >
       {children}

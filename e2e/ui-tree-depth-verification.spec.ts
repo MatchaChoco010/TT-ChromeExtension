@@ -10,20 +10,18 @@ test.describe('UIツリービューのdepth属性検証', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
     const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
       { tabId: childTabId, depth: 0 },
     ], 0);
@@ -31,7 +29,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
     await moveTabToParent(sidePanelPage, childTabId, parentTabId, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
@@ -42,20 +39,18 @@ test.describe('UIツリービューのdepth属性検証', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
     const childTabId = await createTab(serviceWorker, getTestServerUrl('/child'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
       { tabId: childTabId, depth: 0 },
     ], 0);
@@ -63,7 +58,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
     await moveTabToParent(sidePanelPage, childTabId, parentTabId, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
@@ -71,7 +65,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
     const newTabId = await createTab(serviceWorker, getTestServerUrl('/new'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
       { tabId: newTabId, depth: 0 },
@@ -83,20 +76,18 @@ test.describe('UIツリービューのdepth属性検証', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabAId = await createTab(serviceWorker, getTestServerUrl('/A'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
     const tabBId = await createTab(serviceWorker, getTestServerUrl('/B'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
       { tabId: tabBId, depth: 0 },
     ], 0);
@@ -104,7 +95,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
     const tabCId = await createTab(serviceWorker, getTestServerUrl('/C'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
       { tabId: tabBId, depth: 0 },
       { tabId: tabCId, depth: 0 },
@@ -113,7 +103,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
     await moveTabToParent(sidePanelPage, tabBId, tabAId, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
       { tabId: tabCId, depth: 0 },
@@ -122,7 +111,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
     await moveTabToParent(sidePanelPage, tabCId, tabBId, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -131,7 +119,6 @@ test.describe('UIツリービューのdepth属性検証', () => {
     const newTabId = await createTab(serviceWorker, getTestServerUrl('/new'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },

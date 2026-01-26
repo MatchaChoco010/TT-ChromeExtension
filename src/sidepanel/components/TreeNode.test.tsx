@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TreeNode from './TreeNode';
-import type { TabNode, TabInfo } from '@/types';
+import type { UITabNode, TabInfo } from '@/types';
 
 describe('TreeNode', () => {
   const mockOnActivate = vi.fn();
@@ -10,17 +10,14 @@ describe('TreeNode', () => {
   const mockOnClose = vi.fn();
 
   const createMockNode = (
-    id: string,
     tabId: number,
     depth: number = 0,
-    children: TabNode[] = []
-  ): TabNode => ({
-    id,
+    children: UITabNode[] = []
+  ): UITabNode => ({
     tabId,
-    parentId: null,
+    depth,
     children,
     isExpanded: true,
-    depth,
   });
 
   const createMockTab = (
@@ -42,7 +39,7 @@ describe('TreeNode', () => {
 
   describe('基本的な表示', () => {
     it('タブのタイトルを表示できること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Test Tab Title');
 
       render(
@@ -61,7 +58,7 @@ describe('TreeNode', () => {
     });
 
     it('ファビコンを表示できること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(
         1,
         'Test Tab',
@@ -87,7 +84,7 @@ describe('TreeNode', () => {
     });
 
     it('ファビコンがない場合にデフォルトアイコンを表示できること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Test Tab', 'https://example.com');
 
       render(
@@ -107,7 +104,7 @@ describe('TreeNode', () => {
     });
 
     it('depthに基づいてインデントを適用できること', () => {
-      const node = createMockNode('node-1', 1, 2); // depth: 2
+      const node = createMockNode(1, 2); // depth: 2
       const tab = createMockTab(1);
 
       render(
@@ -129,8 +126,8 @@ describe('TreeNode', () => {
 
   describe('展開/折りたたみトグル', () => {
     it('子ノードがある場合に展開トグルボタンを表示できること', () => {
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const tab = createMockTab(1);
 
       render(
@@ -149,7 +146,7 @@ describe('TreeNode', () => {
     });
 
     it('子ノードがない場合は展開トグルボタンを表示しないこと', () => {
-      const node = createMockNode('node-1', 1, 0, []);
+      const node = createMockNode(1, 0, []);
       const tab = createMockTab(1);
 
       render(
@@ -169,8 +166,8 @@ describe('TreeNode', () => {
 
     it('展開トグルボタンをクリックするとonToggleが呼ばれること', async () => {
       const user = userEvent.setup();
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const tab = createMockTab(1);
 
       render(
@@ -188,13 +185,13 @@ describe('TreeNode', () => {
       const toggleButton = screen.getByTestId('expand-button');
       await user.click(toggleButton);
 
-      expect(mockOnToggle).toHaveBeenCalledWith('node-1');
+      expect(mockOnToggle).toHaveBeenCalledWith(1);
       expect(mockOnActivate).not.toHaveBeenCalled();
     });
 
     it('展開状態に応じてトグルアイコンが変わること', () => {
-      const childNode = createMockNode('child-1', 2);
-      const expandedNode = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const expandedNode = createMockNode(1, 0, [childNode]);
       const tab = createMockTab(1);
 
       const { rerender } = render(
@@ -233,7 +230,7 @@ describe('TreeNode', () => {
   describe('タブのアクティブ化', () => {
     it('ノードをクリックするとonActivateが呼ばれること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -255,7 +252,7 @@ describe('TreeNode', () => {
     });
 
     it('アクティブなタブに視覚的なスタイルが適用されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       const { rerender } = render(
@@ -294,7 +291,7 @@ describe('TreeNode', () => {
 
   describe('未読インジケータ', () => {
     it('未読タブに未読インジケータが表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -313,7 +310,7 @@ describe('TreeNode', () => {
     });
 
     it('既読タブに未読インジケータが表示されないこと', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -332,7 +329,7 @@ describe('TreeNode', () => {
     });
 
     it('showUnreadIndicatorがfalseの場合、未読でもバッジが表示されないこと', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -354,7 +351,7 @@ describe('TreeNode', () => {
 
   describe('ローディング状態', () => {
     it('ローディング中のタブにローディングインジケータが表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         ...createMockTab(1),
         status: 'loading',
@@ -376,7 +373,7 @@ describe('TreeNode', () => {
     });
 
     it('完了状態のタブにローディングインジケータが表示されないこと', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         ...createMockTab(1),
         status: 'complete',
@@ -401,7 +398,7 @@ describe('TreeNode', () => {
   describe('タブを閉じる機能', () => {
     it('マウスホバー時に閉じるボタンが表示されること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -428,7 +425,7 @@ describe('TreeNode', () => {
     });
 
     it('閉じるボタンをクリックするとonCloseが呼ばれること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -455,8 +452,8 @@ describe('TreeNode', () => {
     });
 
     it('閉じるボタンをクリック時に子ノードの有無が正しく渡されること', () => {
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const tab = createMockTab(1);
 
       render(
@@ -484,8 +481,8 @@ describe('TreeNode', () => {
 
   describe('確認ダイアログの統合', () => {
     it('折りたたまれたブランチを持つ親タブを閉じようとすると確認ダイアログが表示されること', () => {
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -514,9 +511,9 @@ describe('TreeNode', () => {
     });
 
     it('確認ダイアログにタブ数が表示されること', () => {
-      const child1 = createMockNode('child-1', 2);
-      const child2 = createMockNode('child-2', 3);
-      const node = createMockNode('node-1', 1, 0, [child1, child2]);
+      const child1 = createMockNode(2);
+      const child2 = createMockNode(3);
+      const node = createMockNode(1, 0, [child1, child2]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -542,8 +539,8 @@ describe('TreeNode', () => {
 
     it('確認ダイアログでOKをクリックするとonCloseが呼ばれること', async () => {
       const user = userEvent.setup();
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -573,8 +570,8 @@ describe('TreeNode', () => {
 
     it('確認ダイアログでキャンセルをクリックするとonCloseが呼ばれないこと', async () => {
       const user = userEvent.setup();
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -604,8 +601,8 @@ describe('TreeNode', () => {
     });
 
     it('展開されたブランチを持つ親タブを閉じる場合は確認ダイアログを表示しないこと', () => {
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const expandedNode = { ...node, isExpanded: true };
       const tab = createMockTab(1);
 
@@ -631,7 +628,7 @@ describe('TreeNode', () => {
     });
 
     it('子ノードがない場合は確認ダイアログを表示しないこと', () => {
-      const node = createMockNode('node-1', 1, 0, []);
+      const node = createMockNode(1, 0, []);
       const tab = createMockTab(1);
 
       render(
@@ -659,7 +656,7 @@ describe('TreeNode', () => {
   describe('閉じるボタンの位置', () => {
     it('閉じるボタンがタブの右端に固定配置されていること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Very Long Tab Title That Should Not Push Close Button');
 
       render(
@@ -686,7 +683,7 @@ describe('TreeNode', () => {
     it('タブタイトルの長さに関係なく閉じるボタンが常に右端にあること', async () => {
       const user = userEvent.setup();
       // 短いタイトル
-      const nodeShort = createMockNode('node-short', 1);
+      const nodeShort = createMockNode(1);
       const tabShort = createMockTab(1, 'Short');
 
       const { rerender } = render(
@@ -709,7 +706,7 @@ describe('TreeNode', () => {
       expect(contentContainer).toHaveClass('justify-between');
 
       // 長いタイトルに変更
-      const nodeLong = createMockNode('node-long', 2);
+      const nodeLong = createMockNode(2);
       const tabLong = createMockTab(
         2,
         'This is a very very very long tab title that extends beyond normal width'
@@ -736,7 +733,7 @@ describe('TreeNode', () => {
     });
 
     it('ホバーしていない場合は閉じるボタンが非表示であること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -756,7 +753,7 @@ describe('TreeNode', () => {
 
     it('ホバー時のみ閉じるボタンが表示されること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -786,8 +783,8 @@ describe('TreeNode', () => {
   describe('警告閾値によるダイアログ制御', () => {
     it('サブツリーのタブ数が閾値未満の場合は確認ダイアログを表示しないこと', () => {
       // 閾値を5に設定、サブツリーは親+子1つ=2タブ
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -815,9 +812,9 @@ describe('TreeNode', () => {
 
     it('サブツリーのタブ数が閾値以上の場合は確認ダイアログを表示すること', () => {
       // 閾値を3に設定、サブツリーは親+子2つ=3タブ
-      const child1 = createMockNode('child-1', 2);
-      const child2 = createMockNode('child-2', 3);
-      const node = createMockNode('node-1', 1, 0, [child1, child2]);
+      const child1 = createMockNode(2);
+      const child2 = createMockNode(3);
+      const node = createMockNode(1, 0, [child1, child2]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -845,8 +842,8 @@ describe('TreeNode', () => {
 
     it('サブツリーのタブ数が閾値ちょうどの場合は確認ダイアログを表示すること', () => {
       // 閾値を2に設定、サブツリーは親+子1つ=2タブ
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -874,8 +871,8 @@ describe('TreeNode', () => {
 
     it('閾値が指定されていない場合は、デフォルト値(3)を使用すること', () => {
       // 閾値を指定しない、サブツリーは親+子1つ=2タブ
-      const childNode = createMockNode('child-1', 2);
-      const node = createMockNode('node-1', 1, 0, [childNode]);
+      const childNode = createMockNode(2);
+      const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
       const tab = createMockTab(1);
 
@@ -903,7 +900,7 @@ describe('TreeNode', () => {
 
   describe('タブタイトルの表示改善', () => {
     it('Loading状態の場合「Loading...」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Some Title',
@@ -929,7 +926,7 @@ describe('TreeNode', () => {
     });
 
     it('ロード完了後はタイトルが正しく表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Loaded Page Title',
@@ -954,7 +951,7 @@ describe('TreeNode', () => {
     });
 
     it('Vivaldi/Chromeの内部URL (chrome://vivaldi-webui/startpage) でタイトルがURL形式でない場合、そのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Start Page', // URL形式ではないタイトル → そのまま表示
@@ -979,7 +976,7 @@ describe('TreeNode', () => {
     });
 
     it('タイトルがchrome://vivaldi-webui/startpage形式でURLが空の場合も「スタートページ」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'chrome://vivaldi-webui/startpage',
@@ -1004,7 +1001,7 @@ describe('TreeNode', () => {
     });
 
     it('vivaldi://startpage URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Speed Dial', // URL形式ではないタイトル → そのまま表示
@@ -1029,7 +1026,7 @@ describe('TreeNode', () => {
     });
 
     it('chrome-extension://内部URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'New Tab', // URL形式ではないタイトル → そのまま表示
@@ -1054,7 +1051,7 @@ describe('TreeNode', () => {
     });
 
     it('chrome://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'New Tab', // URL形式ではないタイトル → そのまま表示
@@ -1079,7 +1076,7 @@ describe('TreeNode', () => {
     });
 
     it('vivaldi://newtab URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Speed Dial', // URL形式ではないタイトル → そのまま表示
@@ -1104,7 +1101,7 @@ describe('TreeNode', () => {
     });
 
     it('通常のURLに対しては元のタイトルがそのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Example Domain',
@@ -1129,7 +1126,7 @@ describe('TreeNode', () => {
     });
 
     it('タイトルが変更された場合、再レンダリングで即座に更新されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const initialTab: TabInfo = {
         id: 1,
         title: 'Initial Title',
@@ -1174,7 +1171,7 @@ describe('TreeNode', () => {
     });
 
     it('Loadingから完了に状態が変わった場合、タイトルが更新されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const loadingTab: TabInfo = {
         id: 1,
         title: 'Page Title',
@@ -1219,7 +1216,7 @@ describe('TreeNode', () => {
     });
 
     it('about:blank URLでタイトルがURL形式でない場合、そのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'about:blank',
@@ -1246,7 +1243,7 @@ describe('TreeNode', () => {
 
   describe('テキスト選択の無効化', () => {
     it('タブ要素にuser-select: noneが適用されていること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1);
 
       render(
@@ -1266,7 +1263,7 @@ describe('TreeNode', () => {
     });
 
     it('タブ要素内のテキストがselect-noneクラスを持つこと', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Test Tab Title');
 
       render(
@@ -1288,7 +1285,7 @@ describe('TreeNode', () => {
 
   describe('未読インジケーターの左下三角形表示', () => {
     it('未読インジケーターがタブ要素内に表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1311,7 +1308,7 @@ describe('TreeNode', () => {
     });
 
     it('未読インジケーターが絶対位置指定で左下に配置されること（depth=0）', () => {
-      const node = createMockNode('node-1', 1, 0); // depth: 0
+      const node = createMockNode(1, 0); // depth: 0
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1335,7 +1332,7 @@ describe('TreeNode', () => {
     });
 
     it('未読インジケーターがdepthに応じた位置にインデント表示されること', () => {
-      const node = createMockNode('node-1', 1, 2); // depth: 2
+      const node = createMockNode(1, 2); // depth: 2
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1359,7 +1356,7 @@ describe('TreeNode', () => {
     });
 
     it('未読インジケーターが三角形切り欠き形状であること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1383,7 +1380,7 @@ describe('TreeNode', () => {
     });
 
     it('未読インジケーターがタイトルエリアの外に配置されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1405,7 +1402,7 @@ describe('TreeNode', () => {
 
     it('ホバー時に閉じるボタンと未読インジケーターが両方表示されること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1430,7 +1427,7 @@ describe('TreeNode', () => {
 
   describe('システムページタイトルのフレンドリー表示', () => {
     it('chrome://settingsのタイトルがURL形式の場合「設定」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'chrome://settings/',
@@ -1455,7 +1452,7 @@ describe('TreeNode', () => {
     });
 
     it('vivaldi://settingsのタイトルがURL形式の場合「設定」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'vivaldi://settings/',
@@ -1480,7 +1477,7 @@ describe('TreeNode', () => {
     });
 
     it('chrome://extensionsのタイトルがURL形式の場合「拡張機能」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'chrome://extensions/',
@@ -1505,7 +1502,7 @@ describe('TreeNode', () => {
     });
 
     it('chrome://historyのタイトルがURL形式の場合「履歴」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'chrome://history/',
@@ -1530,7 +1527,7 @@ describe('TreeNode', () => {
     });
 
     it('chrome://downloadsのタイトルがURL形式の場合「ダウンロード」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'chrome://downloads/',
@@ -1555,7 +1552,7 @@ describe('TreeNode', () => {
     });
 
     it('chrome://bookmarksのタイトルがURL形式の場合「ブックマーク」と表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'chrome://bookmarks/',
@@ -1581,7 +1578,7 @@ describe('TreeNode', () => {
 
     // about:blankはURL形式でないためそのまま表示
     it('about:blankのタイトルはURL形式でないためそのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       // about:blankはabout:スキームなのでスキーム://ではないため、URL形式とは判定されない
       const tab: TabInfo = {
         id: 1,
@@ -1608,7 +1605,7 @@ describe('TreeNode', () => {
     });
 
     it('file://のタイトルがURL形式の場合、ファイル名に置き換えられること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'file:///path/to/document.pdf',
@@ -1633,7 +1630,7 @@ describe('TreeNode', () => {
     });
 
     it('file://のタイトルがすでにファイル名の場合、そのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'My Document.pdf',
@@ -1659,7 +1656,7 @@ describe('TreeNode', () => {
     });
 
     it('システムページでもタイトルがURL形式でない場合はそのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: '設定 - Chrome', // すでに適切なタイトルが設定されている
@@ -1685,7 +1682,7 @@ describe('TreeNode', () => {
     });
 
     it('PDFを開いた場合、タイトルがPDFファイル名のままならそのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: '重要な資料.pdf',
@@ -1711,7 +1708,7 @@ describe('TreeNode', () => {
     });
 
     it('URL形式のタイトルでフレンドリー名マッピングがないものはそのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'https://unknown-system-page.com/',
@@ -1739,7 +1736,7 @@ describe('TreeNode', () => {
 
   describe('拡張機能内部ページのタイトル表示', () => {
     it('settings.htmlはHTMLのtitleタグで設定された「Settings」がそのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Settings', // HTMLの<title>タグで設定されたタイトル
@@ -1767,7 +1764,7 @@ describe('TreeNode', () => {
     });
 
     it('group.htmlはHTMLのtitleタグで設定された「Group」がそのまま表示されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Group', // HTMLの<title>タグで設定されたタイトル
@@ -1795,7 +1792,7 @@ describe('TreeNode', () => {
     });
 
     it('chrome.tabs.Tab.titleがそのまま表示されること（フォールバック処理なし）', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
         title: 'Custom Extension Page', // 拡張機能が設定したカスタムタイトル
@@ -1823,7 +1820,7 @@ describe('TreeNode', () => {
 
   describe('休止タブのグレーアウト表示', () => {
     it('休止タブの場合、タイトルにグレーアウトスタイルが適用されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Discarded Tab');
 
       render(
@@ -1846,7 +1843,7 @@ describe('TreeNode', () => {
     });
 
     it('休止タブでない場合、グレーアウトスタイルが適用されないこと', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Normal Tab');
 
       render(
@@ -1869,7 +1866,7 @@ describe('TreeNode', () => {
     });
 
     it('isDiscardedがundefinedの場合、グレーアウトスタイルが適用されないこと（デフォルト）', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Default Tab');
 
       render(
@@ -1892,7 +1889,7 @@ describe('TreeNode', () => {
     });
 
     it('休止タブからアクティブタブになった場合、グレーアウトが解除されること', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'Tab Title');
 
       // 最初は休止タブ

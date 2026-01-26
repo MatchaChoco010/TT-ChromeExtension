@@ -4,15 +4,14 @@
  * このテストスイートでは、親タブのドラッグ時にサブツリー全体が移動することを検証します。
  * - 折りたたまれた親タブのドラッグ時に非表示の子タブも含めて移動
  * - 展開された親タブのドラッグ時に可視の子タブも含めて移動
- * - getSubtreeNodeIdsが折りたたみ/展開状態に関係なくすべての子孫を収集
+ * - getSubtreeTabIdsが折りたたみ/展開状態に関係なくすべての子孫を収集
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
-import type { TabNode, ExtendedTabInfo } from '@/types';
+import type { UITabNode, ExtendedTabInfo } from '@/types';
 
-// Chrome API モック
 vi.mock('@anthropic/sdk', () => ({}));
 
 beforeEach(() => {
@@ -33,18 +32,18 @@ beforeEach(() => {
 });
 
 /**
- * getSubtreeNodeIdsのロジックをテストするためのヘルパー
- * TabTreeView内のgetSubtreeNodeIds関数と同じロジックを使用
+ * getSubtreeTabIdsのロジックをテストするためのヘルパー
+ * TabTreeView内のgetSubtreeTabIds関数と同じロジックを使用
  */
-const getSubtreeNodeIds = (nodeId: string, nodes: TabNode[]): string[] => {
-  const result: string[] = [];
+const getSubtreeTabIds = (tabId: number, nodes: UITabNode[]): number[] => {
+  const result: number[] = [];
 
-  const findAndCollect = (nodeList: TabNode[]): boolean => {
+  const findAndCollect = (nodeList: UITabNode[]): boolean => {
     for (const node of nodeList) {
-      if (node.id === nodeId) {
-        const collectNodeAndDescendants = (n: TabNode) => {
-          result.push(n.id);
-          for (const child of n.children) {
+      if (node.tabId === tabId) {
+        const collectNodeAndDescendants = (n: UITabNode) => {
+          result.push(n.tabId);
+          for (const child of n.children as UITabNode[]) {
             collectNodeAndDescendants(child);
           }
         };
@@ -52,7 +51,7 @@ const getSubtreeNodeIds = (nodeId: string, nodes: TabNode[]): string[] => {
         return true;
       }
       if (node.children && node.children.length > 0) {
-        if (findAndCollect(node.children)) {
+        if (findAndCollect(node.children as UITabNode[])) {
           return true;
         }
       }
@@ -65,209 +64,175 @@ const getSubtreeNodeIds = (nodeId: string, nodes: TabNode[]): string[] => {
 };
 
 describe('折りたたみ/展開状態でのサブツリー移動', () => {
-  describe('getSubtreeNodeIds', () => {
+  describe('getSubtreeTabIds', () => {
     it('折りたたまれた親タブのすべての子孫IDを収集する', () => {
       // Arrange: 折りたたまれた階層構造
-      //   node-1 (isExpanded: false)
-      //   ├── node-2
-      //   │   └── node-4
-      //   └── node-3
-      const node4: TabNode = {
-        id: 'node-4',
+      //   tab-1 (isExpanded: false)
+      //   ├── tab-2
+      //   │   └── tab-4
+      //   └── tab-3
+      const node4: UITabNode = {
         tabId: 4,
-        parentId: 'node-2',
-                children: [],
+        children: [],
         depth: 2,
         isExpanded: true,
       };
-      const node2: TabNode = {
-        id: 'node-2',
+      const node2: UITabNode = {
         tabId: 2,
-        parentId: 'node-1',
-                children: [node4],
+        children: [node4],
         depth: 1,
         isExpanded: true,
       };
-      const node3: TabNode = {
-        id: 'node-3',
+      const node3: UITabNode = {
         tabId: 3,
-        parentId: 'node-1',
-                children: [],
+        children: [],
         depth: 1,
         isExpanded: true,
       };
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [node2, node3],
+        children: [node2, node3],
         depth: 0,
         isExpanded: false, // 折りたたまれている
       };
 
       const nodes = [node1];
 
-      // Act: getSubtreeNodeIdsを呼び出す
-      const subtreeIds = getSubtreeNodeIds('node-1', nodes);
+      // Act: getSubtreeTabIdsを呼び出す
+      const subtreeIds = getSubtreeTabIds(1, nodes);
 
       // Assert: 折りたたまれていてもすべての子孫IDが含まれる
-      expect(subtreeIds).toContain('node-1');
-      expect(subtreeIds).toContain('node-2');
-      expect(subtreeIds).toContain('node-3');
-      expect(subtreeIds).toContain('node-4');
+      expect(subtreeIds).toContain(1);
+      expect(subtreeIds).toContain(2);
+      expect(subtreeIds).toContain(3);
+      expect(subtreeIds).toContain(4);
       expect(subtreeIds).toHaveLength(4);
     });
 
     it('展開された親タブのすべての子孫IDを収集する', () => {
       // Arrange: 展開された階層構造
-      //   node-1 (isExpanded: true)
-      //   ├── node-2
-      //   │   └── node-4
-      //   └── node-3
-      const node4: TabNode = {
-        id: 'node-4',
+      //   tab-1 (isExpanded: true)
+      //   ├── tab-2
+      //   │   └── tab-4
+      //   └── tab-3
+      const node4: UITabNode = {
         tabId: 4,
-        parentId: 'node-2',
-                children: [],
+        children: [],
         depth: 2,
         isExpanded: true,
       };
-      const node2: TabNode = {
-        id: 'node-2',
+      const node2: UITabNode = {
         tabId: 2,
-        parentId: 'node-1',
-                children: [node4],
+        children: [node4],
         depth: 1,
         isExpanded: true,
       };
-      const node3: TabNode = {
-        id: 'node-3',
+      const node3: UITabNode = {
         tabId: 3,
-        parentId: 'node-1',
-                children: [],
+        children: [],
         depth: 1,
         isExpanded: true,
       };
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [node2, node3],
+        children: [node2, node3],
         depth: 0,
         isExpanded: true, // 展開されている
       };
 
       const nodes = [node1];
 
-      // Act: getSubtreeNodeIdsを呼び出す
-      const subtreeIds = getSubtreeNodeIds('node-1', nodes);
+      // Act: getSubtreeTabIdsを呼び出す
+      const subtreeIds = getSubtreeTabIds(1, nodes);
 
       // Assert: 展開されていてもすべての子孫IDが含まれる
-      expect(subtreeIds).toContain('node-1');
-      expect(subtreeIds).toContain('node-2');
-      expect(subtreeIds).toContain('node-3');
-      expect(subtreeIds).toContain('node-4');
+      expect(subtreeIds).toContain(1);
+      expect(subtreeIds).toContain(2);
+      expect(subtreeIds).toContain(3);
+      expect(subtreeIds).toContain(4);
       expect(subtreeIds).toHaveLength(4);
     });
 
     it('中間ノードのサブツリーを正しく収集する', () => {
       // Arrange: 階層構造
-      //   node-1
-      //   ├── node-2 (isExpanded: false)
-      //   │   ├── node-4
-      //   │   └── node-5
-      //   └── node-3
-      const node4: TabNode = {
-        id: 'node-4',
+      //   tab-1
+      //   ├── tab-2 (isExpanded: false)
+      //   │   ├── tab-4
+      //   │   └── tab-5
+      //   └── tab-3
+      const node4: UITabNode = {
         tabId: 4,
-        parentId: 'node-2',
-                children: [],
+        children: [],
         depth: 2,
         isExpanded: true,
       };
-      const node5: TabNode = {
-        id: 'node-5',
+      const node5: UITabNode = {
         tabId: 5,
-        parentId: 'node-2',
-                children: [],
+        children: [],
         depth: 2,
         isExpanded: true,
       };
-      const node2: TabNode = {
-        id: 'node-2',
+      const node2: UITabNode = {
         tabId: 2,
-        parentId: 'node-1',
-                children: [node4, node5],
+        children: [node4, node5],
         depth: 1,
         isExpanded: false, // 折りたたまれている
       };
-      const node3: TabNode = {
-        id: 'node-3',
+      const node3: UITabNode = {
         tabId: 3,
-        parentId: 'node-1',
-                children: [],
+        children: [],
         depth: 1,
         isExpanded: true,
       };
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [node2, node3],
+        children: [node2, node3],
         depth: 0,
         isExpanded: true,
       };
 
       const nodes = [node1];
 
-      // Act: 中間ノードnode-2のサブツリーを取得
-      const subtreeIds = getSubtreeNodeIds('node-2', nodes);
+      // Act: 中間ノードtab-2のサブツリーを取得
+      const subtreeIds = getSubtreeTabIds(2, nodes);
 
-      // Assert: node-2とその子孫のみが含まれる
-      expect(subtreeIds).toContain('node-2');
-      expect(subtreeIds).toContain('node-4');
-      expect(subtreeIds).toContain('node-5');
+      // Assert: tab-2とその子孫のみが含まれる
+      expect(subtreeIds).toContain(2);
+      expect(subtreeIds).toContain(4);
+      expect(subtreeIds).toContain(5);
       expect(subtreeIds).toHaveLength(3);
       // 親ノードや兄弟ノードは含まれない
-      expect(subtreeIds).not.toContain('node-1');
-      expect(subtreeIds).not.toContain('node-3');
+      expect(subtreeIds).not.toContain(1);
+      expect(subtreeIds).not.toContain(3);
     });
 
     it('深くネストされた折りたたみ状態でもすべての子孫を収集する', () => {
       // Arrange: 深い階層構造（すべて折りたたまれている）
-      //   node-1 (isExpanded: false)
-      //   └── node-2 (isExpanded: false)
-      //       └── node-3 (isExpanded: false)
-      //           └── node-4
-      const node4: TabNode = {
-        id: 'node-4',
+      //   tab-1 (isExpanded: false)
+      //   └── tab-2 (isExpanded: false)
+      //       └── tab-3 (isExpanded: false)
+      //           └── tab-4
+      const node4: UITabNode = {
         tabId: 4,
-        parentId: 'node-3',
-                children: [],
+        children: [],
         depth: 3,
         isExpanded: true,
       };
-      const node3: TabNode = {
-        id: 'node-3',
+      const node3: UITabNode = {
         tabId: 3,
-        parentId: 'node-2',
-                children: [node4],
+        children: [node4],
         depth: 2,
         isExpanded: false, // 折りたたまれている
       };
-      const node2: TabNode = {
-        id: 'node-2',
+      const node2: UITabNode = {
         tabId: 2,
-        parentId: 'node-1',
-                children: [node3],
+        children: [node3],
         depth: 1,
         isExpanded: false, // 折りたたまれている
       };
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [node2],
+        children: [node2],
         depth: 0,
         isExpanded: false, // 折りたたまれている
       };
@@ -275,23 +240,21 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
       const nodes = [node1];
 
       // Act: ルートノードのサブツリーを取得
-      const subtreeIds = getSubtreeNodeIds('node-1', nodes);
+      const subtreeIds = getSubtreeTabIds(1, nodes);
 
       // Assert: すべての子孫が含まれる（折りたたみ状態に関係なく）
-      expect(subtreeIds).toContain('node-1');
-      expect(subtreeIds).toContain('node-2');
-      expect(subtreeIds).toContain('node-3');
-      expect(subtreeIds).toContain('node-4');
+      expect(subtreeIds).toContain(1);
+      expect(subtreeIds).toContain(2);
+      expect(subtreeIds).toContain(3);
+      expect(subtreeIds).toContain(4);
       expect(subtreeIds).toHaveLength(4);
     });
 
     it('子を持たないノードは自身のみを返す', () => {
       // Arrange: 子を持たないノード
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [],
+        children: [],
         depth: 0,
         isExpanded: false,
       };
@@ -299,20 +262,18 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
       const nodes = [node1];
 
       // Act
-      const subtreeIds = getSubtreeNodeIds('node-1', nodes);
+      const subtreeIds = getSubtreeTabIds(1, nodes);
 
       // Assert
-      expect(subtreeIds).toEqual(['node-1']);
+      expect(subtreeIds).toEqual([1]);
       expect(subtreeIds).toHaveLength(1);
     });
 
-    it('存在しないノードIDの場合は空配列を返す', () => {
+    it('存在しないタブIDの場合は空配列を返す', () => {
       // Arrange
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [],
+        children: [],
         depth: 0,
         isExpanded: true,
       };
@@ -320,7 +281,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
       const nodes = [node1];
 
       // Act
-      const subtreeIds = getSubtreeNodeIds('non-existent', nodes);
+      const subtreeIds = getSubtreeTabIds(999, nodes);
 
       // Assert
       expect(subtreeIds).toEqual([]);
@@ -339,19 +300,15 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
 
     it('折りたたまれた親タブをドラッグ可能なアイテムとしてレンダリングする', () => {
       // Arrange: 折りたたまれた階層構造
-      const node2: TabNode = {
-        id: 'node-2',
+      const node2: UITabNode = {
         tabId: 2,
-        parentId: 'node-1',
-                children: [],
+        children: [],
         depth: 1,
         isExpanded: true,
       };
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [node2],
+        children: [node2],
         depth: 0,
         isExpanded: false, // 折りたたまれている
       };
@@ -361,7 +318,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           onDragEnd={vi.fn()}
@@ -381,19 +338,15 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
 
     it('展開された親タブとその子タブをすべてレンダリングする', () => {
       // Arrange: 展開された階層構造
-      const node2: TabNode = {
-        id: 'node-2',
+      const node2: UITabNode = {
         tabId: 2,
-        parentId: 'node-1',
-                children: [],
+        children: [],
         depth: 1,
         isExpanded: true,
       };
-      const node1: TabNode = {
-        id: 'node-1',
+      const node1: UITabNode = {
         tabId: 1,
-        parentId: null,
-                children: [node2],
+        children: [node2],
         depth: 0,
         isExpanded: true, // 展開されている
       };
@@ -403,7 +356,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           onDragEnd={vi.fn()}

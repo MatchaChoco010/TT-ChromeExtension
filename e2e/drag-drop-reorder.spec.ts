@@ -14,20 +14,18 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
     ], 0);
 
     const tab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
     ], 0);
@@ -35,7 +33,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const tab3 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
       { tabId: tab3, depth: 0 },
@@ -45,7 +42,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab3, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
@@ -57,20 +53,18 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const child1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
     ], 0);
@@ -78,7 +72,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const child2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
       { tabId: child2, depth: 0 },
@@ -87,7 +80,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const child3 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
       { tabId: child2, depth: 0 },
@@ -97,7 +89,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 0 },
@@ -107,7 +98,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await moveTabToParent(sidePanelPage, child2, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1 },
@@ -117,7 +107,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await moveTabToParent(sidePanelPage, child3, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1 },
@@ -128,7 +117,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child3, depth: 1 },
       { tabId: child1, depth: 1 },
@@ -141,20 +129,18 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
     ], 0);
 
     const child1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
     ], 0);
@@ -162,7 +148,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const child2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
       { tabId: child2, depth: 0 },
@@ -171,7 +156,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const child3 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
       { tabId: child2, depth: 0 },
@@ -181,7 +165,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const child4 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0 },
       { tabId: child1, depth: 0 },
       { tabId: child2, depth: 0 },
@@ -192,7 +175,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await moveTabToParent(sidePanelPage, child1, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 0 },
@@ -203,7 +185,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await moveTabToParent(sidePanelPage, child2, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1 },
@@ -214,7 +195,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await moveTabToParent(sidePanelPage, child3, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1 },
@@ -225,7 +205,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     await moveTabToParent(sidePanelPage, child4, parentTab, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1 },
@@ -237,7 +216,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child3, depth: 1 },
@@ -251,20 +229,18 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tab1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
     ], 0);
 
     const tab2 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
     ], 0);
@@ -283,7 +259,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tab1, depth: 0 },
       { tabId: tab2, depth: 0 },
     ], 0);
@@ -294,20 +269,18 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabA = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabA, depth: 0 },
     ], 0);
 
     const tabB = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabA, depth: 0 },
       { tabId: tabB, depth: 0 },
     ], 0);
@@ -315,7 +288,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const tabC = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabA, depth: 0 },
       { tabId: tabB, depth: 0 },
       { tabId: tabC, depth: 0 },
@@ -324,7 +296,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const tabD = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabA, depth: 0 },
       { tabId: tabB, depth: 0 },
       { tabId: tabC, depth: 0 },
@@ -334,7 +305,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
     const tabE = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabA, depth: 0 },
       { tabId: tabB, depth: 0 },
       { tabId: tabC, depth: 0 },
@@ -346,7 +316,6 @@ test.describe('ドラッグ&ドロップによるタブの並び替え（同階�
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabA, depth: 0 },
       { tabId: tabC, depth: 0 },
       { tabId: tabD, depth: 0 },

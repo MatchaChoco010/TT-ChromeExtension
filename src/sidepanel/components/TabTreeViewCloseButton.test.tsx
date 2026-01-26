@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach, Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
-import type { TabNode, ExtendedTabInfo } from '@/types';
+import type { UITabNode, ExtendedTabInfo } from '@/types';
 
 describe('タブにホバー時の閉じるボタンを実装する', () => {
   let originalChrome: typeof chrome;
@@ -26,18 +26,15 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
   });
 
   const createMockNode = (
-    id: string,
     tabId: number,
     depth: number = 0,
-    children: TabNode[] = [],
+    children: UITabNode[] = [],
     isExpanded: boolean = true,
-  ): TabNode => ({
-    id,
+  ): UITabNode => ({
     tabId,
-    parentId: null,
+    depth,
     children,
     isExpanded,
-    depth,
   });
 
   const createMockTabInfo = (id: number, title: string = 'Test Tab'): ExtendedTabInfo => ({
@@ -52,7 +49,7 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
     index: id,
   });
 
-  const mockGetTabInfo = (nodes: TabNode[]): ((tabId: number) => ExtendedTabInfo | undefined) => {
+  const mockGetTabInfo = (nodes: UITabNode[]): ((tabId: number) => ExtendedTabInfo | undefined) => {
     const tabInfoMap: Record<number, ExtendedTabInfo> = {};
     for (const node of nodes) {
       tabInfoMap[node.tabId] = createMockTabInfo(node.tabId, `Tab ${node.tabId}`);
@@ -62,13 +59,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
   describe('タブにホバー時に閉じるボタンを表示する', () => {
     it('タブノードにマウスをホバーすると、閉じるボタンが表示される', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const getTabInfo = mockGetTabInfo([node]);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           getTabInfo={getTabInfo}
@@ -86,14 +83,14 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
     });
 
     it('子ノードにホバーしても閉じるボタンが表示される', () => {
-      const childNode = createMockNode('child-1', 2, 1);
-      const parentNode = createMockNode('parent-1', 1, 0, [childNode], true);
+      const childNode = createMockNode(2, 1);
+      const parentNode = createMockNode(1, 0, [childNode], true);
       const getTabInfo = mockGetTabInfo([parentNode, childNode]);
 
       render(
         <TabTreeView
           nodes={[parentNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           getTabInfo={getTabInfo}
@@ -112,13 +109,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
   describe('閉じるボタンをクリックするとタブを閉じる', () => {
     it('閉じるボタンをクリックすると、chrome.tabs.removeが呼ばれる', async () => {
-      const node = createMockNode('node-1', 123);
+      const node = createMockNode(123);
       const getTabInfo = mockGetTabInfo([node]);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           getTabInfo={getTabInfo}
@@ -142,14 +139,14 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
     });
 
     it('閉じるボタンのクリックがノードのクリックイベントを伝播しない', async () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const getTabInfo = mockGetTabInfo([node]);
       const onNodeClick = vi.fn();
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={onNodeClick}
           onToggleExpand={vi.fn()}
           getTabInfo={getTabInfo}
@@ -170,13 +167,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
   describe('ホバー解除時に閉じるボタンを非表示にする', () => {
     it('タブノードからマウスを離すと、閉じるボタンが非表示になる', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const getTabInfo = mockGetTabInfo([node]);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           getTabInfo={getTabInfo}
@@ -195,14 +192,14 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
     });
 
     it('別のノードにホバーすると、元のノードの閉じるボタンが非表示になる', () => {
-      const node1 = createMockNode('node-1', 1);
-      const node2 = createMockNode('node-2', 2);
+      const node1 = createMockNode(1);
+      const node2 = createMockNode(2);
       const getTabInfo = mockGetTabInfo([node1, node2]);
 
       render(
         <TabTreeView
           nodes={[node1, node2]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           getTabInfo={getTabInfo}
@@ -230,13 +227,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
   describe('ドラッグ可能なノードでのホバー時閉じるボタン', () => {
     it('ドラッグ可能なノードにホバーしても閉じるボタンが表示される', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const getTabInfo = mockGetTabInfo([node]);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={vi.fn()}
           onToggleExpand={vi.fn()}
           onDragEnd={vi.fn()}
@@ -258,13 +255,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
   describe('閉じるボタンの右端固定とホバー時サイズ安定化', () => {
     describe('閉じるボタンはタブの右端に固定される', () => {
       it('閉じるボタンのラッパーはflex-shrink-0クラスを持つ', () => {
-        const node = createMockNode('node-1', 1);
+        const node = createMockNode(1);
         const getTabInfo = mockGetTabInfo([node]);
 
         render(
           <TabTreeView
             nodes={[node]}
-            currentViewId="default"
+            currentViewIndex={0}
             onNodeClick={vi.fn()}
             onToggleExpand={vi.fn()}
             getTabInfo={getTabInfo}
@@ -276,13 +273,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
       });
 
       it('タブコンテンツがjustify-betweenで配置されている', () => {
-        const node = createMockNode('node-1', 1);
+        const node = createMockNode(1);
         const getTabInfo = mockGetTabInfo([node]);
 
         render(
           <TabTreeView
             nodes={[node]}
-            currentViewId="default"
+            currentViewIndex={0}
             onNodeClick={vi.fn()}
             onToggleExpand={vi.fn()}
             getTabInfo={getTabInfo}
@@ -296,13 +293,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
 
     describe('ホバー時にタブサイズが変わらない', () => {
       it('閉じるボタンラッパーは常にDOMに存在し、visible/invisibleで制御される', () => {
-        const node = createMockNode('node-1', 1);
+        const node = createMockNode(1);
         const getTabInfo = mockGetTabInfo([node]);
 
         render(
           <TabTreeView
             nodes={[node]}
-            currentViewId="default"
+            currentViewIndex={0}
             onNodeClick={vi.fn()}
             onToggleExpand={vi.fn()}
             getTabInfo={getTabInfo}
@@ -326,13 +323,13 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
       });
 
       it('ドラッグ可能なノードでも閉じるボタンラッパーは常にDOMに存在する', () => {
-        const node = createMockNode('node-1', 1);
+        const node = createMockNode(1);
         const getTabInfo = mockGetTabInfo([node]);
 
         render(
           <TabTreeView
             nodes={[node]}
-            currentViewId="default"
+            currentViewIndex={0}
             onNodeClick={vi.fn()}
             onToggleExpand={vi.fn()}
             onDragEnd={vi.fn()}

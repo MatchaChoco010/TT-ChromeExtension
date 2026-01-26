@@ -31,14 +31,13 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const newTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: newTabId, depth: 0 },
       ], 0);
 
@@ -46,7 +45,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -55,14 +53,13 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -70,7 +67,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -79,14 +75,13 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -97,7 +92,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -105,7 +99,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -116,14 +109,13 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -131,7 +123,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -140,7 +131,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -148,7 +138,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -157,14 +146,13 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -172,7 +160,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: childTabId, depth: 1 },
       ], 0);
@@ -185,15 +172,13 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-          { tabId: pseudoSidePanelTabId, depth: 0 },
-          { tabId: parentTabId, depth: 0 },
+          { tabId: parentTabId, depth: 0, expanded: false },
         ], 0);
 
         await expandButton.click({ force: true, noWaitAfter: true });
 
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-          { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: parentTabId, depth: 0, expanded: true },
           { tabId: childTabId, depth: 1 },
         ], 0);
@@ -203,7 +188,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
@@ -211,7 +195,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -222,7 +205,7 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabCount = 10;
@@ -231,24 +214,23 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       for (let i = 0; i < tabCount; i++) {
         const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
         createdTabIds.push(tabId);
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: initialBrowserTabId, depth: 0 },
+          ...createdTabIds.map(id => ({ tabId: id, depth: 0 })),
+        ], 0);
       }
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-        ...createdTabIds.map(id => ({ tabId: id, depth: 0 })),
-      ], 0);
 
       await assertSmoothScrolling(sidePanelPage, tabCount);
 
+      const remainingTabIds = [...createdTabIds];
       for (const tabId of createdTabIds) {
         await closeTab(serviceWorker, tabId);
+        remainingTabIds.shift();
+        await assertTabStructure(sidePanelPage, windowId, [
+          { tabId: initialBrowserTabId, depth: 0 },
+          ...remainingTabIds.map(id => ({ tabId: id, depth: 0 })),
+        ], 0);
       }
-
-      await assertTabStructure(sidePanelPage, windowId, [
-        { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
-      ], 0);
     });
   });
 
@@ -258,14 +240,13 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId = await createTab(serviceWorker, getTestServerUrl('/example'));
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId, depth: 0 },
       ], 0);
 
@@ -273,7 +254,6 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });

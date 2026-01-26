@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import TreeNode from './TreeNode';
 import { UnreadTracker } from '@/services/UnreadTracker';
-import type { TabNode, TabInfo, IStorageService } from '@/types';
+import type { UITabNode, TabInfo, IStorageService } from '@/types';
 
 describe('UnreadIndicator 統合テスト', () => {
   let mockStorageService: IStorageService;
@@ -21,13 +21,10 @@ describe('UnreadIndicator 統合テスト', () => {
   });
 
   const createMockNode = (
-    id: string,
     tabId: number,
     depth: number = 0,
-  ): TabNode => ({
-    id,
+  ): UITabNode => ({
     tabId,
-    parentId: null,
     children: [],
     isExpanded: true,
     depth,
@@ -43,7 +40,7 @@ describe('UnreadIndicator 統合テスト', () => {
 
   describe('未読タブに未読インジケータを表示', () => {
     it('新しく開かれた未読タブに未読バッジが表示される', async () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, '未読タブ');
 
       await unreadTracker.markAsUnread(tab.id);
@@ -72,7 +69,7 @@ describe('UnreadIndicator 統合テスト', () => {
 
   describe('タブアクティブ化時に未読インジケータを削除', () => {
     it('タブをアクティブにすると未読バッジが削除される', async () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, 'アクティブ化するタブ');
 
       await unreadTracker.markAsUnread(tab.id);
@@ -115,7 +112,7 @@ describe('UnreadIndicator 統合テスト', () => {
 
   describe('設定による未読インジケータの表示/非表示切り替え', () => {
     it('showUnreadIndicator=trueの場合、未読バッジが表示される', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, '未読タブ');
 
       render(
@@ -135,7 +132,7 @@ describe('UnreadIndicator 統合テスト', () => {
     });
 
     it('showUnreadIndicator=falseの場合、未読タブでもバッジが表示されない', () => {
-      const node = createMockNode('node-1', 1);
+      const node = createMockNode(1);
       const tab = createMockTab(1, '未読タブ（設定でバッジ非表示）');
 
       render(

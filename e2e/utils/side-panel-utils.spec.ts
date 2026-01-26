@@ -34,7 +34,7 @@ test.describe('SidePanelUtils', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     let createdTabId: number | null = null;
@@ -46,7 +46,6 @@ test.describe('SidePanelUtils', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: createdTabId!, depth: 0 },
     ], 0);
   });
@@ -56,14 +55,13 @@ test.describe('SidePanelUtils', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId, depth: 0 },
     ], 0);
 
@@ -75,7 +73,6 @@ test.describe('SidePanelUtils', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
   });
 
@@ -84,7 +81,7 @@ test.describe('SidePanelUtils', () => {
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const tabCount = 10;
@@ -92,13 +89,11 @@ test.describe('SidePanelUtils', () => {
     for (let i = 0; i < tabCount; i++) {
       const tabId = await createTab(serviceWorker, getTestServerUrl(`/page${i}`));
       createdTabs.push(tabId);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        ...createdTabs.map(id => ({ tabId: id, depth: 0 })),
+      ], 0);
     }
-
-    await assertTabStructure(sidePanelPage, windowId, [
-      { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
-      ...createdTabs.map(id => ({ tabId: id, depth: 0 })),
-    ], 0);
 
     await assertSmoothScrolling(sidePanelPage, tabCount);
   });

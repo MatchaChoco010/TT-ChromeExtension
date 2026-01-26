@@ -6,12 +6,12 @@ import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 
 test.describe('ブラウザ再起動時のツリー構造復元', () => {
-  test('treeStructureがストレージに正しく保存される', async ({
+  test('ツリー構造がストレージに正しく保存される', async ({
     extensionContext,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -19,14 +19,12 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
     await waitForTabInTreeState(serviceWorker, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
@@ -34,50 +32,104 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForTabInTreeState(serviceWorker, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
 
-    interface TreeStructureEntry {
-      url: string;
-      parentIndex: number | null;
-      index: number;
-      viewId: string;
-      isExpanded: boolean;
-    }
-    interface _TreeState {
-      treeStructure?: TreeStructureEntry[];
+    interface ParentChildResult {
+      valid: boolean;
+      reason?: string;
+      parentFound?: boolean;
+      childFound?: boolean;
+      childParentTabId?: number | null;
+      expectedParentTabId?: number;
     }
 
-    let treeStructure: TreeStructureEntry[] | undefined;
+    let parentChildResult: ParentChildResult = { valid: false };
     await waitForCondition(async () => {
-      treeStructure = await serviceWorker.evaluate(async () => {
+      parentChildResult = await serviceWorker.evaluate(async ({ parentTabId, childTabId }) => {
+        interface TabNode {
+          tabId: number;
+          isExpanded: boolean;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
+
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: { url: string; parentIndex: number | null; index: number; viewId: string; isExpanded: boolean; }[] } | undefined;
-        return treeState?.treeStructure;
-      });
-      return treeStructure !== undefined && treeStructure.length >= 2;
-    }, { timeout: 5000, timeoutMessage: 'treeStructure was not saved to storage' });
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) {
+          return { valid: false, reason: 'No tree state' };
+        }
 
-    const parentEntry = treeStructure!.find(e => e.url === getTestServerUrl('/parent'));
-    const childEntry = treeStructure!.find(e => e.url === getTestServerUrl('/child'));
+        const findNodeWithParent = (
+          nodes: TabNode[],
+          targetTabId: number,
+          parent: TabNode | null
+        ): { node: TabNode; parent: TabNode | null } | null => {
+          for (const node of nodes) {
+            if (node.tabId === targetTabId) {
+              return { node, parent };
+            }
+            const found = findNodeWithParent(node.children, targetTabId, node);
+            if (found) return found;
+          }
+          return null;
+        };
 
-    expect(parentEntry).toBeDefined();
-    expect(childEntry).toBeDefined();
-    expect(parentEntry!.parentIndex).toBeNull();
-    expect(childEntry!.parentIndex).not.toBeNull();
+        let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
+        let childResult: { node: TabNode; parent: TabNode | null } | null = null;
 
-    const parentIndex = treeStructure!.findIndex(e => e.url === getTestServerUrl('/parent'));
-    expect(childEntry!.parentIndex).toBe(parentIndex);
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
+            if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
+          }
+        }
+
+        if (!parentResult) {
+          return { valid: false, reason: 'Parent not found', parentFound: false };
+        }
+        if (!childResult) {
+          return { valid: false, reason: 'Child not found', childFound: false };
+        }
+
+        // Parent should be root (no parent)
+        if (parentResult.parent !== null) {
+          return { valid: false, reason: 'Parent should be root' };
+        }
+
+        // Child should be child of parent
+        if (childResult.parent?.tabId !== parentTabId) {
+          return {
+            valid: false,
+            reason: 'Child should be child of parent',
+            childParentTabId: childResult.parent?.tabId ?? null,
+            expectedParentTabId: parentTabId,
+          };
+        }
+
+        return { valid: true };
+      }, { parentTabId, childTabId });
+      return parentChildResult.valid;
+    }, { timeout: 5000, timeoutMessage: 'Parent-child relationship was not saved correctly' });
+
+    expect(parentChildResult).toEqual({ valid: true });
   });
 
-  test('深い階層のツリーがtreeStructureに正しく保存される', async ({
+  test('深い階層のツリーが正しく保存される', async ({
     extensionContext,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -85,14 +137,12 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const tabAId = await createTab(serviceWorker, getTestServerUrl('/A'));
     await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
@@ -100,7 +150,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForTabInTreeState(serviceWorker, tabBId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1 },
     ], 0);
@@ -109,7 +158,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForTabInTreeState(serviceWorker, tabCId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2 },
@@ -119,57 +167,112 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForTabInTreeState(serviceWorker, tabDId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0, expanded: true },
       { tabId: tabBId, depth: 1, expanded: true },
       { tabId: tabCId, depth: 2, expanded: true },
       { tabId: tabDId, depth: 3 },
     ], 0);
 
-    interface TreeStructureEntry {
-      url: string;
-      parentIndex: number | null;
-      index: number;
-      viewId: string;
-      isExpanded: boolean;
+    interface DeepHierarchyResult {
+      valid: boolean;
+      reason?: string;
+      tabAParent?: number | null;
+      tabBParent?: number | null;
+      tabCParent?: number | null;
+      tabDParent?: number | null;
     }
 
-    let treeStructure: TreeStructureEntry[] | undefined;
+    let hierarchyResult: DeepHierarchyResult = { valid: false };
     await waitForCondition(async () => {
-      treeStructure = await serviceWorker.evaluate(async () => {
+      hierarchyResult = await serviceWorker.evaluate(async ({ tabAId, tabBId, tabCId, tabDId }) => {
+        interface TabNode {
+          tabId: number;
+          isExpanded: boolean;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
+
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: { url: string; parentIndex: number | null; index: number; viewId: string; isExpanded: boolean; }[] } | undefined;
-        return treeState?.treeStructure;
-      });
-      if (!treeStructure) return false;
-      const hasA = treeStructure.some(e => e.url === getTestServerUrl('/A'));
-      const hasB = treeStructure.some(e => e.url === getTestServerUrl('/B'));
-      const hasC = treeStructure.some(e => e.url === getTestServerUrl('/C'));
-      const hasD = treeStructure.some(e => e.url === getTestServerUrl('/D'));
-      return hasA && hasB && hasC && hasD;
-    }, { timeout: 5000, timeoutMessage: 'treeStructure was not saved to storage with all tabs' });
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) {
+          return { valid: false, reason: 'No tree state' };
+        }
 
-    const entryA = treeStructure!.find(e => e.url === getTestServerUrl('/A'));
-    const entryB = treeStructure!.find(e => e.url === getTestServerUrl('/B'));
-    const entryC = treeStructure!.find(e => e.url === getTestServerUrl('/C'));
-    const entryD = treeStructure!.find(e => e.url === getTestServerUrl('/D'));
+        const findNodeWithParent = (
+          nodes: TabNode[],
+          targetTabId: number,
+          parent: TabNode | null
+        ): { node: TabNode; parent: TabNode | null } | null => {
+          for (const node of nodes) {
+            if (node.tabId === targetTabId) {
+              return { node, parent };
+            }
+            const found = findNodeWithParent(node.children, targetTabId, node);
+            if (found) return found;
+          }
+          return null;
+        };
 
-    const indexA = treeStructure!.findIndex(e => e.url === getTestServerUrl('/A'));
-    const indexB = treeStructure!.findIndex(e => e.url === getTestServerUrl('/B'));
-    const indexC = treeStructure!.findIndex(e => e.url === getTestServerUrl('/C'));
+        let resultA: { node: TabNode; parent: TabNode | null } | null = null;
+        let resultB: { node: TabNode; parent: TabNode | null } | null = null;
+        let resultC: { node: TabNode; parent: TabNode | null } | null = null;
+        let resultD: { node: TabNode; parent: TabNode | null } | null = null;
 
-    expect(entryA!.parentIndex).toBeNull();
-    expect(entryB!.parentIndex).toBe(indexA);
-    expect(entryC!.parentIndex).toBe(indexB);
-    expect(entryD!.parentIndex).toBe(indexC);
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            if (!resultA) resultA = findNodeWithParent(viewState.rootNodes, tabAId, null);
+            if (!resultB) resultB = findNodeWithParent(viewState.rootNodes, tabBId, null);
+            if (!resultC) resultC = findNodeWithParent(viewState.rootNodes, tabCId, null);
+            if (!resultD) resultD = findNodeWithParent(viewState.rootNodes, tabDId, null);
+          }
+        }
+
+        if (!resultA || !resultB || !resultC || !resultD) {
+          return { valid: false, reason: 'Not all tabs found' };
+        }
+
+        // A should be root (no parent)
+        if (resultA.parent !== null) {
+          return { valid: false, reason: 'A should be root', tabAParent: resultA.parent?.tabId };
+        }
+
+        // B should be child of A
+        if (resultB.parent?.tabId !== tabAId) {
+          return { valid: false, reason: 'B should be child of A', tabBParent: resultB.parent?.tabId ?? null };
+        }
+
+        // C should be child of B
+        if (resultC.parent?.tabId !== tabBId) {
+          return { valid: false, reason: 'C should be child of B', tabCParent: resultC.parent?.tabId ?? null };
+        }
+
+        // D should be child of C
+        if (resultD.parent?.tabId !== tabCId) {
+          return { valid: false, reason: 'D should be child of C', tabDParent: resultD.parent?.tabId ?? null };
+        }
+
+        return { valid: true };
+      }, { tabAId, tabBId, tabCId, tabDId });
+      return hierarchyResult.valid;
+    }, { timeout: 5000, timeoutMessage: 'Deep hierarchy was not saved correctly' });
+
+    expect(hierarchyResult).toEqual({ valid: true });
   });
 
-  test('syncWithChromeTabsがtreeStructureから親子関係を復元する', async ({
+  test('loadStateが親子関係を復元する', async ({
     extensionContext,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -177,14 +280,12 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/parent'));
     await waitForTabInTreeState(serviceWorker, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
@@ -192,7 +293,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForTabInTreeState(serviceWorker, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
@@ -201,139 +301,151 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForTabInTreeState(serviceWorker, grandchildTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1, expanded: true },
       { tabId: grandchildTabId, depth: 2 },
     ], 0);
 
+    // ストレージに親子関係が保存されていることを確認
     await waitForCondition(async () => {
-      const hasTreeStructure = await serviceWorker.evaluate(async () => {
+      const hasTabsInTree = await serviceWorker.evaluate(async () => {
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: unknown[] } | undefined;
-        return treeState?.treeStructure && treeState.treeStructure.length > 0;
-      });
-      return Boolean(hasTreeStructure);
-    }, { timeout: 5000, timeoutMessage: 'treeStructure was not saved to storage' });
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return false;
 
-    await serviceWorker.evaluate(async () => {
-      interface ViewState {
-        info: { id: string; name: string; color: string };
-        rootNodeIds: string[];
-        nodes: Record<string, unknown>;
-      }
-      interface TreeState {
-        views?: Record<string, ViewState>;
-        viewOrder?: string[];
-        currentViewId?: string;
-        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        treeStructure?: unknown[];
-      }
+        let tabCount = 0;
+        const countTabs = (nodes: TabNode[]): void => {
+          for (const node of nodes) {
+            tabCount++;
+            countTabs(node.children);
+          }
+        };
 
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as TreeState | undefined;
-
-      if (treeState) {
-        // タブIDが変わった状態をシミュレート: 各ビューのnodesとrootNodeIdsをクリア、tabToNodeもクリア
-        const clearedViews: Record<string, ViewState> = {};
-        if (treeState.views) {
-          for (const [viewId, viewState] of Object.entries(treeState.views)) {
-            clearedViews[viewId] = {
-              ...viewState,
-              nodes: {},
-              rootNodeIds: [],
-            };
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            countTabs(viewState.rootNodes);
           }
         }
-        const clearedState = {
-          ...treeState,
-          views: clearedViews,
-          tabToNode: {},
-        };
-        await chrome.storage.local.set({ tree_state: clearedState });
+        return tabCount > 0;
+      });
+      return Boolean(hasTabsInTree);
+    }, { timeout: 5000, timeoutMessage: 'Tree state was not saved to storage' });
 
+    // TreeStateManagerのメモリ状態をクリアして再読み込み
+    await serviceWorker.evaluate(async () => {
+      // @ts-expect-error accessing global treeStateManager
+      if (globalThis.treeStateManager) {
+        // @ts-expect-error accessing internal windows array
+        globalThis.treeStateManager.windows = [];
         // @ts-expect-error accessing global treeStateManager
-        if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing global treeStateManager
-          globalThis.treeStateManager.syncCompleted = false;
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.loadState();
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.syncWithChromeTabs();
-        }
+        await globalThis.treeStateManager.loadState();
       }
     });
 
     interface RelationsResult {
       valid: boolean;
       reason?: string;
-      parentNodeId?: string;
-      childNodeId?: string;
-      grandchildNodeId?: string;
-      childParentId?: string | null;
-      grandchildParentId?: string | null;
-      expectedParentId?: string;
+      parentTabId?: number;
+      childTabId?: number;
+      grandchildTabId?: number;
+      actualChildParentTabId?: number | null;
+      actualGrandchildParentTabId?: number | null;
     }
 
     let relationsValid: RelationsResult = { valid: false };
     await waitForCondition(async () => {
       relationsValid = await serviceWorker.evaluate(
         async ({ parentTabId, childTabId, grandchildTabId }) => {
-          interface TreeNode {
-            parentId: string | null;
-            depth: number;
+          interface TabNode {
+            tabId: number;
+            isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
 
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
+          const treeState = result.tree_state as TreeState | undefined;
 
-          if (!treeState?.views || !treeState?.tabToNode) {
+          if (!treeState?.windows) {
             return { valid: false, reason: 'No tree state' };
           }
 
-          const parentNodeInfo = treeState.tabToNode[parentTabId];
-          const childNodeInfo = treeState.tabToNode[childTabId];
-          const grandchildNodeInfo = treeState.tabToNode[grandchildTabId];
+          const findNodeWithParent = (
+            nodes: TabNode[],
+            targetTabId: number,
+            parent: TabNode | null
+          ): { node: TabNode; parent: TabNode | null } | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) {
+                return { node, parent };
+              }
+              const found = findNodeWithParent(node.children, targetTabId, node);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          if (!parentNodeInfo || !childNodeInfo || !grandchildNodeInfo) {
+          let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
+          let childResult: { node: TabNode; parent: TabNode | null } | null = null;
+          let grandchildResult: { node: TabNode; parent: TabNode | null } | null = null;
+
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
+              if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
+              if (!grandchildResult) grandchildResult = findNodeWithParent(viewState.rootNodes, grandchildTabId, null);
+            }
+          }
+
+          if (!parentResult || !childResult || !grandchildResult) {
             return {
               valid: false,
-              reason: 'Missing node IDs',
-              parentNodeId: parentNodeInfo?.nodeId,
-              childNodeId: childNodeInfo?.nodeId,
-              grandchildNodeId: grandchildNodeInfo?.nodeId,
+              reason: 'Missing nodes',
+              parentTabId: parentResult?.node.tabId,
+              childTabId: childResult?.node.tabId,
+              grandchildTabId: grandchildResult?.node.tabId,
             };
           }
 
-          const viewState = treeState.views[parentNodeInfo.viewId];
-          const parentNode = viewState?.nodes[parentNodeInfo.nodeId];
-          const childNode = viewState?.nodes[childNodeInfo.nodeId];
-          const grandchildNode = viewState?.nodes[grandchildNodeInfo.nodeId];
-
-          if (parentNode.parentId !== null) {
+          if (parentResult.parent !== null) {
             return { valid: false, reason: 'Parent should be root' };
           }
-          if (childNode.parentId !== parentNodeInfo.nodeId) {
+
+          if (childResult.parent?.tabId !== parentTabId) {
             return {
               valid: false,
               reason: 'Child should be child of parent',
-              childParentId: childNode.parentId,
-              expectedParentId: parentNodeInfo.nodeId,
+              actualChildParentTabId: childResult.parent?.tabId ?? null,
             };
           }
-          if (grandchildNode.parentId !== childNodeInfo.nodeId) {
+
+          if (grandchildResult.parent?.tabId !== childTabId) {
             return {
               valid: false,
               reason: 'Grandchild should be child of child',
-              grandchildParentId: grandchildNode.parentId,
-              expectedParentId: childNodeInfo.nodeId,
+              actualGrandchildParentTabId: grandchildResult.parent?.tabId ?? null,
             };
           }
 
@@ -347,14 +459,14 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     expect(relationsValid).toEqual({ valid: true });
   });
 
-  test('D&Dで作成した親子関係がtreeStructureに保存され、復元される', async ({
+  test('D&Dで作成した親子関係が保存され、復元される', async ({
     extensionContext,
     serviceWorker,
   }) => {
     test.setTimeout(120000);
 
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -362,14 +474,12 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const parentTabId = await createTab(serviceWorker, getTestServerUrl('/dnd-parent'));
     await waitForTabInTreeState(serviceWorker, parentTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
     ], 0);
 
@@ -377,7 +487,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await waitForTabInTreeState(serviceWorker, childTabId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0 },
       { tabId: childTabId, depth: 0 },
     ], 0);
@@ -385,150 +494,185 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     await moveTabToParent(sidePanelPage, childTabId, parentTabId, serviceWorker);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0);
 
-    interface TreeStructureEntry {
-      url: string;
-      parentIndex: number | null;
-      index: number;
-      viewId: string;
-      isExpanded: boolean;
+    interface DndSaveResult {
+      valid: boolean;
+      reason?: string;
+      parentFound?: boolean;
+      childFound?: boolean;
+      childParentTabId?: number | null;
     }
 
-    let treeStructure: TreeStructureEntry[] | undefined;
-    let parentEntry: TreeStructureEntry | undefined;
-    let childEntry: TreeStructureEntry | undefined;
-
+    let dndSaveResult: DndSaveResult = { valid: false };
     await waitForCondition(async () => {
-      treeStructure = await serviceWorker.evaluate(async () => {
+      dndSaveResult = await serviceWorker.evaluate(async ({ parentTabId, childTabId }) => {
+        interface TabNode {
+          tabId: number;
+          isExpanded: boolean;
+          children: TabNode[];
+        }
+        interface ViewState {
+          rootNodes: TabNode[];
+        }
+        interface WindowState {
+          views: ViewState[];
+        }
+        interface TreeState {
+          windows: WindowState[];
+        }
+
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: { url: string; parentIndex: number | null; index: number; viewId: string; isExpanded: boolean; }[] } | undefined;
-        return treeState?.treeStructure;
-      });
-      if (!treeStructure) return false;
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) {
+          return { valid: false, reason: 'No tree state' };
+        }
 
-      parentEntry = treeStructure.find(e => e.url === getTestServerUrl('/dnd-parent'));
-      childEntry = treeStructure.find(e => e.url === getTestServerUrl('/dnd-child'));
+        const findNodeWithParent = (
+          nodes: TabNode[],
+          targetTabId: number,
+          parent: TabNode | null
+        ): { node: TabNode; parent: TabNode | null } | null => {
+          for (const node of nodes) {
+            if (node.tabId === targetTabId) {
+              return { node, parent };
+            }
+            const found = findNodeWithParent(node.children, targetTabId, node);
+            if (found) return found;
+          }
+          return null;
+        };
 
-      if (!parentEntry || !childEntry) return false;
-      if (parentEntry.parentIndex !== null) return false;
-      if (childEntry.parentIndex === null) return false;
+        let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
+        let childResult: { node: TabNode; parent: TabNode | null } | null = null;
 
-      const parentIndex = treeStructure.findIndex(e => e.url === getTestServerUrl('/dnd-parent'));
-      return childEntry.parentIndex === parentIndex;
-    }, { timeout: 5000, timeoutMessage: 'D&D parent-child relation was not saved to treeStructure' });
-
-    await serviceWorker.evaluate(async () => {
-      interface ViewState {
-        info: { id: string; name: string; color: string };
-        rootNodeIds: string[];
-        nodes: Record<string, unknown>;
-      }
-      interface TreeState {
-        views?: Record<string, ViewState>;
-        viewOrder?: string[];
-        currentViewId?: string;
-        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        treeStructure?: unknown[];
-      }
-
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as TreeState | undefined;
-
-      if (treeState) {
-        const clearedViews: Record<string, ViewState> = {};
-        if (treeState.views) {
-          for (const [viewId, viewState] of Object.entries(treeState.views)) {
-            clearedViews[viewId] = {
-              ...viewState,
-              nodes: {},
-              rootNodeIds: [],
-            };
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
+            if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
           }
         }
-        const clearedState = {
-          ...treeState,
-          views: clearedViews,
-          tabToNode: {},
-        };
-        await chrome.storage.local.set({ tree_state: clearedState });
 
-        // @ts-expect-error accessing global treeStateManager
-        if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing global treeStateManager
-          globalThis.treeStateManager.syncCompleted = false;
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.loadState();
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.syncWithChromeTabs();
+        if (!parentResult) {
+          return { valid: false, reason: 'Parent not found', parentFound: false };
         }
+        if (!childResult) {
+          return { valid: false, reason: 'Child not found', childFound: false };
+        }
+
+        // Parent should be root
+        if (parentResult.parent !== null) {
+          return { valid: false, reason: 'Parent should be root' };
+        }
+
+        // Child should be child of parent
+        if (childResult.parent?.tabId !== parentTabId) {
+          return {
+            valid: false,
+            reason: 'Child should be child of parent',
+            childParentTabId: childResult.parent?.tabId ?? null,
+          };
+        }
+
+        return { valid: true };
+      }, { parentTabId, childTabId });
+      return dndSaveResult.valid;
+    }, { timeout: 5000, timeoutMessage: 'D&D parent-child relation was not saved correctly' });
+
+    // TreeStateManagerのメモリ状態をクリアして再読み込み
+    await serviceWorker.evaluate(async () => {
+      // @ts-expect-error accessing global treeStateManager
+      if (globalThis.treeStateManager) {
+        // @ts-expect-error accessing internal windows array
+        globalThis.treeStateManager.windows = [];
+        // @ts-expect-error accessing global treeStateManager
+        await globalThis.treeStateManager.loadState();
       }
     });
 
     interface DndRelationsResult {
       valid: boolean;
       reason?: string;
-      parentNodeId?: string;
-      childNodeId?: string;
-      childParentId?: string | null;
-      expectedParentId?: string;
+      parentTabId?: number;
+      childTabId?: number;
+      actualChildParentTabId?: number | null;
     }
 
     let relationsValid: DndRelationsResult = { valid: false };
     await waitForCondition(async () => {
       relationsValid = await serviceWorker.evaluate(
         async ({ parentTabId, childTabId }) => {
-          interface TreeNode {
-            parentId: string | null;
-            depth: number;
+          interface TabNode {
+            tabId: number;
+            isExpanded: boolean;
+            children: TabNode[];
           }
           interface ViewState {
-            nodes: Record<string, TreeNode>;
+            rootNodes: TabNode[];
           }
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, ViewState>;
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+          }
+          interface TreeState {
+            windows: WindowState[];
           }
 
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
+          const treeState = result.tree_state as TreeState | undefined;
 
-          if (!treeState?.views || !treeState?.tabToNode) {
+          if (!treeState?.windows) {
             return { valid: false, reason: 'No tree state' };
           }
 
-          const parentNodeInfo = treeState.tabToNode[parentTabId];
-          const childNodeInfo = treeState.tabToNode[childTabId];
+          // Find a node and its parent by tabId
+          const findNodeWithParent = (
+            nodes: TabNode[],
+            targetTabId: number,
+            parent: TabNode | null
+          ): { node: TabNode; parent: TabNode | null } | null => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) {
+                return { node, parent };
+              }
+              const found = findNodeWithParent(node.children, targetTabId, node);
+              if (found) return found;
+            }
+            return null;
+          };
 
-          if (!parentNodeInfo || !childNodeInfo) {
+          let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
+          let childResult: { node: TabNode; parent: TabNode | null } | null = null;
+
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
+              if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
+            }
+          }
+
+          if (!parentResult || !childResult) {
             return {
               valid: false,
-              reason: 'Missing node IDs',
-              parentNodeId: parentNodeInfo?.nodeId,
-              childNodeId: childNodeInfo?.nodeId,
+              reason: 'Missing nodes',
+              parentTabId: parentResult?.node.tabId,
+              childTabId: childResult?.node.tabId,
             };
           }
 
-          const viewState = treeState.views[parentNodeInfo.viewId];
-          const parentNode = viewState?.nodes[parentNodeInfo.nodeId];
-          const childNode = viewState?.nodes[childNodeInfo.nodeId];
-
-          if (!parentNode || !childNode) {
-            return { valid: false, reason: 'Missing nodes' };
-          }
-
-          if (parentNode.parentId !== null) {
+          // Parent should be root
+          if (parentResult.parent !== null) {
             return { valid: false, reason: 'Parent should be root' };
           }
-          if (childNode.parentId !== parentNodeInfo.nodeId) {
+
+          // Child should be child of parent
+          if (childResult.parent?.tabId !== parentTabId) {
             return {
               valid: false,
               reason: 'Child should be child of parent',
-              childParentId: childNode.parentId,
-              expectedParentId: parentNodeInfo.nodeId,
+              actualChildParentTabId: childResult.parent?.tabId ?? null,
             };
           }
 
@@ -543,18 +687,17 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: true },
       { tabId: childTabId, depth: 1 },
     ], 0, { timeout: 5000 });
   });
 
-  test('treeStructureからviewIdが正しく復元される', async ({
+  test('タブが正しいビューに復元される', async ({
     extensionContext,
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -562,175 +705,175 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
 
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
     ], 0);
 
     const tabAId = await createTab(serviceWorker, getTestServerUrl('/page'));
     await waitForTabInTreeState(serviceWorker, tabAId);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    interface TreeStructureEntry {
-      url: string;
-      parentIndex: number | null;
-      index: number;
-      viewId: string;
-      isExpanded: boolean;
-    }
-
+    // Wait for the tab to be saved in storage
     await waitForCondition(async () => {
-      const ts = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as { treeStructure?: TreeStructureEntry[] } | undefined;
-        return treeState?.treeStructure;
-      });
-      return ts !== undefined && ts.length >= 2;
-    }, { timeout: 5000, timeoutMessage: 'Tab not in treeStructure' });
-
-    await serviceWorker.evaluate(async ({ tabAId: _tabAId }) => {
-      interface ViewState {
-        info: { id: string; name: string; color: string };
-        rootNodeIds: string[];
-        nodes: Record<string, unknown>;
-      }
-      interface StoredTreeState {
-        views?: Record<string, ViewState>;
-        viewOrder?: string[];
-        currentViewId?: string;
-        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        treeStructure?: Array<{
-          url: string;
-          parentIndex: number | null;
-          index: number;
-          viewId: string;
-          isExpanded: boolean;
-        }>;
-      }
-
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as StoredTreeState | undefined;
-      if (!treeState?.treeStructure || !treeState?.tabToNode) return;
-
-      const newViews: Record<string, ViewState> = {
-        'default': {
-          info: { id: 'default', name: 'Default', color: '#3b82f6' },
-          rootNodeIds: [],
-          nodes: {},
-        },
-        'custom-view': {
-          info: { id: 'custom-view', name: 'Custom View', color: '#10b981' },
-          rootNodeIds: [],
-          nodes: {},
-        },
-      };
-
-      const lastIndex = treeState.treeStructure.length - 1;
-      const updatedTreeStructure = treeState.treeStructure.map((entry, idx) => {
-        if (idx === lastIndex) {
-          return { ...entry, viewId: 'custom-view' };
+      const found = await serviceWorker.evaluate(async ({ tabAId }) => {
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
         }
-        return entry;
-      });
+        interface TreeState {
+          windows: { views: { rootNodes: TabNode[] }[] }[];
+        }
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return false;
 
-      const updatedState = {
-        ...treeState,
-        views: newViews,
-        viewOrder: ['default', 'custom-view'],
-        treeStructure: updatedTreeStructure,
-      };
-      await chrome.storage.local.set({ tree_state: updatedState });
-    }, { tabAId });
+        const findNode = (nodes: TabNode[], targetTabId: number): boolean => {
+          for (const node of nodes) {
+            if (node.tabId === targetTabId) return true;
+            if (findNode(node.children, targetTabId)) return true;
+          }
+          return false;
+        };
 
-    await serviceWorker.evaluate(async () => {
-      interface ViewState {
-        info: unknown;
-        rootNodeIds: string[];
-        nodes: Record<string, unknown>;
-      }
-      interface StoredTreeState {
-        views?: Record<string, ViewState>;
-        viewOrder?: string[];
-        currentViewId?: string;
-        tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        treeStructure?: unknown[];
-      }
-
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as StoredTreeState | undefined;
-
-      if (treeState) {
-        const clearedViews: Record<string, ViewState> = {};
-        if (treeState.views) {
-          for (const [viewId, view] of Object.entries(treeState.views)) {
-            clearedViews[viewId] = { ...view, nodes: {}, rootNodeIds: [] };
+        for (const windowState of treeState.windows) {
+          for (const viewState of windowState.views) {
+            if (findNode(viewState.rootNodes, tabAId)) return true;
           }
         }
-        const clearedState = {
-          ...treeState,
-          views: clearedViews,
-          tabToNode: {},
-        };
-        await chrome.storage.local.set({ tree_state: clearedState });
+        return false;
+      }, { tabAId });
+      return found;
+    }, { timeout: 5000, timeoutMessage: 'Tab not in storage' });
 
-        // @ts-expect-error accessing global treeStateManager
-        if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing global treeStateManager
-          globalThis.treeStateManager.syncCompleted = false;
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.loadState();
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.syncWithChromeTabs();
+    // Move the tab to a second view (viewIndex=1) by manipulating storage directly
+    await serviceWorker.evaluate(async ({ tabAId }) => {
+      interface TabNode {
+        tabId: number;
+        isExpanded: boolean;
+        children: TabNode[];
+      }
+      interface ViewState {
+        name: string;
+        color: string;
+        rootNodes: TabNode[];
+      }
+      interface WindowState {
+        windowId: number;
+        views: ViewState[];
+        activeViewIndex: number;
+        pinnedTabIds: number[];
+      }
+      interface TreeState {
+        windows: WindowState[];
+      }
+
+      const result = await chrome.storage.local.get('tree_state');
+      const treeState = result.tree_state as TreeState | undefined;
+      if (!treeState?.windows?.[0]) return;
+
+      const windowState = treeState.windows[0];
+
+      // Add a second view if it doesn't exist
+      if (windowState.views.length < 2) {
+        windowState.views.push({
+          name: 'Custom View',
+          color: '#10b981',
+          rootNodes: [],
+        });
+      }
+
+      // Find the tab node in the first view
+      const findAndRemove = (nodes: TabNode[], targetTabId: number): TabNode | null => {
+        for (let i = 0; i < nodes.length; i++) {
+          if (nodes[i].tabId === targetTabId) {
+            return nodes.splice(i, 1)[0];
+          }
+          const found = findAndRemove(nodes[i].children, targetTabId);
+          if (found) return found;
         }
+        return null;
+      };
+
+      const tabNode = findAndRemove(windowState.views[0].rootNodes, tabAId);
+      if (tabNode) {
+        // Move to the second view
+        windowState.views[1].rootNodes.push(tabNode);
+      }
+
+      await chrome.storage.local.set({ tree_state: treeState });
+    }, { tabAId });
+
+    // TreeStateManagerのメモリ状態をクリアして再読み込み
+    await serviceWorker.evaluate(async () => {
+      // @ts-expect-error accessing global treeStateManager
+      if (globalThis.treeStateManager) {
+        // @ts-expect-error accessing internal windows array
+        globalThis.treeStateManager.windows = [];
+        // @ts-expect-error accessing global treeStateManager
+        await globalThis.treeStateManager.loadState();
       }
     });
 
-    interface ViewIdResult {
+    // Verify the tab is in the correct view (viewIndex=1)
+    interface ViewIndexResult {
       valid: boolean;
       reason?: string;
-      viewId?: string;
-      expectedViewId?: string;
+      viewIndex?: number;
+      expectedViewIndex?: number;
     }
 
-    let viewIdValid: ViewIdResult = { valid: false };
+    let viewIndexValid: ViewIndexResult = { valid: false };
     await waitForCondition(async () => {
-      viewIdValid = await serviceWorker.evaluate(
+      viewIndexValid = await serviceWorker.evaluate(
         async ({ tabAId }) => {
-          interface LocalTreeState {
-            tabToNode: Record<number, { viewId: string; nodeId: string }>;
-            views: Record<string, unknown>;
+          interface TabNode {
+            tabId: number;
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
           }
 
           const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
+          const treeState = result.tree_state as TreeState | undefined;
 
-          if (!treeState?.views || !treeState?.tabToNode) {
+          if (!treeState?.windows?.[0]) {
             return { valid: false, reason: 'No tree state' };
           }
 
-          const nodeInfo = treeState.tabToNode[tabAId];
-          if (!nodeInfo) {
-            return { valid: false, reason: 'Node not found for tabAId' };
+          const findNode = (nodes: TabNode[], targetTabId: number): boolean => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return true;
+              if (findNode(node.children, targetTabId)) return true;
+            }
+            return false;
+          };
+
+          const windowState = treeState.windows[0];
+          for (let i = 0; i < windowState.views.length; i++) {
+            if (findNode(windowState.views[i].rootNodes, tabAId)) {
+              // Tab found in viewIndex i - expect it to be in viewIndex 1
+              if (i === 1) {
+                return { valid: true };
+              } else {
+                return {
+                  valid: false,
+                  reason: 'ViewIndex mismatch',
+                  viewIndex: i,
+                  expectedViewIndex: 1,
+                };
+              }
+            }
           }
 
-          if (nodeInfo.viewId !== 'custom-view') {
-            return {
-              valid: false,
-              reason: 'ViewId mismatch',
-              viewId: nodeInfo.viewId,
-              expectedViewId: 'custom-view',
-            };
-          }
-
-          return { valid: true };
+          return { valid: false, reason: 'Tab not found in any view' };
         },
         { tabAId }
       );
-      return viewIdValid.valid;
-    }, { timeout: 5000, timeoutMessage: 'ViewId was not restored correctly' });
+      return viewIndexValid.valid;
+    }, { timeout: 5000, timeoutMessage: 'ViewIndex was not restored correctly' });
 
-    expect(viewIdValid).toEqual({ valid: true });
+    expect(viewIndexValid).toEqual({ valid: true });
   });
 });

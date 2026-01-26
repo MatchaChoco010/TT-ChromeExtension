@@ -6,31 +6,12 @@ import {
   trackHandler,
 } from './event-handlers';
 
-import { testTreeStateManager, testTitlePersistence, testUnreadTracker, testSnapshotManager } from './event-handlers';
+import { testTreeStateManager, testUnreadTracker, testSnapshotManager } from './event-handlers';
 
 import { storageService, STORAGE_KEYS } from '@/storage';
 import type { UserSettings } from '@/types';
 
 const snapshotManager = testSnapshotManager;
-
-/**
- * 古いタブデータをクリーンアップ
- * ブラウザ起動時に存在しないタブをツリーから削除
- */
-async function cleanupStaleTabData(): Promise<void> {
-  try {
-    const tabs = await chrome.tabs.query({});
-    const existingTabIds = tabs
-      .filter((tab) => tab.id !== undefined)
-      .map((tab) => tab.id!);
-
-    await testTreeStateManager.cleanupStaleNodes(existingTabIds);
-
-    testTitlePersistence.cleanup(existingTabIds);
-  } catch {
-    // エラーを無視（クリーンアップ失敗は致命的ではない）
-  }
-}
 
 /**
  * 自動スナップショット機能を初期化
@@ -87,69 +68,55 @@ function startPeriodicPersist(): void {
   });
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
-  await testTreeStateManager.loadState();
-
-  // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
-  await testUnreadTracker.clear();
-
-  // ユーザー設定を取得してsyncWithChromeTabsに渡す
-  // これにより同期中に作成された新規タブも正しい位置に配置される
-  const userSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
-  const syncSettings = {
-    newTabPositionManual: userSettings?.newTabPositionManual ?? 'end' as const,
-  };
-
-  // URLベースの同期を先に実行（タブIDが変わっていても復元可能）
-  await testTreeStateManager.syncWithChromeTabs(syncSettings);
-
-  // 同期後に存在しないタブをクリーンアップ（同期で使われなかった古いタブのみ削除）
-  await cleanupStaleTabData();
-
-  await initializeAutoSnapshot();
-
-  startPeriodicPersist();
-
-  // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
-  // 以降に作成されるタブにのみ未読バッジを表示する
-  testUnreadTracker.setInitialLoadComplete();
-
-  // UIサイドに初期化完了を通知（未読状態をリフレッシュさせる）
-  chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+// onInstalledは使用しない
+// 全ての初期化処理はSW IIFEで行う（競合状態を防ぐため）
+chrome.runtime.onInstalled.addListener((_details) => {
 });
 
 (async () => {
   try {
+    // ストレージに状態があるかチェック
+    const hasExistingState = await testTreeStateManager.hasPersistedState();
+
+    if (!hasExistingState) {
+      // 新規インストール時: ChromeタブからTreeStateを初期化
+      // 設計原則として Chrome → TreeStateManager への同期は禁止だが、
+      // 新規インストール時は既存タブを取り込むためこの方向の同期が必要
+      await testTreeStateManager.initializeFromChromeTabs();
+      testUnreadTracker.setInitialLoadComplete();
+      testTreeStateManager.notifyStateChanged();
+      await initializeAutoSnapshot();
+      startPeriodicPersist();
+      chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+      return;
+    }
+
+    // 既存の状態がある場合: 復元処理
     await testTreeStateManager.loadState();
 
     // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
     await testUnreadTracker.clear();
 
-    // ユーザー設定を取得してsyncWithChromeTabsに渡す
-    // これにより同期中に作成された新規タブも正しい位置に配置される
+    // ユーザー設定を取得してrestoreStateAfterRestartに渡す
     const userSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
     const syncSettings = {
       newTabPositionManual: userSettings?.newTabPositionManual ?? 'end' as const,
     };
 
-    // URLベースの同期を先に実行（タブIDが変わっていても復元可能）
-    await testTreeStateManager.syncWithChromeTabs(syncSettings);
-
-    // 同期後に存在しないタブをクリーンアップ（同期で使われなかった古いタブのみ削除）
-    await cleanupStaleTabData();
+    // インデックスベースの同期を実行（タブIDが変わっていても復元可能）
+    await testTreeStateManager.restoreStateAfterRestart(syncSettings);
 
     await initializeAutoSnapshot();
 
     startPeriodicPersist();
 
-    // 起動完了をマーク（ブラウザ起動時の既存タブには未読バッジを表示しない）
-    // 以降に作成されるタブにのみ未読バッジを表示する
+    // 起動完了をマーク
     testUnreadTracker.setInitialLoadComplete();
 
-    // UIサイドに初期化完了を通知（未読状態をリフレッシュさせる）
+    // UIサイドに初期化完了を通知
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
-    // 初期化失敗時もService Workerは動作を継続（次回起動時に再試行される）
+    // 初期化エラーは致命的だが、ここで処理できることはない
   }
 })();
 

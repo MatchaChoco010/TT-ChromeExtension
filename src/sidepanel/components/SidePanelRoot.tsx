@@ -12,7 +12,7 @@ import { useMenuActions } from '../hooks/useMenuActions';
 import { downloadService } from '@/storage/DownloadService';
 import { storageService } from '@/storage/StorageService';
 import { SnapshotManager } from '@/services/SnapshotManager';
-import type { TabNode, MenuAction, WindowInfo, View } from '@/types';
+import type { UITabNode, TabNode, MenuAction, WindowInfo } from '@/types';
 
 interface SidePanelRootProps {
   children?: React.ReactNode;
@@ -41,7 +41,8 @@ const TreeViewContent: React.FC = () => {
     viewTabCounts,
     moveTabsToView,
     currentWindowId,
-    currentViewId,
+    currentViewIndex,
+    views,
   } = useTreeState();
 
   const sidePanelRef = useRef<HTMLDivElement>(null);
@@ -121,21 +122,31 @@ const TreeViewContent: React.FC = () => {
     chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId } });
   };
 
-  const handleToggleExpand = useCallback((nodeId: string) => {
+  const handleToggleExpand = useCallback((tabId: number) => {
+    if (currentWindowId === null) return;
     chrome.runtime.sendMessage({
       type: 'TOGGLE_NODE_EXPAND',
-      payload: { nodeId, viewId: currentViewId },
+      payload: { tabId, windowId: currentWindowId },
     });
-  }, [currentViewId]);
+  }, [currentWindowId]);
 
-  // 現在のビューのViewStateを取得（buildTreeの前に定義する必要がある）
+  // 現在のウィンドウの状態を取得
+  const currentWindowState = useMemo(() => {
+    if (!treeState || currentWindowId === null) return null;
+    return treeState.windows.find(w => w.windowId === currentWindowId) || null;
+  }, [treeState, currentWindowId]);
+
+  // 現在のビューの状態を取得
   const currentViewState = useMemo(() => {
-    if (!treeState) return null;
-    return treeState.views[currentViewId] || null;
-  }, [treeState, currentViewId]);
+    if (!currentWindowState) return null;
+    return currentWindowState.views[currentViewIndex] || null;
+  }, [currentWindowState, currentViewIndex]);
 
-  const buildTree = (): TabNode[] => {
-    if (!treeState || !currentViewState) return [];
+  /**
+   * TabNodeからUITabNodeを構築（depthを計算）
+   */
+  const buildTree = (): UITabNode[] => {
+    if (!currentViewState) return [];
 
     const pinnedTabIdSet = new Set(pinnedTabIds);
 
@@ -149,59 +160,55 @@ const TreeViewContent: React.FC = () => {
       });
     }
 
-    const nodesWithChildren: Record<string, TabNode> = {};
+    // ピン留め/フィルタリングされた親の子ノードを収集するための配列
+    const orphanedChildren: UITabNode[] = [];
 
-    Object.entries(currentViewState.nodes).forEach(([id, node]) => {
-      if (pinnedTabIdSet.has(node.tabId)) {
-        return;
-      }
-      if (shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId)) {
-        return;
-      }
-      nodesWithChildren[id] = {
-        ...node,
-        children: [],
-      };
-    });
+    // TabNodeをUITabNodeに変換（depthを計算）
+    const convertToUINode = (
+      node: TabNode,
+      depth: number
+    ): UITabNode | null => {
+      const isPinned = pinnedTabIdSet.has(node.tabId);
+      const isFiltered = shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId);
 
-    Object.entries(currentViewState.nodes).forEach(([parentId, parentNode]) => {
-      if (!nodesWithChildren[parentId]) {
-        return;
+      // ピン留めまたはフィルタリング対象のタブの場合、子ノードをルートレベルとして収集
+      if (isPinned || isFiltered) {
+        for (const child of node.children) {
+          const uiChild = convertToUINode(child, 0);
+          if (uiChild) {
+            orphanedChildren.push(uiChild);
+          }
+        }
+        return null;
       }
-      for (const child of parentNode.children) {
-        const childId = child.id;
-        if (nodesWithChildren[childId]) {
-          nodesWithChildren[parentId].children.push(nodesWithChildren[childId]);
+
+      const children: UITabNode[] = [];
+      for (const child of node.children) {
+        const uiChild = convertToUINode(child, depth + 1);
+        if (uiChild) {
+          children.push(uiChild);
         }
       }
-    });
 
-    const rootNodes: TabNode[] = [];
-    Object.values(nodesWithChildren).forEach((node) => {
-      // 親がフィルタリングされた（ピン留めタブや別ウィンドウ）場合もルートノードとして扱う
-      if (!node.parentId || !nodesWithChildren[node.parentId]) {
-        rootNodes.push(node);
-      }
-    });
-
-    const recalculateDepth = (node: TabNode, depth: number): void => {
-      node.depth = depth;
-      for (const child of node.children) {
-        recalculateDepth(child, depth + 1);
-      }
+      return {
+        tabId: node.tabId,
+        isExpanded: node.isExpanded,
+        groupInfo: node.groupInfo,
+        children,
+        depth,
+      };
     };
 
-    rootNodes.forEach((node) => {
-      recalculateDepth(node, 0);
-    });
+    const rootNodes: UITabNode[] = [];
+    for (const node of currentViewState.rootNodes) {
+      const uiNode = convertToUINode(node, 0);
+      if (uiNode) {
+        rootNodes.push(uiNode);
+      }
+    }
 
-    const rootNodeIdsArray = currentViewState.rootNodeIds ?? [];
-    const nodeOrderMap = new Map(rootNodeIdsArray.map((id, index) => [id, index]));
-    rootNodes.sort((a, b) => {
-      const indexA = nodeOrderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-      const indexB = nodeOrderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-      return indexA - indexB;
-    });
+    // ピン留め/フィルタリングされた親の子ノードを末尾に追加
+    rootNodes.push(...orphanedChildren);
 
     return rootNodes;
   };
@@ -244,28 +251,13 @@ const TreeViewContent: React.FC = () => {
     });
   }, [currentWindowId]);
 
-  const viewsArray = useMemo((): View[] => {
-    if (!treeState) return [];
-    const orderedViews: View[] = [];
-    for (const viewId of treeState.viewOrder) {
-      const viewState = treeState.views[viewId];
-      if (viewState) {
-        orderedViews.push(viewState.info);
-      }
-    }
-    for (const [viewId, viewState] of Object.entries(treeState.views)) {
-      if (!treeState.viewOrder.includes(viewId)) {
-        orderedViews.push(viewState.info);
-      }
-    }
-    return orderedViews;
-  }, [treeState]);
-
   const [groupNameModalOpen, setGroupNameModalOpen] = useState(false);
   const [pendingGroupTabIds, setPendingGroupTabIds] = useState<number[]>([]);
+  const [pendingContextMenuTabId, setPendingContextMenuTabId] = useState<number | null>(null);
 
-  const handleGroupRequest = useCallback((tabIds: number[]) => {
+  const handleGroupRequest = useCallback((tabIds: number[], contextMenuTabId: number) => {
     setPendingGroupTabIds(tabIds);
+    setPendingContextMenuTabId(contextMenuTabId);
     setGroupNameModalOpen(true);
   }, []);
 
@@ -274,17 +266,19 @@ const TreeViewContent: React.FC = () => {
     try {
       await chrome.runtime.sendMessage({
         type: 'CREATE_GROUP',
-        payload: { tabIds: pendingGroupTabIds, groupName },
+        payload: { tabIds: pendingGroupTabIds, groupName, contextMenuTabId: pendingContextMenuTabId },
       });
     } catch {
       // グループ化APIのエラーは無視（タブが存在しない場合など）
     }
     setPendingGroupTabIds([]);
-  }, [pendingGroupTabIds]);
+    setPendingContextMenuTabId(null);
+  }, [pendingGroupTabIds, pendingContextMenuTabId]);
 
   const handleGroupNameClose = useCallback(() => {
     setGroupNameModalOpen(false);
     setPendingGroupTabIds([]);
+    setPendingContextMenuTabId(null);
   }, []);
 
   const pendingGroupTabTitles = useMemo(() => {
@@ -296,15 +290,15 @@ const TreeViewContent: React.FC = () => {
       className="flex flex-col h-full bg-gray-900"
       onClick={(e) => {
         const target = e.target as HTMLElement;
-        if (!target.closest('[data-node-id]') && !target.closest('button')) {
+        if (!target.closest('[data-tab-id]') && !target.closest('button')) {
           clearSelection();
         }
       }}
     >
         {treeState && (
           <ViewSwitcher
-            views={viewsArray}
-            currentViewId={currentViewId}
+            views={views}
+            currentViewIndex={currentViewIndex}
             tabCounts={viewTabCounts}
             onViewSwitch={switchView}
             onViewCreate={createView}
@@ -331,8 +325,8 @@ const TreeViewContent: React.FC = () => {
             currentWindowId={currentWindowId ?? undefined}
             otherWindows={otherWindows}
             onMoveToWindow={handleMoveToWindow}
-            views={viewsArray}
-            currentViewId={currentViewId}
+            views={views}
+            currentViewIndex={currentViewIndex}
             onMoveToView={moveTabsToView}
           />
         )}
@@ -343,7 +337,7 @@ const TreeViewContent: React.FC = () => {
         >
           <TabTreeView
             nodes={nodes}
-            currentViewId={currentViewId}
+            currentViewIndex={currentViewIndex}
             onNodeClick={handleNodeClick}
             onToggleExpand={handleToggleExpand}
             onDragEnd={handleDragEnd}
@@ -357,7 +351,7 @@ const TreeViewContent: React.FC = () => {
             getSelectedTabIds={getSelectedTabIds}
             clearSelection={clearSelection}
             onSnapshot={handleSnapshot}
-            views={viewsArray}
+            views={views}
             onMoveToView={moveTabsToView}
             currentWindowId={currentWindowId ?? undefined}
             otherWindows={otherWindows}

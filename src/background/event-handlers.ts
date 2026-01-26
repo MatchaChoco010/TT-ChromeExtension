@@ -50,46 +50,10 @@ unreadTracker.loadFromStorage().catch(() => {});
 
 titlePersistence.loadFromStorage().catch(() => {});
 
-// E2Eテスト用：タブ作成ログを保存する機能
-interface TabCreationLog {
-  tabId: number;
-  message: string;
-  timestamp: number;
-}
-const tabCreationLogs: TabCreationLog[] = [];
-const MAX_LOGS = 200;
-
-function logTabCreation(tabId: number, message: string): void {
-  tabCreationLogs.push({
-    tabId,
-    message,
-    timestamp: Date.now(),
-  });
-  if (tabCreationLogs.length > MAX_LOGS) {
-    tabCreationLogs.shift();
-  }
-}
-
-// globalThisに関数を登録してE2Eテストからアクセス可能にする
+// globalThisにtreeStateManagerを登録してE2Eテストからアクセス可能にする
 declare global {
-   
-  var getTabCreationLogs: (tabId?: number) => TabCreationLog[];
-   
-  var clearTabCreationLogs: () => void;
-   
   var treeStateManager: TreeStateManager;
 }
-
-globalThis.getTabCreationLogs = (tabId?: number): TabCreationLog[] => {
-  if (tabId !== undefined) {
-    return tabCreationLogs.filter(log => log.tabId === tabId);
-  }
-  return [...tabCreationLogs];
-};
-
-globalThis.clearTabCreationLogs = (): void => {
-  tabCreationLogs.length = 0;
-};
 
 globalThis.treeStateManager = treeStateManager;
 
@@ -221,41 +185,6 @@ async function prepareForReset(): Promise<void> {
 let dragState: { tabId: number; treeData: TabNode[]; sourceWindowId: number } | null =
   null;
 
-const DEFAULT_VIEW_ID = 'default';
-
-/**
- * 現在アクティブなビューIDを取得する
- * ストレージからtree_stateを読み込み、指定ウィンドウのcurrentViewIdを返す
- * windowIdが指定されていれば、currentViewByWindowIdから取得
- * 存在しない場合はデフォルトビューIDを返す
- *
- * @param windowId - ウィンドウID（指定されていればそのウィンドウのビュー、なければグローバル）
- */
-async function getCurrentViewId(windowId?: number): Promise<string> {
-  try {
-    const treeState = await storageService.get(STORAGE_KEYS.TREE_STATE);
-    if (!treeState) {
-      return DEFAULT_VIEW_ID;
-    }
-
-    // ウィンドウIDが指定されている場合、そのウィンドウ固有のビューを返す
-    if (windowId !== undefined && treeState.currentViewByWindowId) {
-      const windowViewId = treeState.currentViewByWindowId[windowId];
-      if (windowViewId) {
-        return windowViewId;
-      }
-    }
-
-    // フォールバック: グローバルなcurrentViewIdを返す
-    if (treeState.currentViewId) {
-      return treeState.currentViewId;
-    }
-    return DEFAULT_VIEW_ID;
-  } catch {
-    return DEFAULT_VIEW_ID;
-  }
-}
-
 const pendingTabParents = new Map<number, number>();
 
 const pendingDuplicateSources = new Map<number, { url: string; windowId: number; isSubtreeDuplicate: boolean }>();
@@ -367,7 +296,9 @@ export function registerWindowEventListeners(): void {
  * - Ctrl+T（新規タブ）
  */
 export function registerWebNavigationListeners(): void {
-  chrome.webNavigation.onCreatedNavigationTarget.addListener(handleCreatedNavigationTarget);
+  chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
+    handleCreatedNavigationTarget(details);
+  });
 }
 
 /**
@@ -395,14 +326,37 @@ export function registerMessageListener(): void {
 
 
 /**
+ * 自拡張機能のURLかどうかを判定
+ *
+ * chrome-extension://スキームで始まり、自分のextension IDを持つURLのみを判定する。
+ * これにより、一般ページの同名ファイルとは区別される。
+ */
+function isOwnExtensionUrl(url: string | undefined, path: string): boolean {
+  if (!url) return false;
+  const extensionBaseUrl = `chrome-extension://${chrome.runtime.id}`;
+  return url === `${extensionBaseUrl}/${path}` || url.startsWith(`${extensionBaseUrl}/${path}?`);
+}
+
+/**
  * グループタブ判定
  *
  * グループタブ（group.htmlを開くタブ）を検出する。
  * グループタブはhandleTabCreatedではスキップし、createGroupWithRealTabで処理される。
  */
 function isGroupTabUrl(url: string | undefined): boolean {
-  if (!url) return false;
-  return url.includes('/group.html');
+  return isOwnExtensionUrl(url, 'group.html');
+}
+
+/**
+ * サイドパネルタブ判定
+ *
+ * サイドパネル（sidepanel.htmlを開くタブ）を検出する。
+ * サイドパネルは本来UIパネルであり、タブツリーには追加しない。
+ * E2Eテストでは疑似サイドパネルとして通常タブで開かれるが、
+ * 本物のサイドパネルと同様にTreeStateには含めない。
+ */
+function isSidePanelUrl(url: string | undefined): boolean {
+  return isOwnExtensionUrl(url, 'sidepanel.html');
 }
 
 export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
@@ -410,7 +364,6 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     return;
   }
 
-  logTabCreation(tab.id, `START windowId=${tab.windowId} url=${tab.url?.substring(0, 60)}`);
 
   // 非同期操作の前にlastActiveTabByWindowをキャプチャ
   // onActivatedがmapを更新する前に値を取得する必要がある
@@ -418,22 +371,18 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     ? lastActiveTabByWindow.get(tab.windowId)
     : undefined;
 
-  // ブラウザ起動時の初期同期中は同期完了を待機
-  // これにより、Service Worker再起動後のタブ作成イベントが失われることを防ぐ
-  const syncCompleted = treeStateManager.isSyncCompleted();
-  logTabCreation(tab.id, `syncCompleted=${syncCompleted}`);
-  if (!syncCompleted) {
-    logTabCreation(tab.id, `waiting for sync...`);
-    const completed = await treeStateManager.waitForSyncComplete(15000);
-    logTabCreation(tab.id, `sync wait result=${completed}`);
+  // Service Worker初期化中は初期化完了を待機
+  // これにより、初期化完了前のタブ作成イベントが失われることを防ぐ
+  const initialized = treeStateManager.isInitialized();
+  if (!initialized) {
+    const completed = await treeStateManager.waitForInitialization(15000);
     if (!completed) {
-      throw new Error(`Sync did not complete within timeout for tab ${tab.id}`);
+      throw new Error(`Initialization did not complete within timeout for tab ${tab.id}`);
     }
   }
 
   const existingNode = treeStateManager.getNodeByTabId(tab.id);
   if (existingNode) {
-    logTabCreation(tab.id, `SKIP - already exists in tree`);
     return;
   }
 
@@ -457,10 +406,101 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     return;
   }
 
+  if (isSidePanelUrl(tab.url) || isSidePanelUrl(tab.pendingUrl)) {
+    return;
+  }
+
+  // URLが空またはabout:blankの場合、タブ情報を再取得して判定
+  // タブ作成直後はURLがまだ設定されていない場合がある
+  // context.newPage()でタブが作成された直後はpendingUrl=about:blankになる
+  const isUrlIndeterminate = (!tab.url && !tab.pendingUrl) ||
+    ((!tab.url || tab.url === 'about:blank') && (!tab.pendingUrl || tab.pendingUrl === 'about:blank'));
+  if (isUrlIndeterminate) {
+    // 実際のURLが設定されるまでポーリング（最大500ms）
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      try {
+        const refreshedTab = await chrome.tabs.get(tab.id);
+        // タブ情報が取得できない場合は続行（ユニットテストのモックはnullを返す）
+        if (!refreshedTab) {
+          break;
+        }
+        const actualUrl = refreshedTab.url || refreshedTab.pendingUrl || '';
+        // about:blank以外のURLが設定された場合
+        if (actualUrl && actualUrl !== 'about:blank') {
+          if (isSidePanelUrl(refreshedTab.url) || isSidePanelUrl(refreshedTab.pendingUrl)) {
+            return;
+          }
+          if (isGroupTabUrl(refreshedTab.url) || isGroupTabUrl(refreshedTab.pendingUrl)) {
+            return;
+          }
+          break;
+        }
+      } catch {
+        // タブが閉じられた場合はツリーに追加しない
+        return;
+      }
+    }
+  }
+
   // スナップショット復元中はスキップ（復元処理が直接ツリー状態を更新する）
   if (isRestoringSnapshot || restoringTabIds.has(tab.id)) {
     restoringTabIds.delete(tab.id);
     return;
+  }
+
+  // ピン留めタブはTreeStateに追加しない
+  // ピン留めタブはpinnedTabIdsで別途管理される
+  // ウィンドウが閉じられた時に移動されたピン留めタブはdetachedPinnedTabsByWindowで追跡されている
+  const tabIdForCheck = tab.id;
+  const isDetachedPinnedTab = Array.from(detachedPinnedTabsByWindow.values()).some(
+    tabIds => tabIds.has(tabIdForCheck)
+  );
+  if (isDetachedPinnedTab) {
+    return;
+  }
+
+  // ピン留めタブのチェック
+  try {
+    const currentTab = await chrome.tabs.get(tab.id);
+    if (currentTab.pinned) {
+      if (currentTab.windowId !== undefined) {
+        // 既にピン留めタブとして存在する場合は追加しない（Chrome再起動時の重複防止）
+        if (!treeStateManager.isPinnedTabInAnyView(tab.id, currentTab.windowId)) {
+          treeStateManager.updatePinnedStateFromChromeEvent(tab.id, currentTab.windowId, true);
+        }
+      }
+      return;
+    }
+  } catch {
+    // タブが既に閉じられている場合は続行
+  }
+
+  // 移動されたピン留めタブの検出
+  // ウィンドウが閉じられる時、Chromeはピン留めタブをアンピンして別のウィンドウに移動する
+  // この場合、onCreatedイベントが発火するが、TreeStateに追加すべきではない
+  if (tab.windowId !== undefined && !tab.openerTabId) {
+    const allWindowStates = treeStateManager.getAllWindowStates();
+    for (const windowState of allWindowStates) {
+      if (windowState.windowId === tab.windowId) continue;
+      const activeViewState = windowState.views[windowState.activeViewIndex];
+      if (!activeViewState || activeViewState.pinnedTabIds.length === 0) continue;
+
+      // このウィンドウがChromeにまだ存在するか確認
+      try {
+        await chrome.windows.get(windowState.windowId);
+        // ウィンドウは存在する
+      } catch {
+        // ウィンドウが存在しない = 閉じられている途中
+        // このウィンドウにピン留めタブがあった場合、それが移動された可能性がある
+        try {
+          await chrome.tabs.remove(tab.id);
+        } catch {
+          // タブが既に閉じられている場合は無視
+        }
+        return;
+      }
+    }
   }
 
   try {
@@ -502,7 +542,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       newTabPosition = effectiveSettings.newTabPositionManual;
     }
 
-    let parentId: string | null = null;
+    let parentTabId: number | null = null;
 
     let isDuplicatedTab = false;
     let duplicateSourceTabId: number | null = null;
@@ -523,46 +563,46 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     const duplicateTabPosition = effectiveSettings.duplicateTabPosition;
 
-    let insertAfterNodeId: string | undefined;
+    let insertAfterTabId: number | undefined;
     if (isDuplicatedTab && duplicateSourceTabId !== null) {
       if (duplicateTabPosition === 'nextSibling') {
         const openerResult = treeStateManager.getNodeByTabId(duplicateSourceTabId);
         if (openerResult) {
-          parentId = openerResult.node.parentId;
-          insertAfterNodeId = openerResult.node.id;
+          parentTabId = treeStateManager.getParentTabId(duplicateSourceTabId);
+          insertAfterTabId = duplicateSourceTabId;
         }
       }
-      // 'end'の場合はparentIdとinsertAfterNodeIdを設定しない（ツリーの最後に追加される）
+      // 'end'の場合はparentTabIdとinsertAfterTabIdを設定しない（ツリーの最後に追加される）
     } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'child') {
       const parentResult = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (parentResult) {
-        parentId = parentResult.node.id;
+        parentTabId = effectiveOpenerTabId;
       }
     } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'nextSibling') {
       const openerResult = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (openerResult) {
-        parentId = openerResult.node.parentId;
-        insertAfterNodeId = openerResult.node.id;
+        parentTabId = treeStateManager.getParentTabId(effectiveOpenerTabId);
+        insertAfterTabId = effectiveOpenerTabId;
       }
     } else if (isLinkClick && effectiveOpenerTabId && newTabPosition === 'lastSibling') {
       const openerResult = treeStateManager.getNodeByTabId(effectiveOpenerTabId);
       if (openerResult) {
-        parentId = openerResult.node.parentId;
-        insertAfterNodeId = treeStateManager.getLastSiblingNodeId(effectiveOpenerTabId);
+        parentTabId = treeStateManager.getParentTabId(effectiveOpenerTabId);
+        insertAfterTabId = treeStateManager.getLastSiblingTabId(effectiveOpenerTabId);
       }
     } else if (!isLinkClick && pendingOpenerTabId) {
       // pendingOpenerTabIdが明示的に設定されている場合は、それを親として使用
       // (テストやAPIからのプログラム的なタブ作成でopenerTabIdが指定された場合)
       const parentResult = treeStateManager.getNodeByTabId(pendingOpenerTabId);
       if (parentResult) {
-        parentId = parentResult.node.id;
+        parentTabId = pendingOpenerTabId;
       }
     } else if (!isLinkClick && newTabPosition === 'child') {
       // 手動で開かれたタブで'child'設定の場合、関数先頭でキャプチャした最後のアクティブタブを親とする
       if (capturedLastActiveTabId !== undefined && capturedLastActiveTabId !== tab.id) {
         const lastActiveResult = treeStateManager.getNodeByTabId(capturedLastActiveTabId);
         if (lastActiveResult) {
-          parentId = lastActiveResult.node.id;
+          parentTabId = capturedLastActiveTabId;
         }
       }
     } else if (!isLinkClick && newTabPosition === 'nextSibling') {
@@ -570,8 +610,8 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       if (capturedLastActiveTabId !== undefined && capturedLastActiveTabId !== tab.id) {
         const lastActiveResult = treeStateManager.getNodeByTabId(capturedLastActiveTabId);
         if (lastActiveResult) {
-          parentId = lastActiveResult.node.parentId;
-          insertAfterNodeId = lastActiveResult.node.id;
+          parentTabId = treeStateManager.getParentTabId(capturedLastActiveTabId);
+          insertAfterTabId = capturedLastActiveTabId;
         }
       }
     } else if (!isLinkClick && newTabPosition === 'lastSibling') {
@@ -579,8 +619,8 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       if (capturedLastActiveTabId !== undefined && capturedLastActiveTabId !== tab.id) {
         const lastActiveResult = treeStateManager.getNodeByTabId(capturedLastActiveTabId);
         if (lastActiveResult) {
-          parentId = lastActiveResult.node.parentId;
-          insertAfterNodeId = treeStateManager.getLastSiblingNodeId(capturedLastActiveTabId);
+          parentTabId = treeStateManager.getParentTabId(capturedLastActiveTabId);
+          insertAfterTabId = treeStateManager.getLastSiblingTabId(capturedLastActiveTabId);
         }
       }
     }
@@ -589,29 +629,18 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       pendingTabParents.delete(tab.id);
     }
 
-    // 子タブは親タブのビューに追加（ビューを跨いだ親子関係を防ぐ）
-    let viewId: string;
-    if (parentId) {
-      const parentResult = treeStateManager.getNodeById(parentId);
-      viewId = parentResult?.viewId ?? await getCurrentViewId(tab.windowId);
-    } else {
-      viewId = await getCurrentViewId(tab.windowId);
-    }
-
     // 通常複製（サブツリー複製ではない）の場合、タブの移動はuseMenuActionsで既に行われている
     const isNormalDuplicate = isDuplicatedTab && !isSubtreeDuplicate;
 
-    logTabCreation(tab.id, `calling addTab viewId=${viewId} parentId=${parentId}`);
-    await treeStateManager.addTab(tab, parentId, viewId, insertAfterNodeId);
-    logTabCreation(tab.id, `addTab completed`);
+    await treeStateManager.addTab(tab, parentTabId, tab.windowId!, undefined, insertAfterTabId);
 
     // 親ノードを自動展開（新しい子タブを見えるようにするため）
     // ただし複製タブの場合はスキップ:
     // - 単一タブ複製: 元のタブが見えている=親は既に展開済み
     // - サブツリー複製: handleDuplicateSubtreeが後で親子関係を修正する
     //   この時点で展開すると、元のタブの折りたたみ状態が壊れる
-    if (parentId && !isDuplicatedTab) {
-      await treeStateManager.expandNode(parentId);
+    if (parentTabId && !isDuplicatedTab) {
+      await treeStateManager.expandNode(parentTabId);
     }
 
     if (!tab.active && tab.id) {
@@ -621,18 +650,11 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     // ツリー状態をChromeタブに同期
     // 通常複製の場合はuseMenuActionsで既に正しい位置に移動済みなのでスキップ
     if (!isNormalDuplicate) {
-      logTabCreation(tab.id, `calling syncTreeStateToChromeTabs`);
       await treeStateManager.syncTreeStateToChromeTabs();
-      logTabCreation(tab.id, `sync completed`);
     }
 
-    logTabCreation(tab.id, `calling notifyStateChanged`);
     treeStateManager.notifyStateChanged();
-    logTabCreation(tab.id, `DONE`);
   } catch (error) {
-    if (tab.id) {
-      logTabCreation(tab.id, `ERROR: ${error instanceof Error ? error.message : String(error)}`);
-    }
     console.error('[handleTabCreated] Error:', error);
   }
 }
@@ -645,7 +667,6 @@ export async function handleTabRemoved(
 
   // ウィンドウが閉じられる場合はツリー状態を保持する
   // これにより、ブラウザ再起動時にtreeStructureからビュー情報を含む状態を復元できる
-  // ウィンドウを閉じただけの場合はsyncWithChromeTabsで古いノードがcleanupStaleNodesでクリーンアップされる
   if (isWindowClosing) {
     // ウィンドウ閉鎖時はunreadとtitleのみクリア（ツリー状態は保持）
     if (unreadTracker.isUnread(tabId)) {
@@ -681,13 +702,30 @@ export async function handleTabMoved(
   tabId: number,
   moveInfo: chrome.tabs.OnMovedInfo,
 ): Promise<void> {
-  void tabId;
+  // ピン留め操作時のスキップ判定
+  // ピン留め操作時はonMoved→onUpdatedの順でイベントが発火し、
+  // onMovedの時点ではTreeStateにピン留め状態が反映されていないため、
+  // syncTreeStateToChrobeTabsがタブをunpinしてしまう
+  // ただし、既にTreeStateでピン留めされているタブの移動は通常通り同期する
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.pinned && tab.windowId !== undefined) {
+      // TreeStateでピン留めされているか確認
+      const isPinnedInTreeState = treeStateManager.isPinnedTabInAnyView(tabId, tab.windowId);
+      if (!isPinnedInTreeState) {
+        // ピン留め操作中（TreeStateにまだ反映されていない）なのでスキップ
+        treeStateManager.notifyStateChanged();
+        return;
+      }
+      // 既にピン留めされているタブの移動は下で通常通り同期される
+    }
+  } catch {
+    // タブが存在しない場合は続行
+  }
 
   // ツリービューが常に正。Chromeのタブ順序変更はツリーに反映せず、
   // ツリー状態をChromeに再同期して元に戻す
-  // ただしピン留めタブの順序変更はChromeを正として受け入れる
   try {
-    await treeStateManager.syncPinnedOrderFromChrome(moveInfo.windowId);
     await treeStateManager.syncTreeStateToChromeTabs(moveInfo.windowId);
   } catch {
     // 同期失敗は無視
@@ -793,26 +831,34 @@ async function handleTabAttached(
   tabId: number,
   attachInfo: chrome.tabs.OnAttachedInfo,
 ): Promise<void> {
-  // 親タブが同じウィンドウに存在するか確認
-  const parentTabId = await treeStateManager.getParentTabId(tabId);
-  let parentInSameWindow = false;
+  // ピン留めタブ（detachされたもの）は通常のタブ移動処理をスキップ
+  // handleWindowRemovedで閉じられるか、ユーザーによる移動の場合は除外処理される
+  const isDetachedPinnedTab = Array.from(detachedPinnedTabsByWindow.values()).some(
+    tabIds => tabIds.has(tabId)
+  );
 
-  if (parentTabId !== null) {
-    try {
-      const parentTab = await chrome.tabs.get(parentTabId);
-      parentInSameWindow = parentTab.windowId === attachInfo.newWindowId;
-    } catch {
-      // 親タブが存在しない場合は無視
+  if (!isDetachedPinnedTab) {
+    // 親タブが同じウィンドウに存在するか確認
+    const parentTabId = await treeStateManager.getParentTabId(tabId);
+    let parentInSameWindow = false;
+
+    if (parentTabId !== null) {
+      try {
+        const parentTab = await chrome.tabs.get(parentTabId);
+        parentInSameWindow = parentTab.windowId === attachInfo.newWindowId;
+      } catch {
+        // 親タブが存在しない場合は無視
+      }
     }
-  }
 
-  // 親タブが同じウィンドウにない場合のみ、ルートノードの最後尾に移動
-  if (!parentInSameWindow) {
-    await treeStateManager.moveTabToRootEnd(tabId);
-  }
+    // 親タブが同じウィンドウにない場合のみ、新しいウィンドウのルートノードの最後尾に移動
+    if (!parentInSameWindow) {
+      await treeStateManager.moveTabToRootEnd(tabId, attachInfo.newWindowId);
+    }
 
-  // ツリービューが常に正。ツリー状態をChromeに再同期
-  await treeStateManager.syncTreeStateToChromeTabs(attachInfo.newWindowId);
+    // ツリービューが常に正。ツリー状態をChromeに再同期
+    await treeStateManager.syncTreeStateToChromeTabs(attachInfo.newWindowId);
+  }
 
   // タブがattachされた場合、通常のタブ移動（ウィンドウが閉じられない場合）は
   // 追跡リストからクリアしない。
@@ -856,23 +902,9 @@ async function handleTabReplaced(
   treeStateManager.notifyStateChanged();
 }
 
-async function handleWindowCreated(window: chrome.windows.Window): Promise<void> {
-  // スナップショット復元中はsyncWithChromeTabsをスキップ
-  // handleRestoreSnapshotが直接ツリー状態を管理するため
-  if (isRestoringSnapshot) {
-    return;
-  }
-
-  if (window.id === undefined) {
-    return;
-  }
-
-  const rawSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
-  const syncSettings = {
-    newTabPositionManual: rawSettings?.newTabPositionManual ?? 'end' as const,
-  };
-  await treeStateManager.syncWithChromeTabs(syncSettings);
-  treeStateManager.notifyStateChanged();
+async function handleWindowCreated(_window: chrome.windows.Window): Promise<void> {
+  // ウィンドウ作成時は特別な処理不要
+  // タブが追加されるときにgetOrCreateWindowStateでウィンドウも自動作成される
 }
 
 async function handleWindowRemoved(windowId: number): Promise<void> {
@@ -893,22 +925,13 @@ async function handleWindowRemoved(windowId: number): Promise<void> {
       detachedPinnedTabsByWindow.delete(windowId);
     }
 
-    // currentViewByWindowIdからこのウィンドウのエントリを削除
-    try {
-      const treeState = await storageService.get(STORAGE_KEYS.TREE_STATE);
-      if (treeState?.currentViewByWindowId && treeState.currentViewByWindowId[windowId]) {
-        const newCurrentViewByWindowId = { ...treeState.currentViewByWindowId };
-        delete newCurrentViewByWindowId[windowId];
-        await storageService.set(STORAGE_KEYS.TREE_STATE, {
-          ...treeState,
-          currentViewByWindowId: Object.keys(newCurrentViewByWindowId).length > 0
-            ? newCurrentViewByWindowId
-            : undefined,
-        });
-      }
-    } catch {
-      // ストレージ更新失敗は無視
-    }
+    // ウィンドウ状態を削除（pinnedTabIdsも削除される）
+    await treeStateManager.removeWindow(windowId);
+
+    // TreeStateに存在しないタブを閉じる
+    // ウィンドウクローズ時にChromeが自動的に移動したピン留めタブは
+    // TreeStateには存在しないため、ここで閉じられる
+    await treeStateManager.syncTreeStateToChromeTabs();
 
     treeStateManager.notifyStateChanged();
   } catch {
@@ -993,7 +1016,7 @@ function handleMessage(
         break;
 
       case 'CREATE_GROUP':
-        trackHandler(() => handleCreateGroup(message.payload.tabIds, message.payload.groupName, sendResponse));
+        trackHandler(() => handleCreateGroup(message.payload.tabIds, message.payload.groupName, message.payload.contextMenuTabId, sendResponse));
         break;
 
       case 'DISSOLVE_GROUP':
@@ -1001,7 +1024,7 @@ function handleMessage(
         break;
 
       case 'UPDATE_GROUP_NAME':
-        trackHandler(() => handleUpdateGroupName(message.payload.nodeId, message.payload.name, sendResponse));
+        trackHandler(() => handleUpdateGroupName(message.payload.tabId, message.payload.name, sendResponse));
         break;
 
       case 'REGISTER_DUPLICATE_SOURCE':
@@ -1062,46 +1085,47 @@ function handleMessage(
 
       case 'MOVE_NODE':
         trackHandler(() => handleMoveNode(
-          message.payload.nodeId,
-          message.payload.targetParentId,
-          message.payload.viewId,
-          message.payload.selectedNodeIds,
+          message.payload.tabId,
+          message.payload.targetParentTabId,
+          message.payload.windowId,
+          message.payload.selectedTabIds,
           sendResponse
         ));
         break;
 
       case 'MOVE_NODE_AS_SIBLING':
         trackHandler(() => handleMoveNodeAsSibling(
-          message.payload.nodeId,
-          message.payload.aboveNodeId,
-          message.payload.belowNodeId,
-          message.payload.viewId,
-          message.payload.selectedNodeIds,
+          message.payload.tabId,
+          message.payload.aboveTabId,
+          message.payload.belowTabId,
+          message.payload.windowId,
+          message.payload.selectedTabIds,
           sendResponse
         ));
         break;
 
       case 'SWITCH_VIEW':
         trackHandler(() => handleSwitchView(
-          message.payload.viewId,
+          message.payload.viewIndex,
           message.payload.windowId,
-          message.payload.previousViewId,
+          message.payload.previousViewIndex,
           message.payload.activeTabId,
           sendResponse
         ));
         break;
 
       case 'CREATE_VIEW':
-        trackHandler(() => handleCreateView(sendResponse));
+        trackHandler(() => handleCreateView(message.payload.windowId, sendResponse));
         break;
 
       case 'DELETE_VIEW':
-        trackHandler(() => handleDeleteView(message.payload.viewId, sendResponse));
+        trackHandler(() => handleDeleteView(message.payload.windowId, message.payload.viewIndex, sendResponse));
         break;
 
       case 'UPDATE_VIEW':
         trackHandler(() => handleUpdateView(
-          message.payload.viewId,
+          message.payload.windowId,
+          message.payload.viewIndex,
           message.payload.updates,
           sendResponse
         ));
@@ -1109,15 +1133,16 @@ function handleMessage(
 
       case 'TOGGLE_NODE_EXPAND':
         trackHandler(() => handleToggleNodeExpand(
-          message.payload.nodeId,
-          message.payload.viewId,
+          message.payload.tabId,
+          message.payload.windowId,
           sendResponse
         ));
         break;
 
       case 'MOVE_TABS_TO_VIEW':
         trackHandler(() => handleMoveTabsToView(
-          message.payload.targetViewId,
+          message.payload.windowId,
+          message.payload.targetViewIndex,
           message.payload.tabIds,
           sendResponse
         ));
@@ -1125,25 +1150,25 @@ function handleMessage(
 
       case 'DELETE_TREE_GROUP':
         trackHandler(() => handleDeleteTreeGroup(
-          message.payload.nodeId,
-          message.payload.viewId,
+          message.payload.tabId,
+          message.payload.windowId,
           sendResponse
         ));
         break;
 
       case 'ADD_TAB_TO_TREE_GROUP':
         trackHandler(() => handleAddTabToTreeGroup(
-          message.payload.nodeId,
-          message.payload.targetGroupNodeId,
-          message.payload.viewId,
+          message.payload.tabId,
+          message.payload.targetGroupTabId,
+          message.payload.windowId,
           sendResponse
         ));
         break;
 
       case 'REMOVE_TAB_FROM_TREE_GROUP':
         trackHandler(() => handleRemoveTabFromTreeGroup(
-          message.payload.nodeId,
-          message.payload.viewId,
+          message.payload.tabId,
+          message.payload.windowId,
           sendResponse
         ));
         break;
@@ -1185,9 +1210,8 @@ async function handleGetState(
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    const tree = treeStateManager.getTree(DEFAULT_VIEW_ID);
-
-    sendResponse({ success: true, data: { tree } });
+    const state = treeStateManager.toJSON();
+    sendResponse({ success: true, data: state });
   } catch (error) {
     sendResponse({
       success: false,
@@ -1203,7 +1227,11 @@ async function handleUpdateTree(
   try {
     const { nodeId, newParentId, index } = payload;
 
-    await treeStateManager.moveNode(nodeId, newParentId, index);
+    // nodeIdはtabId（文字列として渡される）
+    const tabId = parseInt(nodeId, 10);
+    const newParentTabId = newParentId !== null ? parseInt(newParentId, 10) : null;
+
+    await treeStateManager.moveNode(tabId, newParentTabId, index);
 
     treeStateManager.notifyStateChanged();
 
@@ -1461,12 +1489,12 @@ async function handleSyncTabs(
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    // ユーザー設定を取得してsyncWithChromeTabsに渡す
+    // ユーザー設定を取得してrestoreStateAfterRestartに渡す
     const rawSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
     const syncSettings = {
       newTabPositionManual: rawSettings?.newTabPositionManual ?? 'end' as const,
     };
-    await treeStateManager.syncWithChromeTabs(syncSettings);
+    await treeStateManager.restoreStateAfterRestart(syncSettings);
     sendResponse({ success: true, data: null });
   } catch (error) {
     sendResponse({
@@ -1510,6 +1538,7 @@ async function handleRefreshTreeStructure(
 async function handleCreateGroup(
   tabIds: number[],
   groupName: string | undefined,
+  contextMenuTabId: number | undefined,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
@@ -1521,12 +1550,14 @@ async function handleCreateGroup(
       return;
     }
 
+    // コンテキストメニューを開いたタブの情報を取得
+    const targetTabId = contextMenuTabId ?? tabIds[0];
     let windowId: number | undefined;
-    let firstTabIndex: number | undefined;
+    let targetTabIndex: number | undefined;
     try {
-      const firstTab = await chrome.tabs.get(tabIds[0]);
-      windowId = firstTab.windowId;
-      firstTabIndex = firstTab.index;
+      const targetTab = await chrome.tabs.get(targetTabId);
+      windowId = targetTab.windowId;
+      targetTabIndex = targetTab.index;
     } catch {
       // タブ情報取得失敗は無視
     }
@@ -1538,8 +1569,8 @@ async function handleCreateGroup(
     if (windowId !== undefined) {
       createOptions.windowId = windowId;
     }
-    if (firstTabIndex !== undefined) {
-      createOptions.index = firstTabIndex;
+    if (targetTabIndex !== undefined) {
+      createOptions.index = targetTabIndex;
     }
 
     // handleTabCreatedとのレースコンディションを防止
@@ -1561,13 +1592,13 @@ async function handleCreateGroup(
     const groupPageUrl = `chrome-extension://${chrome.runtime.id}/group.html`;
     await chrome.tabs.update(groupTab.id, { url: groupPageUrl });
 
-    const groupNodeId = await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, groupName ?? 'グループ');
+    await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, groupName ?? 'グループ', windowId!, targetTabId);
 
     await chrome.tabs.update(groupTab.id, { active: true });
 
     treeStateManager.notifyStateChanged();
 
-    sendResponse({ success: true, data: { groupId: groupNodeId, groupTabId: groupTab.id } });
+    sendResponse({ success: true, data: { groupTabId: groupTab.id } });
   } catch (error) {
     sendResponse({
       success: false,
@@ -1610,12 +1641,12 @@ async function handleDissolveGroup(
  * グループ名更新
  */
 async function handleUpdateGroupName(
-  nodeId: string,
+  tabId: number,
   name: string,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    const updated = await treeStateManager.updateGroupName(nodeId, name || 'グループ');
+    const updated = await treeStateManager.updateGroupName(tabId, name || 'グループ');
     if (!updated) {
       sendResponse({
         success: false,
@@ -1679,7 +1710,7 @@ async function handleDuplicateSubtree(
       return;
     }
 
-    const tabIdToNewTabId = new Map<number, number>();
+    const oldTabIdToNewTabId = new Map<number, number>();
 
     for (const node of subtree) {
       const sourceTab = await chrome.tabs.get(node.tabId);
@@ -1690,77 +1721,53 @@ async function handleDuplicateSubtree(
       });
       const duplicatedTab = await chrome.tabs.duplicate(node.tabId);
       if (duplicatedTab?.id) {
-        tabIdToNewTabId.set(node.tabId, duplicatedTab.id);
+        oldTabIdToNewTabId.set(node.tabId, duplicatedTab.id);
       }
-      // pendingDuplicateSourcesの削除はhandleTabCreated内で行われる
-      // ここで削除するとhandleTabCreatedが非同期で実行される前に
-      // エントリが削除されてしまうレースコンディションが発生する
     }
 
     // すべての複製タブがtree_stateに追加されるまでポーリングで待機
-    // 固定時間待機ではなく、条件が満たされたら即座に次に進む
-    const newTabIds = Array.from(tabIdToNewTabId.values());
-    const maxIterations = 100; // 最大5秒 (50ms * 100)
+    const newTabIds = Array.from(oldTabIdToNewTabId.values());
+    const maxIterations = 100;
     for (let i = 0; i < maxIterations; i++) {
-      const allTabsInTree = newTabIds.every(tabId =>
-        treeStateManager.getNodeByTabId(tabId) !== null
+      const allTabsInTree = newTabIds.every(tid =>
+        treeStateManager.getNodeByTabId(tid) !== null
       );
       if (allTabsInTree) break;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     const rootNode = subtree[0];
-    const rootNewTabId = tabIdToNewTabId.get(rootNode.tabId);
+    const rootNewTabId = oldTabIdToNewTabId.get(rootNode.tabId);
     const rootNewNodeResult = rootNewTabId ? treeStateManager.getNodeByTabId(rootNewTabId) : null;
     const originalRootNodeResult = treeStateManager.getNodeByTabId(rootNode.tabId);
 
     if (rootNewNodeResult && originalRootNodeResult) {
       // ルートの複製タブを元のタブの兄弟として配置
-      if (originalRootNodeResult.node.parentId) {
-        // 元のタブが親を持つ場合、複製タブも同じ親の子として配置
-        // 元のタブの直後に配置するため、親の子リスト内でのインデックスを取得
-        const parentResult = treeStateManager.getNodeById(originalRootNodeResult.node.parentId);
-        let insertIndex = -1;
-        if (parentResult) {
-          const originalIndex = parentResult.node.children.findIndex(
-            (child) => child.id === originalRootNodeResult.node.id
-          );
-          if (originalIndex !== -1) {
-            // 元のノードの直後に挿入
-            insertIndex = originalIndex + 1;
-          }
-        }
-        await treeStateManager.moveNode(rootNewNodeResult.node.id, originalRootNodeResult.node.parentId, insertIndex);
+      const originalParentTabId = treeStateManager.getParentTabId(rootNode.tabId);
+      if (originalParentTabId !== null) {
+        // 元のタブが親を持つ場合、複製タブも同じ親の子として配置（元のタブの直後）
+        const originalSiblingIndex = treeStateManager.getSiblingIndex(rootNode.tabId);
+        await treeStateManager.moveNode(rootNewTabId!, originalParentTabId, originalSiblingIndex + 1);
       }
 
       // 元のルートノードの展開状態を複製ノードにコピー
-      // 折りたたまれたタブを複製した場合、複製も折りたたまれた状態になるべき
       if (!originalRootNodeResult.node.isExpanded) {
-        // 複製ノードはデフォルトでisExpanded: trueで作成されるので、
-        // 元が折りたたまれている場合のみトグルする
-        await treeStateManager.toggleExpand(rootNewNodeResult.node.id);
+        await treeStateManager.toggleExpand(rootNewTabId!);
       }
 
       // 子孫タブを複製元のツリー構造に合わせて配置
       for (let i = 1; i < subtree.length; i++) {
         const originalNode = subtree[i];
-        const newTabId = tabIdToNewTabId.get(originalNode.tabId);
+        const newTabId = oldTabIdToNewTabId.get(originalNode.tabId);
         if (!newTabId) continue;
 
-        const newNodeResult = treeStateManager.getNodeByTabId(newTabId);
-        if (!newNodeResult) continue;
-
-        const originalParentTabId = originalNode.parentId
-          ? treeStateManager.getNodeById(originalNode.parentId)?.node.tabId
-          : null;
-
-        if (originalParentTabId) {
-          const newParentTabId = tabIdToNewTabId.get(originalParentTabId);
+        // 元のノードの親tabIdを取得
+        const originalParentTabId2 = treeStateManager.getParentTabId(originalNode.tabId);
+        if (originalParentTabId2 !== null) {
+          // 元の親に対応する新しい親タブを見つける
+          const newParentTabId = oldTabIdToNewTabId.get(originalParentTabId2);
           if (newParentTabId) {
-            const newParentNodeResult = treeStateManager.getNodeByTabId(newParentTabId);
-            if (newParentNodeResult) {
-              await treeStateManager.moveNode(newNodeResult.node.id, newParentNodeResult.node.id, -1);
-            }
+            await treeStateManager.moveNode(newTabId, newParentTabId, -1);
           }
         }
       }
@@ -1941,7 +1948,8 @@ async function handleRestoreSnapshot(
       snapshotViews,
       indexToNewTabId,
       indexToSnapshot,
-      closeCurrentTabs
+      closeCurrentTabs,
+      windowIndexToNewWindowId
     );
 
     // 既存タブを閉じる（closeCurrentTabsがtrueの場合）
@@ -2223,14 +2231,14 @@ async function handleReorderPinnedTab(
  * ノードを指定した親の子として移動（D&Dの子としてドロップ）
  */
 async function handleMoveNode(
-  nodeId: string,
-  targetParentId: string,
-  viewId: string,
-  selectedNodeIds: string[],
+  tabId: number,
+  targetParentTabId: number | null,
+  _windowId: number,
+  selectedTabIds: number[],
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.moveNodeToParent(nodeId, targetParentId, viewId, selectedNodeIds);
+    await treeStateManager.moveNodeToParent(tabId, targetParentTabId, selectedTabIds);
     await treeStateManager.syncTreeStateToChromeTabs();
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
@@ -2246,15 +2254,15 @@ async function handleMoveNode(
  * ノードを兄弟として指定位置に挿入（D&DのGapドロップ）
  */
 async function handleMoveNodeAsSibling(
-  nodeId: string,
-  aboveNodeId: string | undefined,
-  belowNodeId: string | undefined,
-  viewId: string,
-  selectedNodeIds: string[],
+  tabId: number,
+  aboveTabId: number | undefined,
+  belowTabId: number | undefined,
+  _windowId: number,
+  selectedTabIds: number[],
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.moveNodeAsSibling(nodeId, aboveNodeId, belowNodeId, viewId, selectedNodeIds);
+    await treeStateManager.moveNodeAsSibling(tabId, aboveTabId, belowTabId, selectedTabIds);
     await treeStateManager.syncTreeStateToChromeTabs();
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
@@ -2270,14 +2278,15 @@ async function handleMoveNodeAsSibling(
  * ビューを切り替え
  */
 async function handleSwitchView(
-  viewId: string,
+  viewIndex: number,
   windowId: number,
-  previousViewId: string,
-  activeTabId: number | null,
+  _previousViewIndex: number,
+  _activeTabId: number | null,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.switchView(viewId, windowId, previousViewId, activeTabId);
+    await treeStateManager.switchView(windowId, viewIndex);
+    await treeStateManager.syncTreeStateToChromeTabs(windowId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2292,12 +2301,13 @@ async function handleSwitchView(
  * ビューを作成
  */
 async function handleCreateView(
+  windowId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    const newViewId = await treeStateManager.createViewWithAutoColor();
+    const newViewIndex = await treeStateManager.createViewWithAutoColor(windowId);
     treeStateManager.notifyStateChanged();
-    sendResponse({ success: true, data: { viewId: newViewId } });
+    sendResponse({ success: true, data: { viewIndex: newViewIndex } });
   } catch (error) {
     sendResponse({
       success: false,
@@ -2310,14 +2320,12 @@ async function handleCreateView(
  * ビューを削除
  */
 async function handleDeleteView(
-  viewId: string,
+  windowId: number,
+  viewIndex: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    const viewOrder = treeStateManager.getViewOrder();
-    const viewIndex = viewOrder.indexOf(viewId);
-    const targetViewId = viewIndex > 0 ? viewOrder[viewIndex - 1] : 'default';
-    await treeStateManager.deleteView(viewId, targetViewId);
+    await treeStateManager.deleteView(windowId, viewIndex);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2332,12 +2340,13 @@ async function handleDeleteView(
  * ビューを更新
  */
 async function handleUpdateView(
-  viewId: string,
+  windowId: number,
+  viewIndex: number,
   updates: { name?: string; color?: string; icon?: string },
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.updateView(viewId, updates);
+    await treeStateManager.updateView(windowId, viewIndex, updates);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2352,12 +2361,12 @@ async function handleUpdateView(
  * ノードの展開状態を切り替え
  */
 async function handleToggleNodeExpand(
-  nodeId: string,
-  _viewId: string,
+  tabId: number,
+  _windowId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.toggleExpand(nodeId);
+    await treeStateManager.toggleExpand(tabId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2372,12 +2381,14 @@ async function handleToggleNodeExpand(
  * タブを別のビューに移動
  */
 async function handleMoveTabsToView(
-  targetViewId: string,
+  windowId: number,
+  targetViewIndex: number,
   tabIds: number[],
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.moveTabsToViewInternal(targetViewId, tabIds);
+    await treeStateManager.moveTabsToViewInternal(tabIds, windowId, targetViewIndex);
+    await treeStateManager.syncTreeStateToChromeTabs(windowId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2392,12 +2403,12 @@ async function handleMoveTabsToView(
  * ツリーグループを削除
  */
 async function handleDeleteTreeGroup(
-  nodeId: string,
-  viewId: string,
+  tabId: number,
+  _windowId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.deleteTreeGroup(nodeId, viewId);
+    await treeStateManager.deleteTreeGroup(tabId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2412,13 +2423,13 @@ async function handleDeleteTreeGroup(
  * タブをツリーグループに追加
  */
 async function handleAddTabToTreeGroup(
-  nodeId: string,
-  targetGroupNodeId: string,
-  viewId: string,
+  tabId: number,
+  targetGroupTabId: number,
+  _windowId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.addTabToTreeGroup(nodeId, targetGroupNodeId, viewId);
+    await treeStateManager.addTabToTreeGroup(tabId, targetGroupTabId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {
@@ -2433,12 +2444,12 @@ async function handleAddTabToTreeGroup(
  * タブをツリーグループから削除
  */
 async function handleRemoveTabFromTreeGroup(
-  nodeId: string,
-  viewId: string,
+  tabId: number,
+  _windowId: number,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.removeTabFromTreeGroup(nodeId, viewId);
+    await treeStateManager.removeTabFromTreeGroup(tabId);
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });
   } catch (error) {

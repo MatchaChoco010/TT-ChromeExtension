@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ThemeProvider, useTheme } from '@/sidepanel/providers/ThemeProvider';
 import SettingsPanel from './SettingsPanel';
 import TreeNode from './TreeNode';
-import type { UserSettings, TabNode, TabInfo, StorageChanges } from '@/types';
+import type { UserSettings, UITabNode, TabInfo, StorageChanges } from '@/types';
 import type { StorageChangeListener } from '@/test/test-types';
 
 describe('UI/UXカスタマイズのインテグレーションテスト', () => {
@@ -85,12 +85,10 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
       const TestSidePanelWithTabs = () => {
         const { settings, updateSettings } = useTheme();
 
-        const mockTabs: Array<{ node: TabNode; tab: TabInfo }> = [
+        const mockTabs: Array<{ node: UITabNode; tab: TabInfo }> = [
           {
             node: {
-              id: 'node-1',
               tabId: 1,
-              parentId: null,
               children: [],
               isExpanded: true,
               depth: 0,
@@ -105,9 +103,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
           },
           {
             node: {
-              id: 'node-2',
               tabId: 2,
-              parentId: null,
               children: [],
               isExpanded: true,
               depth: 0,
@@ -122,9 +118,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
           },
           {
             node: {
-              id: 'node-3',
               tabId: 3,
-              parentId: null,
               children: [],
               isExpanded: true,
               depth: 0,
@@ -150,7 +144,7 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
                 <div className="tab-tree" data-testid="tab-tree">
                   {mockTabs.map(({ node, tab }) => (
                     <TreeNode
-                      key={node.id}
+                      key={node.tabId}
                       node={node}
                       tab={tab}
                       isUnread={false}

@@ -1,19 +1,17 @@
-import type { TabNode, View } from '@/types';
+import type { TabNode, ViewState } from '@/types';
 
 export const testPathAlias = (): void => {
   const testNode: TabNode = {
-    id: 'test',
     tabId: 1,
-    parentId: null,
     children: [],
     isExpanded: true,
-    depth: 0,
   };
 
-  const testView: View = {
-    id: 'default',
+  const testView: ViewState = {
     name: 'Default View',
     color: '#000000',
+    rootNodes: [],
+    pinnedTabIds: [],
   };
 
   void testNode;

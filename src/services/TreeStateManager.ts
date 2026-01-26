@@ -1,58 +1,62 @@
-import type { TabNode, TreeState, TreeStructureEntry, IStorageService, ViewState, View, GroupInfo } from '@/types';
+import type {
+  TabNode,
+  TreeState,
+  IStorageService,
+  ViewState,
+  WindowState,
+  GroupInfo,
+} from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
+
+/**
+ * ノード検索結果
+ */
+interface NodeSearchResult {
+  windowState: WindowState;
+  viewState: ViewState;
+  viewIndex: number;
+  node: TabNode;
+  parent: TabNode | null;
+  nodeIndex: number;
+}
 
 /**
  * TreeStateManager
  *
  * タブツリー状態の集中管理と永続化を担当するサービス
- * ビュー毎にタブツリーを管理し、親子関係のビュー不整合を構造的に防止
+ * 新アーキテクチャ: Window → View → Tab の階層構造
  */
 export class TreeStateManager {
-  private views: Map<string, ViewState> = new Map();
-  private viewOrder: string[] = [];
-  private tabToNode: Map<number, { viewId: string; nodeId: string }> = new Map();
-  private currentViewId: string = 'default';
-  private currentViewByWindowId: Record<number, string> = {};
-  /**
-   * ウィンドウ毎のピン留めタブIDリスト（順序付き）
-   * TreeStateManagerがピン留め状態のSingle Source of Truth
-   */
-  private pinnedTabIdsByWindow: Map<number, number[]> = new Map();
-  private syncInProgress: boolean = false;
-  private syncCompleted: boolean = false;
-  private syncCompletedResolvers: (() => void)[] = [];
+  private windows: WindowState[] = [];
+  private initializationInProgress: boolean = false;
+  private initialized: boolean = false;
+  private initializationResolvers: (() => void)[] = [];
+  private isSyncingToChrome: boolean = false;
 
   constructor(private storageService: IStorageService) {}
 
-  /**
-   * 同期が完了しているかどうかを返す
-   */
-  isSyncCompleted(): boolean {
-    return this.syncCompleted;
+  // ========================================
+  // 初期化管理
+  // ========================================
+
+  isInitialized(): boolean {
+    return this.initialized;
   }
 
-  /**
-   * 同期中かどうかを返す
-   */
-  isSyncInProgress(): boolean {
-    return this.syncInProgress;
+  isInitializationInProgress(): boolean {
+    return this.initializationInProgress;
   }
 
-  /**
-   * 同期が完了するまで待機する
-   * タイムアウトを指定可能（デフォルト5秒）
-   * @returns 同期が完了したらtrue、タイムアウトしたらfalse
-   */
-  async waitForSyncComplete(timeoutMs: number = 5000): Promise<boolean> {
-    if (this.syncCompleted) {
+  async waitForInitialization(timeoutMs: number = 5000): Promise<boolean> {
+    if (this.initialized) {
       return true;
     }
 
     return new Promise<boolean>((resolve) => {
       const timeoutId = setTimeout(() => {
-        const index = this.syncCompletedResolvers.indexOf(resolver);
+        const index = this.initializationResolvers.indexOf(resolver);
         if (index !== -1) {
-          this.syncCompletedResolvers.splice(index, 1);
+          this.initializationResolvers.splice(index, 1);
         }
         resolve(false);
       }, timeoutMs);
@@ -62,278 +66,249 @@ export class TreeStateManager {
         resolve(true);
       };
 
-      this.syncCompletedResolvers.push(resolver);
+      this.initializationResolvers.push(resolver);
     });
   }
 
-  /**
-   * 同期完了を待機しているハンドラーに通知する
-   */
-  private notifySyncComplete(): void {
-    const resolvers = this.syncCompletedResolvers;
-    this.syncCompletedResolvers = [];
-    resolvers.forEach(resolve => resolve());
+  private notifyInitializationComplete(): void {
+    const resolvers = this.initializationResolvers;
+    this.initializationResolvers = [];
+    resolvers.forEach((resolve) => resolve());
   }
 
-  /**
-   * テスト用: 内部状態をリセットし、syncCompletedをtrueに設定
-   * 本番コードでは使用しない
-   */
   resetForTesting(): void {
-    this.views.clear();
-    this.tabToNode.clear();
-    this.syncInProgress = false;
-    this.syncCompleted = true;
-    this.notifySyncComplete();
+    this.windows = [];
+    this.initializationInProgress = false;
+    this.initialized = true;
+    this.notifyInitializationComplete();
+  }
+
+  prepareForInitializationReset(): void {
+    this.notifyInitializationComplete();
+    this.initializationResolvers = [];
+    this.initialized = false;
+    this.initializationInProgress = false;
   }
 
   /**
-   * E2Eテスト用: 同期状態をリセット前の準備状態にする
-   *
-   * 【目的】
-   * E2Eテストのリセット処理で、次のsyncWithChromeTabsが確実に実行されるよう
-   * 同期状態をクリーンにする。
-   *
-   * 【処理内容】
-   * 1. 待機中のウェイター（syncCompletedResolvers）をすべて解決
-   *    - これにより、前のテストからの古いウェイターがタイムアウトするのを防ぐ
-   * 2. syncCompleted と syncInProgress を false にリセット
-   *    - これにより、次のsyncWithChromeTabsが早期リターンせずに実行される
+   * 全てのウィンドウ状態をクリアする（E2Eテストのリセット用）
    */
-  prepareForSyncReset(): void {
-    this.notifySyncComplete();
-    this.syncCompletedResolvers = [];
-    this.syncCompleted = false;
-    this.syncInProgress = false;
+  clearAllWindows(): void {
+    this.windows = [];
   }
 
-  /**
-   * 指定されたviewIdのタブツリーを取得
-   * @param viewId - ビューID
-   * @returns ルートノードの配列
-   */
-  getTree(viewId: string): TabNode[] {
-    const viewState = this.views.get(viewId);
-    if (!viewState) return [];
-
-    return viewState.rootNodeIds
-      .map((id) => viewState.nodes[id])
-      .filter((node): node is TabNode => node !== undefined && node.parentId === null);
-  }
+  // ========================================
+  // ノード検索
+  // ========================================
 
   /**
-   * tabIdからTabNodeとviewIdを取得
-   * @param tabId - タブID
-   * @returns { viewId, node } またはnull
+   * tabIdからノードを検索
    */
-  getNodeByTabId(tabId: number): { viewId: string; node: TabNode } | null {
-    const mapping = this.tabToNode.get(tabId);
-    if (!mapping) return null;
+  private findNodeByTabId(tabId: number): NodeSearchResult | null {
+    for (const windowState of this.windows) {
+      for (let viewIndex = 0; viewIndex < windowState.views.length; viewIndex++) {
+        const viewState = windowState.views[viewIndex];
 
-    const viewState = this.views.get(mapping.viewId);
-    if (!viewState) return null;
+        const searchInNodes = (
+          nodes: TabNode[],
+          parent: TabNode | null
+        ): { node: TabNode; parent: TabNode | null; nodeIndex: number } | null => {
+          for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+            if (node.tabId === tabId) {
+              return { node, parent, nodeIndex: i };
+            }
+            const found = searchInNodes(node.children, node);
+            if (found) return found;
+          }
+          return null;
+        };
 
-    const node = viewState.nodes[mapping.nodeId];
-    if (!node) return null;
-
-    return { viewId: mapping.viewId, node };
-  }
-
-  /**
-   * nodeIdからTabNodeとviewIdを取得
-   * @param nodeId - ノードID
-   * @returns { viewId, node } またはnull
-   */
-  getNodeById(nodeId: string): { viewId: string; node: TabNode } | null {
-    for (const [viewId, viewState] of this.views) {
-      const node = viewState.nodes[nodeId];
-      if (node) {
-        return { viewId, node };
+        const found = searchInNodes(viewState.rootNodes, null);
+        if (found) {
+          return {
+            windowState,
+            viewState,
+            viewIndex,
+            ...found,
+          };
+        }
       }
     }
     return null;
   }
 
   /**
-   * 指定されたタブの最後の兄弟ノードIDを取得
-   * - 親タブがある場合: 同じ親を持つ最後の子のID
-   * - ルートレベルの場合: 最後のルートノードのID
+   * windowIdからWindowStateを取得
    */
-  getLastSiblingNodeId(tabId: number): string | undefined {
-    const result = this.getNodeByTabId(tabId);
+  private getWindowState(windowId: number): WindowState | null {
+    return this.windows.find((w) => w.windowId === windowId) ?? null;
+  }
+
+  /**
+   * ノードの総数を再帰的にカウント
+   */
+  private countNodes(nodes: TabNode[]): number {
+    return nodes.reduce((sum, node) => sum + 1 + this.countNodes(node.children), 0);
+  }
+
+  /**
+   * windowIdからWindowStateを取得、なければ作成
+   */
+  private getOrCreateWindowState(windowId: number): WindowState {
+    let windowState = this.windows.find((w) => w.windowId === windowId);
+    if (!windowState) {
+      windowState = {
+        windowId,
+        views: [
+          {
+            name: 'Default',
+            color: '#3B82F6',
+            rootNodes: [],
+            pinnedTabIds: [],
+          },
+        ],
+        activeViewIndex: 0,
+      };
+      this.windows.push(windowState);
+    }
+    return windowState;
+  }
+
+  // ========================================
+  // ツリー取得
+  // ========================================
+
+  /**
+   * 指定ウィンドウ・ビューのタブツリーを取得
+   */
+  getTree(windowId: number, viewIndex?: number): TabNode[] {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return [];
+
+    const vi = viewIndex ?? windowState.activeViewIndex;
+    const viewState = windowState.views[vi];
+    if (!viewState) return [];
+
+    return viewState.rootNodes;
+  }
+
+  /**
+   * tabIdからTabNodeを取得
+   */
+  getNodeByTabId(
+    tabId: number
+  ): { windowId: number; viewIndex: number; node: TabNode } | null {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return null;
+
+    return {
+      windowId: result.windowState.windowId,
+      viewIndex: result.viewIndex,
+      node: result.node,
+    };
+  }
+
+  /**
+   * タブの親タブIDを取得
+   */
+  getParentTabId(tabId: number): number | null {
+    const result = this.findNodeByTabId(tabId);
+    if (!result || !result.parent) return null;
+    return result.parent.tabId;
+  }
+
+  /**
+   * タブの最後の兄弟ノードのtabIdを取得
+   */
+  getLastSiblingTabId(tabId: number): number | undefined {
+    const result = this.findNodeByTabId(tabId);
     if (!result) return undefined;
 
-    const { viewId, node } = result;
-    const viewState = this.views.get(viewId);
-    if (!viewState) return undefined;
-
-    if (node.parentId) {
-      const parentNode = viewState.nodes[node.parentId];
-      if (!parentNode || parentNode.children.length === 0) return undefined;
-      return parentNode.children[parentNode.children.length - 1].id;
-    } else {
-      if (viewState.rootNodeIds.length === 0) return undefined;
-      return viewState.rootNodeIds[viewState.rootNodeIds.length - 1];
-    }
+    const siblings = result.parent
+      ? result.parent.children
+      : result.viewState.rootNodes;
+    if (siblings.length === 0) return undefined;
+    return siblings[siblings.length - 1].tabId;
   }
 
   /**
-   * ビューを作成
+   * タブの兄弟内インデックスを取得
    */
-  createView(info: View): void {
-    if (this.views.has(info.id)) return;
-
-    this.views.set(info.id, {
-      info,
-      rootNodeIds: [],
-      nodes: {},
-    });
-    if (!this.viewOrder.includes(info.id)) {
-      this.viewOrder.push(info.id);
-    }
+  getSiblingIndex(tabId: number): number {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return -1;
+    return result.nodeIndex;
   }
 
-  /**
-   * ビューの順序を取得
-   */
-  getViewOrder(): string[] {
-    return [...this.viewOrder];
-  }
-
-  /**
-   * ビューの順序を変更
-   */
-  reorderViews(newOrder: string[]): void {
-    this.viewOrder = newOrder.filter(id => this.views.has(id));
-    for (const [viewId] of this.views) {
-      if (!this.viewOrder.includes(viewId)) {
-        this.viewOrder.push(viewId);
-      }
-    }
-  }
-
-  /**
-   * ビューを削除
-   * ビュー内のタブは指定されたターゲットビューに移動
-   */
-  async deleteView(viewId: string, targetViewId: string): Promise<void> {
-    if (viewId === 'default') return;
-
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
-
-    const targetView = this.views.get(targetViewId);
-    if (!targetView) return;
-
-    for (const nodeId of Object.keys(viewState.nodes)) {
-      const node = viewState.nodes[nodeId];
-      if (node) {
-        node.parentId = null;
-        node.depth = 0;
-        targetView.nodes[nodeId] = node;
-        targetView.rootNodeIds.push(nodeId);
-
-        const mapping = this.tabToNode.get(node.tabId);
-        if (mapping) {
-          this.tabToNode.set(node.tabId, { viewId: targetViewId, nodeId });
-        }
-      }
-    }
-
-    this.views.delete(viewId);
-    this.viewOrder = this.viewOrder.filter(id => id !== viewId);
-
-    for (const windowId of Object.keys(this.currentViewByWindowId)) {
-      if (this.currentViewByWindowId[Number(windowId)] === viewId) {
-        this.currentViewByWindowId[Number(windowId)] = targetViewId;
-      }
-    }
-
-    if (this.currentViewId === viewId) {
-      this.currentViewId = targetViewId;
-    }
-
-    await this.persistState();
-  }
-
-  /**
-   * ビュー情報を更新
-   */
-  async updateView(viewId: string, updates: Partial<View>): Promise<void> {
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
-
-    viewState.info = { ...viewState.info, ...updates };
-    await this.persistState();
-  }
+  // ========================================
+  // タブ操作
+  // ========================================
 
   /**
    * 新しいタブを追加
-   * @param tab - Chrome タブオブジェクト
-   * @param parentId - 親ノードID（nullの場合はルートノード）
-   * @param viewId - ビューID
-   * @param insertAfterNodeId - このノードの直後に挿入（兄弟配置時に使用）
    */
   async addTab(
     tab: chrome.tabs.Tab,
-    parentId: string | null,
-    viewId: string,
-    insertAfterNodeId?: string,
+    parentTabId: number | null,
+    windowId: number,
+    viewIndex?: number,
+    insertAfterTabId?: number
   ): Promise<void> {
     if (!tab.id) {
       throw new Error('Tab ID is required');
     }
 
-    if (!this.views.has(viewId)) {
-      this.createView({
-        id: viewId,
-        name: viewId === 'default' ? 'Default' : 'View',
+    const windowState = this.getOrCreateWindowState(windowId);
+    const vi = viewIndex ?? windowState.activeViewIndex;
+
+    if (vi >= windowState.views.length) {
+      windowState.views.push({
+        name: 'View',
         color: '#3B82F6',
+        rootNodes: [],
+        pinnedTabIds: [],
       });
     }
 
-    const viewState = this.views.get(viewId)!;
-    const nodeId = `node-${tab.id}`;
-    const parentNode = parentId ? viewState.nodes[parentId] : null;
-    const depth = parentNode ? parentNode.depth + 1 : 0;
+    const viewState = windowState.views[vi];
 
     const newNode: TabNode = {
-      id: nodeId,
       tabId: tab.id,
-      parentId,
-      children: [],
       isExpanded: true,
-      depth,
+      children: [],
     };
 
-    viewState.nodes[nodeId] = newNode;
-    this.tabToNode.set(tab.id, { viewId, nodeId });
-
-    if (!parentId) {
-      if (insertAfterNodeId) {
-        const insertAfterIndex = viewState.rootNodeIds.indexOf(insertAfterNodeId);
-        if (insertAfterIndex !== -1) {
-          viewState.rootNodeIds.splice(insertAfterIndex + 1, 0, nodeId);
-        } else {
-          viewState.rootNodeIds.push(nodeId);
-        }
-      } else {
-        viewState.rootNodeIds.push(nodeId);
-      }
-    } else {
-      if (parentNode) {
-        if (insertAfterNodeId) {
-          const insertAfterIndex = parentNode.children.findIndex(
-            (child) => child.id === insertAfterNodeId
+    if (parentTabId !== null) {
+      const parentResult = this.findNodeByTabId(parentTabId);
+      if (parentResult && parentResult.windowState.windowId === windowId) {
+        if (insertAfterTabId !== undefined) {
+          const insertIndex = parentResult.node.children.findIndex(
+            (c) => c.tabId === insertAfterTabId
           );
-          if (insertAfterIndex !== -1) {
-            parentNode.children.splice(insertAfterIndex + 1, 0, newNode);
+          if (insertIndex !== -1) {
+            parentResult.node.children.splice(insertIndex + 1, 0, newNode);
           } else {
-            parentNode.children.push(newNode);
+            parentResult.node.children.push(newNode);
           }
         } else {
-          parentNode.children.push(newNode);
+          parentResult.node.children.push(newNode);
         }
+      } else {
+        viewState.rootNodes.push(newNode);
+      }
+    } else {
+      if (insertAfterTabId !== undefined) {
+        const insertIndex = viewState.rootNodes.findIndex(
+          (n) => n.tabId === insertAfterTabId
+        );
+        if (insertIndex !== -1) {
+          viewState.rootNodes.splice(insertIndex + 1, 0, newNode);
+        } else {
+          viewState.rootNodes.push(newNode);
+        }
+      } else {
+        viewState.rootNodes.push(newNode);
       }
     }
 
@@ -341,195 +316,103 @@ export class TreeStateManager {
   }
 
   /**
-   * タブの親タブIDを取得
-   * @param tabId - タブID
-   * @returns 親タブID（ルートタブの場合はnull）
+   * タブを削除（内部用、永続化なし）
    */
-  getParentTabId(tabId: number): number | null {
-    const mapping = this.tabToNode.get(tabId);
-    if (!mapping) return null;
-
-    const viewState = this.views.get(mapping.viewId);
-    if (!viewState) return null;
-
-    const node = viewState.nodes[mapping.nodeId];
-    if (!node || !node.parentId) return null;
-
-    const parentNode = viewState.nodes[node.parentId];
-    return parentNode?.tabId ?? null;
-  }
-
-  /**
-   * タブを削除
-   * @param tabId - タブID
-   * @param childTabBehavior - 子タブの処理方法 ('promote' | 'close_all')
-   * @returns 閉じられたタブIDの配列（close_allの場合）
-   */
-  async removeTab(
+  private removeTabFromTree(
     tabId: number,
-    childTabBehavior: 'promote' | 'close_all' = 'promote',
-  ): Promise<number[]> {
-    const mapping = this.tabToNode.get(tabId);
-    if (!mapping) return [];
+    childTabBehavior: 'promote' | 'close_all' = 'promote'
+  ): number[] {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return [];
 
-    const viewState = this.views.get(mapping.viewId);
-    if (!viewState) return [];
-
-    const node = viewState.nodes[mapping.nodeId];
-    if (!node) return [];
-
+    const { viewState, node, parent, nodeIndex } = result;
     const closedTabIds: number[] = [tabId];
 
     if (childTabBehavior === 'promote') {
-      this.promoteChildren(viewState, node);
+      const siblings = parent ? parent.children : viewState.rootNodes;
+      siblings.splice(nodeIndex, 1, ...node.children);
     } else if (childTabBehavior === 'close_all') {
-      const childTabIds = this.removeChildrenRecursively(viewState, node);
-      closedTabIds.push(...childTabIds);
+      const collectTabIds = (n: TabNode): number[] => {
+        return [n.tabId, ...n.children.flatMap(collectTabIds)];
+      };
+      closedTabIds.push(...node.children.flatMap(collectTabIds));
+      const siblings = parent ? parent.children : viewState.rootNodes;
+      siblings.splice(nodeIndex, 1);
     }
-
-    if (node.parentId) {
-      const parentNode = viewState.nodes[node.parentId];
-      if (parentNode) {
-        parentNode.children = parentNode.children.filter((child) => child.id !== node.id);
-      }
-    } else {
-      viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== node.id);
-    }
-
-    delete viewState.nodes[node.id];
-    this.tabToNode.delete(tabId);
-
-    await this.persistState();
 
     return closedTabIds;
   }
 
   /**
-   * ノードを同一ビュー内で移動
+   * タブを削除
+   */
+  async removeTab(
+    tabId: number,
+    childTabBehavior: 'promote' | 'close_all' = 'promote'
+  ): Promise<number[]> {
+    const closedTabIds = this.removeTabFromTree(tabId, childTabBehavior);
+
+    await this.persistState();
+    return closedTabIds;
+  }
+
+  /**
+   * ノードを移動
    */
   async moveNode(
-    nodeId: string,
-    newParentId: string | null,
-    index: number,
+    tabId: number,
+    newParentTabId: number | null,
+    newIndex: number
   ): Promise<void> {
-    const result = this.getNodeById(nodeId);
+    const result = this.findNodeByTabId(tabId);
     if (!result) return;
 
-    const { viewId, node } = result;
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
+    const { viewState, node, parent, nodeIndex } = result;
 
-    // 自分自身の子孫には移動できない
-    if (newParentId && this.isDescendant(viewState, nodeId, newParentId)) {
-      return;
-    }
+    // 現在の位置から削除
+    const siblings = parent ? parent.children : viewState.rootNodes;
+    siblings.splice(nodeIndex, 1);
 
-    if (newParentId === nodeId) {
-      return;
-    }
-
-    if (node.parentId) {
-      const oldParent = viewState.nodes[node.parentId];
-      if (oldParent) {
-        oldParent.children = oldParent.children.filter((child) => child.id !== nodeId);
+    // 新しい位置に挿入
+    if (newParentTabId !== null) {
+      const newParentResult = this.findNodeByTabId(newParentTabId);
+      if (newParentResult) {
+        newParentResult.node.children.splice(newIndex, 0, node);
       }
     } else {
-      viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== nodeId);
-    }
-
-    node.parentId = newParentId;
-    node.depth = newParentId ? (viewState.nodes[newParentId]?.depth || 0) + 1 : 0;
-
-    this.updateChildrenDepth(node);
-
-    if (newParentId) {
-      const newParent = viewState.nodes[newParentId];
-      if (newParent) {
-        newParent.children.splice(index, 0, node);
-      }
-    } else {
-      viewState.rootNodeIds.splice(index, 0, nodeId);
+      viewState.rootNodes.splice(newIndex, 0, node);
     }
 
     await this.persistState();
   }
 
   /**
-   * タブノードをルートノードの最後尾に移動
-   * ウィンドウ間移動時に使用（移動先ウィンドウの最後尾に表示するため）
+   * タブをルートの最後尾に移動
+   * targetWindowIdが指定された場合、そのウィンドウに移動する
    */
-  async moveTabToRootEnd(tabId: number): Promise<void> {
-    const mapping = this.tabToNode.get(tabId);
-    if (!mapping) return;
+  async moveTabToRootEnd(tabId: number, targetWindowId?: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) {
+      return;
+    }
 
-    const viewState = this.views.get(mapping.viewId);
-    if (!viewState) return;
+    const { viewState, node, parent, nodeIndex } = result;
 
-    const node = viewState.nodes[mapping.nodeId];
-    if (!node) return;
+    // 現在の位置から削除
+    const siblings = parent ? parent.children : viewState.rootNodes;
+    siblings.splice(nodeIndex, 1);
 
-    if (node.parentId) {
-      const parent = viewState.nodes[node.parentId];
-      if (parent) {
-        parent.children = parent.children.filter((child) => child.id !== node.id);
+    if (targetWindowId !== undefined) {
+      // 新しいウィンドウに移動
+      const targetWindowState = this.getOrCreateWindowState(targetWindowId);
+      const targetViewState = targetWindowState.views[targetWindowState.activeViewIndex];
+      if (targetViewState) {
+        targetViewState.rootNodes.push(node);
       }
     } else {
-      viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== node.id);
+      // 同じビューのルートの最後に追加
+      viewState.rootNodes.push(node);
     }
-
-    node.parentId = null;
-    node.depth = 0;
-    this.updateChildrenDepth(node);
-    viewState.rootNodeIds.push(node.id);
-
-    await this.persistState();
-  }
-
-  /**
-   * サブツリー全体を別のビューに移動
-   */
-  async moveSubtreeToView(tabId: number, targetViewId: string): Promise<void> {
-    const mapping = this.tabToNode.get(tabId);
-    if (!mapping) return;
-
-    const sourceViewState = this.views.get(mapping.viewId);
-    if (!sourceViewState) return;
-
-    if (!this.views.has(targetViewId)) {
-      this.createView({
-        id: targetViewId,
-        name: 'View',
-        color: '#3B82F6',
-      });
-    }
-
-    const targetViewState = this.views.get(targetViewId)!;
-    const rootNode = sourceViewState.nodes[mapping.nodeId];
-    if (!rootNode) return;
-
-    const subtreeNodes: TabNode[] = [];
-    this.collectSubtreeNodes(rootNode, subtreeNodes);
-
-    if (rootNode.parentId) {
-      const parentNode = sourceViewState.nodes[rootNode.parentId];
-      if (parentNode) {
-        parentNode.children = parentNode.children.filter((child) => child.id !== rootNode.id);
-      }
-    } else {
-      sourceViewState.rootNodeIds = sourceViewState.rootNodeIds.filter((id) => id !== rootNode.id);
-    }
-
-    for (const node of subtreeNodes) {
-      delete sourceViewState.nodes[node.id];
-      targetViewState.nodes[node.id] = node;
-
-      this.tabToNode.set(node.tabId, { viewId: targetViewId, nodeId: node.id });
-    }
-
-    rootNode.parentId = null;
-    rootNode.depth = 0;
-    this.updateChildrenDepth(rootNode);
-    targetViewState.rootNodeIds.push(rootNode.id);
 
     await this.persistState();
   }
@@ -537,8 +420,8 @@ export class TreeStateManager {
   /**
    * ノードの展開状態を切り替え
    */
-  async toggleExpand(nodeId: string): Promise<void> {
-    const result = this.getNodeById(nodeId);
+  async toggleExpand(tabId: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
     if (!result) return;
 
     result.node.isExpanded = !result.node.isExpanded;
@@ -546,10 +429,10 @@ export class TreeStateManager {
   }
 
   /**
-   * ノードを展開する
+   * ノードを展開
    */
-  async expandNode(nodeId: string): Promise<void> {
-    const result = this.getNodeById(nodeId);
+  async expandNode(tabId: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
     if (!result) return;
 
     if (result.node.isExpanded) return;
@@ -559,181 +442,1457 @@ export class TreeStateManager {
   }
 
   /**
-   * 存在しないタブをクリーンアップ
+   * tabIdを置き換える
    */
-  async cleanupStaleNodes(existingTabIds: number[]): Promise<number> {
-    const existingTabIdSet = new Set(existingTabIds);
-    const staleTabIds: number[] = [];
-
-    this.tabToNode.forEach((_, tabId) => {
-      if (!existingTabIdSet.has(tabId)) {
-        staleTabIds.push(tabId);
-      }
-    });
-
-    if (staleTabIds.length === 0) {
-      return 0;
-    }
-
-    for (const tabId of staleTabIds) {
-      await this.removeStaleNode(tabId);
-    }
-
-    return staleTabIds.length;
-  }
-
-  /**
-   * 存在しないタブノードを削除（内部用）
-   */
-  private async removeStaleNode(tabId: number): Promise<void> {
-    const mapping = this.tabToNode.get(tabId);
-    if (!mapping) return;
-
-    const viewState = this.views.get(mapping.viewId);
-    if (!viewState) return;
-
-    const node = viewState.nodes[mapping.nodeId];
-    if (!node) return;
-
-    this.promoteChildren(viewState, node);
-
-    if (node.parentId) {
-      const parentNode = viewState.nodes[node.parentId];
-      if (parentNode) {
-        parentNode.children = parentNode.children.filter((child) => child.id !== node.id);
-      }
-    } else {
-      viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== node.id);
-    }
-
-    delete viewState.nodes[node.id];
-    this.tabToNode.delete(tabId);
-  }
-
-  /**
-   * chrome.tabs APIと同期
-   */
-  async syncWithChromeTabs(userSettings?: {
-    newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end';
-  }): Promise<void> {
-    if (this.syncInProgress || this.syncCompleted) {
+  async replaceTabId(oldTabId: number, newTabId: number): Promise<void> {
+    const result = this.findNodeByTabId(oldTabId);
+    if (!result) {
       return;
     }
-    this.syncInProgress = true;
+
+    result.node.tabId = newTabId;
+    await this.persistState();
+  }
+
+  // ========================================
+  // サブツリー操作
+  // ========================================
+
+  /**
+   * サブツリーのノード数を取得
+   */
+  getSubtreeSize(tabId: number): number {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return 0;
+
+    const countNodes = (node: TabNode): number => {
+      return 1 + node.children.reduce((sum, c) => sum + countNodes(c), 0);
+    };
+    return countNodes(result.node);
+  }
+
+  /**
+   * サブツリーの全ノードを取得
+   */
+  getSubtree(tabId: number): TabNode[] {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return [];
+
+    const collectNodes = (node: TabNode): TabNode[] => {
+      return [node, ...node.children.flatMap(collectNodes)];
+    };
+    return collectNodes(result.node);
+  }
+
+  /**
+   * サブツリーを別のビューに移動
+   */
+  async moveSubtreeToView(
+    tabId: number,
+    targetWindowId: number,
+    targetViewIndex: number
+  ): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return;
+
+    const { viewState, node, parent, nodeIndex } = result;
+
+    // 元の位置から削除
+    const siblings = parent ? parent.children : viewState.rootNodes;
+    siblings.splice(nodeIndex, 1);
+
+    // 移動先のウィンドウ・ビューを取得
+    const targetWindowState = this.getOrCreateWindowState(targetWindowId);
+    while (targetWindowState.views.length <= targetViewIndex) {
+      targetWindowState.views.push({
+        name: 'View',
+        color: '#3B82F6',
+        rootNodes: [],
+        pinnedTabIds: [],
+      });
+    }
+    const targetViewState = targetWindowState.views[targetViewIndex];
+
+    // 移動先のルートに追加
+    targetViewState.rootNodes.push(node);
+
+    await this.persistState();
+  }
+
+  // ========================================
+  // ビュー操作
+  // ========================================
+
+  private static readonly VIEW_COLOR_PALETTE = [
+    '#3B82F6', // blue (default)
+    '#10B981', // green
+    '#F59E0B', // yellow
+    '#EF4444', // red
+    '#8B5CF6', // purple
+    '#EC4899', // pink
+    '#06B6D4', // cyan
+    '#F97316', // orange
+  ];
+
+  /**
+   * 全てのビュー情報を取得
+   */
+  getAllViews(windowId: number): Array<{ name: string; color: string; icon?: string }> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return [];
+
+    return windowState.views.map((v) => ({
+      name: v.name,
+      color: v.color,
+      icon: v.icon,
+    }));
+  }
+
+  /**
+   * ビューの順序を取得
+   */
+  getViewOrder(windowId: number): number[] {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return [];
+    return windowState.views.map((_, i) => i);
+  }
+
+  /**
+   * 新しいビューを作成（名前と色を指定）
+   */
+  async createView(windowId: number, name: string, color: string): Promise<number> {
+    const windowState = this.getOrCreateWindowState(windowId);
+
+    const newView: ViewState = {
+      name,
+      color,
+      rootNodes: [],
+      pinnedTabIds: [],
+    };
+    windowState.views.push(newView);
+
+    const newViewIndex = windowState.views.length - 1;
+    await this.persistState();
+    return newViewIndex;
+  }
+
+  /**
+   * 新しいビューを作成（自動カラー選択）
+   */
+  async createViewWithAutoColor(windowId: number): Promise<number> {
+    const windowState = this.getOrCreateWindowState(windowId);
+    const viewCount = windowState.views.length;
+    const colorIndex = viewCount % TreeStateManager.VIEW_COLOR_PALETTE.length;
+    const newColor = TreeStateManager.VIEW_COLOR_PALETTE[colorIndex];
+
+    return this.createView(windowId, 'View', newColor);
+  }
+
+  /**
+   * ビューを削除
+   */
+  async deleteView(windowId: number, viewIndex: number): Promise<void> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) {
+      return;
+    }
+    if (viewIndex === 0) {
+      return;
+    }
+    if (viewIndex >= windowState.views.length) {
+      return;
+    }
+
+    const deletedView = windowState.views[viewIndex];
+    windowState.views.splice(viewIndex, 1);
+
+    // 削除されたビューのタブをデフォルトビューに移動
+    windowState.views[0].rootNodes.push(...deletedView.rootNodes);
+
+    // アクティブビューの調整
+    if (windowState.activeViewIndex >= viewIndex) {
+      windowState.activeViewIndex = Math.max(0, windowState.activeViewIndex - 1);
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * ビュー情報を更新
+   */
+  async updateView(
+    windowId: number,
+    viewIndex: number,
+    updates: Partial<{ name: string; color: string; icon: string }>
+  ): Promise<void> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return;
+    if (viewIndex >= windowState.views.length) return;
+
+    const viewState = windowState.views[viewIndex];
+    if (updates.name !== undefined) viewState.name = updates.name;
+    if (updates.color !== undefined) viewState.color = updates.color;
+    if (updates.icon !== undefined) viewState.icon = updates.icon;
+
+    await this.persistState();
+  }
+
+  /**
+   * ビューを切り替え
+   */
+  async switchView(windowId: number, viewIndex: number): Promise<void> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return;
+    if (viewIndex >= windowState.views.length) return;
+
+    windowState.activeViewIndex = viewIndex;
+    await this.persistState();
+  }
+
+  /**
+   * タブを別のビューに移動
+   */
+  async moveTabsToViewInternal(
+    tabIds: number[],
+    targetWindowId: number,
+    targetViewIndex: number
+  ): Promise<void> {
+    const targetWindowState = this.getOrCreateWindowState(targetWindowId);
+    while (targetWindowState.views.length <= targetViewIndex) {
+      targetWindowState.views.push({
+        name: 'View',
+        color: '#3B82F6',
+        rootNodes: [],
+        pinnedTabIds: [],
+      });
+    }
+    const targetViewState = targetWindowState.views[targetViewIndex];
+
+    // ピン留めタブの移動処理
+    for (const tabId of tabIds) {
+      for (let i = 0; i < targetWindowState.views.length; i++) {
+        if (i === targetViewIndex) continue;
+        const viewState = targetWindowState.views[i];
+        const pinnedIndex = viewState.pinnedTabIds.indexOf(tabId);
+        if (pinnedIndex !== -1) {
+          // 元のビューから削除
+          viewState.pinnedTabIds.splice(pinnedIndex, 1);
+          // 移動先のビューに追加（重複チェック）
+          if (!targetViewState.pinnedTabIds.includes(tabId)) {
+            targetViewState.pinnedTabIds.push(tabId);
+          }
+          break;
+        }
+      }
+    }
+
+    // 親が選択されているタブは移動対象から除外（親の移動で一緒に移動するため）
+    const tabIdSet = new Set(tabIds);
+    const topLevelTabIds: number[] = [];
+    for (const tabId of tabIds) {
+      const result = this.findNodeByTabId(tabId);
+      if (!result) continue;
+
+      const hasSelectedParent = (_node: TabNode, parent: TabNode | null): boolean => {
+        if (!parent) return false;
+        if (tabIdSet.has(parent.tabId)) return true;
+        return false;
+      };
+
+      if (!hasSelectedParent(result.node, result.parent)) {
+        topLevelTabIds.push(tabId);
+      }
+    }
+
+    for (const tabId of topLevelTabIds) {
+      const result = this.findNodeByTabId(tabId);
+      if (!result) continue;
+
+      // 元の位置から削除
+      const siblings = result.parent
+        ? result.parent.children
+        : result.viewState.rootNodes;
+      const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+      if (nodeIndex !== -1) {
+        siblings.splice(nodeIndex, 1);
+      }
+
+      // 移動先に追加
+      targetViewState.rootNodes.push(result.node);
+    }
+
+    await this.persistState();
+  }
+
+  // ========================================
+  // ウィンドウ操作
+  // ========================================
+
+  /**
+   * 全ウィンドウの状態を取得
+   */
+  getAllWindowStates(): WindowState[] {
+    return this.windows;
+  }
+
+  /**
+   * ウィンドウを追加
+   */
+  addWindow(windowId: number): void {
+    if (this.windows.some((w) => w.windowId === windowId)) {
+      return;
+    }
+
+    this.windows.push({
+      windowId,
+      views: [
+        {
+          name: 'Default',
+          color: '#3B82F6',
+          rootNodes: [],
+          pinnedTabIds: [],
+        },
+      ],
+      activeViewIndex: 0,
+    });
+  }
+
+  /**
+   * ウィンドウを削除
+   */
+  async removeWindow(windowId: number): Promise<void> {
+    const index = this.windows.findIndex((w) => w.windowId === windowId);
+    if (index !== -1) {
+      this.windows.splice(index, 1);
+      await this.persistState();
+    }
+  }
+
+  /**
+   * 単一タブで新しいウィンドウを作成
+   */
+  async createWindowWithTab(tabId: number): Promise<number | undefined> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return undefined;
+
+    // 元の位置から削除
+    const siblings = result.parent
+      ? result.parent.children
+      : result.viewState.rootNodes;
+    const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+    if (nodeIndex !== -1) {
+      siblings.splice(nodeIndex, 1);
+    }
+
+    // 新しいウィンドウを作成
+    const newWindow = await chrome.windows.create({ tabId });
+    if (!newWindow || newWindow.id === undefined) return undefined;
+
+    // 新しいウィンドウ状態を作成
+    const newWindowState: WindowState = {
+      windowId: newWindow.id,
+      views: [
+        {
+          name: 'Default',
+          color: '#3B82F6',
+          rootNodes: [result.node],
+          pinnedTabIds: [],
+        },
+      ],
+      activeViewIndex: 0,
+    };
+    this.windows.push(newWindowState);
+
+    await this.persistState();
+    await this.syncTreeStateToChromeTabs();
+    return newWindow.id;
+  }
+
+  /**
+   * サブツリーで新しいウィンドウを作成
+   */
+  async createWindowWithSubtree(tabId: number): Promise<number | undefined> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return undefined;
+
+    const subtree = this.getSubtree(tabId);
+    if (subtree.length === 0) return undefined;
+
+    // 元の位置から削除
+    const siblings = result.parent
+      ? result.parent.children
+      : result.viewState.rootNodes;
+    const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+    if (nodeIndex !== -1) {
+      siblings.splice(nodeIndex, 1);
+    }
+
+    // 新しいウィンドウを作成
+    const newWindow = await chrome.windows.create({ tabId });
+    if (!newWindow || newWindow.id === undefined) return undefined;
+
+    // 子タブも移動
+    for (const node of subtree.slice(1)) {
+      try {
+        await chrome.tabs.move(node.tabId, { windowId: newWindow.id, index: -1 });
+      } catch {
+        // 移動失敗は無視
+      }
+    }
+
+    // 新しいウィンドウ状態を作成
+    const newWindowState: WindowState = {
+      windowId: newWindow.id,
+      views: [
+        {
+          name: 'Default',
+          color: '#3B82F6',
+          rootNodes: [result.node],
+          pinnedTabIds: [],
+        },
+      ],
+      activeViewIndex: 0,
+    };
+    this.windows.push(newWindowState);
+
+    await this.persistState();
+    await this.syncTreeStateToChromeTabs(newWindow.id);
+    return newWindow.id;
+  }
+
+  /**
+   * サブツリーを別のウィンドウに移動
+   */
+  async moveSubtreeToWindow(tabId: number, targetWindowId: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return;
+
+    const subtree = this.getSubtree(tabId);
+    if (subtree.length === 0) return;
+
+    // 元の位置から削除
+    const siblings = result.parent
+      ? result.parent.children
+      : result.viewState.rootNodes;
+    const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+    if (nodeIndex !== -1) {
+      siblings.splice(nodeIndex, 1);
+    }
+
+    // タブを移動
+    for (const node of subtree) {
+      try {
+        await chrome.tabs.move(node.tabId, { windowId: targetWindowId, index: -1 });
+      } catch {
+        // 移動失敗は無視
+      }
+    }
+
+    // 移動先ウィンドウのアクティブビューに追加
+    const targetWindowState = this.getOrCreateWindowState(targetWindowId);
+    const targetViewState = targetWindowState.views[targetWindowState.activeViewIndex];
+    targetViewState.rootNodes.push(result.node);
+
+    await this.persistState();
+    await this.syncTreeStateToChromeTabs(targetWindowId);
+  }
+
+  /**
+   * 複数タブで新しいウィンドウを作成
+   */
+  async moveTabsToNewWindow(tabIds: number[]): Promise<number | undefined> {
+    if (tabIds.length === 0) return undefined;
+
+    const nodesToMove: TabNode[] = [];
+    const tabIdSet = new Set(tabIds);
+
+    // 親が選択されているタブは移動対象から除外
+    for (const tabId of tabIds) {
+      const result = this.findNodeByTabId(tabId);
+      if (!result) continue;
+      if (result.parent && tabIdSet.has(result.parent.tabId)) continue;
+
+      // 元の位置から削除
+      const siblings = result.parent
+        ? result.parent.children
+        : result.viewState.rootNodes;
+      const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+      if (nodeIndex !== -1) {
+        siblings.splice(nodeIndex, 1);
+        nodesToMove.push(result.node);
+      }
+    }
+
+    if (nodesToMove.length === 0) return undefined;
+
+    // 新しいウィンドウを作成（最初のタブで）
+    const newWindow = await chrome.windows.create({ tabId: nodesToMove[0].tabId });
+    if (!newWindow || newWindow.id === undefined) return undefined;
+
+    const collectTabIds = (node: TabNode): number[] => {
+      return [node.tabId, ...node.children.flatMap(collectTabIds)];
+    };
+
+    // 全ノードのタブを移動
+    for (let i = 0; i < nodesToMove.length; i++) {
+      // 最初のノードは子のみ移動（自身はwindows.createで移動済み）
+      // 残りのノードは自身と子を全て移動
+      const tabIdsToMove =
+        i === 0
+          ? nodesToMove[0].children.flatMap(collectTabIds)
+          : collectTabIds(nodesToMove[i]);
+      for (const tid of tabIdsToMove) {
+        try {
+          await chrome.tabs.move(tid, { windowId: newWindow.id, index: -1 });
+        } catch {
+          // 移動失敗は無視
+        }
+      }
+    }
+
+    // 新しいウィンドウ状態を作成
+    const newWindowState: WindowState = {
+      windowId: newWindow.id,
+      views: [
+        {
+          name: 'Default',
+          color: '#3B82F6',
+          rootNodes: nodesToMove,
+          pinnedTabIds: [],
+        },
+      ],
+      activeViewIndex: 0,
+    };
+    this.windows.push(newWindowState);
+
+    await this.persistState();
+    await this.syncTreeStateToChromeTabs(newWindow.id);
+    return newWindow.id;
+  }
+
+  /**
+   * タブを別のウィンドウに移動
+   */
+  async moveTabToWindow(tabId: number, targetWindowId: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) return;
+
+    // 元の位置から削除
+    const siblings = result.parent
+      ? result.parent.children
+      : result.viewState.rootNodes;
+    const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+    if (nodeIndex !== -1) {
+      siblings.splice(nodeIndex, 1);
+    }
+
+    // 移動先ウィンドウのアクティブビューに追加
+    const targetWindowState = this.getOrCreateWindowState(targetWindowId);
+    const targetViewState = targetWindowState.views[targetWindowState.activeViewIndex];
+    targetViewState.rootNodes.push(result.node);
+
+    // Chromeタブも移動
+    try {
+      await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
+    } catch {
+      // タブが存在しない場合は無視
+    }
+
+    await this.persistState();
+    await this.syncTreeStateToChromeTabs(targetWindowId);
+  }
+
+  // ========================================
+  // ピン留め操作
+  // ========================================
+
+  /**
+   * ピン留めタブIDリストを取得
+   * viewIndexを指定した場合はそのビューのピン留めタブを返す
+   * viewIndexを省略した場合はアクティブビューのピン留めタブを返す
+   */
+  getPinnedTabIds(windowId: number, viewIndex?: number): number[] {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return [];
+    const vi = viewIndex ?? windowState.activeViewIndex;
+    const viewState = windowState.views[vi];
+    return viewState?.pinnedTabIds ?? [];
+  }
+
+  /**
+   * タブをピン留め
+   * pinnedTabIdsに追加し、rootNodesから削除する
+   */
+  async pinTabs(tabIds: number[], windowId: number, viewIndex?: number): Promise<void> {
+    const windowState = this.getOrCreateWindowState(windowId);
+    const vi = viewIndex ?? windowState.activeViewIndex;
+    const viewState = windowState.views[vi];
+    if (!viewState) return;
+
+    for (const tabId of tabIds) {
+      if (!viewState.pinnedTabIds.includes(tabId)) {
+        viewState.pinnedTabIds.push(tabId);
+      }
+      // rootNodesから削除（子ノードは昇格させる）
+      this.removeTabFromTree(tabId, 'promote');
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * タブのピン留めを解除
+   */
+  async unpinTabs(tabIds: number[], windowId: number, viewIndex?: number): Promise<void> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return;
+
+    const vi = viewIndex ?? windowState.activeViewIndex;
+    const viewState = windowState.views[vi];
+    if (!viewState) return;
+
+    const tabIdSet = new Set(tabIds);
+    const unpinnedTabIds = viewState.pinnedTabIds.filter((id) =>
+      tabIdSet.has(id)
+    );
+    viewState.pinnedTabIds = viewState.pinnedTabIds.filter(
+      (id) => !tabIdSet.has(id)
+    );
+
+    // ピン留め解除されたタブをrootNodesに追加
+    for (const tabId of unpinnedTabIds) {
+      const newNode: TabNode = {
+        tabId,
+        isExpanded: true,
+        children: [],
+      };
+      viewState.rootNodes.push(newNode);
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * ピン留めタブの順序を変更
+   */
+  async reorderPinnedTab(
+    tabId: number,
+    newIndex: number,
+    windowId: number,
+    viewIndex?: number
+  ): Promise<void> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return;
+
+    const vi = viewIndex ?? windowState.activeViewIndex;
+    const viewState = windowState.views[vi];
+    if (!viewState) return;
+
+    const currentIndex = viewState.pinnedTabIds.indexOf(tabId);
+    if (currentIndex === -1) return;
+    if (newIndex < 0 || newIndex >= viewState.pinnedTabIds.length) return;
+    if (currentIndex === newIndex) return;
+
+    viewState.pinnedTabIds.splice(currentIndex, 1);
+    viewState.pinnedTabIds.splice(newIndex, 0, tabId);
+
+    await this.persistState();
+  }
+
+  /**
+   * 指定したタブがピン留めタブかどうかを確認
+   * viewIndexを省略した場合はアクティブビューで確認
+   */
+  isPinnedTab(tabId: number, windowId: number, viewIndex?: number): boolean {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return false;
+    const vi = viewIndex ?? windowState.activeViewIndex;
+    const viewState = windowState.views[vi];
+    if (!viewState) return false;
+    return viewState.pinnedTabIds.includes(tabId);
+  }
+
+  /**
+   * 指定したタブがどこかのビューでピン留めされているか確認
+   */
+  isPinnedTabInAnyView(tabId: number, windowId: number): boolean {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return false;
+    for (const viewState of windowState.views) {
+      if (viewState.pinnedTabIds.includes(tabId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Chromeイベントからのピン留め状態変更を反映
+   * 同期中は無視（無限ループ防止）
+   */
+  updatePinnedStateFromChromeEvent(
+    tabId: number,
+    windowId: number,
+    isPinned: boolean
+  ): void {
+    // 同期中は無視（syncTreeStateToChromeTabs → onUpdated → ここ → ... の無限ループを防ぐ）
+    if (this.isSyncingToChrome) {
+      return;
+    }
+
+    const windowState = this.getOrCreateWindowState(windowId);
+    const viewState = windowState.views[windowState.activeViewIndex];
+    if (!viewState) return;
+
+    const isInList = viewState.pinnedTabIds.includes(tabId);
+
+    if (isPinned && !isInList) {
+      viewState.pinnedTabIds.push(tabId);
+      // rootNodesから削除（子ノードは昇格させる）
+      this.removeTabFromTree(tabId, 'promote');
+    } else if (!isPinned && isInList) {
+      viewState.pinnedTabIds = viewState.pinnedTabIds.filter(
+        (id) => id !== tabId
+      );
+
+      // ピン留め解除されたタブをアクティブビューのrootNodesに追加
+      const newNode: TabNode = {
+        tabId,
+        isExpanded: true,
+        children: [],
+      };
+      viewState.rootNodes.push(newNode);
+    }
+  }
+
+  // ========================================
+  // グループ操作
+  // ========================================
+
+  /**
+   * グループを作成
+   * @param contextMenuTabId コンテキストメニューを開いたタブのID（グループの挿入位置を決定）
+   */
+  async createGroupWithRealTab(
+    groupTabId: number,
+    tabIds: number[],
+    groupName: string = '新しいグループ',
+    windowId: number,
+    contextMenuTabId?: number
+  ): Promise<void> {
+    if (tabIds.length === 0) {
+      throw new Error('No tabs specified for grouping');
+    }
+
+    const windowState = this.getOrCreateWindowState(windowId);
+    const viewState = windowState.views[windowState.activeViewIndex];
+
+    // グループノードを作成
+    const groupNode: TabNode = {
+      tabId: groupTabId,
+      isExpanded: true,
+      groupInfo: {
+        name: groupName,
+        color: '#f59e0b',
+      },
+      children: [],
+    };
+
+    // コンテキストメニューを開いたタブの位置を特定
+    // 親が選択されている場合は、最上位の選択タブを使用
+    const tabIdSet = new Set(tabIds);
+    let targetTabId = contextMenuTabId ?? tabIds[0];
+    let targetResult = this.findNodeByTabId(targetTabId);
+    while (targetResult?.parent && tabIdSet.has(targetResult.parent.tabId)) {
+      targetTabId = targetResult.parent.tabId;
+      targetResult = this.findNodeByTabId(targetTabId);
+    }
+    let insertParent: TabNode | null = null;
+    let insertAtIndex: number | null = null;
+    let insertParentChildren: TabNode[] | null = null;
+
+    if (targetResult) {
+      insertParent = targetResult.parent;
+      insertParentChildren = targetResult.parent
+        ? targetResult.parent.children
+        : targetResult.viewState.rootNodes;
+      insertAtIndex = insertParentChildren.findIndex((n) => n.tabId === targetTabId);
+    }
+
+    // 選択されたタブをグループの子として追加
+    const nodesToMove: TabNode[] = [];
+
+    // 親が選択されていないタブのみ移動対象
+    for (const tabId of tabIds) {
+      const result = this.findNodeByTabId(tabId);
+      if (!result) continue;
+      if (result.parent && tabIdSet.has(result.parent.tabId)) continue;
+
+      // 元の位置から削除
+      const siblings = result.parent
+        ? result.parent.children
+        : result.viewState.rootNodes;
+      const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+      if (nodeIndex !== -1) {
+        siblings.splice(nodeIndex, 1);
+        nodesToMove.push(result.node);
+        // 削除によってインデックスがずれるので調整
+        if (insertParentChildren === siblings && insertAtIndex !== null && nodeIndex < insertAtIndex) {
+          insertAtIndex--;
+        }
+      }
+    }
+
+    // グループの子として追加
+    groupNode.children = nodesToMove;
+
+    // グループを記録した位置に挿入（なければ末尾に追加）
+    if (insertAtIndex !== null && insertParentChildren !== null && insertAtIndex >= 0) {
+      insertParentChildren.splice(insertAtIndex, 0, groupNode);
+    } else if (insertParent !== null) {
+      insertParent.children.push(groupNode);
+    } else {
+      viewState.rootNodes.push(groupNode);
+    }
+
+    await this.persistState();
+  }
+
+  /**
+   * グループを解除
+   */
+  async dissolveGroup(tabId: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) throw new Error('Tab not found');
+
+    let groupNode: TabNode;
+    let groupParent: TabNode | null;
+    let groupNodeIndex: number;
+
+    if (result.node.groupInfo) {
+      groupNode = result.node;
+      groupParent = result.parent;
+      groupNodeIndex = result.nodeIndex;
+    } else if (result.parent?.groupInfo) {
+      groupNode = result.parent;
+      // 親のグループノードの親を探す
+      const grandparentResult = this.findNodeByTabId(groupNode.tabId);
+      if (!grandparentResult) throw new Error('Group not found');
+      groupParent = grandparentResult.parent;
+      groupNodeIndex = grandparentResult.nodeIndex;
+    } else {
+      throw new Error('Group not found');
+    }
+
+    // グループの子を昇格
+    const siblings = groupParent
+      ? groupParent.children
+      : result.viewState.rootNodes;
+    siblings.splice(groupNodeIndex, 1, ...groupNode.children);
+
+    await this.persistState();
+  }
+
+  /**
+   * グループ情報を取得
+   */
+  async getGroupInfo(tabId: number): Promise<{
+    name: string;
+    children: Array<{ tabId: number; title: string; url: string }>;
+  }> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result) throw new Error('Group not found');
+    if (!result.node.groupInfo) throw new Error('Not a group tab');
+
+    const children: Array<{ tabId: number; title: string; url: string }> = [];
+    for (const child of result.node.children) {
+      try {
+        const tab = await chrome.tabs.get(child.tabId);
+        children.push({
+          tabId: child.tabId,
+          title: tab.title || '',
+          url: tab.url || '',
+        });
+      } catch {
+        // タブが存在しない場合は無視
+      }
+    }
+
+    return {
+      name: result.node.groupInfo.name,
+      children,
+    };
+  }
+
+  /**
+   * グループ名を更新
+   */
+  async updateGroupName(tabId: number, name: string): Promise<boolean> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result || !result.node.groupInfo) return false;
+
+    result.node.groupInfo.name = name;
+    await this.persistState();
+    return true;
+  }
+
+  /**
+   * タブをグループに追加
+   */
+  async addTabToTreeGroup(
+    tabId: number,
+    targetGroupTabId: number
+  ): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    const groupResult = this.findNodeByTabId(targetGroupTabId);
+    if (!result || !groupResult) return;
+
+    // 元の位置から削除
+    const siblings = result.parent
+      ? result.parent.children
+      : result.viewState.rootNodes;
+    const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+    if (nodeIndex !== -1) {
+      siblings.splice(nodeIndex, 1);
+    }
+
+    // グループに追加
+    groupResult.node.children.push(result.node);
+
+    await this.persistState();
+  }
+
+  /**
+   * タブをグループから削除
+   */
+  async removeTabFromTreeGroup(tabId: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result || !result.parent?.groupInfo) return;
+
+    // グループから削除
+    const nodeIndex = result.parent.children.findIndex(
+      (n) => n.tabId === tabId
+    );
+    if (nodeIndex !== -1) {
+      result.parent.children.splice(nodeIndex, 1);
+    }
+
+    // ルートに移動
+    result.viewState.rootNodes.push(result.node);
+
+    await this.persistState();
+  }
+
+  // ========================================
+  // D&D操作
+  // ========================================
+
+  /**
+   * ノードを親の子として移動
+   * targetParentTabIdがnullの場合はルートに移動
+   */
+  async moveNodeToParent(
+    tabId: number,
+    targetParentTabId: number | null,
+    selectedTabIds: number[]
+  ): Promise<void> {
+    const isSelected = selectedTabIds.includes(tabId);
+    const tabIdsToMove = isSelected ? selectedTabIds : [tabId];
+    const tabIdSet = new Set(tabIdsToMove);
+
+    // ルートへの移動
+    if (targetParentTabId === null) {
+      // 親が選択されているタブは移動対象から除外
+      const topLevelTabIds = tabIdsToMove.filter((id) => {
+        const result = this.findNodeByTabId(id);
+        if (!result || !result.parent) return true;
+        return !tabIdSet.has(result.parent.tabId);
+      });
+
+      for (const id of topLevelTabIds) {
+        const result = this.findNodeByTabId(id);
+        if (!result) continue;
+
+        // 元の位置から削除
+        const siblings = result.parent
+          ? result.parent.children
+          : result.viewState.rootNodes;
+        const nodeIndex = siblings.findIndex((n) => n.tabId === id);
+        if (nodeIndex !== -1) {
+          siblings.splice(nodeIndex, 1);
+        }
+
+        // ルートに追加
+        result.viewState.rootNodes.push(result.node);
+      }
+
+      await this.persistState();
+      return;
+    }
+
+    const targetResult = this.findNodeByTabId(targetParentTabId);
+    if (!targetResult) return;
+
+    // 自身の子孫への移動を防ぐ
+    for (const id of tabIdsToMove) {
+      const result = this.findNodeByTabId(id);
+      if (result) {
+        const isDescendant = (node: TabNode, targetId: number): boolean => {
+          if (node.tabId === targetId) return true;
+          return node.children.some((c) => isDescendant(c, targetId));
+        };
+        if (isDescendant(result.node, targetParentTabId)) return;
+      }
+    }
+
+    // 親が選択されているタブは移動対象から除外
+    const topLevelTabIds = tabIdsToMove.filter((id) => {
+      const result = this.findNodeByTabId(id);
+      if (!result || !result.parent) return true;
+      return !tabIdSet.has(result.parent.tabId);
+    });
+
+    for (const id of topLevelTabIds) {
+      const result = this.findNodeByTabId(id);
+      if (!result) continue;
+
+      // 元の位置から削除
+      const siblings = result.parent
+        ? result.parent.children
+        : result.viewState.rootNodes;
+      const nodeIndex = siblings.findIndex((n) => n.tabId === id);
+      if (nodeIndex !== -1) {
+        siblings.splice(nodeIndex, 1);
+      }
+
+      // ターゲットの子として追加
+      targetResult.node.children.push(result.node);
+    }
+
+    targetResult.node.isExpanded = true;
+    await this.persistState();
+  }
+
+  /**
+   * ノードを兄弟として移動
+   */
+  async moveNodeAsSibling(
+    tabId: number,
+    aboveTabId: number | undefined,
+    belowTabId: number | undefined,
+    selectedTabIds: number[]
+  ): Promise<void> {
+    const isSelected = selectedTabIds.includes(tabId);
+    const tabIdsToMove = isSelected ? selectedTabIds : [tabId];
+    const tabIdSet = new Set(tabIdsToMove);
+
+    // 挿入先の親を決定
+    let targetParent: TabNode | null = null;
+    let targetViewState: ViewState | null = null;
+
+    if (belowTabId !== undefined) {
+      const belowResult = this.findNodeByTabId(belowTabId);
+      if (belowResult) {
+        targetParent = belowResult.parent;
+        targetViewState = belowResult.viewState;
+      }
+    } else if (aboveTabId !== undefined) {
+      const aboveResult = this.findNodeByTabId(aboveTabId);
+      if (aboveResult) {
+        targetParent = aboveResult.parent;
+        targetViewState = aboveResult.viewState;
+      }
+    }
+
+    if (!targetViewState) return;
+
+    // 親が選択されているタブは移動対象から除外
+    const topLevelTabIds = tabIdsToMove.filter((id) => {
+      const result = this.findNodeByTabId(id);
+      if (!result || !result.parent) return true;
+      return !tabIdSet.has(result.parent.tabId);
+    });
+
+    // 移動するノードを収集しつつ、元の位置から削除
+    const nodesToMove: TabNode[] = [];
+    for (const id of topLevelTabIds) {
+      const result = this.findNodeByTabId(id);
+      if (!result) continue;
+
+      const siblings = result.parent
+        ? result.parent.children
+        : result.viewState.rootNodes;
+      const nodeIndex = siblings.findIndex((n) => n.tabId === id);
+      if (nodeIndex !== -1) {
+        siblings.splice(nodeIndex, 1);
+        nodesToMove.push(result.node);
+      }
+    }
+
+    // 挿入先を決定
+    const targetSiblings = targetParent
+      ? targetParent.children
+      : targetViewState.rootNodes;
+
+    if (belowTabId !== undefined) {
+      const insertIndex = targetSiblings.findIndex((n) => n.tabId === belowTabId);
+      if (insertIndex !== -1) {
+        targetSiblings.splice(insertIndex, 0, ...nodesToMove);
+      } else {
+        targetSiblings.push(...nodesToMove);
+      }
+    } else if (aboveTabId !== undefined) {
+      const insertIndex = targetSiblings.findIndex((n) => n.tabId === aboveTabId);
+      if (insertIndex !== -1) {
+        targetSiblings.splice(insertIndex + 1, 0, ...nodesToMove);
+      } else {
+        targetSiblings.push(...nodesToMove);
+      }
+    } else {
+      targetSiblings.push(...nodesToMove);
+    }
+
+    await this.persistState();
+  }
+
+  // ========================================
+  // Chrome同期
+  // ========================================
+
+  /**
+   * 拡張機能の新規インストール時にChromeタブからTreeStateを初期化
+   * 設計原則として Chrome → TreeStateManager への同期は通常禁止だが、
+   * 新規インストール時のみ許可される唯一の例外
+   */
+  async initializeFromChromeTabs(): Promise<void> {
+    const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+
+    for (const window of windows) {
+      if (window.id === undefined) continue;
+
+      const windowState = this.getOrCreateWindowState(window.id);
+      const viewState = windowState.views[0];
+
+      const tabs = await chrome.tabs.query({ windowId: window.id });
+      const sortedTabs = tabs
+        .filter((t) => t.id !== undefined)
+        .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      for (const tab of sortedTabs) {
+        if (tab.id === undefined) continue;
+
+        if (tab.pinned) {
+          viewState.pinnedTabIds.push(tab.id);
+        } else {
+          viewState.rootNodes.push({
+            tabId: tab.id,
+            isExpanded: true,
+            children: [],
+          });
+        }
+      }
+    }
+
+    await this.persistState();
+
+    this.initialized = true;
+    this.notifyInitializationComplete();
+  }
+
+  /**
+   * ブラウザ再起動後の状態復元
+   */
+  async restoreStateAfterRestart(_userSettings?: {
+    newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end';
+  }): Promise<void> {
+    if (this.initializationInProgress || this.initialized) {
+      return;
+    }
+    this.initializationInProgress = true;
 
     try {
       await this.loadState();
 
-      const tabs = await chrome.tabs.query({});
-      const defaultViewId = 'default';
+      const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
 
-      if (!this.views.has(defaultViewId)) {
-        this.createView({
-          id: defaultViewId,
-          name: 'Default',
-          color: '#3B82F6',
-        });
+      // ウィンドウIDの対応付け
+      // ブラウザ再起動でwindowIdが変わるため、配列順序でマッチング
+      const chromeWindowIds = windows
+        .filter((w) => w.id !== undefined)
+        .map((w) => w.id!)
+        .sort((a, b) => a - b);
+
+      const minLength = Math.min(this.windows.length, chromeWindowIds.length);
+      for (let i = 0; i < minLength; i++) {
+        this.windows[i].windowId = chromeWindowIds[i];
       }
 
-      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-      const treeStructure = state?.treeStructure;
-
-      if (treeStructure && treeStructure.length > 0) {
-        await this.restoreFromTreeStructure(tabs, treeStructure, defaultViewId, userSettings);
-      } else {
-        await this.syncWithOpenerTabId(tabs, defaultViewId, userSettings);
+      // 新しいウィンドウを追加
+      for (const windowId of chromeWindowIds) {
+        if (!this.windows.some((w) => w.windowId === windowId)) {
+          this.addWindow(windowId);
+        }
       }
 
-      // ブラウザ再起動時、タブIDが変わるため、常にChromeの現在のピン留め状態から再構築
-      this.pinnedTabIdsByWindow.clear();
-      const pinnedTabs = tabs.filter(t => t.pinned && t.id !== undefined);
-      pinnedTabs.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-      for (const tab of pinnedTabs) {
-        if (tab.windowId === undefined || tab.id === undefined) continue;
-        const windowPinned = this.pinnedTabIdsByWindow.get(tab.windowId) ?? [];
-        windowPinned.push(tab.id);
-        this.pinnedTabIdsByWindow.set(tab.windowId, windowPinned);
-      }
+      // 存在しないウィンドウを削除
+      this.windows = this.windows.filter((w) =>
+        chromeWindowIds.includes(w.windowId)
+      );
+
+      // グループタブの再作成（足りないグループタブを正しい位置に作成）
+      await this.restoreGroupTabs();
+
+      // tabIdのマッチング（tabIdのみを更新、タブの追加・削除は行わない）
+      // pinnedTabIdsのマッチングもここで行う
+      await this.rebuildTabIds();
 
       await this.persistState();
-
       await this.syncTreeStateToChromeTabs();
 
-      this.syncCompleted = true;
-      this.notifySyncComplete();
+      this.initialized = true;
+      this.notifyInitializationComplete();
     } catch {
-      this.syncCompleted = true;
-      this.notifySyncComplete();
+      this.initialized = true;
+      this.notifyInitializationComplete();
     } finally {
-      this.syncInProgress = false;
+      this.initializationInProgress = false;
     }
   }
 
   /**
-   * 現在のメモリ状態をストレージに永続化する
-   *
-   * TreeStateManagerはSingle Source of Truthであり、メモリ上の状態が常に正しい。
-   * ストレージからの再読込み（loadState）は行わない。
-   * loadStateを呼ぶと、進行中の操作（addTab等）で追加された状態が失われる可能性がある。
+   * グループタブを復元
+   * TreeStateを深さ優先で走査し、Chromeタブと前から順番に突き合わせながら、
+   * TreeStateにグループノードがあるがChrome側に対応するタブがない場合はその位置にグループタブを作成する
    */
-  async refreshTreeStructure(): Promise<void> {
-    try {
-      await this.persistState();
-    } catch {
-      // 永続化失敗は無視（次回のアラームで再試行される）
+  private async restoreGroupTabs(): Promise<void> {
+    const groupTabUrl = `chrome-extension://${chrome.runtime.id}/group.html`;
+
+    for (const windowState of this.windows) {
+      // 現在のChromeタブをindex順で取得
+      let windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
+      windowTabs = windowTabs
+        .filter((t) => t.id !== undefined && !t.pinned)
+        .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      // TreeStateを深さ優先でフラット化
+      const flattenNodes: TabNode[] = [];
+      const flattenInNodes = (nodes: TabNode[]): void => {
+        for (const node of nodes) {
+          flattenNodes.push(node);
+          flattenInNodes(node.children);
+        }
+      };
+      for (const viewState of windowState.views) {
+        flattenInNodes(viewState.rootNodes);
+      }
+
+      // TreeStateとChromeタブを前から順番に突き合わせる
+      let chromeIndex = 0;
+      for (let treeIndex = 0; treeIndex < flattenNodes.length; treeIndex++) {
+        const node = flattenNodes[treeIndex];
+
+        if (node.groupInfo) {
+          // グループノードの場合：Chrome側に対応するgroup.htmlがあるか確認
+          const chromeTab = windowTabs[chromeIndex];
+
+          if (chromeTab && chromeTab.url?.startsWith(groupTabUrl)) {
+            // Chrome側にgroup.htmlがある → 次へ
+            chromeIndex++;
+          } else {
+            // Chrome側にgroup.htmlがない → その位置に作成
+            try {
+              const insertIndex = chromeTab?.index ?? windowTabs.length;
+              await chrome.tabs.create({
+                url: groupTabUrl,
+                windowId: windowState.windowId,
+                index: insertIndex,
+                active: false,
+              });
+
+              // Chromeタブリストを再取得（作成後にindexがずれるため）
+              windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
+              windowTabs = windowTabs
+                .filter((t) => t.id !== undefined && !t.pinned)
+                .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+              chromeIndex++;
+            } catch {
+              // ウィンドウが存在しない場合は無視
+            }
+          }
+        } else {
+          // 通常ノードの場合：Chrome側のタブをスキップ
+          chromeIndex++;
+        }
+      }
     }
   }
 
   /**
-   * TreeStateManagerの状態をChromeタブに冪等に反映する
-   *
-   * この関数は冪等であり、TreeStateManagerの状態が変わらない限り
-   * 何回呼び出しても同じ結果になる。
-   *
-   * 同期内容：
-   * - TreeStateManagerに存在しないタブの削除
-   * - タブの順序（chrome.tabs.move）
-   * - ピン留め状態（chrome.tabs.update({pinned})）
-   *
-   * @param windowId - 対象ウィンドウID（省略時は全ウィンドウ）
+   * tabIdを再構築
+   * ブラウザ再起動後はtabIdが変わるため、インデックスベースでマッチングを行う
+   */
+  private async rebuildTabIds(): Promise<void> {
+    // サイドパネルURLを除外するためのプレフィックス
+    // サイドパネルはUIパネルであり、TreeStateには含めない
+    const sidePanelUrlPrefix = `chrome-extension://${chrome.runtime.id}/sidepanel.html`;
+
+    const isSidePanelTab = (tab: chrome.tabs.Tab): boolean => {
+      const url = tab.url || tab.pendingUrl || '';
+      return url === sidePanelUrlPrefix || url.startsWith(`${sidePanelUrlPrefix}?`);
+    };
+
+    for (const windowState of this.windows) {
+      const windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
+
+      // ピン留めタブのtabIdマッチング（インデックスベース）
+      // サイドパネルタブは除外
+      const chromePinnedTabs = windowTabs
+        .filter((t) => t.id !== undefined && t.pinned && !isSidePanelTab(t))
+        .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      // 全ビューのpinnedTabIdsをビュー順序でフラット化
+      const orderedOldPinnedIds: number[] = [];
+      for (const viewState of windowState.views) {
+        for (const id of viewState.pinnedTabIds) {
+          orderedOldPinnedIds.push(id);
+        }
+      }
+
+      // ピン留めタブのマッピング表作成
+      const pinnedIdMap = new Map<number, number>();
+      for (let i = 0; i < orderedOldPinnedIds.length && i < chromePinnedTabs.length; i++) {
+        pinnedIdMap.set(orderedOldPinnedIds[i], chromePinnedTabs[i].id!);
+      }
+
+      // 各ビューのpinnedTabIdsを新しいtabIdで更新
+      for (const viewState of windowState.views) {
+        viewState.pinnedTabIds = viewState.pinnedTabIds
+          .map((id) => pinnedIdMap.get(id))
+          .filter((id): id is number => id !== undefined);
+      }
+
+      // 全Chromeタブ（ピン留め除く、sidepanel含む）をインデックス順にソート
+      const chromeAllNonPinned = windowTabs
+        .filter((t) => t.id !== undefined && !t.pinned)
+        .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      // TreeStateのノードを深さ優先でフラット化
+      const flattenNodes: TabNode[] = [];
+      const flattenInNodes = (nodes: TabNode[]): void => {
+        for (const node of nodes) {
+          flattenNodes.push(node);
+          flattenInNodes(node.children);
+        }
+      };
+      for (const viewState of windowState.views) {
+        flattenInNodes(viewState.rootNodes);
+      }
+
+
+      // Step 1: sidepanelタブに対応するノードを特定して削除
+      // TreeStateノードとChromeタブをインデックスベースで照合し、
+      // sidepanelタブに対応するノードをTreeStateから削除する
+      const sidepanelNodeTabIds: number[] = [];
+      for (let i = 0; i < flattenNodes.length && i < chromeAllNonPinned.length; i++) {
+        const chromeTab = chromeAllNonPinned[i];
+        if (isSidePanelTab(chromeTab)) {
+          sidepanelNodeTabIds.push(flattenNodes[i].tabId);
+        }
+      }
+
+      // sidepanelノードをTreeStateから削除
+      for (const tabId of sidepanelNodeTabIds) {
+        this.removeTabFromTree(tabId, 'close_all');
+      }
+
+      // Step 2: 削除後のTreeStateを再度フラット化
+      const cleanFlattenNodes: TabNode[] = [];
+      const flattenClean = (nodes: TabNode[]): void => {
+        for (const node of nodes) {
+          cleanFlattenNodes.push(node);
+          flattenClean(node.children);
+        }
+      };
+      for (const viewState of windowState.views) {
+        flattenClean(viewState.rootNodes);
+      }
+
+      // sidepanel除外後のChromeタブ
+      const chromeNonPinnedTabs = chromeAllNonPinned.filter((t) => !isSidePanelTab(t));
+
+      // インデックスベースでマッチング
+      for (let i = 0; i < cleanFlattenNodes.length && i < chromeNonPinnedTabs.length; i++) {
+        const newTabId = chromeNonPinnedTabs[i].id!;
+        cleanFlattenNodes[i].tabId = newTabId;
+      }
+    }
+  }
+
+  /**
+   * TreeStateの状態をChromeタブに同期
    */
   async syncTreeStateToChromeTabs(windowId?: number): Promise<void> {
-    // 現在のChromeタブを取得
-    const queryOptions = windowId !== undefined ? { windowId } : {};
-    const currentTabs = await chrome.tabs.query(queryOptions);
+    this.isSyncingToChrome = true;
+    try {
+      const queryOptions = windowId !== undefined ? { windowId } : {};
+      const currentTabs = await chrome.tabs.query(queryOptions);
 
-    const windowIds = windowId !== undefined
-      ? [windowId]
-      : [...new Set(currentTabs.map(t => t.windowId).filter((id): id is number => id !== undefined))];
+      const windowIds =
+        windowId !== undefined
+          ? [windowId]
+          : [
+              ...new Set(
+                currentTabs
+                  .map((t) => t.windowId)
+                  .filter((id): id is number => id !== undefined)
+              ),
+            ];
 
-    for (const wid of windowIds) {
-      await this.syncPinnedStateForWindow(wid, currentTabs);
+      for (const wid of windowIds) {
+        await this.syncPinnedStateForWindow(wid, currentTabs);
+      }
+
+      const refreshedTabs = await chrome.tabs.query(queryOptions);
+      const pinnedSet = new Set<number>();
+      for (const tab of refreshedTabs) {
+        if (tab.id !== undefined && tab.pinned) {
+          pinnedSet.add(tab.id);
+        }
+      }
+
+      for (const wid of windowIds) {
+        await this.syncTabOrderForWindow(wid, pinnedSet);
+      }
+
+      await this.closeEmptyWindows();
+    } finally {
+      this.isSyncingToChrome = false;
     }
+  }
 
-    const refreshedTabs = await chrome.tabs.query(queryOptions);
+  /**
+   * ピン留め状態を同期
+   * すべてのビューのピン留めタブをChromeに同期
+   */
+  private async syncPinnedStateForWindow(
+    windowId: number,
+    currentTabs: chrome.tabs.Tab[]
+  ): Promise<void> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return;
 
-    const pinnedSet = new Set<number>();
-    for (const tab of refreshedTabs) {
-      if (tab.id !== undefined && tab.pinned) {
-        pinnedSet.add(tab.id);
+    // すべてのビューのpinnedTabIdsをビュー順序で集約
+    const expectedPinnedIds = new Set<number>();
+    const orderedPinnedIds: number[] = [];
+
+    for (const viewState of windowState.views) {
+      for (const tabId of viewState.pinnedTabIds) {
+        orderedPinnedIds.push(tabId);
+        expectedPinnedIds.add(tabId);
       }
     }
 
-    for (const wid of windowIds) {
-      await this.syncTabOrderForWindow(wid, pinnedSet);
-    }
-
-    // 空ウィンドウを閉じる（最後のウィンドウは除く）
-    await this.closeEmptyWindows();
-  }
-
-  /**
-   * 指定ウィンドウのピン留め状態を同期
-   * TreeStateManagerのpinnedTabIdsByWindowが正
-   */
-  private async syncPinnedStateForWindow(windowId: number, currentTabs: chrome.tabs.Tab[]): Promise<void> {
-    const expectedPinnedIds = new Set(this.pinnedTabIdsByWindow.get(windowId) ?? []);
-    const windowTabs = currentTabs.filter(t => t.windowId === windowId);
+    const windowTabs = currentTabs.filter((t) => t.windowId === windowId);
 
     const actuallyPinnedIds = new Set<number>();
     for (const tab of windowTabs) {
@@ -742,6 +1901,7 @@ export class TreeStateManager {
       }
     }
 
+    // ピン留めすべきタブをピン留め
     for (const tabId of expectedPinnedIds) {
       if (!actuallyPinnedIds.has(tabId)) {
         try {
@@ -752,6 +1912,7 @@ export class TreeStateManager {
       }
     }
 
+    // ピン留め解除すべきタブを解除
     for (const tabId of actuallyPinnedIds) {
       if (!expectedPinnedIds.has(tabId)) {
         try {
@@ -762,47 +1923,44 @@ export class TreeStateManager {
       }
     }
 
-    const expectedOrder = this.pinnedTabIdsByWindow.get(windowId) ?? [];
-    for (let i = 0; i < expectedOrder.length; i++) {
-      const tabId = expectedOrder[i];
-      try {
-        await chrome.tabs.move(tabId, { index: i });
-      } catch {
-        // タブが存在しない場合は無視
+    // ピン留めタブの順序を同期（ビュー順序で）
+    // 現在のインデックスマップを作成
+    const currentIndexMap = new Map<number, number>();
+    for (const tab of windowTabs) {
+      if (tab.id !== undefined) {
+        currentIndexMap.set(tab.id, tab.index);
       }
     }
-  }
 
-  /**
-   * 空ウィンドウを閉じる（最後のウィンドウは除く）
-   * syncTreeStateToChromeTabs内で呼び出され、タブ移動後に空になったウィンドウを自動クローズする
-   */
-  private async closeEmptyWindows(): Promise<void> {
-    try {
-      const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-      if (allWindows.length <= 1) {
-        return;
-      }
-
-      for (const window of allWindows) {
-        if (window.id === undefined) continue;
-        const tabs = await chrome.tabs.query({ windowId: window.id });
-        if (tabs.length === 0) {
-          const currentWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-          if (currentWindows.length > 1) {
-            await chrome.windows.remove(window.id);
+    for (let i = 0; i < orderedPinnedIds.length; i++) {
+      const tabId = orderedPinnedIds[i];
+      const currentIndex = currentIndexMap.get(tabId);
+      // 既に正しい位置にいる場合は移動しない
+      if (currentIndex !== undefined && currentIndex !== i) {
+        try {
+          await chrome.tabs.move(tabId, { index: i });
+          // 移動後にインデックスマップを更新
+          const updatedTabs = await chrome.tabs.query({ windowId });
+          currentIndexMap.clear();
+          for (const tab of updatedTabs) {
+            if (tab.id !== undefined) {
+              currentIndexMap.set(tab.id, tab.index);
+            }
           }
+        } catch {
+          // タブが存在しない場合は無視
         }
       }
-    } catch {
-      // ウィンドウクローズ失敗は無視
     }
   }
 
   /**
-   * 指定ウィンドウのタブ順序を同期
+   * タブの順序を同期
    */
-  private async syncTabOrderForWindow(windowId: number, pinnedSet: Set<number>): Promise<void> {
+  private async syncTabOrderForWindow(
+    windowId: number,
+    pinnedSet: Set<number>
+  ): Promise<void> {
     const currentTabs = await chrome.tabs.query({ windowId });
     const currentWindowTabIds = new Set<number>();
     for (const tab of currentTabs) {
@@ -811,6 +1969,10 @@ export class TreeStateManager {
       }
     }
 
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return;
+
+    // 深さ優先でタブIDを収集
     const orderedTabIds: number[] = [];
     const traverse = (node: TabNode): void => {
       if (!pinnedSet.has(node.tabId) && currentWindowTabIds.has(node.tabId)) {
@@ -821,19 +1983,13 @@ export class TreeStateManager {
       }
     };
 
-    for (const viewId of this.viewOrder) {
-      const viewState = this.views.get(viewId);
-      if (!viewState) continue;
-
-      for (const rootNodeId of viewState.rootNodeIds) {
-        const rootNode = viewState.nodes[rootNodeId];
-        if (rootNode && !rootNode.parentId) {
-          traverse(rootNode);
-        }
+    for (const viewState of windowState.views) {
+      for (const rootNode of viewState.rootNodes) {
+        traverse(rootNode);
       }
     }
 
-    const pinnedCount = currentTabs.filter(t => t.pinned).length;
+    const pinnedCount = currentTabs.filter((t) => t.pinned).length;
 
     const currentIndexMap = new Map<number, number>();
     for (const tab of currentTabs) {
@@ -865,1482 +2021,51 @@ export class TreeStateManager {
   }
 
   /**
-   * 指定ウィンドウのピン留めタブIDリストを取得
+   * 空ウィンドウを閉じる
    */
-  getPinnedTabIds(windowId: number): number[] {
-    return this.pinnedTabIdsByWindow.get(windowId) ?? [];
-  }
-
-  /**
-   * タブをピン留め状態に変更（メモリ状態のみ更新）
-   * 実際のChromeタブのピン留めはsyncTreeStateToChromeTabs()で行う
-   */
-  async pinTabs(tabIds: number[], windowId: number): Promise<void> {
-    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
-
-    for (const tabId of tabIds) {
-      if (!pinnedList.includes(tabId)) {
-        pinnedList.push(tabId);
-      }
-    }
-
-    this.pinnedTabIdsByWindow.set(windowId, pinnedList);
-    await this.persistState();
-  }
-
-  /**
-   * タブのピン留めを解除（メモリ状態のみ更新）
-   * 実際のChromeタブのピン留め解除はsyncTreeStateToChromeTabs()で行う
-   */
-  async unpinTabs(tabIds: number[], windowId: number): Promise<void> {
-    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
-    const tabIdSet = new Set(tabIds);
-
-    const newPinnedList = pinnedList.filter(id => !tabIdSet.has(id));
-    this.pinnedTabIdsByWindow.set(windowId, newPinnedList);
-    await this.persistState();
-  }
-
-  /**
-   * ピン留めタブの順序を変更（メモリ状態のみ更新）
-   * 実際のChromeタブの順序変更はsyncTreeStateToChromeTabs()で行う
-   */
-  async reorderPinnedTab(tabId: number, newIndex: number, windowId: number): Promise<void> {
-    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
-    const currentIndex = pinnedList.indexOf(tabId);
-
-    if (currentIndex === -1) return;
-    if (newIndex < 0 || newIndex >= pinnedList.length) return;
-    if (currentIndex === newIndex) return;
-
-    pinnedList.splice(currentIndex, 1);
-    pinnedList.splice(newIndex, 0, tabId);
-
-    this.pinnedTabIdsByWindow.set(windowId, pinnedList);
-    await this.persistState();
-  }
-
-  /**
-   * Chromeイベントからのピン留め状態変更を反映
-   * chrome.tabs.onUpdatedでpinnedが変わった場合に呼び出す
-   */
-  updatePinnedStateFromChromeEvent(tabId: number, windowId: number, isPinned: boolean): void {
-    const pinnedList = this.pinnedTabIdsByWindow.get(windowId) ?? [];
-    const isInList = pinnedList.includes(tabId);
-
-    if (isPinned && !isInList) {
-      pinnedList.push(tabId);
-      this.pinnedTabIdsByWindow.set(windowId, pinnedList);
-    } else if (!isPinned && isInList) {
-      const newList = pinnedList.filter(id => id !== tabId);
-      this.pinnedTabIdsByWindow.set(windowId, newList);
-    }
-  }
-
-  /**
-   * Chromeのピン留めタブ順序をTreeStateManagerに反映
-   * chrome.tabs.onMovedでピン留めタブが移動された場合に呼び出す
-   */
-  async syncPinnedOrderFromChrome(windowId: number): Promise<void> {
-    const tabs = await chrome.tabs.query({ windowId, pinned: true });
-    tabs.sort((a, b) => a.index - b.index);
-    const pinnedOrder = tabs.filter(t => t.id !== undefined).map(t => t.id!);
-    this.pinnedTabIdsByWindow.set(windowId, pinnedOrder);
-  }
-
-  /**
-   * treeStructureから親子関係を復元
-   */
-  private async restoreFromTreeStructure(
-    tabs: chrome.tabs.Tab[],
-    treeStructure: TreeStructureEntry[],
-    defaultViewId: string,
-    userSettings?: { newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end' },
-  ): Promise<void> {
-    const currentTabIds = new Set(tabs.filter(t => t.id).map(t => t.id!));
-
-    for (const [, viewState] of this.views) {
-      const staleNodeIds: string[] = [];
-      for (const nodeId of Object.keys(viewState.nodes)) {
-        const node = viewState.nodes[nodeId];
-        if (!currentTabIds.has(node.tabId)) {
-          staleNodeIds.push(nodeId);
-        }
-      }
-
-      for (const nodeId of staleNodeIds) {
-        const node = viewState.nodes[nodeId];
-        if (node) {
-          this.tabToNode.delete(node.tabId);
-          delete viewState.nodes[nodeId];
-          viewState.rootNodeIds = viewState.rootNodeIds.filter(id => id !== nodeId);
-        }
-      }
-    }
-
-    const sortedTabs = [...tabs].filter(t => t.id).sort((a, b) => a.index - b.index);
-
-    const indexToStructureEntry = new Map<number, { structureIndex: number; entry: TreeStructureEntry }>();
-    for (let i = 0; i < treeStructure.length; i++) {
-      const entry = treeStructure[i];
-      indexToStructureEntry.set(entry.index, { structureIndex: i, entry });
-    }
-
-    const structureIndexToTabId = new Map<number, number>();
-    const matchedTabIds = new Set<number>();
-
-    for (const tab of sortedTabs) {
-      if (!tab.id) continue;
-      const structureData = indexToStructureEntry.get(tab.index);
-      if (structureData && !matchedTabIds.has(tab.id)) {
-        structureIndexToTabId.set(structureData.structureIndex, tab.id);
-        matchedTabIds.add(tab.id);
-      }
-    }
-
-    for (let i = 0; i < treeStructure.length; i++) {
-      const tabId = structureIndexToTabId.get(i);
-      if (!tabId) continue;
-
-      const tab = tabs.find(t => t.id === tabId);
-      if (!tab || !tab.id) continue;
-
-      const entry = treeStructure[i];
-      const viewId = entry.viewId || defaultViewId;
-
-      const existing = this.tabToNode.get(tab.id);
-      if (existing) {
-        const viewState = this.views.get(existing.viewId);
-        if (viewState) {
-          const node = viewState.nodes[existing.nodeId];
-          if (node) {
-            node.isExpanded = entry.isExpanded;
-            if (entry.groupInfo) {
-              node.groupInfo = entry.groupInfo;
-            }
-          }
-        }
-        continue;
-      }
-
-      await this.addTab(tab, null, viewId);
-
-      const mapping = this.tabToNode.get(tab.id);
-      if (mapping) {
-        const viewState = this.views.get(mapping.viewId);
-        if (viewState) {
-          const node = viewState.nodes[mapping.nodeId];
-          if (node) {
-            node.isExpanded = entry.isExpanded;
-            if (entry.groupInfo) {
-              node.groupInfo = entry.groupInfo;
-            }
-          }
-        }
-      }
-    }
-
-    const entriesWithDepth: Array<{ index: number; entry: TreeStructureEntry; depth: number }> = [];
-    for (let i = 0; i < treeStructure.length; i++) {
-      const entry = treeStructure[i];
-      let depth = 0;
-      let currentParentIndex = entry.parentIndex;
-      while (currentParentIndex !== null) {
-        depth++;
-        currentParentIndex = treeStructure[currentParentIndex]?.parentIndex ?? null;
-      }
-      entriesWithDepth.push({ index: i, entry, depth });
-    }
-    entriesWithDepth.sort((a, b) => a.depth - b.depth);
-
-    for (const { index: i, entry } of entriesWithDepth) {
-      if (entry.parentIndex === null) continue;
-
-      const tabId = structureIndexToTabId.get(i);
-      const parentTabId = structureIndexToTabId.get(entry.parentIndex);
-      if (!tabId || !parentTabId) continue;
-
-      const childMapping = this.tabToNode.get(tabId);
-      const parentMapping = this.tabToNode.get(parentTabId);
-      if (!childMapping || !parentMapping) continue;
-
-      if (childMapping.viewId !== parentMapping.viewId) continue;
-
-      const viewState = this.views.get(childMapping.viewId);
-      if (!viewState) continue;
-
-      const childNode = viewState.nodes[childMapping.nodeId];
-      const parentNode = viewState.nodes[parentMapping.nodeId];
-      if (!childNode || !parentNode) continue;
-
-      if (childNode.parentId === parentNode.id) continue;
-
-      if (childNode.parentId) {
-        const oldParent = viewState.nodes[childNode.parentId];
-        if (oldParent) {
-          oldParent.children = oldParent.children.filter(c => c.id !== childNode.id);
-        }
-      } else {
-        viewState.rootNodeIds = viewState.rootNodeIds.filter(id => id !== childNode.id);
-      }
-
-      childNode.parentId = parentNode.id;
-      childNode.depth = parentNode.depth + 1;
-
-      if (!parentNode.children.some(c => c.id === childNode.id)) {
-        parentNode.children.push(childNode);
-      }
-
-      this.updateChildrenDepth(childNode);
-    }
-
-    const newTabPosition = userSettings?.newTabPositionManual ?? 'end';
-
-    for (const tab of tabs) {
-      if (!tab.id) continue;
-      if (matchedTabIds.has(tab.id)) continue;
-
-      const existing = this.tabToNode.get(tab.id);
-      if (!existing) {
-        let parentId: string | null = null;
-
-        if (newTabPosition !== 'end' && tab.openerTabId) {
-          const parentMapping = this.tabToNode.get(tab.openerTabId);
-          parentId = parentMapping?.nodeId || null;
-        }
-
-        await this.addTab(tab, parentId, defaultViewId);
-
-        if (newTabPosition === 'end' && tab.windowId !== undefined) {
-          try {
-            await chrome.tabs.move(tab.id, { index: -1 });
-          } catch {
-            // ignore
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * openerTabIdを使って親子関係を復元
-   */
-  private async syncWithOpenerTabId(
-    tabs: chrome.tabs.Tab[],
-    defaultViewId: string,
-    userSettings?: { newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end' },
-  ): Promise<void> {
-    const tabsMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
-    const processedTabs = new Set<number>();
-    const orderedTabs: chrome.tabs.Tab[] = [];
-    const newTabPosition = userSettings?.newTabPositionManual ?? 'end';
-
-    const addTabAndChildren = (tab: chrome.tabs.Tab) => {
-      if (!tab.id || processedTabs.has(tab.id)) return;
-
-      if (tab.openerTabId && tabsMap.has(tab.openerTabId)) {
-        addTabAndChildren(tabsMap.get(tab.openerTabId)!);
-      }
-
-      processedTabs.add(tab.id);
-      orderedTabs.push(tab);
-    };
-
-    for (const tab of tabs) {
-      if (tab.id) {
-        addTabAndChildren(tab);
-      }
-    }
-
-    for (const tab of orderedTabs) {
-      if (!tab.id) continue;
-
-      const existing = this.tabToNode.get(tab.id);
-      if (!existing) {
-        let parentId: string | null = null;
-
-        if (newTabPosition !== 'end' && tab.openerTabId) {
-          const parentMapping = this.tabToNode.get(tab.openerTabId);
-          parentId = parentMapping?.nodeId || null;
-        }
-
-        await this.addTab(tab, parentId, defaultViewId);
-
-        if (newTabPosition === 'end' && tab.windowId !== undefined) {
-          try {
-            await chrome.tabs.move(tab.id, { index: -1 });
-          } catch {
-            // ignore
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * サブツリー全体のノード数を取得
-   */
-  getSubtreeSize(tabId: number): number {
-    const result = this.getNodeByTabId(tabId);
-    if (!result) return 0;
-    return this.countSubtreeNodes(result.node);
-  }
-
-  /**
-   * サブツリー全体のノードを取得
-   */
-  getSubtree(tabId: number): TabNode[] {
-    const result = this.getNodeByTabId(tabId);
-    if (!result) return [];
-
-    const subtree: TabNode[] = [];
-    this.collectSubtreeNodes(result.node, subtree);
-    return subtree;
-  }
-
-  /**
-   * タブIDを置き換える
-   */
-  async replaceTabId(oldTabId: number, newTabId: number): Promise<void> {
-    const mapping = this.tabToNode.get(oldTabId);
-    if (!mapping) return;
-
-    const viewState = this.views.get(mapping.viewId);
-    if (!viewState) return;
-
-    const node = viewState.nodes[mapping.nodeId];
-    if (!node) return;
-
-    node.tabId = newTabId;
-    this.tabToNode.delete(oldTabId);
-    this.tabToNode.set(newTabId, mapping);
-
-    await this.persistState();
-  }
-
-  /**
-   * グループを作成
-   */
-  async createGroupWithRealTab(groupTabId: number, tabIds: number[], groupName: string = '新しいグループ'): Promise<string> {
-    if (tabIds.length === 0) {
-      throw new Error('No tabs specified for grouping');
-    }
-
-    const firstMapping = this.tabToNode.get(tabIds[0]);
-    if (!firstMapping) {
-      throw new Error('First tab not found');
-    }
-
-    const viewId = firstMapping.viewId;
-    const viewState = this.views.get(viewId);
-    if (!viewState) {
-      throw new Error('View not found');
-    }
-
-    const groupNodeId = `node-${groupTabId}`;
-
-    const parentIds = new Set<string | null>();
-    for (const tabId of tabIds) {
-      const mapping = this.tabToNode.get(tabId);
-      if (mapping && mapping.viewId === viewId) {
-        const node = viewState.nodes[mapping.nodeId];
-        if (node) {
-          parentIds.add(node.parentId);
-        }
-      }
-    }
-
-    const allSameParent = parentIds.size === 1;
-    const firstNode = viewState.nodes[firstMapping.nodeId];
-    const commonParentId = allSameParent ? firstNode?.parentId : null;
-    const groupDepth = commonParentId !== null ? (viewState.nodes[commonParentId]?.depth ?? 0) + 1 : 0;
-
-    const groupNode: TabNode = {
-      id: groupNodeId,
-      tabId: groupTabId,
-      parentId: commonParentId,
-      children: [],
-      isExpanded: true,
-      depth: groupDepth,
-      groupInfo: {
-        name: groupName,
-        color: '#f59e0b',
-      },
-    };
-
-    viewState.nodes[groupNodeId] = groupNode;
-    this.tabToNode.set(groupTabId, { viewId, nodeId: groupNodeId });
-
-    if (commonParentId === null) {
-      const firstNodeIndex = viewState.rootNodeIds.findIndex((nodeId) => {
-        const node = viewState.nodes[nodeId];
-        return node && tabIds.includes(node.tabId);
-      });
-      if (firstNodeIndex >= 0) {
-        viewState.rootNodeIds.splice(firstNodeIndex, 0, groupNodeId);
-      } else {
-        viewState.rootNodeIds.push(groupNodeId);
-      }
-    } else {
-      const parentNode = viewState.nodes[commonParentId];
-      if (parentNode) {
-        const firstChildIndex = parentNode.children.findIndex(
-          (child) => tabIds.includes(child.tabId)
-        );
-        if (firstChildIndex >= 0) {
-          parentNode.children.splice(firstChildIndex, 0, groupNode);
-        } else {
-          parentNode.children.push(groupNode);
-        }
-      }
-    }
-
-    // 選択されたnodeIdのSetを構築
-    const selectedNodeIds = new Set<string>();
-    for (const tabId of tabIds) {
-      const mapping = this.tabToNode.get(tabId);
-      if (mapping && mapping.viewId === viewId) {
-        selectedNodeIds.add(mapping.nodeId);
-      }
-    }
-
-    // ルートノードを特定: 親が選択されていないノード
-    const rootNodesOfSelection: TabNode[] = [];
-    for (const tabId of tabIds) {
-      const mapping = this.tabToNode.get(tabId);
-      if (!mapping || mapping.viewId !== viewId) continue;
-
-      const node = viewState.nodes[mapping.nodeId];
-      if (!node) continue;
-
-      const parentIsSelected = node.parentId && selectedNodeIds.has(node.parentId);
-      if (!parentIsSelected) {
-        rootNodesOfSelection.push(node);
-      }
-    }
-
-    // ルートノードのみをグループに追加
-    for (const node of rootNodesOfSelection) {
-      if (node.parentId) {
-        const oldParent = viewState.nodes[node.parentId];
-        if (oldParent) {
-          oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
-        }
-      } else {
-        viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== node.id);
-      }
-
-      node.parentId = groupNodeId;
-      node.depth = groupDepth + 1;
-      groupNode.children.push(node);
-
-      this.updateChildrenDepth(node);
-    }
-
-    await this.persistState();
-
-    return groupNodeId;
-  }
-
-  /**
-   * グループを解除
-   */
-  async dissolveGroup(tabId: number): Promise<void> {
-    const result = this.getNodeByTabId(tabId);
-    if (!result) {
-      throw new Error('Tab not found');
-    }
-
-    const { viewId, node } = result;
-    const viewState = this.views.get(viewId);
-    if (!viewState) {
-      throw new Error('View not found');
-    }
-
-    let groupNode: TabNode | null = null;
-
-    if (node.groupInfo) {
-      groupNode = node;
-    } else if (node.parentId) {
-      const parentNode = viewState.nodes[node.parentId];
-      if (parentNode?.groupInfo) {
-        groupNode = parentNode;
-      }
-    }
-
-    if (!groupNode) {
-      throw new Error('Group not found');
-    }
-
-    for (const child of [...groupNode.children]) {
-      child.parentId = null;
-      child.depth = 0;
-      this.updateChildrenDepth(child);
-      viewState.rootNodeIds.push(child.id);
-    }
-
-    if (groupNode.parentId) {
-      const parentNode = viewState.nodes[groupNode.parentId];
-      if (parentNode) {
-        parentNode.children = parentNode.children.filter((child) => child.id !== groupNode!.id);
-      }
-    } else {
-      viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== groupNode!.id);
-    }
-
-    delete viewState.nodes[groupNode.id];
-    this.tabToNode.delete(groupNode.tabId);
-
-    await this.persistState();
-  }
-
-  /**
-   * グループ情報を取得
-   */
-  async getGroupInfo(tabId: number): Promise<{
-    nodeId: string;
-    name: string;
-    children: Array<{ tabId: number; title: string; url: string }>;
-  }> {
-    const result = this.getNodeByTabId(tabId);
-    if (!result) {
-      throw new Error('Group not found');
-    }
-
-    if (!result.node.groupInfo) {
-      throw new Error('Not a group tab');
-    }
-
-    const nodeId = result.node.id;
-    const groupName = result.node.groupInfo?.name ?? '新しいグループ';
-
-    const children: Array<{ tabId: number; title: string; url: string }> = [];
-    for (const child of result.node.children) {
-      try {
-        const tab = await chrome.tabs.get(child.tabId);
-        children.push({
-          tabId: child.tabId,
-          title: tab.title || '',
-          url: tab.url || '',
-        });
-      } catch {
-        // ignore
-      }
-    }
-
-    return { nodeId, name: groupName, children };
-  }
-
-  /**
-   * グループ名を更新
-   */
-  async updateGroupName(nodeId: string, name: string): Promise<boolean> {
-    for (const [, viewState] of this.views) {
-      const node = viewState.nodes[nodeId];
-      if (node && node.groupInfo) {
-        node.groupInfo.name = name;
-        await this.persistState();
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * すべてのビューを取得
-   */
-  getAllViews(): View[] {
-    return Array.from(this.views.values()).map(vs => vs.info);
-  }
-
-  /**
-   * 現在の状態をシリアライズ可能な形式に変換
-   * STATE_UPDATEDメッセージのペイロードとして使用
-   */
-  toJSON(): TreeState {
-    const viewsRecord: Record<string, ViewState> = {};
-
-    for (const [viewId, viewState] of this.views) {
-      const nodesRecord: Record<string, TabNode> = {};
-
-      for (const [nodeId, node] of Object.entries(viewState.nodes)) {
-        nodesRecord[nodeId] = {
-          ...node,
-          children: node.children.map(child => ({ id: child.id })) as unknown as TabNode[],
-        };
-      }
-
-      viewsRecord[viewId] = {
-        info: viewState.info,
-        rootNodeIds: [...viewState.rootNodeIds],
-        nodes: nodesRecord,
-      };
-    }
-
-    const tabToNodeRecord: Record<number, { viewId: string; nodeId: string }> = {};
-    this.tabToNode.forEach((mapping, tabId) => {
-      tabToNodeRecord[tabId] = mapping;
-    });
-
-    const pinnedTabIdsByWindowRecord: Record<number, number[]> = {};
-    this.pinnedTabIdsByWindow.forEach((tabIds, windowId) => {
-      pinnedTabIdsByWindowRecord[windowId] = [...tabIds];
-    });
-
-    return {
-      views: viewsRecord,
-      viewOrder: [...this.viewOrder],
-      currentViewId: this.currentViewId,
-      currentViewByWindowId: { ...this.currentViewByWindowId },
-      tabToNode: tabToNodeRecord,
-      treeStructure: [],
-      pinnedTabIdsByWindow: pinnedTabIdsByWindowRecord,
-    };
-  }
-
-  /**
-   * 状態変更後の通知を送信
-   * payloadにシリアライズした状態を含める
-   */
-  notifyStateChanged(): void {
-    const payload = this.toJSON();
-    chrome.runtime.sendMessage({
-      type: 'STATE_UPDATED',
-      payload,
-    }).catch(() => {
-      // メッセージ送信失敗は無視（サイドパネルが閉じている場合など）
-    });
-  }
-
-  /**
-   * ストレージに状態を永続化
-   */
-  private async persistState(): Promise<void> {
-    const viewsRecord: Record<string, ViewState> = {};
-
-    for (const [viewId, viewState] of this.views) {
-      const nodesRecord: Record<string, TabNode> = {};
-
-      for (const [nodeId, node] of Object.entries(viewState.nodes)) {
-        nodesRecord[nodeId] = {
-          ...node,
-          children: node.children.map(child => ({ id: child.id })) as unknown as TabNode[],
-        };
-      }
-
-      viewsRecord[viewId] = {
-        info: viewState.info,
-        rootNodeIds: [...viewState.rootNodeIds],
-        nodes: nodesRecord,
-      };
-    }
-
-    const tabToNodeRecord: Record<number, { viewId: string; nodeId: string }> = {};
-    this.tabToNode.forEach((mapping, tabId) => {
-      tabToNodeRecord[tabId] = mapping;
-    });
-
-    const treeStructure = await this.buildTreeStructure();
-
-    const pinnedTabIdsByWindowRecord: Record<number, number[]> = {};
-    this.pinnedTabIdsByWindow.forEach((tabIds, windowId) => {
-      pinnedTabIdsByWindowRecord[windowId] = [...tabIds];
-    });
-
-    const treeState: TreeState = {
-      views: viewsRecord,
-      viewOrder: [...this.viewOrder],
-      currentViewId: this.currentViewId,
-      currentViewByWindowId: { ...this.currentViewByWindowId },
-      tabToNode: tabToNodeRecord,
-      treeStructure,
-      pinnedTabIdsByWindow: pinnedTabIdsByWindowRecord,
-    };
-
-    await this.storageService.set(STORAGE_KEYS.TREE_STATE, treeState);
-  }
-
-  /**
-   * ツリー構造を順序付きで構築
-   * 内部ツリーの順序（rootNodeIds + 深さ優先）を使用
-   */
-  private async buildTreeStructure(): Promise<TreeStructureEntry[]> {
+  private async closeEmptyWindows(): Promise<void> {
     try {
-      const tabs = await chrome.tabs.query({});
-      const tabMap = new Map(tabs.filter(t => t.id).map(t => [t.id!, t]));
+      const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+      if (allWindows.length <= 1) return;
 
-      const nodesInOrder: Array<{ node: TabNode; viewId: string }> = [];
-
-      const collectInOrder = (node: TabNode, viewId: string): void => {
-        nodesInOrder.push({ node, viewId });
-        for (const child of node.children) {
-          collectInOrder(child, viewId);
-        }
-      };
-
-      for (const [viewId, viewState] of this.views) {
-        for (const rootNodeId of viewState.rootNodeIds) {
-          const rootNode = viewState.nodes[rootNodeId];
-          if (rootNode && !rootNode.parentId) {
-            collectInOrder(rootNode, viewId);
-          }
-        }
-      }
-
-      const nodeIdToIndex = new Map<string, number>();
-      nodesInOrder.forEach(({ node }, index) => {
-        nodeIdToIndex.set(node.id, index);
-      });
-
-      const treeStructure: TreeStructureEntry[] = nodesInOrder.map(({ node, viewId }) => {
-        const tab = tabMap.get(node.tabId);
-        const entry: TreeStructureEntry = {
-          url: tab?.pendingUrl || tab?.url || '',
-          parentIndex: node.parentId ? (nodeIdToIndex.get(node.parentId) ?? null) : null,
-          index: tab?.index ?? -1,
-          viewId,
-          isExpanded: node.isExpanded,
-        };
-        if (node.groupInfo) {
-          entry.groupInfo = node.groupInfo;
-        }
-        return entry;
-      });
-
-      return treeStructure;
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * ストレージから状態を復元
-   */
-  async loadState(): Promise<void> {
-    try {
-      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-      if (!state) {
-        return;
-      }
-
-      this.views.clear();
-      this.tabToNode.clear();
-
-      if (state.viewOrder && Array.isArray(state.viewOrder)) {
-        this.viewOrder = [...state.viewOrder];
-      } else {
-        this.viewOrder = Object.keys(state.views);
-      }
-
-      for (const [viewId, viewStateData] of Object.entries(state.views)) {
-        const viewState: ViewState = {
-          info: viewStateData.info,
-          rootNodeIds: [...viewStateData.rootNodeIds],
-          nodes: {},
-        };
-
-        for (const [nodeId, nodeData] of Object.entries(viewStateData.nodes)) {
-          viewState.nodes[nodeId] = {
-            ...nodeData,
-            children: [],
-          };
-        }
-
-        this.views.set(viewId, viewState);
-      }
-
-      for (const [tabIdStr, mapping] of Object.entries(state.tabToNode)) {
-        const tabId = parseInt(tabIdStr);
-        this.tabToNode.set(tabId, mapping);
-      }
-      for (const viewState of this.views.values()) {
-        const addedChildIds = new Set<string>();
-
-        for (const [, nodeData] of Object.entries(state.views[viewState.info.id]?.nodes || {})) {
-          const parentId = nodeData.id;
-          const parent = viewState.nodes[parentId];
-          if (!parent) continue;
-
-          if (nodeData.children && Array.isArray(nodeData.children)) {
-            for (const storedChild of nodeData.children) {
-              if (!storedChild || typeof storedChild !== 'object') continue;
-              const childId = (storedChild as { id?: string }).id;
-              if (!childId) continue;
-              const child = viewState.nodes[childId];
-              if (child && child.parentId === parentId) {
-                parent.children.push(child);
-                addedChildIds.add(childId);
-              }
-            }
-          }
-        }
-
-        for (const [nodeId, node] of Object.entries(viewState.nodes)) {
-          if (addedChildIds.has(nodeId)) continue;
-          if (node.parentId) {
-            const parent = viewState.nodes[node.parentId];
-            if (parent) {
-              parent.children.push(node);
-            }
-          }
-        }
-
-        const recalculateDepth = (node: TabNode, depth: number): void => {
-          node.depth = depth;
-          for (const child of node.children) {
-            recalculateDepth(child, depth + 1);
-          }
-        };
-
-        for (const nodeId of viewState.rootNodeIds) {
-          const node = viewState.nodes[nodeId];
-          if (node) {
-            recalculateDepth(node, 0);
-          }
-        }
-      }
-
-      this.currentViewId = state.currentViewId || 'default';
-      this.currentViewByWindowId = state.currentViewByWindowId || {};
-
-      this.pinnedTabIdsByWindow.clear();
-      if (state.pinnedTabIdsByWindow) {
-        for (const [windowIdStr, tabIds] of Object.entries(state.pinnedTabIdsByWindow)) {
-          const windowId = parseInt(windowIdStr);
-          if (!isNaN(windowId) && Array.isArray(tabIds)) {
-            this.pinnedTabIdsByWindow.set(windowId, [...tabIds]);
+      for (const window of allWindows) {
+        if (window.id === undefined) continue;
+        const tabs = await chrome.tabs.query({ windowId: window.id });
+        if (tabs.length === 0) {
+          const currentWindows = await chrome.windows.getAll({
+            windowTypes: ['normal'],
+          });
+          if (currentWindows.length > 1) {
+            await chrome.windows.remove(window.id);
           }
         }
       }
     } catch {
-      // ignore
+      // ウィンドウクローズ失敗は無視
     }
   }
 
-  private isDescendant(viewState: ViewState, ancestorId: string, descendantId: string): boolean {
-    const ancestor = viewState.nodes[ancestorId];
-    if (!ancestor) return false;
-
-    for (const child of ancestor.children) {
-      if (child.id === descendantId) return true;
-      if (this.isDescendant(viewState, child.id, descendantId)) return true;
-    }
-
-    return false;
-  }
-
-  private updateChildrenDepth(node: TabNode): void {
-    for (const child of node.children) {
-      child.depth = node.depth + 1;
-      this.updateChildrenDepth(child);
-    }
-  }
-
-  private promoteChildren(viewState: ViewState, parentNode: TabNode): void {
-    const children = [...parentNode.children];
-
-    for (const child of children) {
-      child.parentId = parentNode.parentId;
-      child.depth = parentNode.depth;
-
-      this.updateChildrenDepth(child);
-
-      if (parentNode.parentId) {
-        const grandparentNode = viewState.nodes[parentNode.parentId];
-        if (grandparentNode) {
-          const parentIndex = grandparentNode.children.findIndex(
-            (c) => c.id === parentNode.id,
-          );
-          if (parentIndex !== -1) {
-            grandparentNode.children.splice(parentIndex + 1, 0, child);
-          } else {
-            grandparentNode.children.push(child);
-          }
-        }
-      } else {
-        const parentIndex = viewState.rootNodeIds.indexOf(parentNode.id);
-        if (parentIndex !== -1) {
-          const insertIndex = parentIndex + 1 + children.indexOf(child);
-          viewState.rootNodeIds.splice(insertIndex, 0, child.id);
-        } else {
-          viewState.rootNodeIds.push(child.id);
-        }
-      }
-    }
-
-    parentNode.children = [];
-  }
-
-  private removeChildrenRecursively(viewState: ViewState, parentNode: TabNode): number[] {
-    const closedTabIds: number[] = [];
-
-    for (const child of [...parentNode.children]) {
-      const grandchildTabIds = this.removeChildrenRecursively(viewState, child);
-      closedTabIds.push(...grandchildTabIds);
-
-      closedTabIds.push(child.tabId);
-
-      viewState.rootNodeIds = viewState.rootNodeIds.filter((id) => id !== child.id);
-      delete viewState.nodes[child.id];
-      this.tabToNode.delete(child.tabId);
-    }
-
-    parentNode.children = [];
-
-    return closedTabIds;
-  }
-
-  private countSubtreeNodes(node: TabNode): number {
-    let count = 1;
-    for (const child of node.children) {
-      count += this.countSubtreeNodes(child);
-    }
-    return count;
-  }
-
-  private collectSubtreeNodes(node: TabNode, result: TabNode[]): void {
-    result.push(node);
-    for (const child of node.children) {
-      this.collectSubtreeNodes(child, result);
+  async refreshTreeStructure(): Promise<void> {
+    try {
+      await this.persistState();
+    } catch {
+      // 永続化失敗は無視
     }
   }
 
   /**
-   * ノードを指定した親の子として移動（D&Dの子としてドロップ）
-   * 複数選択対応：選択内でルートになるノードのみを移動先に移動し、
-   * 選択内の親子関係は維持する
-   *
-   * @param nodeId - ドラッグしたノードID
-   * @param targetParentId - ドロップ先の親ノードID
-   * @param viewId - ビューID
-   * @param selectedNodeIds - 選択されているノードID一覧
+   * アクティブビューのインデックスを取得
    */
-  async moveNodeToParent(
-    nodeId: string,
-    targetParentId: string,
-    viewId: string,
-    selectedNodeIds: string[]
-  ): Promise<void> {
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
-
-    const activeNode = viewState.nodes[nodeId];
-    const targetParent = viewState.nodes[targetParentId];
-    if (!activeNode || !targetParent) return;
-
-    const isActiveNodeSelected = selectedNodeIds.includes(nodeId);
-    const nodesToMove = isActiveNodeSelected ? selectedNodeIds : [nodeId];
-    const nodesToMoveSet = new Set(nodesToMove);
-
-    for (const id of nodesToMove) {
-      if (this.isDescendant(viewState, id, targetParentId)) {
-        return;
-      }
-    }
-
-    if (nodesToMoveSet.has(targetParentId)) {
-      return;
-    }
-
-    const rootNodesInSelection = nodesToMove.filter(id => {
-      const node = viewState.nodes[id];
-      if (!node) return false;
-      return !node.parentId || !nodesToMoveSet.has(node.parentId);
-    });
-
-    for (const id of rootNodesInSelection) {
-      const node = viewState.nodes[id];
-      if (!node) continue;
-
-      if (node.parentId) {
-        const oldParent = viewState.nodes[node.parentId];
-        if (oldParent) {
-          oldParent.children = oldParent.children.filter(child => child.id !== id);
-        }
-      } else {
-        viewState.rootNodeIds = viewState.rootNodeIds.filter(rootId => rootId !== id);
-      }
-    }
-
-    for (const id of rootNodesInSelection) {
-      const node = viewState.nodes[id];
-      if (!node) continue;
-
-      node.parentId = targetParentId;
-      node.depth = targetParent.depth + 1;
-      this.updateChildrenDepth(node);
-      targetParent.children.push(node);
-    }
-
-    targetParent.isExpanded = true;
-
-    await this.persistState();
-  }
-
-  /**
-   * ビュー色パレット
-   */
-  private static readonly VIEW_COLOR_PALETTE = [
-    '#3B82F6', // blue (default)
-    '#10B981', // green
-    '#F59E0B', // yellow
-    '#EF4444', // red
-    '#8B5CF6', // purple
-    '#EC4899', // pink
-    '#06B6D4', // cyan
-    '#F97316', // orange
-  ];
-
-  /**
-   * ビューを切り替え
-   * ウィンドウ毎のcurrentViewByWindowIdを更新し、グローバルなcurrentViewIdも更新
-   */
-  async switchView(
-    viewId: string,
-    windowId: number,
-    _previousViewId: string,
-    _activeTabId: number | null
-  ): Promise<void> {
-    this.currentViewId = viewId;
-    this.currentViewByWindowId = {
-      ...this.currentViewByWindowId,
-      [windowId]: viewId,
-    };
-
-    const existingState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-    if (!existingState) return;
-
-    const updatedState: TreeState = {
-      ...existingState,
-      currentViewByWindowId: this.currentViewByWindowId,
-      currentViewId: viewId,
-    };
-
-    await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedState);
-  }
-
-  /**
-   * 新しいビューを自動で色を決定して作成
-   */
-  async createViewWithAutoColor(): Promise<string> {
-    const viewCount = this.views.size;
-    const colorIndex = viewCount % TreeStateManager.VIEW_COLOR_PALETTE.length;
-    const newColor = TreeStateManager.VIEW_COLOR_PALETTE[colorIndex];
-
-    const newViewId = `view_${Date.now()}`;
-    this.createView({
-      id: newViewId,
-      name: 'View',
-      color: newColor,
-    });
-
-    await this.persistState();
-    return newViewId;
-  }
-
-  /**
-   * グループを削除
-   */
-  async deleteTreeGroup(_nodeId: string, _viewId: string): Promise<void> {
-    await this.persistState();
-  }
-
-  /**
-   * タブをグループに追加
-   */
-  async addTabToTreeGroup(nodeId: string, targetGroupNodeId: string, viewId: string): Promise<void> {
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
-
-    const node = viewState.nodes[nodeId];
-    if (!node) return;
-
-    const groupNode = viewState.nodes[targetGroupNodeId];
-    const groupDepth = groupNode?.depth ?? 0;
-
-    if (node.parentId) {
-      const oldParent = viewState.nodes[node.parentId];
-      if (oldParent) {
-        oldParent.children = oldParent.children.filter(child => child.id !== nodeId);
-      }
-    } else {
-      viewState.rootNodeIds = viewState.rootNodeIds.filter(id => id !== nodeId);
-    }
-
-    node.parentId = targetGroupNodeId;
-    node.depth = groupDepth + 1;
-    this.updateChildrenDepth(node);
-
-    if (groupNode) {
-      groupNode.children.push(node);
-    }
-
-    await this.persistState();
-  }
-
-  /**
-   * タブをグループから削除
-   */
-  async removeTabFromTreeGroup(nodeId: string, viewId: string): Promise<void> {
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
-
-    const node = viewState.nodes[nodeId];
-    if (!node) return;
-
-    if (node.parentId && viewState.nodes[node.parentId]) {
-      const parentNode = viewState.nodes[node.parentId];
-      parentNode.children = parentNode.children.filter(child => child.id !== nodeId);
-    }
-
-    node.parentId = null;
-    node.depth = 0;
-    this.updateChildrenDepth(node);
-    viewState.rootNodeIds.push(nodeId);
-
-    await this.persistState();
-  }
-
-  /**
-   * タブを別のビューに移動
-   */
-  async moveTabsToViewInternal(targetViewId: string, tabIds: number[]): Promise<void> {
-    if (!this.views.has(targetViewId)) {
-      const viewCount = this.views.size;
-      const colorIndex = viewCount % TreeStateManager.VIEW_COLOR_PALETTE.length;
-      this.createView({
-        id: targetViewId,
-        name: 'View',
-        color: TreeStateManager.VIEW_COLOR_PALETTE[colorIndex],
-      });
-    }
-
-    const targetViewState = this.views.get(targetViewId)!;
-
-    const collectSubtreeNodeIds = (nodes: Record<string, TabNode>, nodeId: string): string[] => {
-      const result: string[] = [nodeId];
-      const node = nodes[nodeId];
-      if (node && node.children) {
-        for (const child of node.children) {
-          result.push(...collectSubtreeNodeIds(nodes, child.id));
-        }
-      }
-      return result;
-    };
-
-    const tabIdsSet = new Set(tabIds);
-    const topLevelTabIds: number[] = [];
-    for (const tabId of tabIds) {
-      const mapping = this.tabToNode.get(tabId);
-      if (!mapping) continue;
-      const sourceViewState = this.views.get(mapping.viewId);
-      if (!sourceViewState) continue;
-      const node = sourceViewState.nodes[mapping.nodeId];
-      if (!node) continue;
-      if (!node.parentId) {
-        topLevelTabIds.push(tabId);
-      } else {
-        const parentNode = sourceViewState.nodes[node.parentId];
-        if (!parentNode || !tabIdsSet.has(parentNode.tabId)) {
-          topLevelTabIds.push(tabId);
-        }
-      }
-    }
-
-    const topLevelTabIdSet = new Set(topLevelTabIds);
-
-    for (const tabId of topLevelTabIds) {
-      const mapping = this.tabToNode.get(tabId);
-      if (!mapping) continue;
-
-      const sourceViewId = mapping.viewId;
-      if (sourceViewId === targetViewId) continue;
-
-      const sourceViewState = this.views.get(sourceViewId);
-      if (!sourceViewState) continue;
-
-      const rootNode = sourceViewState.nodes[mapping.nodeId];
-      if (!rootNode) continue;
-
-      const subtreeNodeIds = collectSubtreeNodeIds(sourceViewState.nodes, rootNode.id);
-
-      if (rootNode.parentId) {
-        const parentNode = sourceViewState.nodes[rootNode.parentId];
-        if (parentNode) {
-          parentNode.children = parentNode.children.filter(c => c.id !== rootNode.id);
-        }
-      } else {
-        sourceViewState.rootNodeIds = sourceViewState.rootNodeIds.filter(id => id !== rootNode.id);
-      }
-
-      for (const nodeId of subtreeNodeIds) {
-        const node = sourceViewState.nodes[nodeId];
-        if (!node) continue;
-
-        delete sourceViewState.nodes[nodeId];
-
-        if (topLevelTabIdSet.has(node.tabId)) {
-          node.parentId = null;
-          node.depth = 0;
-        }
-
-        targetViewState.nodes[nodeId] = node;
-        this.tabToNode.set(node.tabId, { viewId: targetViewId, nodeId: node.id });
-      }
-
-      targetViewState.rootNodeIds.push(rootNode.id);
-    }
-
-    for (const nodeId of targetViewState.rootNodeIds) {
-      const node = targetViewState.nodes[nodeId];
-      if (node) {
-        node.depth = 0;
-        this.updateChildrenDepth(node);
-      }
-    }
-
-    await this.persistState();
-  }
-
-  /**
-   * ノードを兄弟として指定位置に挿入（D&DのGapドロップ）
-   * 複数選択対応：選択内でルートになるノードのみを移動し、
-   * 選択内の親子関係は維持する
-   *
-   * @param nodeId - ドラッグしたノードID
-   * @param aboveNodeId - 上のノードID（挿入位置の上）
-   * @param belowNodeId - 下のノードID（挿入位置の下）
-   * @param viewId - ビューID
-   * @param selectedNodeIds - 選択されているノードID一覧
-   */
-  async moveNodeAsSibling(
-    nodeId: string,
-    aboveNodeId: string | undefined,
-    belowNodeId: string | undefined,
-    viewId: string,
-    selectedNodeIds: string[]
-  ): Promise<void> {
-    const viewState = this.views.get(viewId);
-    if (!viewState) return;
-
-    const activeNode = viewState.nodes[nodeId];
-    if (!activeNode) return;
-
-    const isActiveNodeSelected = selectedNodeIds.includes(nodeId);
-    const nodesToMove = isActiveNodeSelected ? selectedNodeIds : [nodeId];
-    const nodesToMoveSet = new Set(nodesToMove);
-
-    let targetParentId: string | null = null;
-    if (belowNodeId && viewState.nodes[belowNodeId]) {
-      targetParentId = viewState.nodes[belowNodeId].parentId;
-    } else if (aboveNodeId && viewState.nodes[aboveNodeId]) {
-      targetParentId = viewState.nodes[aboveNodeId].parentId;
-    }
-
-    if (targetParentId) {
-      for (const id of nodesToMove) {
-        if (this.isDescendant(viewState, id, targetParentId)) {
-          return;
-        }
-      }
-    }
-
-    const topLevelNodesToMove = nodesToMove.filter(id => {
-      const node = viewState.nodes[id];
-      if (!node) return false;
-      return !node.parentId || !nodesToMoveSet.has(node.parentId);
-    });
-
-    for (const id of topLevelNodesToMove) {
-      const node = viewState.nodes[id];
-      if (!node) continue;
-
-      if (node.parentId) {
-        const oldParent = viewState.nodes[node.parentId];
-        if (oldParent) {
-          oldParent.children = oldParent.children.filter(child => child.id !== id);
-        }
-      } else {
-        viewState.rootNodeIds = viewState.rootNodeIds.filter(rootId => rootId !== id);
-      }
-    }
-
-    const sortedNodesToMove = topLevelNodesToMove
-      .map(id => viewState.nodes[id])
-      .filter((node): node is TabNode => node !== undefined);
-
-    for (const node of sortedNodesToMove) {
-      node.parentId = targetParentId;
-      node.depth = targetParentId ? (viewState.nodes[targetParentId]?.depth ?? 0) + 1 : 0;
-      this.updateChildrenDepth(node);
-    }
-
-    if (targetParentId) {
-      const targetParent = viewState.nodes[targetParentId];
-      if (targetParent) {
-        if (belowNodeId) {
-          const belowNode = viewState.nodes[belowNodeId];
-          if (belowNode && belowNode.parentId === targetParentId) {
-            const insertIndex = targetParent.children.findIndex(c => c.id === belowNodeId);
-            if (insertIndex !== -1) {
-              targetParent.children.splice(insertIndex, 0, ...sortedNodesToMove);
-            } else {
-              targetParent.children.push(...sortedNodesToMove);
-            }
-          } else {
-            targetParent.children.push(...sortedNodesToMove);
-          }
-        } else if (aboveNodeId) {
-          const aboveNode = viewState.nodes[aboveNodeId];
-          if (aboveNode && aboveNode.parentId === targetParentId) {
-            const insertIndex = targetParent.children.findIndex(c => c.id === aboveNodeId);
-            if (insertIndex !== -1) {
-              targetParent.children.splice(insertIndex + 1, 0, ...sortedNodesToMove);
-            } else {
-              targetParent.children.push(...sortedNodesToMove);
-            }
-          } else {
-            targetParent.children.push(...sortedNodesToMove);
-          }
-        } else {
-          targetParent.children.push(...sortedNodesToMove);
-        }
-      }
-    } else {
-      const nodesToInsertIds = sortedNodesToMove.map(n => n.id);
-      if (belowNodeId) {
-        const insertIndex = viewState.rootNodeIds.indexOf(belowNodeId);
-        if (insertIndex !== -1) {
-          viewState.rootNodeIds.splice(insertIndex, 0, ...nodesToInsertIds);
-        } else {
-          viewState.rootNodeIds.push(...nodesToInsertIds);
-        }
-      } else if (aboveNodeId) {
-        const insertIndex = viewState.rootNodeIds.indexOf(aboveNodeId);
-        if (insertIndex !== -1) {
-          viewState.rootNodeIds.splice(insertIndex + 1, 0, ...nodesToInsertIds);
-        } else {
-          viewState.rootNodeIds.push(...nodesToInsertIds);
-        }
-      } else {
-        viewState.rootNodeIds.push(...nodesToInsertIds);
-      }
-    }
-
-    await this.persistState();
-  }
-
-  /**
-   * タブを別ウィンドウに移動
-   * ツリー状態を更新してからChromeタブを移動し、同期を行う
-   */
-  async moveTabToWindow(tabId: number, targetWindowId: number): Promise<void> {
-    await this.moveTabToRootEnd(tabId);
-    await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
-    await this.syncTreeStateToChromeTabs();
-    await this.persistState();
-  }
-
-  /**
-   * タブで新しいウィンドウを作成
-   * ツリー状態を更新してから新ウィンドウを作成し、同期を行う
-   */
-  async createWindowWithTab(tabId: number): Promise<number | undefined> {
-    await this.moveTabToRootEnd(tabId);
-    const newWindow = await chrome.windows.create({ tabId });
-    await this.syncTreeStateToChromeTabs();
-    await this.persistState();
-    return newWindow?.id;
-  }
-
-  /**
-   * サブツリー全体で新しいウィンドウを作成
-   * 先頭タブで新ウィンドウを作成し、残りのタブを移動する
-   * @returns 作成されたウィンドウID（失敗時はundefined）
-   */
-  async createWindowWithSubtree(rootTabId: number): Promise<number | undefined> {
-    const subtree = this.getSubtree(rootTabId);
-    if (subtree.length === 0) return undefined;
-
-    const tabIds = subtree.map(node => node.tabId);
-    const firstTabId = tabIds[0];
-
-    const newWindow = await chrome.windows.create({ tabId: firstTabId });
-    if (!newWindow || newWindow.id === undefined) return undefined;
-
-    if (tabIds.length > 1) {
-      const remainingTabIds = tabIds.slice(1);
-      for (const tid of remainingTabIds) {
-        try {
-          await chrome.tabs.move(tid, { windowId: newWindow.id, index: -1 });
-        } catch {
-          // タブ移動失敗は無視
-        }
-      }
-    }
-
-    await this.syncTreeStateToChromeTabs();
-    await this.persistState();
-    return newWindow.id;
-  }
-
-  /**
-   * サブツリー全体を別ウィンドウに移動
-   */
-  async moveSubtreeToWindow(rootTabId: number, targetWindowId: number): Promise<void> {
-    const subtree = this.getSubtree(rootTabId);
-    if (subtree.length === 0) return;
-
-    const tabIds = subtree.map(node => node.tabId);
-
-    for (const tid of tabIds) {
-      try {
-        await chrome.tabs.move(tid, { windowId: targetWindowId, index: -1 });
-      } catch {
-        // タブ移動失敗は無視
-      }
-    }
-
-    await this.syncTreeStateToChromeTabs();
-    await this.persistState();
-  }
-
-  /**
-   * 複数タブを新しいウィンドウに移動
-   * コンテキストメニューの「新しいウィンドウに移動」で使用
-   */
-  async moveTabsToNewWindow(tabIds: number[]): Promise<number | undefined> {
-    if (tabIds.length === 0) return undefined;
-
-    const newWindow = await chrome.windows.create({ tabId: tabIds[0] });
-    if (!newWindow || newWindow.id === undefined) return undefined;
-
-    if (tabIds.length > 1) {
-      for (let i = 1; i < tabIds.length; i++) {
-        try {
-          await chrome.tabs.move(tabIds[i], { windowId: newWindow.id, index: -1 });
-        } catch {
-          // タブ移動失敗は無視
-        }
-      }
-    }
-
-    await this.syncTreeStateToChromeTabs();
-    await this.persistState();
-    return newWindow.id;
+  getActiveViewIndex(windowId: number): number {
+    const windowState = this.getWindowState(windowId);
+    return windowState?.activeViewIndex ?? 0;
   }
 
   /**
    * スナップショットからツリー状態を復元
-   * メモリ上の状態を直接更新し、永続化する
-   *
-   * @param snapshotViews - スナップショットのビュー情報
-   * @param indexToNewTabId - スナップショットのindex -> 新しいtabIdのマッピング
-   * @param indexToSnapshot - スナップショットのindex -> タブ情報のマッピング
-   * @param closeCurrentTabs - 既存タブを閉じるかどうか
    */
   async restoreTreeStateFromSnapshot(
-    snapshotViews: Array<{ id: string; name: string; color: string }>,
+    snapshotViews: Array<{ id: string; name: string; color: string; icon?: string }>,
     indexToNewTabId: Map<number, number>,
     indexToSnapshot: Map<number, {
       index: number;
@@ -2353,119 +2078,252 @@ export class TreeStateManager {
       windowIndex?: number;
       groupInfo?: GroupInfo;
     }>,
-    closeCurrentTabs: boolean
+    closeCurrentTabs: boolean,
+    windowIndexToNewWindowId: Map<number, number>
   ): Promise<void> {
-    const updatedViews: Map<string, ViewState> = new Map();
-    const updatedTabToNode: Map<number, { viewId: string; nodeId: string }> = new Map();
-
-    if (!closeCurrentTabs) {
-      for (const [viewId, viewState] of this.views) {
-        updatedViews.set(viewId, {
-          info: { ...viewState.info },
-          rootNodeIds: [...viewState.rootNodeIds],
-          nodes: { ...viewState.nodes },
-        });
-      }
-      for (const [tabId, mapping] of this.tabToNode) {
-        updatedTabToNode.set(tabId, { ...mapping });
-      }
+    // windowIndexごとにウィンドウ状態を構築
+    const windowIndexSet = new Set<number>();
+    for (const [, snapshot] of indexToSnapshot) {
+      windowIndexSet.add(snapshot.windowIndex ?? 0);
     }
 
+    // 既存ウィンドウをクリア（closeCurrentTabsの場合）
+    if (closeCurrentTabs) {
+      this.windows = [];
+    }
+
+    // ビューIDからビュー情報のマップを構築
+    const viewIdToView = new Map<string, { name: string; color: string; icon?: string }>();
     for (const view of snapshotViews) {
-      if (!updatedViews.has(view.id)) {
-        updatedViews.set(view.id, {
-          info: { id: view.id, name: view.name, color: view.color },
-          rootNodeIds: [],
-          nodes: {},
+      viewIdToView.set(view.id, { name: view.name, color: view.color, icon: view.icon });
+    }
+
+    // 各ウィンドウのツリーを構築
+    for (const [windowIndex, windowId] of windowIndexToNewWindowId) {
+      const windowState = this.getOrCreateWindowState(windowId);
+
+      // ウィンドウ内のビューを構築（ピン留めタブも含める）
+      const viewIdSet = new Set<string>();
+      for (const [, snapshot] of indexToSnapshot) {
+        if ((snapshot.windowIndex ?? 0) === windowIndex) {
+          viewIdSet.add(snapshot.viewId);
+        }
+      }
+
+      // 既存のビューをクリアして再構築
+      windowState.views = [];
+      for (const viewId of viewIdSet) {
+        const viewInfo = viewIdToView.get(viewId);
+        windowState.views.push({
+          name: viewInfo?.name ?? 'View',
+          color: viewInfo?.color ?? '#3B82F6',
+          icon: viewInfo?.icon,
+          rootNodes: [],
+          pinnedTabIds: [],
         });
       }
-    }
+      if (windowState.views.length === 0) {
+        windowState.views.push({
+          name: 'Default',
+          color: '#3B82F6',
+          rootNodes: [],
+          pinnedTabIds: [],
+        });
+      }
 
-    if (!updatedViews.has('default')) {
-      updatedViews.set('default', {
-        info: { id: 'default', name: 'Default', color: '#3B82F6' },
-        rootNodeIds: [],
-        nodes: {},
+      // viewIdからviewIndexへのマッピング
+      const viewIdToIndex = new Map<string, number>();
+      let vi = 0;
+      for (const viewId of viewIdSet) {
+        viewIdToIndex.set(viewId, vi);
+        vi++;
+      }
+
+      // indexToNewTabIdをparentIndexでソート（親が先に処理されるよう）
+      const sortedEntries = [...indexToSnapshot.entries()].sort(([indexA], [indexB]) => {
+        const snapshotA = indexToSnapshot.get(indexA)!;
+        const snapshotB = indexToSnapshot.get(indexB)!;
+        // 親がないタブを先に
+        if (snapshotA.parentIndex === null && snapshotB.parentIndex !== null) return -1;
+        if (snapshotA.parentIndex !== null && snapshotB.parentIndex === null) return 1;
+        return indexA - indexB;
       });
-    }
 
-    const allNewNodes: Map<string, TabNode> = new Map();
-    const nodeIdToViewId: Map<string, string> = new Map();
+      // タブノードを構築
+      const indexToNode = new Map<number, TabNode>();
 
-    for (const [index, newTabId] of indexToNewTabId) {
-      const snapshot = indexToSnapshot.get(index);
-      if (!snapshot) continue;
+      for (const [index, snapshot] of sortedEntries) {
+        if ((snapshot.windowIndex ?? 0) !== windowIndex) continue;
 
-      const nodeId = `node-${newTabId}`;
-      let parentId: string | null = null;
-      let depth = 0;
+        const newTabId = indexToNewTabId.get(index);
+        if (newTabId === undefined) continue;
 
-      if (snapshot.parentIndex !== null) {
-        const parentTabId = indexToNewTabId.get(snapshot.parentIndex);
-        if (parentTabId !== undefined) {
-          parentId = `node-${parentTabId}`;
-          const parentNode = allNewNodes.get(parentId);
+        const viewIndex = viewIdToIndex.get(snapshot.viewId) ?? 0;
+
+        if (snapshot.pinned) {
+          const viewState = windowState.views[viewIndex];
+          if (viewState) {
+            viewState.pinnedTabIds.push(newTabId);
+          }
+          continue;
+        }
+
+        const node: TabNode = {
+          tabId: newTabId,
+          isExpanded: snapshot.isExpanded,
+          groupInfo: snapshot.groupInfo,
+          children: [],
+        };
+        indexToNode.set(index, node);
+
+        if (snapshot.parentIndex !== null) {
+          const parentNode = indexToNode.get(snapshot.parentIndex);
           if (parentNode) {
-            depth = parentNode.depth + 1;
+            parentNode.children.push(node);
+            continue;
           }
         }
-      }
 
-      const newNode: TabNode = {
-        id: nodeId,
-        tabId: newTabId,
-        parentId,
-        children: [],
-        isExpanded: snapshot.isExpanded,
-        depth,
-      };
-      if (snapshot.groupInfo) {
-        newNode.groupInfo = snapshot.groupInfo;
-      }
-
-      allNewNodes.set(nodeId, newNode);
-      nodeIdToViewId.set(nodeId, snapshot.viewId);
-      updatedTabToNode.set(newTabId, { viewId: snapshot.viewId, nodeId });
-    }
-
-    for (const [nodeId, node] of allNewNodes) {
-      if (node.parentId && allNewNodes.has(node.parentId)) {
-        const parent = allNewNodes.get(node.parentId)!;
-        const childExists = parent.children.some(c => c.id === nodeId);
-        if (!childExists) {
-          parent.children = [...parent.children, node];
+        // ルートノードとして追加
+        if (viewIndex < windowState.views.length) {
+          windowState.views[viewIndex].rootNodes.push(node);
         }
-      }
-    }
-
-    for (const [nodeId, node] of allNewNodes) {
-      const viewId = nodeIdToViewId.get(nodeId) || 'default';
-      let viewState = updatedViews.get(viewId);
-      if (!viewState) {
-        viewState = {
-          info: { id: viewId, name: viewId === 'default' ? 'Default' : 'View', color: '#3B82F6' },
-          rootNodeIds: [],
-          nodes: {},
-        };
-        updatedViews.set(viewId, viewState);
-      }
-      viewState.nodes[nodeId] = node;
-
-      if (!node.parentId) {
-        viewState.rootNodeIds.push(nodeId);
-      }
-    }
-
-    this.views = updatedViews;
-    this.tabToNode = updatedTabToNode;
-
-    const existingViewOrder = new Set(this.viewOrder);
-    for (const viewId of updatedViews.keys()) {
-      if (!existingViewOrder.has(viewId)) {
-        this.viewOrder.push(viewId);
       }
     }
 
     await this.persistState();
+  }
+
+  /**
+   * ツリーグループを削除（グループタブを閉じ、子を昇格）
+   */
+  async deleteTreeGroup(tabId: number): Promise<void> {
+    const result = this.findNodeByTabId(tabId);
+    if (!result || !result.node.groupInfo) return;
+
+    // グループタブを閉じる
+    try {
+      await chrome.tabs.remove(tabId);
+    } catch {
+      // タブが存在しない場合は無視
+    }
+
+    // 子を昇格
+    const siblings = result.parent
+      ? result.parent.children
+      : result.viewState.rootNodes;
+    const nodeIndex = siblings.findIndex((n) => n.tabId === tabId);
+    if (nodeIndex !== -1) {
+      siblings.splice(nodeIndex, 1, ...result.node.children);
+    }
+
+    await this.persistState();
+  }
+
+  // ========================================
+  // 永続化
+  // ========================================
+
+  /**
+   * 状態をシリアライズ
+   */
+  toJSON(): TreeState {
+    return {
+      windows: this.windows.map((w) => ({
+        windowId: w.windowId,
+        views: w.views.map((v) => ({
+          name: v.name,
+          color: v.color,
+          icon: v.icon,
+          rootNodes: this.serializeNodes(v.rootNodes),
+          pinnedTabIds: [...v.pinnedTabIds],
+        })),
+        activeViewIndex: w.activeViewIndex,
+      })),
+    };
+  }
+
+  /**
+   * ノードをシリアライズ
+   */
+  private serializeNodes(nodes: TabNode[]): TabNode[] {
+    return nodes.map((n) => ({
+      tabId: n.tabId,
+      isExpanded: n.isExpanded,
+      groupInfo: n.groupInfo ? { ...n.groupInfo } : undefined,
+      children: this.serializeNodes(n.children),
+    }));
+  }
+
+  /**
+   * 状態変更を通知
+   */
+  notifyStateChanged(): void {
+    const payload = this.toJSON();
+    chrome.runtime
+      .sendMessage({
+        type: 'STATE_UPDATED',
+        payload,
+      })
+      .catch(() => {
+        // メッセージ送信失敗は無視
+      });
+  }
+
+  /**
+   * ストレージに永続化
+   */
+  private async persistState(): Promise<void> {
+    const treeState = this.toJSON();
+    await this.storageService.set(STORAGE_KEYS.TREE_STATE, treeState);
+  }
+
+  /**
+   * ストレージに保存されたstateが存在するかチェック
+   */
+  async hasPersistedState(): Promise<boolean> {
+    try {
+      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+      return !!(state && state.windows && state.windows.length > 0);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * ストレージから復元
+   */
+  async loadState(): Promise<void> {
+    try {
+      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+      if (!state || !state.windows) {
+        return;
+      }
+
+
+      this.windows = state.windows.map((w) => ({
+        windowId: w.windowId,
+        views: w.views.map((v) => ({
+          name: v.name,
+          color: v.color,
+          icon: v.icon,
+          rootNodes: this.deserializeNodes(v.rootNodes),
+          pinnedTabIds: [...(v.pinnedTabIds || [])],
+        })),
+        activeViewIndex: w.activeViewIndex,
+      }));
+    } catch {
+      // 復元失敗は無視
+    }
+  }
+
+  private deserializeNodes(nodes: TabNode[]): TabNode[] {
+    if (!nodes || !Array.isArray(nodes)) return [];
+    return nodes.map((n) => ({
+      tabId: n.tabId,
+      isExpanded: n.isExpanded ?? true,
+      groupInfo: n.groupInfo ? { ...n.groupInfo } : undefined,
+      children: this.deserializeNodes(n.children || []),
+    }));
   }
 }

@@ -66,9 +66,8 @@ Vivaldi独自のサイドパネルAPIを活用し、ブラウザネイティブ�
 ### Services (`/src/services/`)
 **Purpose**: ビジネスロジック層（スナップショット管理、ツリー状態管理等）
 **Key Components**:
-- `TreeStateManager.ts`: タブツリー状態の集中管理と永続化
+- `TreeStateManager.ts`: タブツリー状態の集中管理と永続化（ビュー管理を含む）
 - `SnapshotManager.ts`: スナップショットの保存・復元
-- `ViewManager.ts`: ビューの管理
 
 **Example**: `TreeStateManager.ts`, `SnapshotManager.ts`
 
@@ -78,7 +77,13 @@ Vivaldi独自のサイドパネルAPIを活用し、ブラウザネイティブ�
 
 ### Types (`/src/types/`)
 **Purpose**: 型定義の集約（プロジェクト全体で共有）
-**Example**: `index.ts` (TabNode, TabInfo, UserSettings等)
+**Key Types**:
+- `TreeState`, `WindowState`, `ViewState`: 状態管理の階層構造
+- `TabNode`, `UITabNode`: タブノード（UITabNodeはdepth付き）
+- `TabInfo`, `ExtendedTabInfo`: タブ情報
+- `UserSettings`: ユーザー設定
+
+**Example**: `index.ts`
 
 ### Testing (`/src/test/`)
 **Purpose**: クロスカッティングな統合テスト（パフォーマンス、互換性）
@@ -300,27 +305,27 @@ try {
 // ✅ 正しい: 各タブ操作の直後に毎回assertTabStructure
 const tab1 = await createTab(extensionContext, 'about:blank');
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
   { tabId: tab1, depth: 0 },
 ], 0);
 
 const tab2 = await createTab(extensionContext, 'about:blank');
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
   { tabId: tab1, depth: 0 },
   { tabId: tab2, depth: 0 },
 ], 0);
 
 await moveTabToParent(sidePanelPage, tab2, tab1, serviceWorker);
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
-  { tabId: tab1, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
+  { tabId: tab1, depth: 0, expanded: true },
   { tabId: tab2, depth: 1 },
 ], 0);
 
 await closeTab(extensionContext, tab2);
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
   { tabId: tab1, depth: 0 },
 ], 0);
 
@@ -343,8 +348,8 @@ await expect(tabNode2).toBeVisible();
 
 // ✅ 正解: 全体構造を網羅的に検証
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
-  { tabId: tab1, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
+  { tabId: tab1, depth: 0, expanded: true },
   { tabId: tab2, depth: 1 },
 ], 0);
 ```
@@ -373,7 +378,7 @@ await assertTabStructure(sidePanelPage, windowId, [
 ```typescript
 // ✅ 正しい: expandedの指定
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
   { tabId: tab2, depth: 0 },
   { tabId: tab1, depth: 0, expanded: true },    // 子を持つタブはexpanded必須
   { tabId: child1, depth: 1 },                   // 子を持たないタブはexpanded不可
@@ -383,7 +388,7 @@ await assertTabStructure(sidePanelPage, windowId, [
 
 // ✅ 正しい: 折りたたまれた場合は子タブを含めない
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
   { tabId: parent, depth: 0, expanded: false },  // 子タブは見えていないので含めない
 ], 0);
 ```
@@ -396,8 +401,8 @@ await assertTabStructure(sidePanelPage, windowId, [
 // ✅ 正しい: D&D操作後、事後条件を網羅的に検証
 await moveTabToParent(sidePanelPage, child, parent, serviceWorker);
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
-  { tabId: parent, depth: 0 },
+  { tabId: initialBrowserTabId, depth: 0 },
+  { tabId: parent, depth: 0, expanded: true },
   { tabId: child, depth: 1 },
 ], 0);
 ```
@@ -448,20 +453,66 @@ chrome.tabs.onCreated.addListener((tab) => {
 - 「一時的なフレーキーでした」
 - 「再現しないから放置」
 
+### フレーキーテスト修正の手順（必須）
+
+フレーキーテストは発生確率が低いため、何度もテストを実行して失敗を待つのは非現実的かつ非効率である。**漫然とテストを何度も繰り返すことは厳に禁止する。**
+
+#### 修正の正しい手順
+
+1. **網羅的なログの埋め込み**
+   - フレーキーテストを修正する前に、**すべての関連箇所にログを仕込む**
+   - 「すべての箇所」とは文字通りすべての箇所である。可能性のある経路をすべて網羅すること
+   - 各関数の事前条件・事後条件、状態の変化、分岐の結果などを記録する
+   - 目的：**1回のフレーキー発生時に、何が起きているかを完全に把握できる状態にする**
+
+2. **ログを確認可能な状態でテストを実行**
+   - ログを仕込んだ状態でテストを実行し、フレーキーが発生するまで待つ
+   - フレーキーが発生したら、収集したログから**実際に何が起きているか**を分析する
+
+3. **根本原因の特定と修正**
+   - ログから根本原因を特定し、論理的に説明できる状態にする
+   - 原因が特定できてから初めて修正を行う
+
+#### 禁止事項
+
+- **ログを確認せずに当てずっぽうで修正することの禁止**
+  - 「おそらくこれが原因だろう」という推測だけで修正してはならない
+  - 修正後にテストが通っても、それが「たまたま通った」のか「本当に修正された」のか判別できない
+
+- **ログが読めないことを理由にした妥協の禁止**
+  - ログがCLIの標準出力に表示されずブラウザのDevToolsにしか表示されない場合でも、ログを読まずに修正を進めてはならない
+  - ログを確認する手段を必ず確保すること
+
+#### ログが確認できない場合の対処
+
+1. **まずログを確認できる方法を探す**
+   - Service Workerのログは`console.log`で出力し、Playwrightの`serviceWorker.evaluate()`内で取得できないか検討する
+   - ログをファイルに書き出す、メッセージで送信する等の代替手段を検討する
+
+2. **それでも確認できない場合はユーザーに依頼する**
+   - ユーザーへの確認依頼は**最後の手段**である
+   - 「DevToolsでこのログを確認してください」と具体的に依頼する
+   - 確認してもらった結果を元に原因を特定する
+
+#### 修正完了の判定
+
+フレーキーテスト修正が完了したと言えるのは、以下をすべて満たす場合のみ：
+- ログから根本原因を**確定的に**特定し、論理的に説明できる
+- 修正内容が根本原因を**直接**解決している
+- 修正後、50回以上のテスト実行で失敗が0回である
+
 ### テスト初期化パターン（必須）
 
 テスト開始時は以下のパターンで初期化すること。ブラウザ起動時のデフォルトタブは閉じずに、assertTabStructureに含める。
 
 ```typescript
-// ウィンドウIDと各種タブIDを取得
+// ウィンドウIDと初期タブIDを取得
 const windowId = await getCurrentWindowId(serviceWorker);
-const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
 const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
 
 // ここからテスト用のタブを作成
 const tab1 = await createTab(extensionContext, 'about:blank');
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },
   { tabId: initialBrowserTabId, depth: 0 },
   { tabId: tab1, depth: 0 },
 ], 0);
@@ -477,16 +528,32 @@ await assertTabStructure(sidePanelPage, windowId, [
 ], 0);
 ```
 
-### 擬似サイドパネルタブ
+### 擬似サイドパネルタブとTreeState
 
-PlaywrightではChrome拡張機能の本物のサイドパネルをテストできないため、`sidepanel.html`を通常のタブとして開く。このタブは`assertTabStructure`に必ず含める。
+PlaywrightではChrome拡張機能の本物のサイドパネルをテストできないため、`sidepanel.html`を通常のタブとして開く（擬似サイドパネルタブ）。
+
+**重要**: サイドパネルタブ（`sidepanel.html`を開いているタブ）はTreeStateから**自動的に除外**される。これは`isOwnExtensionUrl()`と`isSidePanelUrl()`による判定で実現される。
+
+- 本番環境: サイドパネルは実際のサイドパネルAPIで開かれるためタブとして存在しない
+- E2Eテスト環境: 擬似サイドパネルタブはTreeStateから除外されるが、Chromeのタブとしては存在する
 
 ```typescript
-const pseudoSidePanelTabId = await getPseudoSidePanelTabId(serviceWorker, windowId);
+// assertTabStructureにはサイドパネルタブを含めない
 await assertTabStructure(sidePanelPage, windowId, [
-  { tabId: pseudoSidePanelTabId, depth: 0 },  // 常に含める
+  { tabId: initialBrowserTabId, depth: 0 },
   { tabId: testTab, depth: 0 },
 ], 0);
+
+// Chromeタブ数とTreeStateタブ数を比較する場合は、サイドパネルタブを除外する
+const browserTabCount = await serviceWorker.evaluate(async (windowId) => {
+  const extensionId = chrome.runtime.id;
+  const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
+  const tabs = await chrome.tabs.query({ windowId });
+  return tabs.filter(t => {
+    const url = t.url || t.pendingUrl || '';
+    return !url.startsWith(sidePanelUrlPrefix);
+  }).length;
+}, windowId);
 ```
 
 ### Playwrightデバッグコード禁止
@@ -594,6 +661,57 @@ npm run test:e2e   # Playwright E2Eテスト
 
 ## Key Technical Decisions
 
+### データ構造（最重要）
+
+**Window → View → Tab の階層構造**
+
+```typescript
+// TreeState: 全体の状態
+interface TreeState {
+  windows: WindowState[];  // ウィンドウ配列（順序を持つ）
+}
+
+// WindowState: ウィンドウごとの状態
+interface WindowState {
+  windowId: number;
+  views: ViewState[];      // ビュー配列（インデックスで参照）
+  activeViewIndex: number; // 現在アクティブなビューのインデックス
+}
+
+// ViewState: ビューごとの状態
+interface ViewState {
+  name: string;
+  color: string;
+  icon?: string;
+  rootNodes: TabNode[];    // ツリー構造を直接保持
+  pinnedTabIds: number[];  // ピン留めタブのID配列
+}
+
+// TabNode: タブノード（ツリー構造）
+interface TabNode {
+  tabId: number;           // Chrome tabIdを直接識別子として使用
+  isExpanded: boolean;
+  groupInfo?: GroupInfo;
+  children: TabNode[];     // 親子関係はchildren配列で直接表現
+}
+
+// UITabNode: UI表示用（TabNode + depth）
+interface UITabNode extends TabNode {
+  depth: number;           // UI表示用のインデント深度
+  children: UITabNode[];
+}
+```
+
+**識別子体系**:
+- **タブ識別**: `tabId: number`（Chrome tabIdを直接使用。文字列nodeIdは使用しない）
+- **ビュー識別**: `viewIndex: number`（配列インデックス。文字列viewIdは使用しない）
+- **親子関係**: `children: TabNode[]`（parentIdによる間接参照ではなく、配列で直接表現）
+
+**設計原則**:
+- マッピングテーブル（旧`tabToNode`）は不要。ツリー構造から直接検索
+- `depth`はTabNodeに含めない。UI層で計算するか、UITabNodeを使用
+- ビューはウィンドウごとに独立。ウィンドウ間でビューは共有しない
+
 ### 状態管理アーキテクチャ（最重要）
 
 **TreeStateManager（Service Worker）がSingle Source of Truth**
@@ -644,6 +762,12 @@ TreeStateManager
 **ServiceWorker側の禁止事項**:
 - イベントハンドラから直接`chrome.tabs.move()`、`chrome.tabs.update({pinned})`、`chrome.windows.create()`を呼び出すこと
 - これらの操作はTreeStateManagerのメソッドでメモリ状態を変更後、`syncTreeStateToChromeTabs()`で一括反映する
+- **Chrome → TreeStateManager 方向の同期は原則禁止**: 通常運用ではTreeStateManagerが正であり、Chromeタブの状態からTreeStateManagerを更新してはならない
+
+**唯一の例外: 拡張機能の新規インストール時**:
+- `chrome.runtime.onInstalled`で`details.reason === 'install'`の場合のみ、`initializeFromChromeTabs()`でChromeタブをTreeStateManagerに取り込む
+- これは拡張機能インストール前から存在するタブをサイドパネルに表示するための唯一の例外
+- Chrome再起動、ServiceWorker再起動、拡張機能アップデート時にはこの方向の同期は行わない
 
 **理由**: Side PanelとService Workerは別プロセスで動作する。共有メモリ（chrome.storage.local）を介した非同期処理はレースコンディションの温床となる。
 
@@ -667,12 +791,13 @@ TreeStateManager
 - **chrome.downloads API**: スナップショットをJSONファイルとしてダウンロードフォルダに保存
 - **Service Worker**: バックグラウンドでのタブイベント監視とツリー同期
 - **Path Alias `@/`**: `./src/`へのエイリアス
-- **複数ウィンドウ対応**: TreeStateProviderでwindowIdを取得し各ウィンドウで自身のタブのみをフィルタリング表示
+- **複数ウィンドウ対応**: TreeState.windows配列でウィンドウごとに独立した状態を管理。各サイドパネルは自身のwindowIdに対応するWindowStateのみを表示
 - **ウィンドウ間タブ移動**: コンテキストメニューから「別のウィンドウに移動」「新しいウィンドウに移動」で実現
 - **リンククリック検出**: `chrome.webNavigation.onCreatedNavigationTarget` APIを使用。このAPIはリンククリックまたは`window.open()`の場合のみ発火し、`chrome.tabs.create()`・ブックマーク・アドレスバー・Ctrl+Tでは発火しない。これにより「リンクから開いたタブ」と「手動で開いたタブ」を正確に区別し、それぞれの設定（`newTabPositionFromLink` / `newTabPositionManual`）を適用する
 - **ストレージ設計**: `chrome.storage.local`を使用（`unlimitedStorage`権限あり）。IndexedDBは使用しない。想定最大タブ数は2500。15秒ごとの定期永続化でブラウザクラッシュ時のデータロスを最小化。ファビコンはURL文字列（またはdata:URL）として保存
 - **タブ休止（discard）時のtabId変更**: `chrome.tabs.discard()`でタブを休止すると、ChromeはtabIdを変更する。この変更は`chrome.tabs.onReplaced`イベントで検知する。`onReplaced(addedTabId, removedTabId)`が発火したら、TreeStateManagerで旧tabIdを新tabIdに置き換える。Service Worker内ではイベントハンドラが逐次実行されるため、明示的なキューは不要
 - **TreeStateManager→UI/Chrome一方通行同期**: タブの順序・構造はTreeStateManager（Service Worker）が常に正（Single Source of Truth）。Chrome側でタブを直接操作（D&D、ピン留め解除など）した場合、TreeStateManagerの状態をChromeに再同期して元に戻す。これにより、Chrome側操作での親子関係やビュー整合性の破綻を防ぐ
+- **サイドパネルタブのTreeState除外**: 拡張機能自身のサイドパネルURLを持つタブは、TreeStateに追加しない。`isOwnExtensionUrl()`で自拡張機能のURLか判定し、`isSidePanelUrl()`でサイドパネルURLか判定する。本番環境ではサイドパネルAPIで開かれるためタブとして存在しないが、E2Eテストでは擬似サイドパネルタブとして通常タブで開くため、この除外ロジックが必要
 
 ---
 
@@ -698,7 +823,7 @@ TreeStateManager
 
 **採用した設計**: サイドパネル内の空白クリックでのみ選択解除
 - サイドパネル内のタブノード以外の領域（ViewSwitcher下、ツリービュー下の空白など）をクリックすると選択解除
-- 実装: `SidePanelRoot.tsx` の onClick で `!target.closest('[data-node-id]')` をチェック
+- 実装: `SidePanelRoot.tsx` の onClick で `!target.closest('[data-tab-id]')` をチェック
 
 **関連ファイル**: `src/sidepanel/components/SidePanelRoot.tsx`
 

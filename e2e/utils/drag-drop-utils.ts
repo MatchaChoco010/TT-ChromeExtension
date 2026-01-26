@@ -428,29 +428,39 @@ export async function moveTabToRoot(
   await waitForDragEnd(page, 2000);
 
   await page.evaluate(async (childId) => {
-    interface TreeNode {
-      id: string;
+    interface TabNode {
       tabId: number;
-      parentId: string | null;
+      isExpanded: boolean;
+      children: TabNode[];
     }
     interface ViewState {
-      nodes: Record<string, TreeNode>;
+      rootNodes: TabNode[];
+    }
+    interface WindowState {
+      views: ViewState[];
     }
     interface LocalTreeState {
-      views: Record<string, ViewState>;
+      windows: WindowState[];
     }
+
+    function isTabAtRoot(windows: WindowState[], tabId: number): boolean {
+      for (const windowState of windows) {
+        for (const view of windowState.views) {
+          for (const rootNode of view.rootNodes) {
+            if (rootNode.tabId === tabId) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
     for (let i = 0; i < 20; i++) {
       const result = await chrome.storage.local.get('tree_state');
       const treeState = result.tree_state as LocalTreeState | undefined;
-      if (treeState?.views) {
-        for (const view of Object.values(treeState.views)) {
-          const childNode = Object.values(view.nodes).find(
-            (n: TreeNode) => n.tabId === childId
-          );
-          if (childNode && childNode.parentId === null) {
-            return;
-          }
-        }
+      if (treeState?.windows && isTabAtRoot(treeState.windows, childId)) {
+        return;
       }
       await new Promise(resolve => setTimeout(resolve, 50));
     }

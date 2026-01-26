@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@/test/test-utils';
 import userEvent from '@testing-library/user-event';
 import SidePanelRoot from './SidePanelRoot';
 import TabTreeView from './TabTreeView';
-import type { TabNode } from '@/types';
+import type { UITabNode, TreeState } from '@/types';
 
 describe('基本UI表示の統合テスト', () => {
   beforeEach(() => {
@@ -12,46 +12,32 @@ describe('基本UI表示の統合テスト', () => {
 
   describe('Acceptance Criteria 1.1-1.2: サイドパネル表示とタブツリー表示', () => {
     it('サイドパネルが正しくレンダリングされ、ツリー構造でタブを表示できること', async () => {
-      const mockTreeState = {
-        views: {
-          default: {
-            info: {
-              id: 'default',
-              name: 'Default',
-              color: '#3b82f6',
-            },
-            rootNodeIds: ['node-1', 'node-2'],
-            nodes: {
-              'node-1': {
-                id: 'node-1',
-                tabId: 1,
-                parentId: null,
-                children: [],
-                isExpanded: true,
-                depth: 0,
-              } as TabNode,
-              'node-2': {
-                id: 'node-2',
-                tabId: 2,
-                parentId: null,
-                children: [],
-                isExpanded: true,
-                depth: 0,
-              } as TabNode,
-            },
+      const mockTreeState: TreeState = {
+        windows: [
+          {
+            windowId: 1,
+            views: [
+              {
+                name: 'Default',
+                color: '#3b82f6',
+                rootNodes: [
+                  { tabId: 1, isExpanded: true, children: [] },
+                  { tabId: 2, isExpanded: true, children: [] },
+                ],
+                pinnedTabIds: [],
+              },
+            ],
+            activeViewIndex: 0,
           },
-        },
-        viewOrder: ['default'],
-        currentViewId: 'default',
-        tabToNode: {
-          1: { viewId: 'default', nodeId: 'node-1' },
-          2: { viewId: 'default', nodeId: 'node-2' },
-        },
+        ],
       };
 
-      global.chrome.storage.local.get = vi
-        .fn()
-        .mockResolvedValue({ tree_state: mockTreeState });
+      global.chrome.runtime.sendMessage = vi.fn().mockImplementation((message) => {
+        if (message.type === 'GET_STATE') {
+          return Promise.resolve({ success: true, data: mockTreeState });
+        }
+        return Promise.resolve({ success: true });
+      });
 
       render(<SidePanelRoot />);
 
@@ -76,38 +62,32 @@ describe('基本UI表示の統合テスト', () => {
       const mockOnNodeClick = vi.fn();
       const mockOnToggleExpand = vi.fn();
 
-      const nodes: TabNode[] = [
+      const nodes: UITabNode[] = [
         {
-          id: 'node-1',
           tabId: 1,
-          parentId: null,
+          isExpanded: true,
+          depth: 0,
           children: [
             {
-              id: 'node-2',
               tabId: 2,
-              parentId: 'node-1',
-              children: [],
               isExpanded: true,
               depth: 1,
+              children: [],
             },
           ],
-          isExpanded: true,
-          depth: 0,
         },
         {
-          id: 'node-3',
           tabId: 3,
-          parentId: null,
-          children: [],
           isExpanded: true,
           depth: 0,
+          children: [],
         },
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -125,30 +105,26 @@ describe('基本UI表示の統合テスト', () => {
       const mockOnNodeClick = vi.fn();
       const mockOnToggleExpand = vi.fn();
 
-      const nodes: TabNode[] = [
+      const nodes: UITabNode[] = [
         {
-          id: 'parent',
           tabId: 1,
-          parentId: null,
-          children: [
-            {
-              id: 'child',
-              tabId: 2,
-              parentId: 'parent',
-              children: [],
-              isExpanded: true,
-              depth: 1,
-            },
-          ],
           isExpanded: true,
           depth: 0,
+          children: [
+            {
+              tabId: 2,
+              isExpanded: true,
+              depth: 1,
+              children: [],
+            },
+          ],
         },
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -170,21 +146,19 @@ describe('基本UI表示の統合テスト', () => {
       const mockOnNodeClick = vi.fn();
       const mockOnToggleExpand = vi.fn();
 
-      const initialNodes: TabNode[] = [
+      const initialNodes: UITabNode[] = [
         {
-          id: 'node-1',
           tabId: 1,
-          parentId: null,
-          children: [],
           isExpanded: true,
           depth: 0,
+          children: [],
         },
       ];
 
       const { rerender } = render(
         <TabTreeView
           nodes={initialNodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -193,22 +167,20 @@ describe('基本UI表示の統合テスト', () => {
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
 
-      const updatedNodes: TabNode[] = [
+      const updatedNodes: UITabNode[] = [
         ...initialNodes,
         {
-          id: 'node-2',
           tabId: 2,
-          parentId: null,
-          children: [],
           isExpanded: true,
           depth: 0,
+          children: [],
         },
       ];
 
       rerender(
         <TabTreeView
           nodes={updatedNodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -227,29 +199,25 @@ describe('基本UI表示の統合テスト', () => {
 
       global.chrome.tabs.update = vi.fn().mockResolvedValue({});
 
-      const nodes: TabNode[] = [
+      const nodes: UITabNode[] = [
         {
-          id: 'node-1',
           tabId: 1,
-          parentId: null,
-          children: [],
           isExpanded: true,
           depth: 0,
+          children: [],
         },
         {
-          id: 'node-2',
           tabId: 2,
-          parentId: null,
-          children: [],
           isExpanded: true,
           depth: 0,
+          children: [],
         },
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -271,37 +239,29 @@ describe('基本UI表示の統合テスト', () => {
 
   describe('ExternalDropZone削除の確認', () => {
     it('ツリービュー表示後もExternalDropZone（新規ウィンドウドロップエリア）が存在しないこと', async () => {
-      const mockTreeState = {
-        views: {
-          default: {
-            info: {
-              id: 'default',
-              name: 'Default',
-              color: '#3b82f6',
-            },
-            rootNodeIds: ['node-1'],
-            nodes: {
-              'node-1': {
-                id: 'node-1',
-                tabId: 1,
-                parentId: null,
-                children: [],
-                isExpanded: true,
-                depth: 0,
-              } as TabNode,
-            },
+      const mockTreeState: TreeState = {
+        windows: [
+          {
+            windowId: 1,
+            views: [
+              {
+                name: 'Default',
+                color: '#3b82f6',
+                rootNodes: [{ tabId: 1, isExpanded: true, children: [] }],
+                pinnedTabIds: [],
+              },
+            ],
+            activeViewIndex: 0,
           },
-        },
-        viewOrder: ['default'],
-        currentViewId: 'default',
-        tabToNode: {
-          1: { viewId: 'default', nodeId: 'node-1' },
-        },
+        ],
       };
 
-      global.chrome.storage.local.get = vi
-        .fn()
-        .mockResolvedValue({ tree_state: mockTreeState });
+      global.chrome.runtime.sendMessage = vi.fn().mockImplementation((message) => {
+        if (message.type === 'GET_STATE') {
+          return Promise.resolve({ success: true, data: mockTreeState });
+        }
+        return Promise.resolve({ success: true });
+      });
 
       render(<SidePanelRoot />);
 
@@ -319,28 +279,29 @@ describe('基本UI表示の統合テスト', () => {
 
   describe('統合シナリオ: サイドパネルからタブツリー表示まで', () => {
     it('サイドパネルが開いてからタブをツリー表示し、クリックでアクティブ化できること', async () => {
-      const mockTreeState = {
-        views: {
-          default: {
-            info: {
-              id: 'default',
-              name: 'Default',
-              color: '#3b82f6',
-            },
-            rootNodeIds: [],
-            nodes: {},
+      const mockTreeState: TreeState = {
+        windows: [
+          {
+            windowId: 1,
+            views: [
+              {
+                name: 'Default',
+                color: '#3b82f6',
+                rootNodes: [],
+                pinnedTabIds: [],
+              },
+            ],
+            activeViewIndex: 0,
           },
-        },
-        viewOrder: ['default'],
-        currentViewId: 'default',
-        tabToNode: {},
+        ],
       };
 
-      global.chrome.storage.local.get = vi
-        .fn()
-        .mockResolvedValue({ tree_state: mockTreeState });
-
-      global.chrome.storage.local.set = vi.fn().mockResolvedValue(undefined);
+      global.chrome.runtime.sendMessage = vi.fn().mockImplementation((message) => {
+        if (message.type === 'GET_STATE') {
+          return Promise.resolve({ success: true, data: mockTreeState });
+        }
+        return Promise.resolve({ success: true });
+      });
 
       render(<SidePanelRoot />);
 
@@ -360,9 +321,9 @@ describe('基本UI表示の統合テスト', () => {
 
       expect(screen.queryByText('Vivaldi-TT')).not.toBeInTheDocument();
 
-      expect(global.chrome.storage.local.get).toHaveBeenCalledWith(
-        'tree_state'
-      );
+      expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'GET_STATE',
+      });
     });
   });
 });

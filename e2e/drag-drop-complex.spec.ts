@@ -10,7 +10,7 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -21,13 +21,38 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     //   └─ child2
     //       └─ grandChild
     const parentTab = await createTab(serviceWorker, getTestServerUrl('/parent'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTab, depth: 0 },
+    ], 0);
+
     const child1 = await createTab(serviceWorker, getTestServerUrl('/child1'), parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: child1, depth: 1 },
+    ], 0);
+
     const child2 = await createTab(serviceWorker, getTestServerUrl('/child2'), parentTab);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1 },
+    ], 0);
+
     const grandChild = await createTab(serviceWorker, getTestServerUrl('/grandchild'), child2);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId: parentTab, depth: 0, expanded: true },
+      { tabId: child1, depth: 1 },
+      { tabId: child2, depth: 1, expanded: true },
+      { tabId: grandChild, depth: 2 },
+    ], 0);
+
     const targetParent = await createTab(serviceWorker, getTestServerUrl('/target'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1, expanded: true },
@@ -44,7 +69,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     // targetParent(depth=0) -> parentTab(depth=1) -> child1/child2(depth=2) -> grandChild(depth=3)
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: targetParent, depth: 0, expanded: true },
       { tabId: parentTab, depth: 1, expanded: true },
       { tabId: child1, depth: 2 },
@@ -58,7 +82,7 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -71,14 +95,12 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const rootParent = await createTab(serviceWorker, getTestServerUrl('/rootparent'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootParent, depth: 0 },
     ], 0);
 
     const childWithSubtree = await createTab(serviceWorker, getTestServerUrl('/child-subtree'), rootParent);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootParent, depth: 0, expanded: true },
       { tabId: childWithSubtree, depth: 1 },
     ], 0);
@@ -90,7 +112,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     );
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootParent, depth: 0, expanded: true },
       { tabId: childWithSubtree, depth: 1, expanded: true },
       { tabId: grandChild1, depth: 2 },
@@ -103,7 +124,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     );
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootParent, depth: 0, expanded: true },
       { tabId: childWithSubtree, depth: 1, expanded: true },
       { tabId: grandChild1, depth: 2 },
@@ -113,7 +133,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const rootTab = await createTab(serviceWorker, getTestServerUrl('/roottab'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootParent, depth: 0, expanded: true },
       { tabId: childWithSubtree, depth: 1, expanded: true },
       { tabId: grandChild1, depth: 2 },
@@ -130,7 +149,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     // childWithSubtree(depth=0) -> grandChild1/grandChild2(depth=1)
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: rootParent, depth: 0 },
       { tabId: rootTab, depth: 0 },
       { tabId: childWithSubtree, depth: 0, expanded: true },
@@ -144,7 +162,7 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -161,14 +179,12 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const parent1 = await createTab(serviceWorker, getTestServerUrl('/parent1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0 },
     ], 0);
 
     const child1_1 = await createTab(serviceWorker, getTestServerUrl('/child1_1'), parent1);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1_1, depth: 1 },
     ], 0);
@@ -180,7 +196,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     );
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1_1, depth: 1, expanded: true },
       { tabId: grandChild1_1_1, depth: 2 },
@@ -189,7 +204,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const parent2 = await createTab(serviceWorker, getTestServerUrl('/parent2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1_1, depth: 1, expanded: true },
       { tabId: grandChild1_1_1, depth: 2 },
@@ -199,7 +213,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const child2_1 = await createTab(serviceWorker, getTestServerUrl('/child2_1'), parent2);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1_1, depth: 1, expanded: true },
       { tabId: grandChild1_1_1, depth: 2 },
@@ -216,7 +229,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     // parent2(depth=0) -> child2_1(depth=1) -> child1_1(depth=2) -> grandChild1_1_1(depth=3)
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0 },
       { tabId: parent2, depth: 0, expanded: true },
       { tabId: child2_1, depth: 1, expanded: true },
@@ -230,7 +242,7 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -242,14 +254,12 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const parent = await createTab(serviceWorker, getTestServerUrl('/parent'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent, depth: 0 },
     ], 0);
 
     const child = await createTab(serviceWorker, getTestServerUrl('/child'), parent);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent, depth: 0, expanded: true },
       { tabId: child, depth: 1 },
     ], 0);
@@ -257,7 +267,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const grandChild = await createTab(serviceWorker, getTestServerUrl('/grandchild'), child);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent, depth: 0, expanded: true },
       { tabId: child, depth: 1, expanded: true },
       { tabId: grandChild, depth: 2 },
@@ -273,7 +282,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     // parent(depth=0) -> child(depth=1) -> grandChild(depth=2)
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent, depth: 0, expanded: true },
       { tabId: child, depth: 1, expanded: true },
       { tabId: grandChild, depth: 2 },
@@ -285,7 +293,7 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     serviceWorker,
   }) => {
     const windowId = await getCurrentWindowId(serviceWorker);
-    const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+    const { initialBrowserTabId, sidePanelPage } =
       await setupWindow(extensionContext, serviceWorker, windowId);
 
     const sidePanelRoot = sidePanelPage.locator('[data-testid="side-panel-root"]');
@@ -298,14 +306,12 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const parent1 = await createTab(serviceWorker, getTestServerUrl('/parent1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0 },
     ], 0);
 
     const child1 = await createTab(serviceWorker, getTestServerUrl('/child1'), parent1);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
     ], 0);
@@ -313,7 +319,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const child2 = await createTab(serviceWorker, getTestServerUrl('/child2'), parent1);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1 },
@@ -326,7 +331,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     );
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1, expanded: true },
@@ -336,7 +340,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     const parent2 = await createTab(serviceWorker, getTestServerUrl('/parent2'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: child2, depth: 1, expanded: true },
@@ -353,7 +356,6 @@ test.describe('ドラッグ&ドロップによる複雑なツリー移動', () =
     // parent2(depth=0) -> child2(depth=1) -> grandChild(depth=2)
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
-      { tabId: pseudoSidePanelTabId, depth: 0 },
       { tabId: parent1, depth: 0, expanded: true },
       { tabId: child1, depth: 1 },
       { tabId: parent2, depth: 0, expanded: true },

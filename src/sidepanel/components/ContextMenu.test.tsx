@@ -542,7 +542,7 @@ describe('ContextMenu', () => {
           onAction={onAction}
           onClose={onClose}
           views={mockViews}
-          currentViewId="default"
+          currentViewIndex={0}
           onMoveToView={onMoveToView}
         />
       );
@@ -562,7 +562,7 @@ describe('ContextMenu', () => {
           onAction={onAction}
           onClose={onClose}
           views={[{ id: 'default', name: 'Default', color: '#3b82f6' }]}
-          currentViewId="default"
+          currentViewIndex={0}
           onMoveToView={onMoveToView}
         />
       );
@@ -583,7 +583,7 @@ describe('ContextMenu', () => {
           onAction={onAction}
           onClose={onClose}
           views={mockViews}
-          currentViewId="default"
+          currentViewIndex={0}
           onMoveToView={onMoveToView}
         />
       );
@@ -610,7 +610,7 @@ describe('ContextMenu', () => {
           onAction={onAction}
           onClose={onClose}
           views={mockViews}
-          currentViewId="default"
+          currentViewIndex={0}
           onMoveToView={onMoveToView}
         />
       );
@@ -621,7 +621,7 @@ describe('ContextMenu', () => {
       const workView = screen.getByText('Work');
       await user.click(workView);
 
-      expect(onMoveToView).toHaveBeenCalledWith('work', [1, 2]);
+      expect(onMoveToView).toHaveBeenCalledWith(1, [1, 2]);
       expect(onClose).toHaveBeenCalled();
     });
 
@@ -638,7 +638,7 @@ describe('ContextMenu', () => {
           onAction={onAction}
           onClose={onClose}
           views={mockViews}
-          currentViewId="work"
+          currentViewIndex={1}
           onMoveToView={onMoveToView}
         />
       );
@@ -652,7 +652,7 @@ describe('ContextMenu', () => {
 
       await user.click(screen.getByText('Personal'));
 
-      expect(onMoveToView).toHaveBeenCalledWith('personal', [1, 2, 3]);
+      expect(onMoveToView).toHaveBeenCalledWith(2, [1, 2, 3]);
     });
 
     it('viewsがundefinedの場合は「別のビューへ移動」が表示されない', () => {

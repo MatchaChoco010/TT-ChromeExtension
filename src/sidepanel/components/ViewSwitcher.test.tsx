@@ -10,7 +10,7 @@ describe('ViewSwitcher', () => {
     { id: 'view-3', name: 'Research', color: '#10b981' },
   ];
 
-  const mockCurrentViewId = 'view-1';
+  const mockCurrentViewIndex = 0;
   const mockOnViewSwitch = vi.fn();
   const mockOnViewCreate = vi.fn();
   const mockOnViewDelete = vi.fn();
@@ -25,7 +25,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -42,7 +42,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -58,7 +58,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={[]}
-          currentViewId="default"
+          currentViewIndex={0}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -76,7 +76,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -95,7 +95,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -120,7 +120,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -133,7 +133,7 @@ describe('ViewSwitcher', () => {
       });
       fireEvent.click(personalButton);
 
-      expect(mockOnViewSwitch).toHaveBeenCalledWith('view-2');
+      expect(mockOnViewSwitch).toHaveBeenCalledWith(1);
       expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
     });
 
@@ -141,7 +141,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -154,7 +154,7 @@ describe('ViewSwitcher', () => {
       });
       fireEvent.click(workButton);
 
-      expect(mockOnViewSwitch).toHaveBeenCalledWith('view-1');
+      expect(mockOnViewSwitch).toHaveBeenCalledWith(0);
     });
   });
 
@@ -163,7 +163,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -183,7 +183,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -204,7 +204,7 @@ describe('ViewSwitcher', () => {
       const { container } = render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -230,7 +230,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={manyViews}
-          currentViewId="view-0"
+          currentViewIndex={0}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -251,7 +251,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -264,7 +264,7 @@ describe('ViewSwitcher', () => {
       });
       fireEvent.click(researchButton);
 
-      expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
+      expect(mockOnViewSwitch).toHaveBeenCalledWith(2);
     });
   });
 
@@ -273,7 +273,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -291,7 +291,7 @@ describe('ViewSwitcher', () => {
       render(
         <ViewSwitcher
           views={mockViews}
-          currentViewId={mockCurrentViewId}
+          currentViewIndex={mockCurrentViewIndex}
           onViewSwitch={mockOnViewSwitch}
           onViewCreate={mockOnViewCreate}
           onViewDelete={mockOnViewDelete}
@@ -312,7 +312,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -332,7 +332,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -353,7 +353,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={viewsWithIcon}
-            currentViewId="view-1"
+            currentViewIndex={0}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -384,7 +384,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mixedViews}
-            currentViewId="view-1"
+            currentViewIndex={0}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -408,7 +408,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -424,7 +424,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -441,7 +441,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -460,7 +460,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -480,7 +480,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -498,7 +498,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -516,7 +516,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -536,7 +536,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -557,7 +557,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -587,7 +587,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -601,7 +601,7 @@ describe('ViewSwitcher', () => {
         const deleteMenuItem = screen.getByRole('menuitem', { name: /ビューを削除/i });
         fireEvent.click(deleteMenuItem);
 
-        expect(mockOnViewDelete).toHaveBeenCalledWith('view-1');
+        expect(mockOnViewDelete).toHaveBeenCalledWith(0);
       });
 
       it('ビューが1つだけの場合、削除オプションは無効になる', () => {
@@ -610,7 +610,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={singleView}
-            currentViewId="view-1"
+            currentViewIndex={0}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -633,7 +633,7 @@ describe('ViewSwitcher', () => {
             <div data-testid="outside">Outside</div>
             <ViewSwitcher
               views={mockViews}
-              currentViewId={mockCurrentViewId}
+              currentViewIndex={mockCurrentViewIndex}
               onViewSwitch={mockOnViewSwitch}
               onViewCreate={mockOnViewCreate}
               onViewDelete={mockOnViewDelete}
@@ -659,7 +659,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -682,16 +682,12 @@ describe('ViewSwitcher', () => {
   describe('ビューのタブ数表示機能', () => {
     describe('各ビューのファビコン上にタブ数を小さく表示', () => {
       it('タブ数バッジが各ビューに表示される', () => {
-        const tabCounts = {
-          'view-1': 5,
-          'view-2': 3,
-          'view-3': 10,
-        };
+        const tabCounts = [5, 3, 10];
 
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={tabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -700,22 +696,18 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('5');
-        expect(screen.getByTestId('tab-count-badge-view-2')).toHaveTextContent('3');
-        expect(screen.getByTestId('tab-count-badge-view-3')).toHaveTextContent('10');
+        expect(screen.getByTestId('tab-count-badge-0')).toHaveTextContent('5');
+        expect(screen.getByTestId('tab-count-badge-1')).toHaveTextContent('3');
+        expect(screen.getByTestId('tab-count-badge-2')).toHaveTextContent('10');
       });
 
       it('タブ数が0の場合はバッジを表示しない', () => {
-        const tabCounts = {
-          'view-1': 0,
-          'view-2': 5,
-          'view-3': 0,
-        };
+        const tabCounts = [0, 5, 0];
 
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={tabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -724,24 +716,20 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        expect(screen.queryByTestId('tab-count-badge-view-1')).not.toBeInTheDocument();
-        expect(screen.getByTestId('tab-count-badge-view-2')).toHaveTextContent('5');
-        expect(screen.queryByTestId('tab-count-badge-view-3')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('tab-count-badge-0')).not.toBeInTheDocument();
+        expect(screen.getByTestId('tab-count-badge-1')).toHaveTextContent('5');
+        expect(screen.queryByTestId('tab-count-badge-2')).not.toBeInTheDocument();
       });
     });
 
     describe('ファビコンのサイズを維持したままタブ数を表示', () => {
       it('ビューボタンのサイズは変わらない (w-8, h-8)', () => {
-        const tabCounts = {
-          'view-1': 100,
-          'view-2': 999,
-          'view-3': 1,
-        };
+        const tabCounts = [100, 999, 1];
 
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={tabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -757,16 +745,12 @@ describe('ViewSwitcher', () => {
       });
 
       it('タブ数バッジは小さく表示される', () => {
-        const tabCounts = {
-          'view-1': 5,
-          'view-2': 3,
-          'view-3': 10,
-        };
+        const tabCounts = [5, 3, 10];
 
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={tabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -775,23 +759,19 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        const badge = screen.getByTestId('tab-count-badge-view-1');
+        const badge = screen.getByTestId('tab-count-badge-0');
         expect(badge).toHaveClass('text-xs');
       });
     });
 
     describe('ビュー内のタブ数が変化した場合、表示を即座に更新', () => {
       it('タブ数プロップが変更されると表示が更新される', () => {
-        const initialTabCounts = {
-          'view-1': 5,
-          'view-2': 3,
-          'view-3': 10,
-        };
+        const initialTabCounts = [5, 3, 10];
 
         const { rerender } = render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={initialTabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -800,18 +780,14 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('5');
+        expect(screen.getByTestId('tab-count-badge-0')).toHaveTextContent('5');
 
-        const updatedTabCounts = {
-          'view-1': 8,
-          'view-2': 3,
-          'view-3': 10,
-        };
+        const updatedTabCounts = [8, 3, 10];
 
         rerender(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={updatedTabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -820,7 +796,7 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        expect(screen.getByTestId('tab-count-badge-view-1')).toHaveTextContent('8');
+        expect(screen.getByTestId('tab-count-badge-0')).toHaveTextContent('8');
       });
     });
 
@@ -829,7 +805,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -838,22 +814,18 @@ describe('ViewSwitcher', () => {
         );
 
         expect(screen.getByRole('button', { name: 'Switch to Work view' })).toBeInTheDocument();
-        expect(screen.queryByTestId('tab-count-badge-view-1')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('tab-count-badge-0')).not.toBeInTheDocument();
       });
     });
 
     describe('タブ数バッジの視認性向上', () => {
       it('タブ数バッジはmin-w-[20px]で数字が見切れない', () => {
-        const tabCounts = {
-          'view-1': 99,
-          'view-2': 3,
-          'view-3': 100,
-        };
+        const tabCounts = [99, 3, 100];
 
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={tabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -862,19 +834,17 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        const badge = screen.getByTestId('tab-count-badge-view-1');
+        const badge = screen.getByTestId('tab-count-badge-0');
         expect(badge).toHaveClass('min-w-[20px]');
       });
 
       it('タブ数バッジは右上角ではなく内側に配置される', () => {
-        const tabCounts = {
-          'view-1': 5,
-        };
+        const tabCounts = [5];
 
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId={mockCurrentViewId}
+            currentViewIndex={mockCurrentViewIndex}
             tabCounts={tabCounts}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
@@ -883,7 +853,7 @@ describe('ViewSwitcher', () => {
           />
         );
 
-        const badge = screen.getByTestId('tab-count-badge-view-1');
+        const badge = screen.getByTestId('tab-count-badge-0');
         expect(badge).toHaveClass('-top-0.5');
         expect(badge).toHaveClass('-right-0.5');
       });
@@ -896,7 +866,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-2"
+            currentViewIndex={1}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -908,7 +878,7 @@ describe('ViewSwitcher', () => {
 
         fireEvent.wheel(container, { deltaY: -100 });
 
-        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-1');
+        expect(mockOnViewSwitch).toHaveBeenCalledWith(0);
         expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
       });
     });
@@ -918,7 +888,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-2"
+            currentViewIndex={1}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -930,7 +900,7 @@ describe('ViewSwitcher', () => {
 
         fireEvent.wheel(container, { deltaY: 100 });
 
-        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
+        expect(mockOnViewSwitch).toHaveBeenCalledWith(2);
         expect(mockOnViewSwitch).toHaveBeenCalledTimes(1);
       });
     });
@@ -940,7 +910,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-1"
+            currentViewIndex={0}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -959,7 +929,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-3"
+            currentViewIndex={2}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -980,7 +950,7 @@ describe('ViewSwitcher', () => {
         const { rerender } = render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-1"
+            currentViewIndex={0}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -991,12 +961,12 @@ describe('ViewSwitcher', () => {
         const container = screen.getByTestId('view-switcher-container');
 
         fireEvent.wheel(container, { deltaY: 100 });
-        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-2');
+        expect(mockOnViewSwitch).toHaveBeenCalledWith(1);
 
         rerender(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-2"
+            currentViewIndex={1}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -1005,7 +975,7 @@ describe('ViewSwitcher', () => {
         );
 
         fireEvent.wheel(container, { deltaY: 100 });
-        expect(mockOnViewSwitch).toHaveBeenCalledWith('view-3');
+        expect(mockOnViewSwitch).toHaveBeenCalledWith(2);
       });
     });
 
@@ -1016,7 +986,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={singleView}
-            currentViewId="view-1"
+            currentViewIndex={0}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}
@@ -1039,7 +1009,7 @@ describe('ViewSwitcher', () => {
         render(
           <ViewSwitcher
             views={mockViews}
-            currentViewId="view-2"
+            currentViewIndex={1}
             onViewSwitch={mockOnViewSwitch}
             onViewCreate={mockOnViewCreate}
             onViewDelete={mockOnViewDelete}

@@ -2,25 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@/test/test-utils';
 import userEvent from '@testing-library/user-event';
 import TabTreeView from './TabTreeView';
-import type { TabNode, ExtendedTabInfo } from '@/types';
+import type { UITabNode, ExtendedTabInfo } from '@/types';
 
 describe('TabTreeView', () => {
   const mockOnNodeClick = vi.fn();
   const mockOnToggleExpand = vi.fn();
 
   const createMockNode = (
-    id: string,
     tabId: number,
-    _viewId: string,
-    parentId: string | null = null,
-    children: TabNode[] = []
-  ): TabNode => ({
-    id,
+    depth: number,
+    children: UITabNode[] = []
+  ): UITabNode => ({
     tabId,
-    parentId,
+    depth,
     children,
     isExpanded: true,
-    depth: 0,
   });
 
   beforeEach(() => {
@@ -31,7 +27,7 @@ describe('TabTreeView', () => {
     render(
       <TabTreeView
         nodes={[]}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -41,12 +37,12 @@ describe('TabTreeView', () => {
   });
 
   it('単一のタブノードを表示できること', () => {
-    const node = createMockNode('node-1', 1, 'default');
+    const node = createMockNode(1, 0);
 
     render(
       <TabTreeView
         nodes={[node]}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -57,19 +53,16 @@ describe('TabTreeView', () => {
   });
 
   it('渡されたすべてのノードを表示すること（viewIdフィルタリングはSidePanelRootで行われる）', () => {
-    // 新しいアーキテクチャでは、TabNodeにviewIdがなく、
-    // ビューによるフィルタリングはSidePanelRoot.buildTree()で行われる
-    // TabTreeViewは渡されたすべてのノードを表示する
     const nodes = [
-      createMockNode('node-1', 1, 'default'),
-      createMockNode('node-2', 2, 'default'),
-      createMockNode('node-3', 3, 'default'),
+      createMockNode(1, 0),
+      createMockNode(2, 0),
+      createMockNode(3, 0),
     ];
 
     render(
       <TabTreeView
         nodes={nodes}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -81,15 +74,13 @@ describe('TabTreeView', () => {
   });
 
   it('子ノードを再帰的に表示できること', () => {
-    const childNode = createMockNode('child-1', 2, 'default', 'parent-1');
-    const parentNode = createMockNode('parent-1', 1, 'default', null, [
-      childNode,
-    ]);
+    const childNode = createMockNode(2, 1);
+    const parentNode = createMockNode(1, 0, [childNode]);
 
     render(
       <TabTreeView
         nodes={[parentNode]}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -100,16 +91,16 @@ describe('TabTreeView', () => {
   });
 
   it('折りたたまれたノードの子を非表示にできること', () => {
-    const childNode = createMockNode('child-1', 2, 'default', 'parent-1');
-    const parentNode: TabNode = {
-      ...createMockNode('parent-1', 1, 'default', null, [childNode]),
+    const childNode = createMockNode(2, 1);
+    const parentNode: UITabNode = {
+      ...createMockNode(1, 0, [childNode]),
       isExpanded: false,
     };
 
     render(
       <TabTreeView
         nodes={[parentNode]}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -121,12 +112,12 @@ describe('TabTreeView', () => {
 
   it('ノードクリック時にonNodeClickが呼ばれること', async () => {
     const user = userEvent.setup();
-    const node = createMockNode('node-1', 1, 'default');
+    const node = createMockNode(1, 0);
 
     render(
       <TabTreeView
         nodes={[node]}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -140,15 +131,13 @@ describe('TabTreeView', () => {
 
   it('展開/折りたたみトグルクリック時にonToggleExpandが呼ばれること', async () => {
     const user = userEvent.setup();
-    const childNode = createMockNode('child-1', 2, 'default', 'parent-1');
-    const parentNode = createMockNode('parent-1', 1, 'default', null, [
-      childNode,
-    ]);
+    const childNode = createMockNode(2, 1);
+    const parentNode = createMockNode(1, 0, [childNode]);
 
     render(
       <TabTreeView
         nodes={[parentNode]}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -157,18 +146,18 @@ describe('TabTreeView', () => {
     const toggleButton = screen.getByTestId('expand-button');
     await user.click(toggleButton);
 
-    expect(mockOnToggleExpand).toHaveBeenCalledWith('parent-1');
+    expect(mockOnToggleExpand).toHaveBeenCalledWith(1);
   });
 
   it('深い階層のツリーを正しくレンダリングできること', () => {
-    const grandchildNode = createMockNode('grandchild-1', 3, 'default', 'child-1');
-    const childNode = createMockNode('child-1', 2, 'default', 'parent-1', [grandchildNode]);
-    const parentNode = createMockNode('parent-1', 1, 'default', null, [childNode]);
+    const grandchildNode = createMockNode(3, 2);
+    const childNode = createMockNode(2, 1, [grandchildNode]);
+    const parentNode = createMockNode(1, 0, [childNode]);
 
     render(
       <TabTreeView
         nodes={[parentNode]}
-        currentViewId="default"
+        currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
       />
@@ -181,12 +170,12 @@ describe('TabTreeView', () => {
 
   describe('SortableTree Integration', () => {
     it('ドラッグ可能なアイテムとしてノードをレンダリングできること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -196,17 +185,17 @@ describe('TabTreeView', () => {
       const draggableItem = screen.getByTestId('tree-node-1');
       expect(draggableItem).toHaveAttribute(
         'data-draggable-item',
-        'draggable-item-node-1'
+        'draggable-item-1'
       );
     });
 
     it('ドラッグ開始時にハイライト表示のクラスが存在すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -217,18 +206,18 @@ describe('TabTreeView', () => {
       expect(nodeElement).toBeInTheDocument();
       expect(nodeElement).toHaveAttribute(
         'data-draggable-item',
-        'draggable-item-node-1'
+        'draggable-item-1'
       );
     });
 
     it('ドロップ可能位置の視覚化要素が存在すること', () => {
-      const node1 = createMockNode('node-1', 1, 'default');
-      const node2 = createMockNode('node-2', 2, 'default');
+      const node1 = createMockNode(1, 0);
+      const node2 = createMockNode(2, 0);
 
       render(
         <TabTreeView
           nodes={[node1, node2]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -240,11 +229,11 @@ describe('TabTreeView', () => {
 
       expect(draggableItem1).toHaveAttribute(
         'data-draggable-item',
-        'draggable-item-node-1'
+        'draggable-item-1'
       );
       expect(draggableItem2).toHaveAttribute(
         'data-draggable-item',
-        'draggable-item-node-2'
+        'draggable-item-2'
       );
     });
   });
@@ -262,8 +251,8 @@ describe('TabTreeView', () => {
       status: 'complete',
       isPinned: false,
       windowId: 1,
-      discarded: false, // 休止タブ状態
-      index: tabId, // ピン留めタブの順序同期
+      discarded: false,
+      index: tabId,
     });
 
     const mockGetTabInfo = vi.fn();
@@ -273,14 +262,14 @@ describe('TabTreeView', () => {
     });
 
     it('タブのタイトルとしてページタイトルを表示すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const tabInfo = createMockTabInfo(1, 'Example Page Title');
       mockGetTabInfo.mockReturnValue(tabInfo);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
@@ -292,14 +281,14 @@ describe('TabTreeView', () => {
     });
 
     it('タブの左側にファビコンを表示すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const tabInfo = createMockTabInfo(1, 'Example Page', 'https://example.com/favicon.ico');
       mockGetTabInfo.mockReturnValue(tabInfo);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
@@ -312,14 +301,14 @@ describe('TabTreeView', () => {
     });
 
     it('ファビコンが取得できない場合、デフォルトアイコンを表示すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const tabInfo = createMockTabInfo(1, 'Example Page', undefined);
       mockGetTabInfo.mockReturnValue(tabInfo);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
@@ -331,13 +320,13 @@ describe('TabTreeView', () => {
     });
 
     it('タブ情報がロード中の場合、Loading...プレースホルダーを表示すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       mockGetTabInfo.mockReturnValue(undefined);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
@@ -348,12 +337,12 @@ describe('TabTreeView', () => {
     });
 
     it('getTabInfoが提供されない場合、フォールバックとして「Tab {tabId}」を表示すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -363,8 +352,8 @@ describe('TabTreeView', () => {
     });
 
     it('子ノードにもタブ情報が正しく表示されること', () => {
-      const childNode = createMockNode('child-1', 2, 'default', 'parent-1');
-      const parentNode = createMockNode('parent-1', 1, 'default', null, [childNode]);
+      const childNode = createMockNode(2, 1);
+      const parentNode = createMockNode(1, 0, [childNode]);
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
         if (tabId === 1) return createMockTabInfo(1, 'Parent Page');
@@ -375,7 +364,7 @@ describe('TabTreeView', () => {
       render(
         <TabTreeView
           nodes={[parentNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
@@ -387,14 +376,14 @@ describe('TabTreeView', () => {
     });
 
     it('ドラッグ可能なノードにもタブ情報が正しく表示されること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const tabInfo = createMockTabInfo(1, 'Draggable Page', 'https://example.com/favicon.ico');
       mockGetTabInfo.mockReturnValue(tabInfo);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -418,13 +407,13 @@ describe('TabTreeView', () => {
     });
 
     it('選択されたノードに選択状態のスタイルが適用されること', () => {
-      const node = createMockNode('node-1', 1, 'default');
-      mockIsNodeSelected.mockImplementation((nodeId: string) => nodeId === 'node-1');
+      const node = createMockNode(1, 0);
+      mockIsNodeSelected.mockImplementation((tabId: number) => tabId === 1);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
@@ -439,13 +428,13 @@ describe('TabTreeView', () => {
     });
 
     it('選択されていないノードには選択スタイルが適用されないこと', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       mockIsNodeSelected.mockReturnValue(false);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
@@ -459,13 +448,13 @@ describe('TabTreeView', () => {
 
     it('通常クリック時にonSelectが正しいmodifiersで呼ばれること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       mockIsNodeSelected.mockReturnValue(false);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
@@ -476,18 +465,18 @@ describe('TabTreeView', () => {
       const nodeElement = screen.getByTestId('tree-node-1');
       await user.click(nodeElement);
 
-      expect(mockOnSelect).toHaveBeenCalledWith('node-1', { shift: false, ctrl: false });
+      expect(mockOnSelect).toHaveBeenCalledWith(1, { shift: false, ctrl: false });
     });
 
     it('Ctrlキー押下時にonSelectがctrl: trueで呼ばれること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       mockIsNodeSelected.mockReturnValue(false);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
@@ -500,18 +489,18 @@ describe('TabTreeView', () => {
       await user.click(nodeElement);
       await user.keyboard('{/Control}');
 
-      expect(mockOnSelect).toHaveBeenCalledWith('node-1', { shift: false, ctrl: true });
+      expect(mockOnSelect).toHaveBeenCalledWith(1, { shift: false, ctrl: true });
     });
 
     it('Shiftキー押下時にonSelectがshift: trueで呼ばれること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       mockIsNodeSelected.mockReturnValue(false);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
@@ -524,24 +513,23 @@ describe('TabTreeView', () => {
       await user.click(nodeElement);
       await user.keyboard('{/Shift}');
 
-      expect(mockOnSelect).toHaveBeenCalledWith('node-1', { shift: true, ctrl: false });
+      expect(mockOnSelect).toHaveBeenCalledWith(1, { shift: true, ctrl: false });
     });
 
     it('複数選択時に選択されたすべてのタブが視覚的に識別可能であること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
-        createMockNode('node-3', 3, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
+        createMockNode(3, 0),
       ];
-      // node-1とnode-3のみ選択
-      mockIsNodeSelected.mockImplementation((nodeId: string) =>
-        nodeId === 'node-1' || nodeId === 'node-3'
+      mockIsNodeSelected.mockImplementation((tabId: number) =>
+        tabId === 1 || tabId === 3
       );
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
@@ -559,12 +547,12 @@ describe('TabTreeView', () => {
     });
 
     it('isNodeSelectedが提供されない場合、選択スタイルが適用されないこと', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -576,13 +564,13 @@ describe('TabTreeView', () => {
 
     it('onSelectが提供されない場合、通常のクリック動作のみ行われること', async () => {
       const user = userEvent.setup();
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       mockIsNodeSelected.mockReturnValue(false);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           isNodeSelected={mockIsNodeSelected}
@@ -596,13 +584,13 @@ describe('TabTreeView', () => {
     });
 
     it('ドラッグ可能なノードでも選択状態が正しく表示されること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       mockIsNodeSelected.mockReturnValue(true);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -619,14 +607,14 @@ describe('TabTreeView', () => {
   describe('ドラッグ中の横スクロール防止', () => {
     it('ドラッグ中にコンテナにoverflow-x: hiddenが適用されること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -639,12 +627,12 @@ describe('TabTreeView', () => {
     });
 
     it('ドラッグ可能なツリービューのコンテナにdrag-containerクラスが存在すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -656,12 +644,12 @@ describe('TabTreeView', () => {
     });
 
     it('globalIsDraggingがtrueの時、コンテナにis-draggingクラスが適用されること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -676,14 +664,14 @@ describe('TabTreeView', () => {
   describe('ドラッグ時のスクロール制御', () => {
     it('ドラッグコンテナにautoScroll設定が適用されていること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -695,12 +683,12 @@ describe('TabTreeView', () => {
     });
 
     it('autoScrollが適切なスクロール閾値で設定されていること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -712,15 +700,15 @@ describe('TabTreeView', () => {
 
     it('ドラッグ可能なビューでautoScroll制限が有効であること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
-        createMockNode('node-3', 3, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
+        createMockNode(3, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -736,14 +724,14 @@ describe('TabTreeView', () => {
   describe('ドラッグ中のスクロール範囲制限', () => {
     it('ツリービューコンテナにoverflow-y-autoが適用されていること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -756,14 +744,14 @@ describe('TabTreeView', () => {
 
     it('ドラッグ中にコンテナにoverflow-x-hiddenが適用されること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -776,12 +764,12 @@ describe('TabTreeView', () => {
     });
 
     it('autoScroll設定が横スクロールを無効化する設定を持つこと', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -793,15 +781,15 @@ describe('TabTreeView', () => {
 
     it('autoScroll設定がコンテンツ範囲外へのスクロールを制限する設定を持つこと', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
-        createMockNode('node-3', 3, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
+        createMockNode(3, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -817,15 +805,15 @@ describe('TabTreeView', () => {
   describe('ドラッグ中のタブ位置固定', () => {
     it('ドラッグ可能な状態でタブツリービューがレンダリングされること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
-        createMockNode('node-3', 3, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
+        createMockNode(3, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -838,12 +826,12 @@ describe('TabTreeView', () => {
     });
 
     it('ドラッグ可能なノードにsortable属性が存在すること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -851,16 +839,16 @@ describe('TabTreeView', () => {
       );
 
       const nodeElement = screen.getByTestId('tree-node-1');
-      expect(nodeElement).toHaveAttribute('data-draggable-item', 'draggable-item-node-1');
+      expect(nodeElement).toHaveAttribute('data-draggable-item', 'draggable-item-1');
     });
 
     it('コンテナがrelative positionを持っていること（DropIndicator配置のため）', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -875,15 +863,15 @@ describe('TabTreeView', () => {
   describe('ドラッグ中のタブサイズ安定化', () => {
     it('ドラッグ中に他のタブのtransformが無効化されていること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
-        createMockNode('node-3', 3, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
+        createMockNode(3, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -900,14 +888,14 @@ describe('TabTreeView', () => {
 
     it('ドラッグ中でも他のタブのホバー時にサイズが変更されないこと', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -923,24 +911,24 @@ describe('TabTreeView', () => {
 
     it('ドラッグ開始時のタブレイアウトが維持されること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
-        createMockNode('node-3', 3, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
+        createMockNode(3, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
         />
       );
 
-      expect(screen.getByTestId('tree-node-1')).toHaveAttribute('data-node-id', 'node-1');
-      expect(screen.getByTestId('tree-node-2')).toHaveAttribute('data-node-id', 'node-2');
-      expect(screen.getByTestId('tree-node-3')).toHaveAttribute('data-node-id', 'node-3');
+      expect(screen.getByTestId('tree-node-1')).toHaveAttribute('data-tab-id', '1');
+      expect(screen.getByTestId('tree-node-2')).toHaveAttribute('data-tab-id', '2');
+      expect(screen.getByTestId('tree-node-3')).toHaveAttribute('data-tab-id', '3');
 
       const container = screen.getByTestId('tab-tree-view').querySelector('[data-drag-container]');
       expect(container).toBeInTheDocument();
@@ -948,12 +936,12 @@ describe('TabTreeView', () => {
     });
 
     it('自前D&D実装によりリアルタイム並べ替えが無効化されていること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -968,15 +956,15 @@ describe('TabTreeView', () => {
   describe('親子関係を作るドロップ時のタブサイズ固定', () => {
     it('ドラッグハイライト状態でも他のタブのサイズが変更されないこと', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
-        createMockNode('node-3', 3, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
+        createMockNode(3, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -998,14 +986,14 @@ describe('TabTreeView', () => {
 
     it('親子関係ドロップ時にドラッグハイライトされたタブのサイズが維持されること', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1027,14 +1015,14 @@ describe('TabTreeView', () => {
 
     it('ドラッグ中のアイテム以外はtransformが適用されないこと（shouldApplyTransformフラグ）', () => {
       const nodes = [
-        createMockNode('node-1', 1, 'default'),
-        createMockNode('node-2', 2, 'default'),
+        createMockNode(1, 0),
+        createMockNode(2, 0),
       ];
 
       render(
         <TabTreeView
           nodes={nodes}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1048,7 +1036,7 @@ describe('TabTreeView', () => {
 
   describe('ビュー移動サブメニュー用のプロパティ', () => {
     it('viewsとonMoveToViewプロパティを受け取れること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const mockViews = [
         { id: 'default', name: 'Default', color: '#3b82f6' },
         { id: 'view-2', name: 'View 2', color: '#10b981' },
@@ -1058,7 +1046,7 @@ describe('TabTreeView', () => {
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           views={mockViews}
@@ -1070,12 +1058,12 @@ describe('TabTreeView', () => {
     });
 
     it('viewsとonMoveToViewがundefinedでもレンダリングできること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -1087,12 +1075,12 @@ describe('TabTreeView', () => {
 
   describe('テキスト選択禁止', () => {
     it('ツリービュー全体にselect-noneクラスが適用されていること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1104,12 +1092,12 @@ describe('TabTreeView', () => {
     });
 
     it('タブノード要素にselect-noneクラスが適用されていること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1121,12 +1109,12 @@ describe('TabTreeView', () => {
     });
 
     it('非ドラッグ可能なタブノードにもselect-noneクラスが適用されていること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
         />
@@ -1137,13 +1125,13 @@ describe('TabTreeView', () => {
     });
 
     it('子ノードを含む全てのノードにselect-noneクラスが適用されていること', () => {
-      const childNode = createMockNode('child-1', 2, 'default', 'parent-1');
-      const parentNode = createMockNode('parent-1', 1, 'default', null, [childNode]);
+      const childNode = createMockNode(2, 1);
+      const parentNode = createMockNode(1, 0, [childNode]);
 
       render(
         <TabTreeView
           nodes={[parentNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1160,13 +1148,13 @@ describe('TabTreeView', () => {
 
   describe('ツリー外ドロップで新規ウィンドウ作成', () => {
     it('onExternalDropコールバックを受け取れること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const mockOnExternalDrop = vi.fn();
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1178,12 +1166,12 @@ describe('TabTreeView', () => {
     });
 
     it('onExternalDropがundefinedでもレンダリングできること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1196,13 +1184,13 @@ describe('TabTreeView', () => {
 
   describe('ツリービュー外へのドロップ検知', () => {
     it('ドラッグ中にonOutsideTreeChangeコールバックが提供された場合、状態変化を通知できること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const mockOnOutsideTreeChange = vi.fn();
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1214,12 +1202,12 @@ describe('TabTreeView', () => {
     });
 
     it('onOutsideTreeChangeがundefinedでもレンダリングできること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1232,14 +1220,14 @@ describe('TabTreeView', () => {
 
   describe('ツリービュー外へのドロップ処理', () => {
     it('onExternalDropとonOutsideTreeChangeを同時に設定できること', () => {
-      const node = createMockNode('node-1', 1, 'default');
+      const node = createMockNode(1, 0);
       const mockOnExternalDrop = vi.fn();
       const mockOnOutsideTreeChange = vi.fn();
 
       render(
         <TabTreeView
           nodes={[node]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1252,15 +1240,15 @@ describe('TabTreeView', () => {
     });
 
     it('子ノードを持つ親ノードでもonExternalDropを設定できること', () => {
-      const childNode1 = createMockNode('child-1', 2, 'default', 'parent-1');
-      const childNode2 = createMockNode('child-2', 3, 'default', 'parent-1');
-      const parentNode = createMockNode('parent-1', 1, 'default', null, [childNode1, childNode2]);
+      const childNode1 = createMockNode(2, 1);
+      const childNode2 = createMockNode(3, 1);
+      const parentNode = createMockNode(1, 0, [childNode1, childNode2]);
       const mockOnExternalDrop = vi.fn();
 
       render(
         <TabTreeView
           nodes={[parentNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           onDragEnd={vi.fn()}
@@ -1282,24 +1270,15 @@ describe('TabTreeView', () => {
       mockGetTabInfo.mockReset();
     });
 
-    /**
-     * グループノードを模擬するヘルパー関数
-     * グループノードは実タブIDを持ち、idが'group-'で始まる
-     * グループノードは通常のタブノードと同じように表示される
-     * グループ情報はnode.groupInfoに埋め込まれる
-     */
     const createMockGroupNode = (
-      id: string,
       tabId: number,
-      _viewId: string,
-      children: TabNode[] = []
-    ): TabNode => ({
-      id,
+      depth: number,
+      children: UITabNode[] = []
+    ): UITabNode => ({
       tabId,
-      parentId: null,
+      depth,
       children,
       isExpanded: true,
-      depth: 0,
       groupInfo: {
         name: 'テストグループ',
         color: '#f59e0b',
@@ -1307,16 +1286,9 @@ describe('TabTreeView', () => {
     });
 
     it('グループノード（group-で始まるID）が通常のタブノードと同じ形式で表示されること', () => {
-      const groupNode = createMockGroupNode('group-100', 100, 'default');
-      const childNode1: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-100'),
-        depth: 1,
-      };
-      const childNode2: TabNode = {
-        ...createMockNode('node-2', 2, 'default', 'group-100'),
-        depth: 1,
-      };
-      groupNode.children = [childNode1, childNode2];
+      const childNode1 = createMockNode(1, 1);
+      const childNode2 = createMockNode(2, 1);
+      const groupNode = createMockGroupNode(100, 0, [childNode1, childNode2]);
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
         if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
@@ -1328,28 +1300,22 @@ describe('TabTreeView', () => {
       render(
         <TabTreeView
           nodes={[groupNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
         />
       );
 
-      // グループノードがtree-nodeとして表示されること
       expect(screen.getByTestId('tree-node-100')).toBeInTheDocument();
-      // 子タブが表示されること
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
 
     it('グループノードの展開/折りたたみボタンクリック時にonToggleExpandが呼ばれること', async () => {
       const user = userEvent.setup();
-      const groupNode = createMockGroupNode('group-100', 100, 'default');
-      const childNode: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-100'),
-        depth: 1,
-      };
-      groupNode.children = [childNode];
+      const childNode = createMockNode(1, 1);
+      const groupNode = createMockGroupNode(100, 0, [childNode]);
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
         if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
@@ -1360,33 +1326,27 @@ describe('TabTreeView', () => {
       render(
         <TabTreeView
           nodes={[groupNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
         />
       );
 
-      // グループノード内の展開/折りたたみボタンをクリック
       const groupNodeElement = screen.getByTestId('tree-node-100');
       const toggleButton = groupNodeElement.querySelector('[data-testid="expand-button"]');
       expect(toggleButton).not.toBeNull();
       await user.click(toggleButton!);
 
-      // onToggleExpandが呼ばれる
-      expect(mockOnToggleExpand).toHaveBeenCalledWith('group-100');
+      expect(mockOnToggleExpand).toHaveBeenCalledWith(100);
     });
 
     it('折りたたまれたグループノードの子タブが非表示になること', () => {
-      const groupNode: TabNode = {
-        ...createMockGroupNode('group-100', 100, 'default'),
+      const childNode = createMockNode(1, 1);
+      const groupNode: UITabNode = {
+        ...createMockGroupNode(100, 0, [childNode]),
         isExpanded: false,
       };
-      const childNode: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-100'),
-        depth: 1,
-      };
-      groupNode.children = [childNode];
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
         if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
@@ -1397,28 +1357,21 @@ describe('TabTreeView', () => {
       render(
         <TabTreeView
           nodes={[groupNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
         />
       );
 
-      // グループノードは表示される
       expect(screen.getByTestId('tree-node-100')).toBeInTheDocument();
-      // 子タブは非表示
       expect(screen.queryByTestId('tree-node-1')).not.toBeInTheDocument();
     });
 
     it('グループノードと通常のタブノードが混在する場合、両方が正しくレンダリングされること', () => {
-      const groupNode = createMockGroupNode('group-100', 100, 'default');
-      const groupChildNode: TabNode = {
-        ...createMockNode('node-1', 1, 'default', 'group-100'),
-        depth: 1,
-      };
-      groupNode.children = [groupChildNode];
-
-      const regularNode = createMockNode('node-2', 2, 'default');
+      const groupChildNode = createMockNode(1, 1);
+      const groupNode = createMockGroupNode(100, 0, [groupChildNode]);
+      const regularNode = createMockNode(2, 0);
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
         if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
@@ -1430,18 +1383,15 @@ describe('TabTreeView', () => {
       render(
         <TabTreeView
           nodes={[groupNode, regularNode]}
-          currentViewId="default"
+          currentViewIndex={0}
           onNodeClick={mockOnNodeClick}
           onToggleExpand={mockOnToggleExpand}
           getTabInfo={mockGetTabInfo}
         />
       );
 
-      // グループノードが表示される
       expect(screen.getByTestId('tree-node-100')).toBeInTheDocument();
-      // グループの子タブが表示される
       expect(screen.getByTestId('tree-node-1')).toBeInTheDocument();
-      // 通常のタブも表示される
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
   });

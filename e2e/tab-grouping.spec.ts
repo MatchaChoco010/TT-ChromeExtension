@@ -12,20 +12,18 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -67,17 +65,33 @@ test.describe('タブグループ化機能', () => {
 
       await waitForCondition(
         async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-            } | undefined;
-          });
-          if (!treeState?.views) return false;
-          for (const view of Object.values(treeState.views)) {
-            if (Object.values(view.nodes).some(
-              (node) => node.groupInfo !== undefined && node.tabId > 0
-            )) return true;
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              if (findGroupNode(view.rootNodes)) return true;
+            }
           }
           return false;
         },
@@ -85,23 +99,38 @@ test.describe('タブグループ化機能', () => {
       );
 
       const groupTabId = await serviceWorker.evaluate(async () => {
+        interface TabNode {
+          tabId: number;
+          groupInfo?: { name: string };
+          children: TabNode[];
+        }
+        interface TreeState {
+          windows: { views: { rootNodes: TabNode[] }[] }[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-        } | undefined;
-        if (!treeState?.views) return null;
-        for (const view of Object.values(treeState.views)) {
-          const groupNode = Object.values(view.nodes).find(
-            (node) => node.groupInfo !== undefined && node.tabId > 0
-          );
-          if (groupNode) return groupNode.tabId;
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return null;
+
+        const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+          for (const node of nodes) {
+            if (node.groupInfo !== undefined && node.tabId > 0) return node;
+            const found = findGroupNode(node.children);
+            if (found) return found;
+          }
+          return undefined;
+        };
+
+        for (const window of treeState.windows) {
+          for (const view of window.views) {
+            const groupNode = findGroupNode(view.rootNodes);
+            if (groupNode) return groupNode.tabId;
+          }
         }
         return null;
       });
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -110,7 +139,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
       ], 0);
@@ -118,7 +146,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
     });
@@ -130,20 +157,18 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -186,20 +211,36 @@ test.describe('タブグループ化機能', () => {
       let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-            } | undefined;
-          });
-          if (!treeState?.views) return false;
-          for (const view of Object.values(treeState.views)) {
-            const groupNode = Object.values(view.nodes).find(
-              (node) => node.groupInfo !== undefined && node.tabId > 0
-            );
-            if (groupNode) {
-              groupTabId = groupNode.tabId;
-              return true;
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode) {
+                groupTabId = groupNode.tabId;
+                return true;
+              }
             }
           }
           return false;
@@ -209,7 +250,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -217,24 +257,41 @@ test.describe('タブグループ化機能', () => {
 
       await waitForCondition(
         async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; groupInfo?: unknown }> }>;
-              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-            } | undefined;
-          });
-          if (!treeState?.views || !treeState?.tabToNode) return false;
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
 
-          const tabNodeInfo = treeState.tabToNode[tabId1];
-          if (!tabNodeInfo) return false;
+          const findNodeWithParent = (nodes: TabNode[], targetTabId: number): { node: TabNode; parent: TabNode | null } | undefined => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) return { node, parent: null };
+              for (const child of node.children) {
+                if (child.tabId === targetTabId) return { node: child, parent: node };
+                const found = findNodeWithParent(child.children, targetTabId);
+                if (found) return found;
+              }
+            }
+            return undefined;
+          };
 
-          const viewState = treeState.views[tabNodeInfo.viewId];
-          const tabNodeState = viewState?.nodes[tabNodeInfo.nodeId];
-          if (!tabNodeState || !tabNodeState.parentId) return false;
-
-          const parentNode = viewState?.nodes[tabNodeState.parentId];
-          return parentNode?.groupInfo !== undefined;
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const result = findNodeWithParent(view.rootNodes, tabId1);
+              if (result && result.parent && result.parent.groupInfo !== undefined) {
+                return true;
+              }
+            }
+          }
+          return false;
         },
         { timeout: 10000, timeoutMessage: 'Tab was not added as child of group' }
       );
@@ -242,7 +299,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
       ], 0);
@@ -250,7 +306,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
     });
@@ -260,7 +315,7 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange: 共通単語がないタイトルのタブを使用
@@ -269,14 +324,12 @@ test.describe('タブグループ化機能', () => {
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/blank'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/example'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -316,17 +369,31 @@ test.describe('タブグループ化機能', () => {
       await waitForCondition(
         async () => {
           const result = await serviceWorker.evaluate(async () => {
+            interface TabNode {
+              tabId: number;
+              groupInfo?: { name: string };
+              children: TabNode[];
+            }
+            interface TreeState {
+              windows: { views: { rootNodes: TabNode[] }[] }[];
+            }
             const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; groupInfo?: { name: string } }> }>
-            } | undefined;
-            if (!treeState?.views) return false;
+            const treeState = storage.tree_state as TreeState | undefined;
+            if (!treeState?.windows) return false;
 
-            for (const view of Object.values(treeState.views)) {
-              const groupNode = Object.values(view.nodes).find(
-                (node) => node.groupInfo !== undefined && node.groupInfo?.name === 'グループ'
-              );
-              if (groupNode) return true;
+            const findGroupNodeByName = (nodes: TabNode[], name: string): TabNode | undefined => {
+              for (const node of nodes) {
+                if (node.groupInfo?.name === name) return node;
+                const found = findGroupNodeByName(node.children, name);
+                if (found) return found;
+              }
+              return undefined;
+            };
+
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                if (findGroupNodeByName(view.rootNodes, 'グループ')) return true;
+              }
             }
             return false;
           });
@@ -336,16 +403,32 @@ test.describe('タブグループ化機能', () => {
       );
 
       const groupTabId = await serviceWorker.evaluate(async () => {
+        interface TabNode {
+          tabId: number;
+          groupInfo?: { name: string };
+          children: TabNode[];
+        }
+        interface TreeState {
+          windows: { views: { rootNodes: TabNode[] }[] }[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-        } | undefined;
-        if (!treeState?.views) return null;
-        for (const view of Object.values(treeState.views)) {
-          const groupNode = Object.values(view.nodes).find(
-            (node) => node.groupInfo !== undefined && node.tabId > 0
-          );
-          if (groupNode) return groupNode.tabId;
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return null;
+
+        const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+          for (const node of nodes) {
+            if (node.groupInfo !== undefined && node.tabId > 0) return node;
+            const found = findGroupNode(node.children);
+            if (found) return found;
+          }
+          return undefined;
+        };
+
+        for (const window of treeState.windows) {
+          for (const view of window.views) {
+            const groupNode = findGroupNode(view.rootNodes);
+            if (groupNode) return groupNode.tabId;
+          }
         }
         return null;
       });
@@ -353,7 +436,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId2, depth: 1 },
       ], 0);
@@ -361,14 +443,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, groupTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -379,21 +459,19 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -435,17 +513,33 @@ test.describe('タブグループ化機能', () => {
       await waitForCondition(
         async () => {
           const result = await serviceWorker.evaluate(async () => {
+            interface TabNode {
+              tabId: number;
+              groupInfo?: { name: string };
+              children: TabNode[];
+            }
+            interface TreeState {
+              windows: { views: { rootNodes: TabNode[] }[] }[];
+            }
             const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-            } | undefined;
-            if (!treeState?.views) return { found: false };
+            const treeState = storage.tree_state as TreeState | undefined;
+            if (!treeState?.windows) return { found: false };
 
-            let groupNode: { id: string; tabId: number } | undefined;
-            for (const view of Object.values(treeState.views)) {
-              groupNode = Object.values(view.nodes).find(
-                (node) => node.groupInfo !== undefined && node.tabId > 0
-              );
+            const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+              for (const node of nodes) {
+                if (node.groupInfo !== undefined && node.tabId > 0) return node;
+                const found = findGroupNode(node.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
+
+            let groupNode: TabNode | undefined;
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                groupNode = findGroupNode(view.rootNodes);
+                if (groupNode) break;
+              }
               if (groupNode) break;
             }
             if (!groupNode) return { found: false };
@@ -469,7 +563,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -479,7 +572,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -488,14 +580,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -504,21 +594,19 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -556,21 +644,36 @@ test.describe('タブグループ化機能', () => {
       let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-            } | undefined;
-          });
-          if (!treeState?.views) return false;
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
 
-          for (const view of Object.values(treeState.views)) {
-            const groupNode = Object.values(view.nodes).find(
-              (node) => node.groupInfo !== undefined && node.tabId > 0
-            );
-            if (groupNode) {
-              groupTabId = groupNode.tabId;
-              return true;
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode) {
+                groupTabId = groupNode.tabId;
+                return true;
+              }
             }
           }
           return false;
@@ -591,7 +694,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -601,7 +703,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -610,14 +711,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -626,21 +725,19 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -678,37 +775,58 @@ test.describe('タブグループ化機能', () => {
       await waitForCondition(
         async () => {
           const result = await serviceWorker.evaluate(async (targetTabId) => {
-            const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null }> }>;
-              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-            } | undefined;
-            if (!treeState?.views || !treeState?.tabToNode) {
-              return { found: false };
+            interface TabNode {
+              tabId: number;
+              groupInfo?: { name: string };
+              children: TabNode[];
             }
+            interface TreeState {
+              windows: { views: { rootNodes: TabNode[] }[] }[];
+            }
+            const storage = await chrome.storage.local.get('tree_state');
+            const treeState = storage.tree_state as TreeState | undefined;
+            if (!treeState?.windows) return { found: false };
 
-            let groupNode: { id: string; tabId: number } | undefined;
-            let groupViewId: string | undefined;
-            for (const [viewId, view] of Object.entries(treeState.views)) {
-              groupNode = Object.values(view.nodes).find(
-                (node) => node.groupInfo !== undefined && node.tabId > 0
-              );
-              if (groupNode) {
-                groupViewId = viewId;
-                break;
+            const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+              for (const node of nodes) {
+                if (node.groupInfo !== undefined && node.tabId > 0) return node;
+                const found = findGroupNode(node.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
+
+            const findNodeWithParent = (nodes: TabNode[], targetTabId: number): { node: TabNode; parent: TabNode | null } | undefined => {
+              for (const node of nodes) {
+                if (node.tabId === targetTabId) return { node, parent: null };
+                for (const child of node.children) {
+                  if (child.tabId === targetTabId) return { node: child, parent: node };
+                  const found = findNodeWithParent(child.children, targetTabId);
+                  if (found) return found;
+                }
+              }
+              return undefined;
+            };
+
+            let groupNode: TabNode | undefined;
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                groupNode = findGroupNode(view.rootNodes);
+                if (groupNode) break;
+              }
+              if (groupNode) break;
+            }
+            if (!groupNode) return { found: false };
+
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                const nodeResult = findNodeWithParent(view.rootNodes, targetTabId);
+                if (nodeResult && nodeResult.parent && nodeResult.parent.tabId === groupNode.tabId) {
+                  return { found: true, groupTabId: groupNode.tabId, isChild: true };
+                }
               }
             }
-            if (!groupNode || !groupViewId) return { found: false };
-
-            const tabNodeInfo = treeState.tabToNode[targetTabId];
-            if (!tabNodeInfo) return { found: false, reason: 'tabNodeInfo not found' };
-
-            const viewState = treeState.views[tabNodeInfo.viewId];
-            const tabNodeState = viewState?.nodes[tabNodeInfo.nodeId];
-            if (!tabNodeState) return { found: false, reason: 'tabNodeState not found' };
-
-            const isChild = tabNodeState.parentId === groupNode.id;
-            return { found: true, groupTabId: groupNode.tabId, isChild };
+            return { found: true, groupTabId: groupNode.tabId, isChild: false };
           }, tabId1);
 
           if (result.found && result.groupTabId) {
@@ -722,7 +840,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -732,7 +849,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -741,14 +857,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -757,21 +871,19 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -812,21 +924,36 @@ test.describe('タブグループ化機能', () => {
       let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-            } | undefined;
-          });
-          if (!treeState?.views) return false;
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
 
-          for (const view of Object.values(treeState.views)) {
-            const groupNode = Object.values(view.nodes).find(
-              (node) => node.groupInfo !== undefined && node.tabId > 0
-            );
-            if (groupNode) {
-              groupTabId = groupNode.tabId;
-              return true;
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode) {
+                groupTabId = groupNode.tabId;
+                return true;
+              }
             }
           }
           return false;
@@ -847,7 +974,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -857,7 +983,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -866,14 +991,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -882,20 +1005,18 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -932,22 +1053,37 @@ test.describe('タブグループ化機能', () => {
       await waitForCondition(
         async () => {
           const result = await serviceWorker.evaluate(async () => {
+            interface TabNode {
+              tabId: number;
+              groupInfo?: { name: string; color: string };
+              children: TabNode[];
+            }
+            interface TreeState {
+              windows: { views: { rootNodes: TabNode[] }[] }[];
+            }
             const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; groupInfo?: { name: string; color: string } }> }>
-            } | undefined;
-            if (!treeState?.views) return { found: false };
+            const treeState = storage.tree_state as TreeState | undefined;
+            if (!treeState?.windows) return { found: false };
 
-            for (const view of Object.values(treeState.views)) {
-              const groupNode = Object.values(view.nodes).find(
-                (node) => node.groupInfo !== undefined && node.tabId > 0
-              );
-              if (groupNode) {
-                return {
-                  found: true,
-                  groupTabId: groupNode.tabId,
-                  hasGroupInfo: !!groupNode.groupInfo
-                };
+            const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+              for (const node of nodes) {
+                if (node.groupInfo !== undefined && node.tabId > 0) return node;
+                const found = findGroupNode(node.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
+
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                const groupNode = findGroupNode(view.rootNodes);
+                if (groupNode) {
+                  return {
+                    found: true,
+                    groupTabId: groupNode.tabId,
+                    hasGroupInfo: !!groupNode.groupInfo
+                  };
+                }
               }
             }
             return { found: false };
@@ -963,7 +1099,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -973,7 +1108,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -982,14 +1116,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });
@@ -1000,14 +1132,13 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange
       const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId, depth: 0 },
       ], 0);
 
@@ -1047,17 +1178,33 @@ test.describe('タブグループ化機能', () => {
       // Assert
       await waitForCondition(
         async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-            } | undefined;
-          });
-          if (!treeState?.views) return false;
-          for (const view of Object.values(treeState.views)) {
-            if (Object.values(view.nodes).some(
-              (node) => node.groupInfo !== undefined && node.tabId > 0
-            )) return true;
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              if (findGroupNode(view.rootNodes)) return true;
+            }
           }
           return false;
         },
@@ -1065,23 +1212,38 @@ test.describe('タブグループ化機能', () => {
       );
 
       const groupTabId = await serviceWorker.evaluate(async () => {
+        interface TabNode {
+          tabId: number;
+          groupInfo?: { name: string };
+          children: TabNode[];
+        }
+        interface TreeState {
+          windows: { views: { rootNodes: TabNode[] }[] }[];
+        }
         const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as {
-          views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-        } | undefined;
-        if (!treeState?.views) return null;
-        for (const view of Object.values(treeState.views)) {
-          const groupNode = Object.values(view.nodes).find(
-            (node) => node.groupInfo !== undefined && node.tabId > 0
-          );
-          if (groupNode) return groupNode.tabId;
+        const treeState = result.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return null;
+
+        const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+          for (const node of nodes) {
+            if (node.groupInfo !== undefined && node.tabId > 0) return node;
+            const found = findGroupNode(node.children);
+            if (found) return found;
+          }
+          return undefined;
+        };
+
+        for (const window of treeState.windows) {
+          for (const view of window.views) {
+            const groupNode = findGroupNode(view.rootNodes);
+            if (groupNode) return groupNode.tabId;
+          }
         }
         return null;
       });
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId, depth: 1 },
       ], 0);
@@ -1089,7 +1251,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
     });
@@ -1099,21 +1260,19 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -1149,22 +1308,38 @@ test.describe('タブグループ化機能', () => {
       await waitForCondition(
         async () => {
           const result = await serviceWorker.evaluate(async () => {
+            interface TabNode {
+              tabId: number;
+              isExpanded: boolean;
+              groupInfo?: { name: string };
+              children: TabNode[];
+            }
+            interface TreeState {
+              windows: { views: { rootNodes: TabNode[] }[] }[];
+            }
             const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; isExpanded: boolean }> }>
-            } | undefined;
-            if (!treeState?.views) return { found: false };
+            const treeState = storage.tree_state as TreeState | undefined;
+            if (!treeState?.windows) return { found: false };
 
-            for (const view of Object.values(treeState.views)) {
-              const groupNode = Object.values(view.nodes).find(
-                (node) => node.groupInfo !== undefined && node.tabId > 0
-              );
-              if (groupNode) {
-                return {
-                  found: true,
-                  groupTabId: groupNode.tabId,
-                  isExpanded: groupNode.isExpanded
-                };
+            const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+              for (const node of nodes) {
+                if (node.groupInfo !== undefined && node.tabId > 0) return node;
+                const found = findGroupNode(node.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
+
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                const groupNode = findGroupNode(view.rootNodes);
+                if (groupNode) {
+                  return {
+                    found: true,
+                    groupTabId: groupNode.tabId,
+                    isExpanded: groupNode.isExpanded
+                  };
+                }
               }
             }
             return { found: false };
@@ -1180,7 +1355,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -1190,7 +1364,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -1199,14 +1372,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -1215,20 +1386,18 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -1236,7 +1405,6 @@ test.describe('タブグループ化機能', () => {
       const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
@@ -1280,35 +1448,39 @@ test.describe('タブグループ化機能', () => {
       await waitForCondition(
         async () => {
           const result = await serviceWorker.evaluate(async (tabIds) => {
-            const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; children?: string[] }> }>;
-              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-            } | undefined;
-            if (!treeState?.views || !treeState?.tabToNode) return { found: false };
-
-            let groupNode: { id: string; tabId: number } | undefined;
-            let groupViewId: string | undefined;
-            for (const [viewId, view] of Object.entries(treeState.views)) {
-              groupNode = Object.values(view.nodes).find(
-                (node) => node.groupInfo !== undefined && node.tabId > 0
-              );
-              if (groupNode) {
-                groupViewId = viewId;
-                break;
-              }
+            interface TabNode {
+              tabId: number;
+              groupInfo?: { name: string };
+              children: TabNode[];
             }
-            if (!groupNode || !groupViewId) return { found: false };
+            interface TreeState {
+              windows: { views: { rootNodes: TabNode[] }[] }[];
+            }
+            const storage = await chrome.storage.local.get('tree_state');
+            const treeState = storage.tree_state as TreeState | undefined;
+            if (!treeState?.windows) return { found: false };
 
-            const viewState = treeState.views[groupViewId];
-            const childrenParentIds = tabIds.map(tabId => {
-              const nodeInfo = treeState.tabToNode![tabId];
-              if (!nodeInfo) return null;
-              const node = viewState?.nodes[nodeInfo.nodeId];
-              return node?.parentId;
-            });
+            const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+              for (const node of nodes) {
+                if (node.groupInfo !== undefined && node.tabId > 0) return node;
+                const found = findGroupNode(node.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
 
-            const allAreChildren = childrenParentIds.every(parentId => parentId === groupNode!.id);
+            let groupNode: TabNode | undefined;
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                groupNode = findGroupNode(view.rootNodes);
+                if (groupNode) break;
+              }
+              if (groupNode) break;
+            }
+            if (!groupNode) return { found: false };
+
+            const childTabIds = groupNode.children.map(child => child.tabId);
+            const allAreChildren = tabIds.every(tabId => childTabIds.includes(tabId));
             if (!allAreChildren) return { found: false };
 
             const tabs = await chrome.tabs.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
@@ -1334,7 +1506,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -1345,7 +1516,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
           { tabId: tabId3, depth: 0 },
@@ -1355,7 +1525,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
         { tabId: tabId3, depth: 0 },
       ], 0);
@@ -1363,14 +1532,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId3, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId3);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
 
@@ -1379,21 +1546,19 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       // Arrange
       const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
       ], 0);
 
       const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId1, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
@@ -1429,37 +1594,40 @@ test.describe('タブグループ化機能', () => {
       await waitForCondition(
         async () => {
           const result = await serviceWorker.evaluate(async (tabIds) => {
-            const storage = await chrome.storage.local.get('tree_state');
-            const treeState = storage.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null }> }>;
-              tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-            } | undefined;
-            if (!treeState?.views || !treeState?.tabToNode) return { found: false };
-
-            let groupNode: { id: string; tabId: number } | undefined;
-            let groupViewId: string | undefined;
-            for (const [viewId, view] of Object.entries(treeState.views)) {
-              groupNode = Object.values(view.nodes).find(
-                (node) => node.groupInfo !== undefined && node.tabId > 0
-              );
-              if (groupNode) {
-                groupViewId = viewId;
-                break;
-              }
+            interface TabNode {
+              tabId: number;
+              groupInfo?: { name: string };
+              children: TabNode[];
             }
-            if (!groupNode || !groupViewId) return { found: false };
+            interface TreeState {
+              windows: { views: { rootNodes: TabNode[] }[] }[];
+            }
+            const storage = await chrome.storage.local.get('tree_state');
+            const treeState = storage.tree_state as TreeState | undefined;
+            if (!treeState?.windows) return { found: false };
 
-            const viewState = treeState.views[groupViewId];
-            const tab1NodeInfo = treeState.tabToNode[tabIds[0]];
-            const tab2NodeInfo = treeState.tabToNode[tabIds[1]];
-            if (!tab1NodeInfo || !tab2NodeInfo) return { found: false };
+            const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+              for (const node of nodes) {
+                if (node.groupInfo !== undefined && node.tabId > 0) return node;
+                const found = findGroupNode(node.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
 
-            const tab1Node = viewState?.nodes[tab1NodeInfo.nodeId];
-            const tab2Node = viewState?.nodes[tab2NodeInfo.nodeId];
-            if (!tab1Node || !tab2Node) return { found: false };
+            let groupNode: TabNode | undefined;
+            for (const window of treeState.windows) {
+              for (const view of window.views) {
+                groupNode = findGroupNode(view.rootNodes);
+                if (groupNode) break;
+              }
+              if (groupNode) break;
+            }
+            if (!groupNode) return { found: false };
 
-            const isTab1Child = tab1Node.parentId === groupNode.id;
-            const isTab2Child = tab2Node.parentId === groupNode.id;
+            const childTabIds = groupNode.children.map(child => child.tabId);
+            const isTab1Child = childTabIds.includes(tabIds[0]);
+            const isTab2Child = childTabIds.includes(tabIds[1]);
 
             return {
               found: true,
@@ -1481,7 +1649,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: tabId1, depth: 1 },
         { tabId: tabId2, depth: 1 },
@@ -1491,7 +1658,6 @@ test.describe('タブグループ化機能', () => {
         await closeTab(serviceWorker, groupTabId);
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
           { tabId: tabId1, depth: 0 },
           { tabId: tabId2, depth: 0 },
         ], 0);
@@ -1500,14 +1666,377 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: tabId2, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
+      ], 0);
+    });
+  });
+
+  test.describe('非選択タブの右クリックでのグループ化', () => {
+    test('複数タブ選択時に非選択タブを右クリックすると選択タブの最後の位置にグループが作成される', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      // タブを作成: tab1, tab2, tab3, tab4
+      // tab1とtab2を選択した状態でtab4を右クリック
+      // → tab1とtab2がグループ化され、グループはtab2の位置に挿入される
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
+      const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
+      const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+      ], 0);
+
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // tab1とtab2を選択
+      const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await expect(tabNode1).toHaveClass(/bg-gray-500/);
+
+      const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
+      await expect(tabNode2).toHaveClass(/bg-gray-500/);
+
+      // tab4(非選択)を右クリック
+      const tabNode4 = sidePanelPage.locator(`[data-testid="tree-node-${tabId4}"]`);
+
+      await sidePanelPage.waitForFunction(
+        (tabId) => {
+          const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+          if (!node) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        },
+        tabId4,
+        { timeout: 5000 }
+      );
+
+      await tabNode4.click({ button: 'right', force: true, noWaitAfter: true });
+
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      // 非選択タブを右クリックするとtargetTabIdsは右クリックしたタブのみになるため
+      // メニューは「タブをグループ化」と表示される
+      // しかし、実際の動作は選択タブをグループ化する
+      const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: 'タブをグループ化' });
+      await expect(groupMenuItem).toBeVisible();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
+
+      await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+
+      await confirmGroupNameModal(sidePanelPage);
+
+      let groupTabId: number | undefined;
+      await waitForCondition(
+        async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
+          const treeState = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('tree_state');
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode) {
+                groupTabId = groupNode.tabId;
+                return true;
+              }
+            }
+          }
+          return false;
+        },
+        { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
+      );
+
+      // グループがtab2の位置（tab3の前）に挿入されていることを確認
+      // 期待: initialBrowserTabId, groupTabId(tab1,tab2を含む), tab3, tab4
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+        { tabId: tabId3, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+      ], 0);
+
+      // クリーンアップ
+      await closeTab(serviceWorker, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: tabId2, depth: 1 },
+        { tabId: tabId3, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, groupTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId4);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      ], 0);
+    });
+
+    test('非連続選択時に非選択タブを右クリックすると選択タブの最後の位置にグループが作成される', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      // タブを作成: tab1, tab2, tab3, tab4, tab5
+      // tab1とtab3を選択（非連続）した状態でtab5を右クリック
+      // → tab1とtab3がグループ化され、グループはtab3の位置に挿入される
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
+      const tabId3 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+      ], 0);
+
+      const tabId4 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+      ], 0);
+
+      const tabId5 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId3, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+        { tabId: tabId5, depth: 0 },
+      ], 0);
+
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // tab1とtab3を選択（非連続）
+      const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await expect(tabNode1).toHaveClass(/bg-gray-500/);
+
+      const tabNode3 = sidePanelPage.locator(`[data-testid="tree-node-${tabId3}"]`);
+      await tabNode3.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
+      await expect(tabNode3).toHaveClass(/bg-gray-500/);
+
+      // tab5(非選択)を右クリック
+      const tabNode5 = sidePanelPage.locator(`[data-testid="tree-node-${tabId5}"]`);
+
+      await sidePanelPage.waitForFunction(
+        (tabId) => {
+          const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+          if (!node) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        },
+        tabId5,
+        { timeout: 5000 }
+      );
+
+      await tabNode5.click({ button: 'right', force: true, noWaitAfter: true });
+
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      // 非選択タブを右クリックするとtargetTabIdsは右クリックしたタブのみになるため
+      // メニューは「タブをグループ化」と表示される
+      // しかし、実際の動作は選択タブをグループ化する
+      const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: 'タブをグループ化' });
+      await expect(groupMenuItem).toBeVisible();
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
+
+      await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+
+      await confirmGroupNameModal(sidePanelPage);
+
+      let groupTabId: number | undefined;
+      await waitForCondition(
+        async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
+          const treeState = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('tree_state');
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode) {
+                groupTabId = groupNode.tabId;
+                return true;
+              }
+            }
+          }
+          return false;
+        },
+        { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
+      );
+
+      // グループがtab3の位置（選択タブの最後）に挿入されていることを確認
+      // 期待: initialBrowserTabId, tab2, groupTabId(tab1,tab3を含む), tab4, tab5
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId3, depth: 1 },
+        { tabId: tabId4, depth: 0 },
+        { tabId: tabId5, depth: 0 },
+      ], 0);
+
+      // クリーンアップ
+      await closeTab(serviceWorker, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: tabId3, depth: 1 },
+        { tabId: tabId4, depth: 0 },
+        { tabId: tabId5, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId3);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+        { tabId: tabId5, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, groupTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+        { tabId: tabId5, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId4, depth: 0 },
+        { tabId: tabId5, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId4);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId5, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId5);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
       ], 0);
     });
   });
@@ -1518,20 +2047,18 @@ test.describe('タブグループ化機能', () => {
       serviceWorker,
     }) => {
       const windowId = await getCurrentWindowId(serviceWorker);
-      const { initialBrowserTabId, sidePanelPage, pseudoSidePanelTabId } =
+      const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
       const parentTabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
       ], 0);
 
       const child1TabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
         { tabId: child1TabId, depth: 0 },
       ], 0);
@@ -1539,7 +2066,6 @@ test.describe('タブグループ化機能', () => {
       const child2TabId = await createTab(serviceWorker, getTestServerUrl('/page'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0 },
         { tabId: child1TabId, depth: 0 },
         { tabId: child2TabId, depth: 0 },
@@ -1548,7 +2074,6 @@ test.describe('タブグループ化機能', () => {
       await moveTabToParent(sidePanelPage, child1TabId, parentTabId, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: child1TabId, depth: 1 },
         { tabId: child2TabId, depth: 0 },
@@ -1557,7 +2082,6 @@ test.describe('タブグループ化機能', () => {
       await moveTabToParent(sidePanelPage, child2TabId, parentTabId, serviceWorker);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: parentTabId, depth: 0, expanded: true },
         { tabId: child1TabId, depth: 1 },
         { tabId: child2TabId, depth: 1 },
@@ -1605,20 +2129,36 @@ test.describe('タブグループ化機能', () => {
       let groupTabId: number | undefined;
       await waitForCondition(
         async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
           const treeState = await serviceWorker.evaluate(async () => {
             const result = await chrome.storage.local.get('tree_state');
-            return result.tree_state as {
-              views?: Record<string, { nodes: Record<string, { id: string; tabId: number }> }>;
-            } | undefined;
-          });
-          if (!treeState?.views) return false;
-          for (const view of Object.values(treeState.views)) {
-            const groupNode = Object.values(view.nodes).find(
-              (node) => node.groupInfo !== undefined && node.tabId > 0
-            );
-            if (groupNode) {
-              groupTabId = groupNode.tabId;
-              return true;
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode) {
+                groupTabId = groupNode.tabId;
+                return true;
+              }
             }
           }
           return false;
@@ -1628,7 +2168,6 @@ test.describe('タブグループ化機能', () => {
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: parentTabId, depth: 1, expanded: true },
         { tabId: child1TabId, depth: 2 },
@@ -1636,30 +2175,47 @@ test.describe('タブグループ化機能', () => {
       ], 0);
 
       const verifyResult = await serviceWorker.evaluate(async (tabIds) => {
+        interface TabNode {
+          tabId: number;
+          children: TabNode[];
+        }
+        interface TreeState {
+          windows: { views: { rootNodes: TabNode[] }[] }[];
+        }
         const storage = await chrome.storage.local.get('tree_state');
-        const treeState = storage.tree_state as {
-          views?: Record<string, { nodes: Record<string, { id: string; tabId: number; parentId: string | null; children: { id: string }[] }> }>;
-          tabToNode?: Record<number, { viewId: string; nodeId: string }>;
-        } | undefined;
-        if (!treeState?.views || !treeState?.tabToNode) return { verified: false };
+        const treeState = storage.tree_state as TreeState | undefined;
+        if (!treeState?.windows) return { verified: false };
 
         const [parentTabId, child1TabId, child2TabId] = tabIds;
 
-        const parentNodeInfo = treeState.tabToNode[parentTabId];
-        const child1NodeInfo = treeState.tabToNode[child1TabId];
-        const child2NodeInfo = treeState.tabToNode[child2TabId];
-        if (!parentNodeInfo || !child1NodeInfo || !child2NodeInfo) return { verified: false };
+        const findNodeWithParent = (nodes: TabNode[], targetTabId: number, parentOfNodes: TabNode | null = null): { node: TabNode; parent: TabNode | null } | undefined => {
+          for (const node of nodes) {
+            if (node.tabId === targetTabId) return { node, parent: parentOfNodes };
+            const found = findNodeWithParent(node.children, targetTabId, node);
+            if (found) return found;
+          }
+          return undefined;
+        };
 
-        const viewState = treeState.views[parentNodeInfo.viewId];
-        if (!viewState) return { verified: false };
+        let parentNode: TabNode | undefined;
+        let child1Parent: TabNode | null | undefined;
+        let child2Parent: TabNode | null | undefined;
 
-        const parentNode = viewState.nodes[parentNodeInfo.nodeId];
-        const child1Node = viewState.nodes[child1NodeInfo.nodeId];
-        const child2Node = viewState.nodes[child2NodeInfo.nodeId];
-        if (!parentNode || !child1Node || !child2Node) return { verified: false };
+        for (const window of treeState.windows) {
+          for (const view of window.views) {
+            const parentResult = findNodeWithParent(view.rootNodes, parentTabId);
+            if (parentResult) parentNode = parentResult.node;
+            const child1Result = findNodeWithParent(view.rootNodes, child1TabId);
+            if (child1Result) child1Parent = child1Result.parent;
+            const child2Result = findNodeWithParent(view.rootNodes, child2TabId);
+            if (child2Result) child2Parent = child2Result.parent;
+          }
+        }
 
-        const child1IsChildOfParent = child1Node.parentId === parentNode.id;
-        const child2IsChildOfParent = child2Node.parentId === parentNode.id;
+        if (!parentNode || child1Parent === undefined || child2Parent === undefined) return { verified: false };
+
+        const child1IsChildOfParent = child1Parent?.tabId === parentTabId;
+        const child2IsChildOfParent = child2Parent?.tabId === parentTabId;
         const parentHasTwoChildren = parentNode.children.length === 2;
 
         return {
@@ -1676,7 +2232,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, child1TabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: parentTabId, depth: 1, expanded: true },
         { tabId: child2TabId, depth: 2 },
@@ -1685,7 +2240,6 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, child2TabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0, expanded: true },
         { tabId: parentTabId, depth: 1 },
       ], 0);
@@ -1693,14 +2247,12 @@ test.describe('タブグループ化機能', () => {
       await closeTab(serviceWorker, parentTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
         { tabId: groupTabId!, depth: 0 },
       ], 0);
 
       await closeTab(serviceWorker, groupTabId!);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
-        { tabId: pseudoSidePanelTabId, depth: 0 },
       ], 0);
     });
   });

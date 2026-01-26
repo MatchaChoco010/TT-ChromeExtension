@@ -105,49 +105,107 @@ export async function createTab(
   await waitForTabInTreeState(serviceWorker, tab.id!);
 
   if (parentTabId !== undefined) {
-    // handleTabCreatedがpendingTabParentsを使用して親子関係を設定する
-    // タブがツリーに追加された後、親子関係が正しく設定されるまで待機
-    const parentChildSet = await serviceWorker.evaluate(
-      async ({ parentTabId, childTabId }) => {
-        interface TreeNode {
-          parentId: string | null;
-        }
+    // ピン留めタブが親として指定された場合、親子関係は設定されない
+    // （ピン留めタブはrootNodesに含まれないため、新しいタブはルートノードとして追加される）
+    const isParentPinned = await serviceWorker.evaluate(
+      async (parentTabId) => {
         interface ViewState {
-          info: { id: string; name: string; color: string };
-          rootNodeIds: string[];
-          nodes: Record<string, TreeNode>;
+          pinnedTabIds: number[];
+        }
+        interface WindowState {
+          windowId: number;
+          views: ViewState[];
         }
         interface LocalTreeState {
-          tabToNode: Record<number, { viewId: string; nodeId: string }>;
-          views: Record<string, ViewState>;
+          windows: WindowState[];
         }
-        for (let i = 0; i < 100; i++) {
-          const result = await chrome.storage.local.get('tree_state');
-          const treeState = result.tree_state as LocalTreeState | undefined;
-          if (treeState?.views && treeState?.tabToNode) {
-            const parentNodeInfo = treeState.tabToNode[parentTabId];
-            const childNodeInfo = treeState.tabToNode[childTabId];
-            if (parentNodeInfo && childNodeInfo && parentNodeInfo.viewId === childNodeInfo.viewId) {
-              const viewState = treeState.views[childNodeInfo.viewId];
-              if (viewState) {
-                const childNode = viewState.nodes[childNodeInfo.nodeId];
-                if (childNode && childNode.parentId === parentNodeInfo.nodeId) {
-                  return true;
-                }
+
+        const result = await chrome.storage.local.get('tree_state');
+        const treeState = result.tree_state as LocalTreeState | undefined;
+        if (treeState?.windows) {
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              if (viewState.pinnedTabIds?.includes(parentTabId)) {
+                return true;
               }
             }
           }
-          await new Promise(resolve => setTimeout(resolve, 20));
         }
         return false;
       },
-      { parentTabId, childTabId: tab.id! }
+      parentTabId
     );
 
-    if (!parentChildSet) {
-      throw new Error(
-        `Timeout waiting for parent-child relationship: parentTabId=${parentTabId}, childTabId=${tab.id}`
+    // ピン留めタブが親の場合、親子関係の確認はスキップ
+    // （新しいタブはルートノードとして追加されているはず）
+    if (!isParentPinned) {
+      // handleTabCreatedがpendingTabParentsを使用して親子関係を設定する
+      // タブがツリーに追加された後、親子関係が正しく設定されるまで待機
+      const parentChildSet = await serviceWorker.evaluate(
+        async ({ parentTabId, childTabId }) => {
+          interface TabNode {
+            tabId: number;
+            isExpanded: boolean;
+            children: TabNode[];
+          }
+          interface ViewState {
+            name: string;
+            color: string;
+            rootNodes: TabNode[];
+          }
+          interface WindowState {
+            windowId: number;
+            views: ViewState[];
+            activeViewIndex: number;
+            pinnedTabIds: number[];
+          }
+          interface LocalTreeState {
+            windows: WindowState[];
+          }
+
+          // 再帰的にタブを検索し、親タブIDも返す
+          const findTabWithParent = (
+            nodes: TabNode[],
+            targetTabId: number,
+            parentTabId: number | null = null
+          ): { found: boolean; parentTabId: number | null } => {
+            for (const node of nodes) {
+              if (node.tabId === targetTabId) {
+                return { found: true, parentTabId };
+              }
+              const result = findTabWithParent(node.children, targetTabId, node.tabId);
+              if (result.found) {
+                return result;
+              }
+            }
+            return { found: false, parentTabId: null };
+          };
+
+          for (let i = 0; i < 100; i++) {
+            const result = await chrome.storage.local.get('tree_state');
+            const treeState = result.tree_state as LocalTreeState | undefined;
+            if (treeState?.windows) {
+              for (const windowState of treeState.windows) {
+                for (const viewState of windowState.views) {
+                  const childResult = findTabWithParent(viewState.rootNodes, childTabId);
+                  if (childResult.found && childResult.parentTabId === parentTabId) {
+                    return true;
+                  }
+                }
+              }
+            }
+            await new Promise(resolve => setTimeout(resolve, 20));
+          }
+          return false;
+        },
+        { parentTabId, childTabId: tab.id! }
       );
+
+      if (!parentChildSet) {
+        throw new Error(
+          `Timeout waiting for parent-child relationship: parentTabId=${parentTabId}, childTabId=${tab.id}`
+        );
+      }
     }
   }
 
@@ -320,41 +378,6 @@ export async function getCurrentWindowId(serviceWorker: Worker): Promise<number>
 
     throw new Error('Could not determine windowId: no tabs found');
   });
-}
-
-/**
- * 擬似サイドパネルタブのIDを取得
- *
- * Playwrightでは本物のChrome拡張機能サイドパネル（chrome.sidePanel API）を
- * 直接テストできないため、sidepanel.htmlを通常のタブとして開いてテストしている。
- * この「擬似サイドパネルタブ」はテスト環境でのみ存在し、ツリービューの検証に使用される。
- *
- * 本物のサイドパネルはchrome.tabs.queryに含まれないが、
- * 擬似サイドパネルタブは通常のタブとして存在するため、
- * テストではこのタブを考慮する必要がある。
- *
- * @param serviceWorker - Service Worker
- * @param windowId - ウィンドウID
- * @returns 擬似サイドパネルタブのID
- * @throws 擬似サイドパネルタブが見つからない場合
- */
-export async function getPseudoSidePanelTabId(serviceWorker: Worker, windowId: number): Promise<number> {
-  return await serviceWorker.evaluate(async (wId) => {
-    const extensionId = chrome.runtime.id;
-    const sidePanelUrlPrefix = `chrome-extension://${extensionId}/sidepanel.html`;
-
-    const tabs = await chrome.tabs.query({ windowId: wId });
-    const sidePanelTab = tabs.find(t => {
-      const url = t.url || t.pendingUrl || '';
-      return url.startsWith(sidePanelUrlPrefix);
-    });
-
-    if (!sidePanelTab || !sidePanelTab.id) {
-      throw new Error('Pseudo side panel tab not found');
-    }
-
-    return sidePanelTab.id;
-  }, windowId);
 }
 
 /**
@@ -544,7 +567,44 @@ export async function confirmGroupNameModal(page: Page): Promise<void> {
   const modal = page.locator('[data-testid="group-name-modal"]');
   await modal.waitFor({ state: 'visible', timeout: 5000 });
   const saveButton = page.locator('[data-testid="group-name-save-button"]');
-  await saveButton.click({ force: true, noWaitAfter: true });
-  await modal.waitFor({ state: 'hidden', timeout: 3000 });
+  // ボタンが完全にクリック可能になるまで待つ
+  await saveButton.waitFor({ state: 'visible', timeout: 3000 });
+  await saveButton.click({ noWaitAfter: true });
+  await modal.waitFor({ state: 'hidden', timeout: 5000 });
+}
+
+/**
+ * ページを開いてタブIDを取得
+ *
+ * extensionContext.newPage()でページを作成し、指定URLに遷移してタブIDを取得する。
+ * タブがTreeStateに追加されるまで待機するため、返却後すぐにassertTabStructureを呼べる。
+ *
+ * @param extensionContext - Playwright BrowserContext
+ * @param serviceWorker - Service Worker
+ * @param url - 開くURL
+ * @returns ページオブジェクトとタブID
+ */
+export async function openPageAndGetTabId(
+  extensionContext: { newPage: () => Promise<Page> },
+  serviceWorker: Worker,
+  url: string
+): Promise<{ page: Page; tabId: number }> {
+  const page = await extensionContext.newPage();
+  await page.goto(url);
+  await page.waitForLoadState('domcontentloaded');
+
+  const tabId = await serviceWorker.evaluate(async (targetUrl) => {
+    const tabs = await chrome.tabs.query({});
+    const tab = tabs.find(t => (t.url || t.pendingUrl || '').includes(targetUrl));
+    return tab?.id;
+  }, url);
+
+  if (tabId === undefined) {
+    throw new Error(`Tab with URL containing "${url}" not found`);
+  }
+
+  await waitForTabInTreeState(serviceWorker, tabId);
+
+  return { page, tabId };
 }
 

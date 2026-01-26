@@ -47,8 +47,17 @@ const DEFAULT_INTERVAL = 16.667;
  *   serviceWorker,
  *   async (tabId) => {
  *     const result = await chrome.storage.local.get('tree_state');
- *     const treeState = result.tree_state;
- *     return !!treeState?.tabToNode?.[tabId];
+ *     const treeState = result.tree_state as { windows: { views: { rootNodes: TabNode[] }[] }[] } | undefined;
+ *     if (!treeState?.windows) return false;
+ *     // Traverse tree to find tabId
+ *     const findTab = (nodes: TabNode[]): boolean => {
+ *       for (const node of nodes) {
+ *         if (node.tabId === tabId) return true;
+ *         if (findTab(node.children)) return true;
+ *       }
+ *       return false;
+ *     };
+ *     return treeState.windows.some(w => w.views.some(v => findTab(v.rootNodes)));
  *   },
  *   tabId,
  *   { timeout: 5000, timeoutMessage: `Tab ${tabId} was not added to tree` }
@@ -146,7 +155,7 @@ export async function waitForTabInTreeState(
   tabId: number,
   options: PollingOptions = {}
 ): Promise<void> {
-  // Service Workerの処理が遅れる場合（waitForSyncComplete等）に対応するため、
+  // Service Workerの処理が遅れる場合（waitForInitialization等）に対応するため、
   // デフォルトタイムアウトを15秒に設定
   const {
     timeout = 15000,
@@ -177,22 +186,34 @@ export async function waitForTabInTreeState(
         tabExists = false;
       }
 
-      const syncCompleted = globalThis.treeStateManager?.isSyncCompleted?.() ?? 'unknown';
+      const initialized = globalThis.treeStateManager?.isInitialized?.() ?? 'unknown';
 
       const memoryNode = globalThis.treeStateManager?.getNodeByTabId?.(tabId);
       const hasNodeInMemory = !!memoryNode;
 
       const treeState = globalThis.treeStateManager?.toJSON?.();
-      const registeredTabIds = treeState?.tabToNode
-        ? Object.keys(treeState.tabToNode).map(Number)
-        : [];
+      // 新しい構造: windows[] -> views[] -> rootNodes[] (再帰的にchildren)
+      const collectTabIds = (nodes: { tabId: number; children?: unknown[] }[]): number[] => {
+        const ids: number[] = [];
+        for (const node of nodes) {
+          ids.push(node.tabId);
+          if (node.children && Array.isArray(node.children)) {
+            ids.push(...collectTabIds(node.children as { tabId: number; children?: unknown[] }[]));
+          }
+        }
+        return ids;
+      };
+      const registeredTabIds: number[] = [];
+      if (treeState?.windows) {
+        for (const win of treeState.windows) {
+          for (const view of win.views || []) {
+            registeredTabIds.push(...collectTabIds(view.rootNodes || []));
+          }
+        }
+      }
 
       const allChromeTabs = await chrome.tabs.query({});
       const allChromeTabIds = allChromeTabs.map(t => t.id).filter((id): id is number => id !== undefined);
-
-      const tabCreationLogs = globalThis.getTabCreationLogs?.(tabId) ?? [];
-      const recentLogs = globalThis.getTabCreationLogs?.() ?? [];
-      const last50Logs = recentLogs.slice(-50);
 
       return {
         success: false,
@@ -203,10 +224,8 @@ export async function waitForTabInTreeState(
           registeredTabIds,
           allChromeTabIds,
           missingFromTree: allChromeTabIds.filter(id => !registeredTabIds.includes(id)),
-          syncCompleted,
+          initialized,
           hasNodeInMemory,
-          tabCreationLogs: tabCreationLogs.map(l => l.message),
-          last50Logs: last50Logs.map(l => `[tabId=${l.tabId}] ${l.message}`),
         },
       };
     },
@@ -440,20 +459,38 @@ export async function waitForWindowTreeSync(
 
   const result = await serviceWorker.evaluate(
     async ({ windowId, iterations, interval }) => {
+      // 新しい構造: windows[] -> views[] -> rootNodes[] (再帰的にchildren)
+      const collectTabIds = (nodes: { tabId: number; children?: unknown[] }[]): number[] => {
+        const ids: number[] = [];
+        for (const node of nodes) {
+          ids.push(node.tabId);
+          if (node.children && Array.isArray(node.children)) {
+            ids.push(...collectTabIds(node.children as { tabId: number; children?: unknown[] }[]));
+          }
+        }
+        return ids;
+      };
+
       for (let i = 0; i < iterations; i++) {
         const tabs = await chrome.tabs.query({ windowId });
         const result = await chrome.storage.local.get('tree_state');
         const treeState = result.tree_state as
-          | { tabToNode?: Record<number, string> }
+          | { windows?: { windowId: number; views?: { rootNodes?: unknown[] }[] }[] }
           | undefined;
 
-        if (treeState?.tabToNode && tabs.length > 0) {
-          const tabToNode = treeState.tabToNode;
-          const allTabsSynced = tabs.every(
-            (tab: chrome.tabs.Tab) => tab.id && tabToNode[tab.id]
-          );
-          if (allTabsSynced) {
-            return { success: true };
+        if (treeState?.windows && tabs.length > 0) {
+          const windowState = treeState.windows.find(w => w.windowId === windowId);
+          if (windowState?.views) {
+            const registeredTabIds: number[] = [];
+            for (const view of windowState.views) {
+              registeredTabIds.push(...collectTabIds((view.rootNodes || []) as { tabId: number; children?: unknown[] }[]));
+            }
+            const allTabsSynced = tabs.every(
+              (tab: chrome.tabs.Tab) => tab.id && registeredTabIds.includes(tab.id)
+            );
+            if (allTabsSynced) {
+              return { success: true };
+            }
           }
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
@@ -557,22 +594,22 @@ export async function waitForGroupRemovedFromStorage(
 }
 
 /**
- * syncWithChromeTabsが完了するまで待機
+ * Service Workerの初期化が完了するまで待機
  *
- * Service WorkerのsyncCompletedフラグがtrueになるまでポーリングで待機する。
+ * Service Workerのinitializedフラグがtrueになるまでポーリングで待機する。
  * これはタブ作成イベント（handleTabCreated）が処理されるために必要。
  *
  * @param serviceWorker - Service Worker
  * @param options - ポーリングオプション
  */
-export async function waitForSyncCompleted(
+export async function waitForInitialized(
   serviceWorker: Worker,
   options: PollingOptions = {}
 ): Promise<void> {
   const {
     timeout = 10000,
     interval = 100,
-    timeoutMessage = 'Timeout waiting for syncWithChromeTabs to complete',
+    timeoutMessage = 'Timeout waiting for Service Worker initialization to complete',
   } = options;
 
   const iterations = Math.ceil(timeout / interval);
@@ -581,7 +618,7 @@ export async function waitForSyncCompleted(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         // @ts-expect-error accessing global treeStateManager
-        if (globalThis.treeStateManager?.isSyncCompleted?.()) {
+        if (globalThis.treeStateManager?.isInitialized?.()) {
           return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
@@ -618,11 +655,11 @@ export async function waitForTreeStateInitialized(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        // 新しいTreeState構造: views は Record<string, ViewState>
+        // 新しいTreeState構造: windows は WindowState[]
         const treeState = result.tree_state as
-          | { views?: Record<string, unknown> }
+          | { windows?: unknown[] }
           | undefined;
-        if (treeState?.views && Object.keys(treeState.views).length > 0) {
+        if (treeState?.windows && treeState.windows.length > 0) {
           return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));
@@ -715,11 +752,11 @@ export async function waitForSidePanelReady(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
         const result = await chrome.storage.local.get('tree_state');
-        // 新しいTreeState構造: views は Record<string, ViewState>
+        // 新しいTreeState構造: windows は WindowState[]
         const treeState = result.tree_state as
-          | { views?: Record<string, unknown> }
+          | { windows?: unknown[] }
           | undefined;
-        if (treeState?.views && Object.keys(treeState.views).length > 0) {
+        if (treeState?.windows && treeState.windows.length > 0) {
           return { success: true };
         }
         await new Promise((resolve) => setTimeout(resolve, interval));

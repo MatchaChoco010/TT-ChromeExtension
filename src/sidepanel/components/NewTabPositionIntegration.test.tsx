@@ -2,11 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { chromeMock } from '@/test/chrome-mock';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
 import { TreeStateManager } from '@/services/TreeStateManager';
-import type { UserSettings } from '@/types';
+import type { UserSettings, TreeState } from '@/types';
 
 describe('新規タブ位置の統合テスト', () => {
   let testStorageService: StorageService;
   let testTreeStateManager: TreeStateManager;
+  const defaultWindowId = 1;
 
   beforeEach(async () => {
     chromeMock.clearAllListeners();
@@ -15,19 +16,23 @@ describe('新規タブ位置の統合テスト', () => {
     testStorageService = new StorageService();
     testTreeStateManager = new TreeStateManager(testStorageService);
 
-    await testStorageService.set(STORAGE_KEYS.TREE_STATE, {
-      views: {
-        'default-view': {
-          info: { id: 'default-view', name: 'デフォルト', color: '#3b82f6' },
-          rootNodeIds: [],
-          nodes: {},
+    const initialTreeState: TreeState = {
+      windows: [
+        {
+          windowId: defaultWindowId,
+          views: [
+            {
+              name: 'デフォルト',
+              color: '#3b82f6',
+              rootNodes: [],
+              pinnedTabIds: [],
+            },
+          ],
+          activeViewIndex: 0,
         },
-      },
-      viewOrder: ['default-view'],
-      currentViewId: 'default-view',
-      tabToNode: {},
-      treeStructure: [],
-    });
+      ],
+    };
+    await testStorageService.set(STORAGE_KEYS.TREE_STATE, initialTreeState);
 
     const defaultSettings: UserSettings = {
       fontSize: 14,
@@ -40,7 +45,7 @@ describe('新規タブ位置の統合テスト', () => {
       showUnreadIndicator: true,
       autoSnapshotInterval: 0,
       childTabBehavior: 'promote',
-        snapshotSubfolder: 'TT-Snapshots',
+      snapshotSubfolder: 'TT-Snapshots',
     };
     await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, defaultSettings);
 
@@ -71,7 +76,7 @@ describe('新規タブ位置の統合テスト', () => {
       const parentTab = {
         id: 1,
         index: 0,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://example.com',
         title: '親タブ',
         active: false,
@@ -80,12 +85,12 @@ describe('新規タブ位置の統合テスト', () => {
         incognito: false,
       } as chrome.tabs.Tab;
 
-      await testTreeStateManager.addTab(parentTab, null, 'default-view');
+      await testTreeStateManager.addTab(parentTab, null, defaultWindowId);
 
       const childTab = {
         id: 2,
         index: 1,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://example.com/page',
         title: '子タブ',
         active: false,
@@ -95,21 +100,15 @@ describe('新規タブ位置の統合テスト', () => {
         openerTabId: 1,
       } as chrome.tabs.Tab;
 
-      const parentNodeResult = testTreeStateManager.getNodeByTabId(1);
-      await testTreeStateManager.addTab(
-        childTab,
-        parentNodeResult?.node.id || null,
-        'default-view',
-      );
+      await testTreeStateManager.addTab(childTab, 1, defaultWindowId);
 
       const parentResult = testTreeStateManager.getNodeByTabId(1);
       const childResult = testTreeStateManager.getNodeByTabId(2);
 
       expect(parentResult).toBeDefined();
       expect(childResult).toBeDefined();
-      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
       expect(parentResult?.node.children).toHaveLength(1);
-      expect(parentResult?.node.children[0].id).toBe(childResult?.node.id);
+      expect(parentResult?.node.children[0].tabId).toBe(2);
     });
 
     it('newTabPosition設定が「child」の場合、openerTabIdを持つタブが子として配置される', async () => {
@@ -129,7 +128,7 @@ describe('新規タブ位置の統合テスト', () => {
       const parentTab = {
         id: 1,
         index: 0,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://parent.com',
         title: '親タブ',
         active: false,
@@ -138,12 +137,12 @@ describe('新規タブ位置の統合テスト', () => {
         incognito: false,
       } as chrome.tabs.Tab;
 
-      await testTreeStateManager.addTab(parentTab, null, 'default-view');
+      await testTreeStateManager.addTab(parentTab, null, defaultWindowId);
 
       const childTab = {
         id: 2,
         index: 1,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://child.com',
         title: '子タブ',
         active: false,
@@ -153,17 +152,13 @@ describe('新規タブ位置の統合テスト', () => {
         openerTabId: 1,
       } as chrome.tabs.Tab;
 
-      const parentNodeResult = testTreeStateManager.getNodeByTabId(1);
-      await testTreeStateManager.addTab(
-        childTab,
-        parentNodeResult?.node.id || null,
-        'default-view',
-      );
+      await testTreeStateManager.addTab(childTab, 1, defaultWindowId);
 
       const parentResult = testTreeStateManager.getNodeByTabId(1);
       const childResult = testTreeStateManager.getNodeByTabId(2);
 
-      expect(childResult?.node.parentId).toBe(parentResult?.node.id);
+      expect(childResult).toBeDefined();
+      expect(parentResult?.node.children.some(c => c.tabId === 2)).toBe(true);
     });
   });
 
@@ -187,7 +182,7 @@ describe('新規タブ位置の統合テスト', () => {
       const existingTab = {
         id: 1,
         index: 0,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://existing.com',
         title: '既存タブ',
         active: false,
@@ -196,12 +191,12 @@ describe('新規タブ位置の統合テスト', () => {
         incognito: false,
       } as chrome.tabs.Tab;
 
-      await testTreeStateManager.addTab(existingTab, null, 'default-view');
+      await testTreeStateManager.addTab(existingTab, null, defaultWindowId);
 
       const manualTab = {
         id: 2,
         index: 1,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://manual.com',
         title: '手動タブ',
         active: false,
@@ -210,16 +205,15 @@ describe('新規タブ位置の統合テスト', () => {
         incognito: false,
       } as chrome.tabs.Tab;
 
-      await testTreeStateManager.addTab(manualTab, null, 'default-view');
+      await testTreeStateManager.addTab(manualTab, null, defaultWindowId);
 
       const manualResult = testTreeStateManager.getNodeByTabId(2);
 
       expect(manualResult).toBeDefined();
-      expect(manualResult?.node.parentId).toBeNull();
 
-      const tree = testTreeStateManager.getTree('default-view');
+      const tree = testTreeStateManager.getTree(defaultWindowId);
       expect(tree).toHaveLength(2);
-      expect(tree[1].id).toBe(manualResult?.node.id);
+      expect(tree[1].tabId).toBe(2);
     });
 
     it('newTabPosition設定が「end」の場合、新しいタブがルートレベルの最後に配置される', async () => {
@@ -239,7 +233,7 @@ describe('新規タブ位置の統合テスト', () => {
       const tab1 = {
         id: 1,
         index: 0,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://tab1.com',
         title: 'タブ1',
         active: false,
@@ -251,7 +245,7 @@ describe('新規タブ位置の統合テスト', () => {
       const tab2 = {
         id: 2,
         index: 1,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://tab2.com',
         title: 'タブ2',
         active: false,
@@ -263,7 +257,7 @@ describe('新規タブ位置の統合テスト', () => {
       const tab3 = {
         id: 3,
         index: 2,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://tab3.com',
         title: 'タブ3',
         active: false,
@@ -272,19 +266,22 @@ describe('新規タブ位置の統合テスト', () => {
         incognito: false,
       } as chrome.tabs.Tab;
 
-      await testTreeStateManager.addTab(tab1, null, 'default-view');
-      await testTreeStateManager.addTab(tab2, null, 'default-view');
-      await testTreeStateManager.addTab(tab3, null, 'default-view');
+      await testTreeStateManager.addTab(tab1, null, defaultWindowId);
+      await testTreeStateManager.addTab(tab2, null, defaultWindowId);
+      await testTreeStateManager.addTab(tab3, null, defaultWindowId);
 
-      const tree = testTreeStateManager.getTree('default-view');
+      const tree = testTreeStateManager.getTree(defaultWindowId);
       expect(tree).toHaveLength(3);
       expect(tree[0].tabId).toBe(1);
       expect(tree[1].tabId).toBe(2);
       expect(tree[2].tabId).toBe(3);
 
-      expect(tree[0].parentId).toBeNull();
-      expect(tree[1].parentId).toBeNull();
-      expect(tree[2].parentId).toBeNull();
+      const result1 = testTreeStateManager.getNodeByTabId(1);
+      const result2 = testTreeStateManager.getNodeByTabId(2);
+      const result3 = testTreeStateManager.getNodeByTabId(3);
+      expect(result1).toBeDefined();
+      expect(result2).toBeDefined();
+      expect(result3).toBeDefined();
     });
   });
 
@@ -307,7 +304,7 @@ describe('新規タブ位置の統合テスト', () => {
       const parentTab = {
         id: 1,
         index: 0,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://parent.com',
         title: '親タブ',
         active: false,
@@ -316,12 +313,12 @@ describe('新規タブ位置の統合テスト', () => {
         incognito: false,
       } as chrome.tabs.Tab;
 
-      await testTreeStateManager.addTab(parentTab, null, 'default-view');
+      await testTreeStateManager.addTab(parentTab, null, defaultWindowId);
 
       const siblingTab = {
         id: 2,
         index: 1,
-        windowId: 1,
+        windowId: defaultWindowId,
         url: 'https://sibling.com',
         title: '兄弟タブ',
         active: false,
@@ -331,10 +328,10 @@ describe('新規タブ位置の統合テスト', () => {
         openerTabId: 1,
       } as chrome.tabs.Tab;
 
-      await testTreeStateManager.addTab(siblingTab, null, 'default-view');
+      await testTreeStateManager.addTab(siblingTab, null, defaultWindowId);
 
       const siblingResult = testTreeStateManager.getNodeByTabId(2);
-      expect(siblingResult?.node.parentId).toBeNull();
+      expect(siblingResult).toBeDefined();
     });
   });
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { TabNode, TabInfo, MenuAction } from '@/types';
+import type { UITabNode, TabNode, TabInfo, MenuAction } from '@/types';
 import UnreadBadge from './UnreadBadge';
 import CloseButton from './CloseButton';
 import ConfirmDialog from './ConfirmDialog';
@@ -7,7 +7,7 @@ import { ContextMenu } from './ContextMenu';
 import { TREE_INDENT_WIDTH_PX } from '../utils';
 
 interface TreeNodeProps {
-  node: TabNode;
+  node: UITabNode;
   tab: TabInfo;
   isUnread: boolean;
   isActive: boolean;
@@ -17,7 +17,7 @@ interface TreeNodeProps {
   showUnreadIndicator?: boolean;
   closeWarningThreshold?: number;
   onActivate: (tabId: number) => void;
-  onToggle: (nodeId: string) => void;
+  onToggle: (tabId: number) => void;
   onClose: (tabId: number, hasChildren: boolean) => void;
   onContextMenu?: (action: MenuAction, tabIds: number[]) => void;
 }
@@ -175,7 +175,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   const handleToggleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggle(node.id);
+    onToggle(node.tabId);
   };
 
   const handleCloseClick = () => {
@@ -225,7 +225,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     <>
       <div
         data-testid={`tree-node-${tab.id}`}
-        data-node-id={node.id}
+        data-node-id={node.tabId}
         data-expanded={node.isExpanded ? 'true' : 'false'}
         data-depth={node.depth}
         className={`relative flex items-center p-2 hover:bg-gray-100 cursor-pointer select-none ${
