@@ -130,13 +130,11 @@ const TreeViewContent: React.FC = () => {
     });
   }, [currentWindowId]);
 
-  // 現在のウィンドウの状態を取得
   const currentWindowState = useMemo(() => {
     if (!treeState || currentWindowId === null) return null;
     return treeState.windows.find(w => w.windowId === currentWindowId) || null;
   }, [treeState, currentWindowId]);
 
-  // 現在のビューの状態を取得
   const currentViewState = useMemo(() => {
     if (!currentWindowState) return null;
     return currentWindowState.views[currentViewIndex] || null;
@@ -160,10 +158,8 @@ const TreeViewContent: React.FC = () => {
       });
     }
 
-    // ピン留め/フィルタリングされた親の子ノードを収集するための配列
     const orphanedChildren: UITabNode[] = [];
 
-    // TabNodeをUITabNodeに変換（depthを計算）
     const convertToUINode = (
       node: TabNode,
       depth: number
@@ -171,7 +167,6 @@ const TreeViewContent: React.FC = () => {
       const isPinned = pinnedTabIdSet.has(node.tabId);
       const isFiltered = shouldFilterByWindow && node.tabId >= 0 && !currentWindowTabIds.has(node.tabId);
 
-      // ピン留めまたはフィルタリング対象のタブの場合、子ノードをルートレベルとして収集
       if (isPinned || isFiltered) {
         for (const child of node.children) {
           const uiChild = convertToUINode(child, 0);
@@ -207,7 +202,6 @@ const TreeViewContent: React.FC = () => {
       }
     }
 
-    // ピン留め/フィルタリングされた親の子ノードを末尾に追加
     rootNodes.push(...orphanedChildren);
 
     return rootNodes;

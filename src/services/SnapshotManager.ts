@@ -46,8 +46,6 @@ export class SnapshotManager {
       throw new Error('Tree state not found');
     }
 
-    // 新構造: treeState.windows[].views からビュー情報を収集
-    // ビューIDはviewIdとして保存（タブのviewIdと一致させるため）
     const views: View[] = [];
     for (let windowIndex = 0; windowIndex < treeState.windows.length; windowIndex++) {
       const windowState = treeState.windows[windowIndex];
@@ -110,9 +108,6 @@ export class SnapshotManager {
   /**
    * タブノードからタブスナップショットを作成
    *
-   * 新構造: treeState.windows[] → views[] → rootNodes[] の階層を走査
-   * 各タブにindexを割り当て、親子関係はparentIndexで表現
-   *
    * @param treeState - ツリー状態
    * @returns タブスナップショット配列
    */
@@ -123,7 +118,6 @@ export class SnapshotManager {
     const tabs = await chrome.tabs.query({});
     const tabMap = new Map(tabs.map((tab) => [tab.id, tab]));
 
-    // ノード情報を収集（親情報も含む）
     interface NodeInfo {
       node: TabNode;
       viewName: string;
@@ -132,7 +126,6 @@ export class SnapshotManager {
     }
 
     const nodeInfos: NodeInfo[] = [];
-    // ピン留めタブ情報を収集（tabId -> { viewName, windowIndex }）
     const pinnedTabInfos: Array<{
       tabId: number;
       viewName: string;
@@ -142,7 +135,6 @@ export class SnapshotManager {
     for (let windowIndex = 0; windowIndex < treeState.windows.length; windowIndex++) {
       const windowState = treeState.windows[windowIndex];
       for (const viewState of windowState.views) {
-        // ピン留めタブを収集
         for (const tabId of viewState.pinnedTabIds) {
           pinnedTabInfos.push({
             tabId,
@@ -151,7 +143,6 @@ export class SnapshotManager {
           });
         }
 
-        // 通常タブを収集
         const collectNodes = (nodes: TabNode[], parent: TabNode | null) => {
           for (const node of nodes) {
             nodeInfos.push({
@@ -167,7 +158,6 @@ export class SnapshotManager {
       }
     }
 
-    // ピン留めタブのスナップショットを先に作成（index 0から開始）
     let currentIndex = 0;
     for (const pinnedInfo of pinnedTabInfos) {
       const tab = tabMap.get(pinnedInfo.tabId);
@@ -187,13 +177,11 @@ export class SnapshotManager {
       }
     }
 
-    // 通常タブのindexマッピング（ピン留めタブの後から開始）
     const tabIdToIndex = new Map<number, number>();
     nodeInfos.forEach((info, i) => {
       tabIdToIndex.set(info.node.tabId, currentIndex + i);
     });
 
-    // 通常タブのスナップショットを作成
     for (let i = 0; i < nodeInfos.length; i++) {
       const { node, viewName, windowIndex, parent } = nodeInfos[i];
       const tab = tabMap.get(node.tabId);
@@ -225,12 +213,6 @@ export class SnapshotManager {
 
   /**
    * スナップショットからタブを復元
-   *
-   * 新構造対応の復元アルゴリズム:
-   * 1. windowIndexごとに新しいウィンドウを作成
-   * 2. 各ウィンドウ内で親を持たないタブ（ルートタブ）を先に作成
-   * 3. 子タブを親の順に作成
-   * 4. 全タブ作成後、新構造のWindowState[]を構築してTreeStateに追加
    *
    * @param tabs - タブスナップショット配列
    * @param views - ビュー配列
@@ -303,17 +285,14 @@ export class SnapshotManager {
     const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
     if (!treeState) return;
 
-    // 新しいウィンドウ用のWindowStateを構築
     const newWindows: WindowState[] = [];
 
     for (const windowIndex of windowIndices) {
       const newWindowId = windowIndexToNewWindowId.get(windowIndex);
       if (newWindowId === undefined) continue;
 
-      // このウィンドウのタブを収集
       const windowTabs = sortedTabs.filter(t => (t.windowIndex ?? 0) === windowIndex);
 
-      // このウィンドウに存在するビュー名を収集
       const viewNamesInThisWindow = new Set<string>();
       for (const tab of windowTabs) {
         viewNamesInThisWindow.add(tab.viewId);
@@ -327,13 +306,11 @@ export class SnapshotManager {
         }
       }
 
-      // 各ビューのViewStateを構築
       const viewStates: ViewState[] = [];
       for (const viewName of orderedViewNames) {
         const viewInfo = views.find(v => v.name === viewName);
         const viewTabs = windowTabs.filter(t => t.viewId === viewName);
 
-        // TabNodeを構築
         const tabIdToNode = new Map<number, TabNode>();
         const rootNodes: TabNode[] = [];
 
@@ -352,7 +329,6 @@ export class SnapshotManager {
           tabIdToNode.set(newTabId, node);
         }
 
-        // 親子関係を構築
         for (const tabSnapshot of viewTabs) {
           const newTabId = indexToNewTabId.get(tabSnapshot.index);
           if (newTabId === undefined) continue;
@@ -376,7 +352,6 @@ export class SnapshotManager {
           }
         }
 
-        // ビュー内のピン留めタブを収集
         const viewPinnedTabIds: number[] = [];
         for (const tabSnapshot of viewTabs) {
           if (tabSnapshot.pinned) {
@@ -396,7 +371,6 @@ export class SnapshotManager {
         });
       }
 
-      // デフォルトビューを追加（ビューが空の場合）
       if (viewStates.length === 0) {
         viewStates.push({
           name: 'Default',
@@ -413,7 +387,6 @@ export class SnapshotManager {
       });
     }
 
-    // TreeStateを更新（既存ウィンドウに追加）
     const updatedTreeState: TreeState = {
       windows: [...treeState.windows, ...newWindows],
     };

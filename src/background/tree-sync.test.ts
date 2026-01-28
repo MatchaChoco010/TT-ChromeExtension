@@ -53,7 +53,6 @@ describe('ツリー同期とリアルタイム更新', () => {
         { id: 103, url: 'https://example.com/3', title: 'Tab 3', index: 2, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
       ];
 
-      // 保存された状態（古いtabId）
       const savedState = {
         windows: [{
           windowId: 1,
@@ -79,7 +78,6 @@ describe('ツリー同期とリアルタイム更新', () => {
 
       await manager.restoreStateAfterRestart();
 
-      // tabIdが新しい値（101, 102, 103）に再構築されていることを確認
       const result1 = manager.getNodeByTabId(101);
       const result2 = manager.getNodeByTabId(102);
       const result3 = manager.getNodeByTabId(103);
@@ -88,10 +86,8 @@ describe('ツリー同期とリアルタイム更新', () => {
       expect(result2).not.toBeNull();
       expect(result3).not.toBeNull();
 
-      // 親子関係が維持されていることを確認
       expect(result1?.node.children.some(c => c.tabId === 102)).toBe(true);
 
-      // ルートノードの確認
       const tree = manager.getTree(1);
       expect(tree.some(n => n.tabId === 101)).toBe(true);
       expect(tree.some(n => n.tabId === 103)).toBe(true);
@@ -126,7 +122,6 @@ describe('ツリー同期とリアルタイム更新', () => {
       const result1 = manager.getNodeByTabId(101);
       const firstTabId = result1?.node.tabId;
 
-      // 2回目の呼び出し（initializedフラグにより何もしない）
       await manager.restoreStateAfterRestart();
       const result1Again = manager.getNodeByTabId(101);
 

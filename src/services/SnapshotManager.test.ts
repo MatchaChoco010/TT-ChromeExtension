@@ -18,7 +18,6 @@ describe('SnapshotManager', () => {
   let storageService: IStorageService;
   let snapshotManager: SnapshotManager;
 
-  // New hierarchical TreeState structure
   const mockTreeState: TreeState = {
     windows: [
       {
@@ -151,7 +150,6 @@ describe('SnapshotManager', () => {
 
       await snapshotManager.restoreFromJson(snapshotJson);
 
-      // Should create a new window and a tab
       expect(chrome.windows.create).toHaveBeenCalled();
       expect(chrome.tabs.create).toHaveBeenCalledWith({
         url: 'https://example.com',

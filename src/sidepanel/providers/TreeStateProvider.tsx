@@ -285,8 +285,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const switchView = useCallback(async (viewIndex: number) => {
     if (!treeState || currentWindowId === null) return;
 
-    // refから切り替え先ビューの最後のアクティブタブを取得
-    // （useStateのクロージャ問題を回避するためrefを使用）
     const tabIdToActivate = viewActiveTabIdsRef.current[viewIndex];
 
     if (activeTabId !== null) {

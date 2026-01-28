@@ -96,7 +96,6 @@ describe('タブ開き方別の位置ルール', () => {
 
       expect(parentResult).toBeDefined();
       expect(childResult).toBeDefined();
-      // In the new structure, parent-child is expressed via children[] array
       expect(parentResult?.node.children.some(c => c.tabId === 2)).toBe(true);
     });
 
@@ -154,7 +153,6 @@ describe('タブ開き方別の位置ルール', () => {
       const parentResult = testTreeStateManager.getNodeByTabId(1);
       const childResult = testTreeStateManager.getNodeByTabId(2);
       expect(childResult).toBeDefined();
-      // Tab 2 should be a root node (not a child of tab 1)
       expect(parentResult?.node.children.some(c => c.tabId === 2)).toBe(false);
     });
   });
@@ -189,7 +187,6 @@ describe('タブ開き方別の位置ルール', () => {
 
       const result = testTreeStateManager.getNodeByTabId(1);
       expect(result).toBeDefined();
-      // Tab is a root node (no parent)
       const tree = testTreeStateManager.getTree(1);
       expect(tree.some(n => n.tabId === 1)).toBe(true);
     });
@@ -382,7 +379,6 @@ describe('システムページ判定と新規タブ位置設定', () => {
 
       const result = testTreeStateManager.getNodeByTabId(1);
       expect(result).toBeDefined();
-      // Tab is a root node
       const tree = testTreeStateManager.getTree(1);
       expect(tree.some(n => n.tabId === 1)).toBe(true);
     });

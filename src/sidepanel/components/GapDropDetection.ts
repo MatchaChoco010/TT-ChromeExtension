@@ -300,7 +300,6 @@ export function calculateDropTarget(
     }
   }
 
-  // ここには到達しないはずだが、安全のため
   return { type: DropTargetType.None };
 }
 
@@ -437,7 +436,6 @@ export function calculateHorizontalDropTarget(
     }
   }
 
-  // ここには到達しないはずだが、安全のため
   return { type: DropTargetType.None };
 }
 

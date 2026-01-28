@@ -97,8 +97,6 @@ const getDisplayTitle = (tab: { title: string; url: string; status?: 'loading' |
 const getInternalPageFavicon = (url: string): string | null => {
   if (!url) return null;
 
-  // chrome://favicon/ APIを使用してファビコンを取得
-  // このAPIは多くの内部ページでも動作する
   if (url.startsWith('chrome://') ||
       url.startsWith('vivaldi://') ||
       url.startsWith('chrome-extension://') ||
@@ -284,7 +282,6 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // コンテキストメニューを開いた時点のtargetTabIdsを保存
     const targetIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
     setContextMenuTargetTabIds(targetIds);
     setContextMenuPosition({ x: e.clientX, y: e.clientY });
@@ -294,10 +291,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const isCollapsedParent = hasChildren && !node.isExpanded;
 
   const handleContextMenuAction = (action: MenuAction) => {
-    // コンテキストメニューを開いた時点で保存したtargetTabIdsを使用
     const targetTabIds = contextMenuTargetTabIds;
-    // expanded: falseの親タブを単独で閉じる場合はサブツリー全体を閉じる
-    // 複数タブ選択時（targetTabIds.length > 1）はサブツリー操作ではなく個別操作
     const shouldCloseSubtree = targetTabIds.length === 1 && !isSelected && isCollapsedParent;
 
     if (action === 'close') {
@@ -680,7 +674,6 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // コンテキストメニューを開いた時点のtargetTabIdsを保存
     const targetIds = isSelected && getSelectedTabIds ? getSelectedTabIds() : [node.tabId];
     setContextMenuTargetTabIds(targetIds);
     setContextMenuPosition({ x: e.clientX, y: e.clientY });
@@ -690,10 +683,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   const isCollapsedParent = hasChildren && !node.isExpanded;
 
   const handleContextMenuAction = (action: MenuAction) => {
-    // コンテキストメニューを開いた時点で保存したtargetTabIdsを使用
     const targetTabIds = contextMenuTargetTabIds;
-    // expanded: falseの親タブを単独で閉じる場合はサブツリー全体を閉じる
-    // 複数タブ選択時（targetTabIds.length > 1）はサブツリー操作ではなく個別操作
     const shouldCloseSubtree = targetTabIds.length === 1 && !isSelected && isCollapsedParent;
 
     if (action === 'close') {

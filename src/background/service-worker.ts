@@ -68,14 +68,12 @@ function startPeriodicPersist(): void {
   });
 }
 
-// onInstalledは使用しない
 // 全ての初期化処理はSW IIFEで行う（競合状態を防ぐため）
 chrome.runtime.onInstalled.addListener((_details) => {
 });
 
 (async () => {
   try {
-    // ストレージに状態があるかチェック
     const hasExistingState = await testTreeStateManager.hasPersistedState();
 
     if (!hasExistingState) {
@@ -91,13 +89,11 @@ chrome.runtime.onInstalled.addListener((_details) => {
       return;
     }
 
-    // 既存の状態がある場合: 復元処理
     await testTreeStateManager.loadState();
 
     // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
     await testUnreadTracker.clear();
 
-    // ユーザー設定を取得してrestoreStateAfterRestartに渡す
     const userSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
     const syncSettings = {
       newTabPositionManual: userSettings?.newTabPositionManual ?? 'end' as const,
@@ -110,10 +106,8 @@ chrome.runtime.onInstalled.addListener((_details) => {
 
     startPeriodicPersist();
 
-    // 起動完了をマーク
     testUnreadTracker.setInitialLoadComplete();
 
-    // UIサイドに初期化完了を通知
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
     // 初期化エラーは致命的だが、ここで処理できることはない

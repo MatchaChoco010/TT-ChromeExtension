@@ -369,7 +369,6 @@ export interface DragEndResult {
  * - 両方存在: タブ間の隙間
  */
 export interface SiblingDropInfo {
-  /** ドラッグ中のタブID */
   activeTabId: number;
   insertIndex: number;
   /** 上のタブID（リスト先頭の場合はundefined） */

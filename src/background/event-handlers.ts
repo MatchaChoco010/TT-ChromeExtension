@@ -26,7 +26,6 @@ function getSettingsWithDefaults(settings: UserSettings | null): {
   duplicateTabPosition: 'nextSibling' | 'end';
   childTabBehavior: 'promote' | 'close_all';
 } {
-  // 古い設定からのマイグレーション: 'sibling' -> 'nextSibling'
   const migratePosition = (pos: string | undefined, defaultValue: string): string => {
     if (pos === 'sibling') return 'nextSibling';
     return pos ?? defaultValue;
@@ -50,7 +49,6 @@ unreadTracker.loadFromStorage().catch(() => {});
 
 titlePersistence.loadFromStorage().catch(() => {});
 
-// globalThisにtreeStateManagerを登録してE2Eテストからアクセス可能にする
 declare global {
   var treeStateManager: TreeStateManager;
 }
@@ -209,7 +207,6 @@ const restoringTabIds = new Set<number>();
  */
 let isRestoringSnapshot = false;
 
-// E2Eテスト等のService Worker評価コンテキストからアクセスするためglobalThisにエクスポート
 declare global {
 
   var pendingTabParents: Map<number, number>;

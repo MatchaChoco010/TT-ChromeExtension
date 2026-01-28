@@ -359,8 +359,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       offset,
     };
 
-    // Synchronously update the ref to avoid race condition with event handlers
-    // Event handlers may fire before useEffect updates the ref
     dragStateRef.current = newState;
     setDragState(newState);
 
@@ -395,7 +393,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       offset: { x: 0, y: 0 },
     };
 
-    // Synchronously update the ref to avoid race condition with event handlers
     dragStateRef.current = newState;
     setDragState(newState);
 

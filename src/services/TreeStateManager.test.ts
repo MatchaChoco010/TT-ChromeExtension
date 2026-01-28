@@ -90,7 +90,6 @@ describe('TreeStateManager', () => {
       expect(result?.node.tabId).toBe(tab.id);
       expect(result?.windowId).toBe(defaultWindowId);
 
-      // 親を持たない場合はrootNodesに含まれる
       const tree = manager.getTree(defaultWindowId);
       expect(tree.some(n => n.tabId === tab.id)).toBe(true);
     });
@@ -113,12 +112,10 @@ describe('TreeStateManager', () => {
       const parentResult = manager.getNodeByTabId(parentTab.id!);
       expect(parentResult).toBeDefined();
 
-      // 新構造では親tabIdを渡す
       await manager.addTab(childTab, parentTab.id!, defaultWindowId);
       const childResult = manager.getNodeByTabId(childTab.id!);
 
       expect(childResult).toBeDefined();
-      // 子は親のchildren配列に含まれる
       expect(parentResult!.node.children.some(c => c.tabId === childTab.id)).toBe(true);
     });
 
@@ -234,7 +231,6 @@ describe('TreeStateManager', () => {
       const result = manager.getNodeByTabId(tab.id!);
       const initialExpanded = result!.node.isExpanded;
 
-      // 新構造ではtabIdを渡す
       await manager.toggleExpand(tab.id!);
 
       const updatedResult = manager.getNodeByTabId(tab.id!);
@@ -305,7 +301,6 @@ describe('TreeStateManager', () => {
         expect(child1Result).toBeDefined();
         expect(child2Result).toBeDefined();
 
-        // ルートに昇格していることを確認
         const tree = manager.getTree(defaultWindowId);
         expect(tree.some(n => n.tabId === child1Tab.id)).toBe(true);
         expect(tree.some(n => n.tabId === child2Tab.id)).toBe(true);
@@ -325,11 +320,9 @@ describe('TreeStateManager', () => {
         expect(manager.getNodeByTabId(parentTab.id!)).toBeNull();
 
         const promotedChild = manager.getNodeByTabId(childTab.id!);
-        // ルートに昇格
         const tree = manager.getTree(defaultWindowId);
         expect(tree.some(n => n.tabId === childTab.id)).toBe(true);
 
-        // 孫は子の子として維持
         expect(promotedChild?.node.children.some(c => c.tabId === grandchildTab.id)).toBe(true);
       });
     });
@@ -440,7 +433,6 @@ describe('TreeStateManager', () => {
 
       const childBefore = manager.getNodeByTabId(2);
       expect(childBefore).toBeDefined();
-      // childは親の子になっている
       const parentBefore = manager.getNodeByTabId(1);
       expect(parentBefore?.node.children.some(c => c.tabId === 2)).toBe(true);
 
@@ -481,10 +473,8 @@ describe('TreeStateManager', () => {
         await manager.addTab(childTab2, parentTab.id!, defaultWindowId);
 
         const groupTabId = 100;
-        // childTab1（タブID 2）でコンテキストメニューを開いてグループ化
         await manager.createGroupWithRealTab(groupTabId, [2, 3], 'グループ', defaultWindowId, 2);
 
-        // グループタブはchildTab1の位置（親タブの子）として配置される
         const parentResult = manager.getNodeByTabId(parentTab.id!);
         expect(parentResult?.node.children.some(c => c.tabId === groupTabId)).toBe(true);
 
@@ -505,10 +495,8 @@ describe('TreeStateManager', () => {
         await manager.addTab(child2Tab, parent2Tab.id!, defaultWindowId);
 
         const groupTabId = 100;
-        // child1Tab（タブID 3）でコンテキストメニューを開いてグループ化
         await manager.createGroupWithRealTab(groupTabId, [3, 4], 'グループ', defaultWindowId, 3);
 
-        // グループタブはchild1Tabの位置（parent1Tabの子）として配置される
         const parent1Result = manager.getNodeByTabId(parent1Tab.id!);
         expect(parent1Result?.node.children.some(c => c.tabId === groupTabId)).toBe(true);
 
@@ -528,10 +516,8 @@ describe('TreeStateManager', () => {
         await manager.addTab(rootTab, null, defaultWindowId);
 
         const groupTabId = 100;
-        // rootTab（タブID 3）でコンテキストメニューを開いてグループ化
         await manager.createGroupWithRealTab(groupTabId, [2, 3], 'グループ', defaultWindowId, 3);
 
-        // グループタブはrootTabの位置（ルートレベル）に配置される
         const tree = manager.getTree(defaultWindowId);
         expect(tree.some(n => n.tabId === groupTabId)).toBe(true);
       });
@@ -565,7 +551,6 @@ describe('TreeStateManager', () => {
         expect(tree.some(n => n.tabId === groupTabId)).toBe(true);
 
         const groupResult = manager.getNodeByTabId(groupTabId);
-        // グループ直下に親（id:1）だけが入り、その子（2,3）は親の下に維持される
         expect(groupResult?.node.children.length).toBe(1);
 
         const parentAfter = manager.getNodeByTabId(1);

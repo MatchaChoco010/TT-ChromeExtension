@@ -19,7 +19,6 @@ export const useMenuActions = () => {
               payload: { tabId: tabIds[0] },
             });
           } else if (tabIds.length > 1) {
-            // 複数選択時は、expanded: falseの親タブのサブツリーも含めて閉じる
             await chrome.runtime.sendMessage({
               type: 'CLOSE_TABS_WITH_COLLAPSED_SUBTREES',
               payload: { tabIds },

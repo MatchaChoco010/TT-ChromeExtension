@@ -31,7 +31,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} targetDepth={0} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // containerPadding(8px) + depth(0) * indentWidth(20) = 8px
       expect(indicator).toHaveStyle({ left: '8px' });
     });
 
@@ -39,7 +38,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} targetDepth={1} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // containerPadding(8px) + depth(1) * indentWidth(20) = 28px
       expect(indicator).toHaveStyle({ left: '28px' });
     });
 
@@ -47,7 +45,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} targetDepth={2} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // containerPadding(8px) + depth(2) * indentWidth(20) = 48px
       expect(indicator).toHaveStyle({ left: '48px' });
     });
 
@@ -55,7 +52,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} targetDepth={1} indentWidth={30} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // containerPadding(8px) + depth(1) * indentWidth(30) = 38px
       expect(indicator).toHaveStyle({ left: '38px' });
     });
   });
@@ -110,7 +106,6 @@ describe('DropIndicator', () => {
       );
 
       const indicator = screen.getByTestId('drop-indicator');
-      // containerPadding(12px) + depth(1) * indentWidth(20) = 32px
       expect(indicator).toHaveStyle({ left: '32px' });
     });
   });
@@ -144,7 +139,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // topPositionがundefinedの場合、topスタイルは設定されない
       expect(indicator.style.top).toBe('');
     });
 
@@ -152,7 +146,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} targetDepth={2} topPosition={80} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // containerPadding(8px) + depth(2) * indentWidth(20) = 48px
       expect(indicator).toHaveStyle({ left: '48px', top: '80px' });
     });
   });
