@@ -798,6 +798,7 @@ TreeStateManager
 - **タブ休止（discard）時のtabId変更**: `chrome.tabs.discard()`でタブを休止すると、ChromeはtabIdを変更する。この変更は`chrome.tabs.onReplaced`イベントで検知する。`onReplaced(addedTabId, removedTabId)`が発火したら、TreeStateManagerで旧tabIdを新tabIdに置き換える。Service Worker内ではイベントハンドラが逐次実行されるため、明示的なキューは不要
 - **TreeStateManager→UI/Chrome一方通行同期**: タブの順序・構造はTreeStateManager（Service Worker）が常に正（Single Source of Truth）。Chrome側でタブを直接操作（D&D、ピン留め解除など）した場合、TreeStateManagerの状態をChromeに再同期して元に戻す。これにより、Chrome側操作での親子関係やビュー整合性の破綻を防ぐ
 - **サイドパネルタブのTreeState除外**: 拡張機能自身のサイドパネルURLを持つタブは、TreeStateに追加しない。`isOwnExtensionUrl()`で自拡張機能のURLか判定し、`isSidePanelUrl()`でサイドパネルURLか判定する。本番環境ではサイドパネルAPIで開かれるためタブとして存在しないが、E2Eテストでは擬似サイドパネルタブとして通常タブで開くため、この除外ロジックが必要
+- **Chrome再起動時のタブイベント抑制**: Chrome再起動時、セッション復元で作成されたタブの`onCreated`イベントをTreeStateに反映させないため、`isRestoringState`フラグを使用。Service Worker初期化の**最初**（await前）に`setRestoringState(true)`を設定し、`restoreStateAfterRestart()`完了後に`false`に戻す。`handleTabCreated`は`waitForInitialization()`の**前**にこのフラグをキャプチャし、復元中に発火したイベントをスキップする。これにより、`rebuildTabIds()`でtabIdがマッピングされた後に重複してタブが追加されることを防ぐ
 
 ---
 

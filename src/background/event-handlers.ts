@@ -361,6 +361,11 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     return;
   }
 
+  // Chrome再起動時のセッション復元で作成されたタブはTreeStateに追加しない
+  // rebuildTabIds()が既存ノードのtabIdを更新するため、ここで追加すると重複する
+  // waitForInitialization()の前にフラグをキャプチャする必要がある
+  // （待機中にフラグがfalseに変わるため）
+  const wasTriggeredDuringRestore = treeStateManager.isRestoringState;
 
   // 非同期操作の前にlastActiveTabByWindowをキャプチャ
   // onActivatedがmapを更新する前に値を取得する必要がある
@@ -376,6 +381,11 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     if (!completed) {
       throw new Error(`Initialization did not complete within timeout for tab ${tab.id}`);
     }
+  }
+
+  // 復元中に発生したイベントはスキップ
+  if (wasTriggeredDuringRestore) {
+    return;
   }
 
   const existingNode = treeStateManager.getNodeByTabId(tab.id);
@@ -1590,6 +1600,12 @@ async function handleCreateGroup(
     await chrome.tabs.update(groupTab.id, { url: groupPageUrl });
 
     await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, groupName ?? 'グループ', windowId!, targetTabId);
+
+    // TreeStateとChromeタブの順序を同期
+    // グループ化ではgroup.htmlをcontextMenuTabIdのindexに作成するが、
+    // TreeStateではグループノードが深さ優先順で先頭に来る場合がある
+    // この不一致を解消しないと、Chrome再起動時にrestoreGroupTabsが誤動作する
+    await treeStateManager.syncTreeStateToChromeTabs(windowId);
 
     await chrome.tabs.update(groupTab.id, { active: true });
 

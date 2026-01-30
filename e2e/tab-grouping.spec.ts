@@ -2256,4 +2256,188 @@ test.describe('タブグループ化機能', () => {
       ], 0);
     });
   });
+
+  test.describe('グループタブ名編集', () => {
+    test('サイドパネルのコンテキストメニューからグループ名を編集できる', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { initialBrowserTabId, sidePanelPage } =
+        await setupWindow(extensionContext, serviceWorker, windowId);
+
+      // タブを2つ作成
+      const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+      ], 0);
+
+      const tabId2 = await createTab(serviceWorker, getTestServerUrl('/page'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: tabId1, depth: 0 },
+        { tabId: tabId2, depth: 0 },
+      ], 0);
+
+      await sidePanelPage.bringToFront();
+      await sidePanelPage.evaluate(() => window.focus());
+
+      // 複数タブを選択
+      const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
+      const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
+
+      await sidePanelPage.waitForFunction(
+        (tabId) => {
+          const node = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
+          if (!node) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        },
+        tabId2,
+        { timeout: 5000 }
+      );
+
+      await tabNode1.click({ force: true, noWaitAfter: true });
+      await tabNode2.click({ modifiers: ['Control'], force: true, noWaitAfter: true });
+
+      // グループ化
+      await tabNode2.click({ button: 'right', force: true, noWaitAfter: true });
+      const contextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      const groupMenuItem = sidePanelPage.getByRole('menuitem', { name: /選択されたタブをグループ化/ });
+      await groupMenuItem.click({ force: true, noWaitAfter: true });
+      await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+
+      await confirmGroupNameModal(sidePanelPage);
+
+      // グループタブIDを取得
+      let groupTabId: number | undefined;
+      await waitForCondition(
+        async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
+          const treeState = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('tree_state');
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode) {
+                groupTabId = groupNode.tabId;
+                return true;
+              }
+            }
+          }
+          return false;
+        },
+        { timeout: 10000, timeoutMessage: 'Group parent node was not created' }
+      );
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: tabId1, depth: 1 },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
+      // グループタブを右クリックして名前を編集
+      const groupNode = sidePanelPage.locator(`[data-testid="tree-node-${groupTabId}"]`);
+      await groupNode.click({ button: 'right', force: true, noWaitAfter: true });
+
+      const editContextMenu = sidePanelPage.locator('[role="menu"]');
+      await expect(editContextMenu).toBeVisible({ timeout: 5000 });
+
+      const editTitleMenuItem = sidePanelPage.locator('[data-testid="context-menu-edit-group-title"]');
+      await expect(editTitleMenuItem).toBeVisible();
+      await editTitleMenuItem.click({ force: true, noWaitAfter: true });
+      await expect(editContextMenu).not.toBeVisible({ timeout: 3000 });
+
+      // インライン入力フィールドが表示されるのを待つ
+      const inlineInput = sidePanelPage.locator(`[data-testid="tree-node-${groupTabId}"] input`);
+      await expect(inlineInput).toBeVisible({ timeout: 5000 });
+
+      // 新しいグループ名を入力
+      await inlineInput.clear();
+      await inlineInput.fill('新しいグループ名');
+      await inlineInput.press('Enter');
+
+      // グループ名が更新されたことを確認
+      await waitForCondition(
+        async () => {
+          interface TabNode {
+            tabId: number;
+            groupInfo?: { name: string };
+            children: TabNode[];
+          }
+          interface TreeState {
+            windows: { views: { rootNodes: TabNode[] }[] }[];
+          }
+          const treeState = await serviceWorker.evaluate(async () => {
+            const result = await chrome.storage.local.get('tree_state');
+            return result.tree_state;
+          }) as TreeState | undefined;
+          if (!treeState?.windows) return false;
+
+          const findGroupNode = (nodes: TabNode[]): TabNode | undefined => {
+            for (const node of nodes) {
+              if (node.groupInfo !== undefined && node.tabId > 0) return node;
+              const found = findGroupNode(node.children);
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const groupNode = findGroupNode(view.rootNodes);
+              if (groupNode?.groupInfo?.name === '新しいグループ名') {
+                return true;
+              }
+            }
+          }
+          return false;
+        },
+        { timeout: 10000, timeoutMessage: 'Group name was not updated' }
+      );
+
+      // クリーンアップ
+      await closeTab(serviceWorker, tabId1);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0, expanded: true },
+        { tabId: tabId2, depth: 1 },
+      ], 0);
+
+      await closeTab(serviceWorker, tabId2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+        { tabId: groupTabId!, depth: 0 },
+      ], 0);
+
+      await closeTab(serviceWorker, groupTabId!);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      ], 0);
+    });
+  });
 });

@@ -32,8 +32,17 @@ export class TreeStateManager {
   private initialized: boolean = false;
   private initializationResolvers: (() => void)[] = [];
   private isSyncingToChrome: boolean = false;
+  private _isRestoringState: boolean = false;
 
   constructor(private storageService: IStorageService) {}
+
+  get isRestoringState(): boolean {
+    return this._isRestoringState;
+  }
+
+  setRestoringState(value: boolean): void {
+    this._isRestoringState = value;
+  }
 
   // ========================================
   // 初期化管理
@@ -606,8 +615,9 @@ export class TreeStateManager {
     const deletedView = windowState.views[viewIndex];
     windowState.views.splice(viewIndex, 1);
 
-    // 削除されたビューのタブをデフォルトビューに移動
-    windowState.views[0].rootNodes.push(...deletedView.rootNodes);
+    // 削除されたビューのタブを一つ前のビューに移動
+    const targetViewIndex = viewIndex - 1;
+    windowState.views[targetViewIndex].rootNodes.push(...deletedView.rootNodes);
 
     // アクティブビューの調整
     if (windowState.activeViewIndex >= viewIndex) {
@@ -1668,13 +1678,12 @@ export class TreeStateManager {
     const groupTabUrl = `chrome-extension://${chrome.runtime.id}/group.html`;
 
     for (const windowState of this.windows) {
-      // 現在のChromeタブをindex順で取得
       let windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
+
       windowTabs = windowTabs
         .filter((t) => t.id !== undefined && !t.pinned)
         .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 
-      // TreeStateを深さ優先でフラット化
       const flattenNodes: TabNode[] = [];
       const flattenInNodes = (nodes: TabNode[]): void => {
         for (const node of nodes) {
@@ -1686,20 +1695,16 @@ export class TreeStateManager {
         flattenInNodes(viewState.rootNodes);
       }
 
-      // TreeStateとChromeタブを前から順番に突き合わせる
       let chromeIndex = 0;
       for (let treeIndex = 0; treeIndex < flattenNodes.length; treeIndex++) {
         const node = flattenNodes[treeIndex];
 
         if (node.groupInfo) {
-          // グループノードの場合：Chrome側に対応するgroup.htmlがあるか確認
           const chromeTab = windowTabs[chromeIndex];
 
           if (chromeTab && chromeTab.url?.startsWith(groupTabUrl)) {
-            // Chrome側にgroup.htmlがある → 次へ
             chromeIndex++;
           } else {
-            // Chrome側にgroup.htmlがない → その位置に作成
             try {
               const insertIndex = chromeTab?.index ?? windowTabs.length;
               await chrome.tabs.create({
@@ -1709,7 +1714,6 @@ export class TreeStateManager {
                 active: false,
               });
 
-              // Chromeタブリストを再取得（作成後にindexがずれるため）
               windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
               windowTabs = windowTabs
                 .filter((t) => t.id !== undefined && !t.pinned)
@@ -1720,7 +1724,6 @@ export class TreeStateManager {
             }
           }
         } else {
-          // 通常ノードの場合：Chrome側のタブをスキップ
           chromeIndex++;
         }
       }

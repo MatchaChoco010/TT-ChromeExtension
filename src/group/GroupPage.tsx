@@ -7,7 +7,6 @@ interface ChildTabInfo {
 }
 
 interface GroupInfo {
-  nodeId: string;
   name: string;
   children: ChildTabInfo[];
 }
@@ -94,14 +93,14 @@ export const GroupPage: React.FC = () => {
     try {
       await chrome.runtime.sendMessage({
         type: 'UPDATE_GROUP_NAME',
-        payload: { nodeId: state.groupInfo.nodeId, name: editedTitle.trim() },
+        payload: { tabId, name: editedTitle.trim() },
       });
       await loadGroupInfo();
     } catch {
       // エラーは無視
     }
     setIsEditing(false);
-  }, [state, editedTitle, loadGroupInfo]);
+  }, [state, editedTitle, loadGroupInfo, tabId]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {

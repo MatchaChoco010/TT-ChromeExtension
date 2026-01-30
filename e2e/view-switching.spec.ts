@@ -387,6 +387,87 @@ test.describe('ビュー切り替え機能', () => {
       const deleteMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを削除' });
       await expect(deleteMenuItem).toBeDisabled({ timeout: 5000 });
     });
+
+    test('ビュー削除時にタブが一つ前のビューに移動する', async ({
+      extensionContext,
+      serviceWorker,
+    }) => {
+      const windowId = await getCurrentWindowId(serviceWorker);
+      const { sidePanelPage, initialBrowserTabId } = await setupWindow(extensionContext, serviceWorker, windowId);
+      await waitForViewSwitcher(sidePanelPage);
+
+      // ビュー1を作成（名前を変更して一意にする）
+      const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
+      await expect(addButton).toBeVisible({ timeout: 5000 });
+      await addButton.click();
+
+      const view1Button = sidePanelPage.locator('[aria-label="Switch to View view"]');
+      await expect(view1Button).toBeVisible({ timeout: 5000 });
+
+      // ビュー1の名前を「View1」に変更
+      await view1Button.click({ button: 'right' });
+      const editContextMenu = sidePanelPage.locator('[data-testid="view-context-menu"]');
+      await expect(editContextMenu).toBeVisible({ timeout: 5000 });
+      const editMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを編集' });
+      await editMenuItem.click();
+      const editModal = sidePanelPage.locator('[data-testid="view-edit-modal"]');
+      await expect(editModal).toBeVisible({ timeout: 5000 });
+      const nameInput = sidePanelPage.locator('#view-name');
+      await nameInput.clear();
+      await nameInput.fill('View1');
+      const saveButton = sidePanelPage.locator('button', { hasText: 'Save' });
+      await saveButton.click();
+      await expect(editModal).not.toBeVisible({ timeout: 5000 });
+
+      const view1ButtonRenamed = sidePanelPage.locator('[aria-label="Switch to View1 view"]');
+      await expect(view1ButtonRenamed).toBeVisible({ timeout: 5000 });
+
+      // ビュー2を作成
+      await addButton.click();
+
+      const view2Button = sidePanelPage.locator('[aria-label="Switch to View view"]');
+      await expect(view2Button).toBeVisible({ timeout: 5000 });
+
+      // ビュー2に切り替えてタブを作成
+      await view2Button.click();
+      await expect(view2Button).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      const tabInView2 = await createTab(serviceWorker, getTestServerUrl('/page?id=view2tab'));
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tabInView2, depth: 0 },
+      ], 2);
+
+      // ビュー2を削除
+      await view2Button.click({ button: 'right' });
+      const contextMenu = sidePanelPage.locator('[data-testid="view-context-menu"]');
+      await expect(contextMenu).toBeVisible({ timeout: 5000 });
+
+      const deleteMenuItem = sidePanelPage.locator('button', { hasText: 'ビューを削除' });
+      await deleteMenuItem.click();
+
+      // ビュー1がアクティブになる
+      await expect(view1ButtonRenamed).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      // タブがビュー1に移動していることを確認
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: tabInView2, depth: 0 },
+      ], 1);
+
+      // デフォルトビューには移動していないことを確認
+      const defaultViewButton = sidePanelPage.locator('[aria-label="Switch to Default view"]');
+      await defaultViewButton.click();
+      await expect(defaultViewButton).toHaveAttribute('data-active', 'true', { timeout: 5000 });
+
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      ], 0);
+
+      // クリーンアップ
+      await closeTab(serviceWorker, tabInView2);
+      await assertTabStructure(sidePanelPage, windowId, [
+        { tabId: initialBrowserTabId, depth: 0 },
+      ], 0);
+    });
   });
 
   test.describe('ビューごとのアクティブタブ管理', () => {

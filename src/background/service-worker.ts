@@ -73,6 +73,10 @@ chrome.runtime.onInstalled.addListener((_details) => {
 });
 
 (async () => {
+  // Chrome再起動時、セッション復元で作成されたタブのonCreatedイベントを抑制するため、
+  // awaitより前に復元中フラグを設定する
+  testTreeStateManager.setRestoringState(true);
+
   try {
     const hasExistingState = await testTreeStateManager.hasPersistedState();
 
@@ -80,6 +84,7 @@ chrome.runtime.onInstalled.addListener((_details) => {
       // 新規インストール時: ChromeタブからTreeStateを初期化
       // 設計原則として Chrome → TreeStateManager への同期は禁止だが、
       // 新規インストール時は既存タブを取り込むためこの方向の同期が必要
+      testTreeStateManager.setRestoringState(false);
       await testTreeStateManager.initializeFromChromeTabs();
       testUnreadTracker.setInitialLoadComplete();
       testTreeStateManager.notifyStateChanged();
@@ -102,6 +107,8 @@ chrome.runtime.onInstalled.addListener((_details) => {
     // インデックスベースの同期を実行（タブIDが変わっていても復元可能）
     await testTreeStateManager.restoreStateAfterRestart(syncSettings);
 
+    testTreeStateManager.setRestoringState(false);
+
     await initializeAutoSnapshot();
 
     startPeriodicPersist();
@@ -110,6 +117,7 @@ chrome.runtime.onInstalled.addListener((_details) => {
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
   } catch {
+    testTreeStateManager.setRestoringState(false);
     // 初期化エラーは致命的だが、ここで処理できることはない
   }
 })();
