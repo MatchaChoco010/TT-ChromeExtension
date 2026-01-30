@@ -1,22 +1,25 @@
 ---
-description: Fix all comment rule violations in src/ and e2e/ directories
+name: fix-comment-rules
+description: src/とe2e/内のコメント規約違反を一括修正する
+disable-model-invocation: true
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Task
 ---
 
 # コメント規約違反の一括修正
 
-<background_information>
-- **Mission**: `src/`と`e2e/`内のすべてのコードのコメントが`docs/comment-rules.md`のルールに従っているかを確認し、違反しているコメントを削除または修正する
-- **Success Criteria**:
-  - すべての`.ts`、`.tsx`ファイルのコメントを確認
-  - 規約違反のコメントを削除または修正
-  - 修正のサマリーをユーザーに提示
-</background_information>
+## Mission
 
-<instructions>
+`src/`と`e2e/`内のすべてのコードのコメントが[comment-rules.md](comment-rules.md)のルールに従っているかを確認し、違反しているコメントを削除または修正する。
+
+## Success Criteria
+
+- すべての`.ts`、`.tsx`ファイルのコメントを確認
+- 規約違反のコメントを削除または修正
+- 修正のサマリーをユーザーに提示
+
 ## Core Task
 
-`src/`と`e2e/`内のすべてのTypeScript/TSXファイルのコメントを確認し、`docs/comment-rules.md`のルールに違反しているコメントを削除または規約を満たすように修正する。
+`src/`と`e2e/`内のすべてのTypeScript/TSXファイルのコメントを確認し、[comment-rules.md](comment-rules.md)のルールに違反しているコメントを削除または規約を満たすように修正する。
 
 **重要**: すべてのコメントを確認する作業は作業量が多いからといってサボってはいけない。ファイルごとにエージェントを起動してすべてのファイルについて並列に実行すること。
 
@@ -24,7 +27,7 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Task
 
 ### Step 1: コメント規約の読み込み
 
-`docs/comment-rules.md`を読み込み、コメント規約を理解する。
+[comment-rules.md](comment-rules.md)を読み込み、コメント規約を理解する。
 
 ### Step 2: 対象ファイルの特定
 
@@ -46,11 +49,11 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Task
 ## タスク
 1. ファイルを読み込む
 2. ファイル内のすべてのコメントを特定する
-3. 各コメントについて docs/comment-rules.md のルールに従っているか判定する
+3. 各コメントについて .claude/skills/fix-comment-rules/comment-rules.md のルールに従っているか判定する
 4. 違反しているコメントを削除するか、規約を満たすように書き直す
 
 ## 判定フロー
-docs/comment-rules.md の判定ステップ1〜20に従って各コメントを判定する。
+comment-rules.md の判定ステップ1〜20に従って各コメントを判定する。
 
 ## 出力形式
 以下の形式でJSONを返す（マークダウンコードブロックなしで純粋なJSONのみ）:
@@ -102,50 +105,45 @@ docs/comment-rules.md の判定ステップ1〜20に従って各コメントを�
 
 - **サボり禁止**: ファイル数が多くても、すべてのファイルを確認すること
 - **並列実行**: 効率のため、可能な限り多くのエージェントを並列に起動すること
-- **正確な判定**: `docs/comment-rules.md`の判定フローに厳密に従うこと
+- **正確な判定**: comment-rules.mdの判定フローに厳密に従うこと
 - **許可コメントの保持**: 許可されているコメントは削除・修正しないこと
 - **日本語での応答**: すべての出力は日本語で行うこと
 
-## Output Description
+## Output Format
 
 **初期ステータス**:
 ```
-📋 コメント規約チェックを開始します
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+コメント規約チェックを開始します
 
 対象ディレクトリ: src/, e2e/
 対象ファイル数: {count} 件
 
-🔄 ファイルごとにエージェントを並列起動中...
+ファイルごとにエージェントを並列起動中...
 ```
 
 **最終サマリー**:
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎉 コメント規約チェックが完了しました
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+コメント規約チェックが完了しました
 
-📊 全体統計:
-• 確認ファイル数: {count}
-• 確認コメント数: {count}
-• 違反ファイル数: {count}
-• 削除コメント数: {count}
-• 修正コメント数: {count}
+全体統計:
+- 確認ファイル数: {count}
+- 確認コメント数: {count}
+- 違反ファイル数: {count}
+- 削除コメント数: {count}
+- 修正コメント数: {count}
 
-📝 修正したファイル:
+修正したファイル:
 {ファイルごとの詳細}
 
-⚠️ 未分類コメント（要確認）:
+未分類コメント（要確認）:
 {未分類コメントの詳細}
 ```
 
-## Safety & Fallback
+## Error Handling
 
-### エラーシナリオ
-
-**docs/comment-rules.mdが見つからない場合**:
+**comment-rules.mdが見つからない場合**:
 - **実行停止**: 規約ファイルが必須
-- **メッセージ**: 「docs/comment-rules.md が見つかりません」
+- **メッセージ**: 「comment-rules.md が見つかりません」
 
 **対象ファイルがない場合**:
 - **正常終了**: チェック対象なし
@@ -154,5 +152,3 @@ docs/comment-rules.md の判定ステップ1〜20に従って各コメントを�
 **エージェント実行エラー**:
 - **継続**: 他のファイルのチェックは続行
 - **報告**: エラーが発生したファイルをサマリーに含める
-
-</instructions>
