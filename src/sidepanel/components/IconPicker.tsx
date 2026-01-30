@@ -523,6 +523,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
   );
 
   const tabListRef = useRef<HTMLDivElement | null>(null);
+  const iconGridRef = useRef<HTMLDivElement | null>(null);
 
   const handleCategoryChange = useCallback((categoryId: IconCategory) => {
     setSelectedCategory(categoryId);
@@ -601,7 +602,13 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         ref={tabListRef}
         role="tablist"
         aria-label="Icon categories"
-        className="flex border-b border-gray-700 bg-gray-900"
+        className="flex overflow-x-auto border-b border-gray-700 bg-gray-900"
+        onWheel={(e) => {
+          if (e.deltaY !== 0 && tabListRef.current) {
+            e.preventDefault();
+            tabListRef.current.scrollLeft += e.deltaY;
+          }
+        }}
       >
         {CATEGORIES.map((category, index) => (
           <button
@@ -610,7 +617,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
             aria-selected={selectedCategory === category.id}
             aria-controls={`panel-${category.id}`}
             tabIndex={selectedCategory === category.id ? 0 : -1}
-            className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors ${
               selectedCategory === category.id
                 ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-800'
                 : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
@@ -627,12 +634,19 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         id={`panel-${selectedCategory}`}
         role="tabpanel"
         aria-labelledby={`tab-${selectedCategory}`}
-        className="p-3"
+        ref={iconGridRef}
+        className="p-3 overflow-x-auto"
+        onWheel={(e) => {
+          if (e.deltaY !== 0 && iconGridRef.current) {
+            e.preventDefault();
+            iconGridRef.current.scrollLeft += e.deltaY;
+          }
+        }}
       >
         <div
           data-testid="icon-grid"
           role="grid"
-          className="grid grid-cols-8 gap-2"
+          className="grid grid-cols-8 gap-2 min-w-fit"
         >
           {currentCategoryIcons.map((icon) => (
             <button

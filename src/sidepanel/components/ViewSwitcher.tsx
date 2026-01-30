@@ -145,7 +145,8 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
               {view.icon ? (
                 isCustomIcon(view.icon) ? (
                   <span
-                    className="w-5 h-5 text-gray-200"
+                    className="w-5 h-5"
+                    style={{ color: view.color }}
                     data-testid="view-custom-icon"
                   >
                     {getIconByName(view.icon)?.svg}
