@@ -415,23 +415,6 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         onMouseDown={handleMouseDown}
       >
         <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
-        {hasChildren ? (
-          <button
-            data-testid="expand-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleExpand(node.tabId);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="mr-1 w-3 h-3 flex items-center justify-center text-[10px] leading-none"
-            aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
-          >
-            {node.isExpanded ? '▼' : '▶'}
-          </button>
-        ) : (
-          <div className="mr-1 w-3 h-3 flex-shrink-0" />
-        )}
 
         {getTabInfo && tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0 relative">
@@ -460,6 +443,24 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
                 data-testid="discarded-favicon-overlay"
                 className="absolute inset-0 bg-black/50 rounded-sm"
               />
+            )}
+            {hasChildren && (node.isExpanded ? isHovered : true) && (
+              <div
+                data-testid="expand-overlay"
+                className="absolute inset-0 flex items-center justify-center cursor-pointer rounded-sm bg-black/50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand(node.tabId);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
+                role="button"
+              >
+                <span className="text-white text-[10px]">
+                  {node.isExpanded ? '▼' : '▶'}
+                </span>
+              </div>
             )}
           </div>
         ) : getTabInfo && !tabInfo ? (
@@ -794,23 +795,6 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         onMouseLeave={handleMouseLeave}
       >
         <UnreadBadge isUnread={isUnread} showIndicator={true} depth={node.depth} />
-        {hasChildren ? (
-          <button
-            data-testid="expand-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleExpand(node.tabId);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="mr-1 w-3 h-3 flex items-center justify-center text-[10px] leading-none"
-            aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
-          >
-            {node.isExpanded ? '▼' : '▶'}
-          </button>
-        ) : (
-          <div className="mr-1 w-3 h-3 flex-shrink-0" />
-        )}
 
         {getTabInfo && tabInfo ? (
           <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0 relative">
@@ -839,6 +823,24 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
                 data-testid="discarded-favicon-overlay"
                 className="absolute inset-0 bg-black/50 rounded-sm"
               />
+            )}
+            {hasChildren && (node.isExpanded ? isHovered : true) && (
+              <div
+                data-testid="expand-overlay"
+                className="absolute inset-0 flex items-center justify-center cursor-pointer rounded-sm bg-black/50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand(node.tabId);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
+                role="button"
+              >
+                <span className="text-white text-[10px]">
+                  {node.isExpanded ? '▼' : '▶'}
+                </span>
+              </div>
             )}
           </div>
         ) : getTabInfo && !tabInfo ? (

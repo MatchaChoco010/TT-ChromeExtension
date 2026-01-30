@@ -129,10 +129,17 @@ describe('TabTreeView', () => {
     expect(mockOnNodeClick).toHaveBeenCalledWith(1);
   });
 
-  it('展開/折りたたみトグルクリック時にonToggleExpandが呼ばれること', async () => {
+  it('展開/折りたたみオーバーレイクリック時にonToggleExpandが呼ばれること', async () => {
     const user = userEvent.setup();
     const childNode = createMockNode(2, 1);
-    const parentNode = createMockNode(1, 0, [childNode]);
+    // 折りたたみ中のノードを作成（オーバーレイが常に表示される）
+    const parentNode = { ...createMockNode(1, 0, [childNode]), isExpanded: false };
+
+    const mockGetTabInfo = vi.fn().mockImplementation((tabId: number) => {
+      if (tabId === 1) return { id: 1, title: 'Parent Tab', url: 'https://example.com/1', status: 'complete' as const, isPinned: false, windowId: 1, discarded: false };
+      if (tabId === 2) return { id: 2, title: 'Child Tab', url: 'https://example.com/2', status: 'complete' as const, isPinned: false, windowId: 1, discarded: false };
+      return undefined;
+    });
 
     render(
       <TabTreeView
@@ -140,11 +147,13 @@ describe('TabTreeView', () => {
         currentViewIndex={0}
         onNodeClick={mockOnNodeClick}
         onToggleExpand={mockOnToggleExpand}
+        getTabInfo={mockGetTabInfo}
       />
     );
 
-    const toggleButton = screen.getByTestId('expand-button');
-    await user.click(toggleButton);
+    // 折りたたみ中はオーバーレイが常に表示される
+    const toggleOverlay = screen.getByTestId('expand-overlay');
+    await user.click(toggleOverlay);
 
     expect(mockOnToggleExpand).toHaveBeenCalledWith(1);
   });
@@ -1312,10 +1321,14 @@ describe('TabTreeView', () => {
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
     });
 
-    it('グループノードの展開/折りたたみボタンクリック時にonToggleExpandが呼ばれること', async () => {
+    it('グループノードの展開/折りたたみオーバーレイクリック時にonToggleExpandが呼ばれること', async () => {
       const user = userEvent.setup();
       const childNode = createMockNode(1, 1);
-      const groupNode = createMockGroupNode(100, 0, [childNode]);
+      // 折りたたみ中のグループノードを作成（オーバーレイが常に表示される）
+      const groupNode: UITabNode = {
+        ...createMockGroupNode(100, 0, [childNode]),
+        isExpanded: false,
+      };
 
       mockGetTabInfo.mockImplementation((tabId: number) => {
         if (tabId === 100) return { id: 100, title: 'Group Tab', url: 'chrome-extension://test/group.html', status: 'complete', isPinned: false, windowId: 1, discarded: false };
@@ -1334,9 +1347,10 @@ describe('TabTreeView', () => {
       );
 
       const groupNodeElement = screen.getByTestId('tree-node-100');
-      const toggleButton = groupNodeElement.querySelector('[data-testid="expand-button"]');
-      expect(toggleButton).not.toBeNull();
-      await user.click(toggleButton!);
+      // 折りたたみ中はオーバーレイが常に表示される
+      const toggleOverlay = groupNodeElement.querySelector('[data-testid="expand-overlay"]');
+      expect(toggleOverlay).not.toBeNull();
+      await user.click(toggleOverlay!);
 
       expect(mockOnToggleExpand).toHaveBeenCalledWith(100);
     });

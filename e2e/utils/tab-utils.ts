@@ -535,25 +535,33 @@ export async function clickLinkToNavigate(
 }
 
 /**
- * UIの展開/折りたたみボタンをクリックしてノードを折りたたむ
+ * UIの展開/折りたたみオーバーレイをクリックしてノードを折りたたむ
+ *
+ * 展開中のタブはホバー時のみオーバーレイが表示されるため、
+ * ノードにホバーしてからオーバーレイをクリックする。
  *
  * @param page - サイドパネルページ
  * @param tabId - 折りたたむタブのID
  */
 export async function collapseNode(page: Page, tabId: number): Promise<void> {
-  const collapseButton = page.locator(`[data-testid="tree-node-${tabId}"] button[aria-label="Collapse"]`).first();
-  await collapseButton.click();
+  const treeNode = page.locator(`[data-testid="tree-node-${tabId}"]`).first();
+  await treeNode.hover();
+  const collapseOverlay = treeNode.locator('[data-testid="expand-overlay"]').first();
+  await collapseOverlay.click();
 }
 
 /**
- * UIの展開/折りたたみボタンをクリックしてノードを展開する
+ * UIの展開/折りたたみオーバーレイをクリックしてノードを展開する
+ *
+ * 折りたたみ中のタブはオーバーレイが常に表示されているため、
+ * 直接クリックできる。
  *
  * @param page - サイドパネルページ
  * @param tabId - 展開するタブのID
  */
 export async function expandNode(page: Page, tabId: number): Promise<void> {
-  const expandButton = page.locator(`[data-testid="tree-node-${tabId}"] button[aria-label="Expand"]`).first();
-  await expandButton.click();
+  const expandOverlay = page.locator(`[data-testid="tree-node-${tabId}"] [data-testid="expand-overlay"]`).first();
+  await expandOverlay.click();
 }
 
 /**

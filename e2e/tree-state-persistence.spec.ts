@@ -283,8 +283,10 @@ test.describe('ツリー状態永続化', () => {
       }, { timeout: 5000, timeoutMessage: 'Expanded state was not saved to storage' });
 
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-      const expandButton = parentNode.locator('[data-testid="expand-button"]');
-      await expandButton.first().click();
+      // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+      await parentNode.hover();
+      const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
+      await expandOverlay.first().click();
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -365,9 +367,11 @@ test.describe('ツリー状態永続化', () => {
         { tabId: childTab, depth: 1 },
       ], 0);
 
-      const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-      const expandButton = parentNode.locator('[data-testid="expand-button"]');
-      await expandButton.first().click();
+      const parentNode2 = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
+      // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+      await parentNode2.hover();
+      const expandOverlay2 = parentNode2.locator('[data-testid="expand-overlay"]');
+      await expandOverlay2.first().click();
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -582,8 +586,10 @@ test.describe('ツリー状態永続化', () => {
       ], 0);
 
       const parent2Node = sidePanelPage.locator(`[data-testid="tree-node-${parent2}"]`).first();
-      const expandButton2 = parent2Node.locator('[data-testid="expand-button"]');
-      await expandButton2.first().click();
+      // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+      await parent2Node.hover();
+      const expandOverlay3 = parent2Node.locator('[data-testid="expand-overlay"]');
+      await expandOverlay3.first().click();
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -659,8 +665,9 @@ test.describe('ツリー状態永続化', () => {
       ], 0);
 
       const parent2NodeAfter = sidePanelPage.locator(`[data-testid="tree-node-${parent2}"]`).first();
-      const expandButton2After = parent2NodeAfter.locator('[data-testid="expand-button"]');
-      await expandButton2After.first().click();
+      // 折りたたみ中はオーバーレイが常に表示されているので、直接クリックできる
+      const expandOverlay2After = parent2NodeAfter.locator('[data-testid="expand-overlay"]');
+      await expandOverlay2After.first().click();
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -702,8 +709,7 @@ test.describe('ツリー状態永続化', () => {
         { tabId: childTab, depth: 1 },
       ], 0);
 
-      const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-      const expandButton = parentNode.locator('[data-testid="expand-button"]');
+      const parentNode3 = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
 
       const getExpandedFromStorage = async () => {
         return await serviceWorker.evaluate(async (parentId) => {
@@ -750,7 +756,10 @@ test.describe('ツリー状態永続化', () => {
         timeoutMessage: 'Expanded state (true) was not saved to storage',
       });
 
-      await expandButton.first().click();
+      // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+      await parentNode3.hover();
+      const expandOverlay4 = parentNode3.locator('[data-testid="expand-overlay"]');
+      await expandOverlay4.first().click();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: false },
@@ -760,7 +769,8 @@ test.describe('ツリー状態永続化', () => {
         timeoutMessage: 'Collapsed state (false) was not saved to storage',
       });
 
-      await expandButton.first().click();
+      // 折りたたみ中はオーバーレイが常に表示されているので、直接クリックできる
+      await expandOverlay4.first().click();
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },

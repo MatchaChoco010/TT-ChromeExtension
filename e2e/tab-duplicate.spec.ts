@@ -548,8 +548,10 @@ test.describe('タブ複製時の配置', () => {
       ], 0);
 
       const child2Node = sidePanelPage.locator(`[data-testid="tree-node-${child2TabId}"]`);
-      const expandButton = child2Node.locator('[data-testid="expand-button"]');
-      await expandButton.click();
+      // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+      await child2Node.hover();
+      const expandOverlay = child2Node.locator('[data-testid="expand-overlay"]');
+      await expandOverlay.click();
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },

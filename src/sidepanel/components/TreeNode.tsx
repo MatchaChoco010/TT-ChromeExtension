@@ -239,19 +239,6 @@ const TreeNode: React.FC<TreeNodeProps> = ({
       >
         <UnreadBadge isUnread={isUnread} showIndicator={showUnreadIndicator} depth={node.depth} />
 
-        {hasChildren ? (
-          <button
-            data-testid="expand-button"
-            onClick={handleToggleClick}
-            className="mr-1 w-3 h-3 flex items-center justify-center text-gray-600 text-[10px] leading-none"
-            aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
-          >
-            {node.isExpanded ? '▼' : '▶'}
-          </button>
-        ) : (
-          <div className="mr-1 w-3 h-3 flex-shrink-0" />
-        )}
-
         <div className="mr-2 w-4 h-4 flex items-center justify-center flex-shrink-0 relative">
           {tab.favIconUrl ? (
             <img
@@ -270,6 +257,21 @@ const TreeNode: React.FC<TreeNodeProps> = ({
               data-testid="discarded-favicon-overlay"
               className="absolute inset-0 bg-black/50 rounded-sm"
             />
+          )}
+          {hasChildren && (node.isExpanded ? isHovered : true) && (
+            <div
+              data-testid="expand-overlay"
+              className="absolute inset-0 flex items-center justify-center cursor-pointer rounded-sm bg-black/50"
+              onClick={handleToggleClick}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label={node.isExpanded ? 'Collapse' : 'Expand'}
+              role="button"
+            >
+              <span className="text-white text-[10px]">
+                {node.isExpanded ? '▼' : '▶'}
+              </span>
+            </div>
           )}
         </div>
 

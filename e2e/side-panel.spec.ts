@@ -165,17 +165,20 @@ test.describe('Side Panelの表示とリアルタイム更新', () => {
       ], 0);
 
       const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-      const expandButton = parentNode.locator('[data-testid="expand-button"]');
+      // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+      await parentNode.hover();
+      const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
 
-      if (await expandButton.count() > 0) {
-        await expandButton.click({ force: true, noWaitAfter: true });
+      if (await expandOverlay.count() > 0) {
+        await expandOverlay.click({ force: true, noWaitAfter: true });
 
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },
           { tabId: parentTabId, depth: 0, expanded: false },
         ], 0);
 
-        await expandButton.click({ force: true, noWaitAfter: true });
+        // 折りたたみ中はオーバーレイが常に表示されているので、直接クリックできる
+        await expandOverlay.click({ force: true, noWaitAfter: true });
 
         await assertTabStructure(sidePanelPage, windowId, [
           { tabId: initialBrowserTabId, depth: 0 },

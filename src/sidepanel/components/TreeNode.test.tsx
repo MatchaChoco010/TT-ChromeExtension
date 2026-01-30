@@ -125,9 +125,9 @@ describe('TreeNode', () => {
   });
 
   describe('展開/折りたたみトグル', () => {
-    it('子ノードがある場合に展開トグルボタンを表示できること', () => {
+    it('折りたたみ中の親タブはオーバーレイが常に表示されること', () => {
       const childNode = createMockNode(2);
-      const node = createMockNode(1, 0, [childNode]);
+      const node = { ...createMockNode(1, 0, [childNode]), isExpanded: false };
       const tab = createMockTab(1);
 
       render(
@@ -142,29 +142,10 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(screen.getByTestId('expand-button')).toBeInTheDocument();
+      expect(screen.getByTestId('expand-overlay')).toBeInTheDocument();
     });
 
-    it('子ノードがない場合は展開トグルボタンを表示しないこと', () => {
-      const node = createMockNode(1, 0, []);
-      const tab = createMockTab(1);
-
-      render(
-        <TreeNode
-          node={node}
-          tab={tab}
-          isUnread={false}
-          isActive={false}
-          onActivate={mockOnActivate}
-          onToggle={mockOnToggle}
-          onClose={mockOnClose}
-        />
-      );
-
-      expect(screen.queryByTestId('expand-button')).not.toBeInTheDocument();
-    });
-
-    it('展開トグルボタンをクリックするとonToggleが呼ばれること', async () => {
+    it('展開中の親タブはホバー時のみオーバーレイが表示されること', async () => {
       const user = userEvent.setup();
       const childNode = createMockNode(2);
       const node = createMockNode(1, 0, [childNode]);
@@ -182,14 +163,65 @@ describe('TreeNode', () => {
         />
       );
 
-      const toggleButton = screen.getByTestId('expand-button');
-      await user.click(toggleButton);
+      // ホバーしていない状態ではオーバーレイは表示されない
+      expect(screen.queryByTestId('expand-overlay')).not.toBeInTheDocument();
+
+      // ホバーするとオーバーレイが表示される
+      const treeNodeElement = screen.getByTestId('tree-node-1');
+      await user.hover(treeNodeElement);
+      expect(screen.getByTestId('expand-overlay')).toBeInTheDocument();
+
+      // ホバーを外すとオーバーレイが消える
+      await user.unhover(treeNodeElement);
+      expect(screen.queryByTestId('expand-overlay')).not.toBeInTheDocument();
+    });
+
+    it('子ノードがない場合はオーバーレイを表示しないこと', () => {
+      const node = createMockNode(1, 0, []);
+      const tab = createMockTab(1);
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.queryByTestId('expand-overlay')).not.toBeInTheDocument();
+    });
+
+    it('オーバーレイをクリックするとonToggleが呼ばれること', async () => {
+      const user = userEvent.setup();
+      const childNode = createMockNode(2);
+      const node = { ...createMockNode(1, 0, [childNode]), isExpanded: false };
+      const tab = createMockTab(1);
+
+      render(
+        <TreeNode
+          node={node}
+          tab={tab}
+          isUnread={false}
+          isActive={false}
+          onActivate={mockOnActivate}
+          onToggle={mockOnToggle}
+          onClose={mockOnClose}
+        />
+      );
+
+      const toggleOverlay = screen.getByTestId('expand-overlay');
+      await user.click(toggleOverlay);
 
       expect(mockOnToggle).toHaveBeenCalledWith(1);
       expect(mockOnActivate).not.toHaveBeenCalled();
     });
 
-    it('展開状態に応じてトグルアイコンが変わること', () => {
+    it('展開状態に応じてトグルアイコンが変わること', async () => {
+      const user = userEvent.setup();
       const childNode = createMockNode(2);
       const expandedNode = createMockNode(1, 0, [childNode]);
       const tab = createMockTab(1);
@@ -206,8 +238,12 @@ describe('TreeNode', () => {
         />
       );
 
-      const toggleButton = screen.getByTestId('expand-button');
-      expect(toggleButton).toHaveTextContent('▼');
+      // 展開中はホバーしないとオーバーレイが表示されない
+      const treeNodeElement = screen.getByTestId('tree-node-1');
+      await user.hover(treeNodeElement);
+
+      const toggleOverlay = screen.getByTestId('expand-overlay');
+      expect(toggleOverlay).toHaveTextContent('▼');
 
       // 折りたたみ状態に変更
       const collapsedNode = { ...expandedNode, isExpanded: false };
@@ -223,7 +259,9 @@ describe('TreeNode', () => {
         />
       );
 
-      expect(toggleButton).toHaveTextContent('▶');
+      // 折りたたみ中は常にオーバーレイが表示される
+      const collapsedOverlay = screen.getByTestId('expand-overlay');
+      expect(collapsedOverlay).toHaveTextContent('▶');
     });
   });
 

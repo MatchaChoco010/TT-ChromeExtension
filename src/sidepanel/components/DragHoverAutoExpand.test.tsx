@@ -66,6 +66,12 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
       },
     ];
 
+    const mockGetTabInfo = vi.fn().mockImplementation((tabId: number) => {
+      if (tabId === 3) return { id: 3, title: 'Parent Tab', url: 'https://example.com/3', status: 'complete' as const, isPinned: false, windowId: 1, discarded: false };
+      if (tabId === 4) return { id: 4, title: 'Child Tab', url: 'https://example.com/4', status: 'complete' as const, isPinned: false, windowId: 1, discarded: false };
+      return undefined;
+    });
+
     render(
       <TabTreeView
         nodes={testNodes}
@@ -73,14 +79,16 @@ describe('ドラッグホバー時のブランチ自動展開', () => {
         onNodeClick={vi.fn()}
         onToggleExpand={handleToggleExpand}
         onDragEnd={handleDragEnd}
+        getTabInfo={mockGetTabInfo}
       />
     );
 
     const parentNode = screen.getByTestId('tree-node-3');
     expect(parentNode).toBeInTheDocument();
 
-    const toggleButton = screen.getByTestId('expand-button');
-    expect(toggleButton.textContent).toBe('▶');
+    // 折りたたみ中はオーバーレイが常に表示される
+    const toggleOverlay = screen.getByTestId('expand-overlay');
+    expect(toggleOverlay.textContent).toBe('▶');
 
     expect(screen.queryByTestId('tree-node-4')).not.toBeInTheDocument();
 

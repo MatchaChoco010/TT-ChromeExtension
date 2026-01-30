@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@/test/test-utils';
+import { render, screen, within, fireEvent } from '@/test/test-utils';
 import TabTreeView from './TabTreeView';
 import type { UITabNode, ExtendedTabInfo } from '@/types';
 
@@ -331,9 +331,10 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
 
       expect(screen.queryByTestId('tree-node-2')).not.toBeInTheDocument();
 
-      const expandButton = within(parentNode).getByTestId('expand-button');
-      expect(expandButton).toBeInTheDocument();
-      expect(expandButton).toHaveTextContent('▶');
+      // 折りたたみ中はオーバーレイが常に表示される
+      const expandOverlay = within(parentNode).getByTestId('expand-overlay');
+      expect(expandOverlay).toBeInTheDocument();
+      expect(expandOverlay).toHaveTextContent('▶');
     });
 
     it('展開された親タブとその子タブをすべてレンダリングする', () => {
@@ -368,8 +369,10 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
       expect(screen.getByTestId('tree-node-2')).toBeInTheDocument();
 
       const parentNode = screen.getByTestId('tree-node-1');
-      const expandButton = within(parentNode).getByTestId('expand-button');
-      expect(expandButton).toHaveTextContent('▼');
+      // 展開中はホバー時のみオーバーレイが表示されるため、ホバーしてから確認
+      fireEvent.mouseEnter(parentNode);
+      const expandOverlay = within(parentNode).getByTestId('expand-overlay');
+      expect(expandOverlay).toHaveTextContent('▼');
     });
   });
 });

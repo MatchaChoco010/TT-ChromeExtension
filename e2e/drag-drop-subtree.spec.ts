@@ -80,8 +80,10 @@ test.describe('ドラッグ&ドロップによるサブツリー移動', () => {
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first();
-    const expandButton = parentNode.locator('[data-testid="expand-button"]');
-    await expandButton.first().click();
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
+    await expandOverlay.first().click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: tab1, depth: 0, expanded: false },

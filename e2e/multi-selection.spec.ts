@@ -320,8 +320,10 @@ test.describe('複数選択機能', () => {
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-    const expandButton = parentNode.locator('[data-testid="expand-button"]');
-    await expandButton.click();
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
+    await expandOverlay.click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: false },
@@ -331,6 +333,9 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
+    // ホバーを外してからクリック（ファビコン部分ではなく、タブノードをクリック）
+    const anotherNodeForHover = sidePanelPage.locator(`[data-testid="tree-node-${anotherTabId}"]`);
+    await anotherNodeForHover.hover();
     await parentNode.click();
     const anotherNode = sidePanelPage.locator(`[data-testid="tree-node-${anotherTabId}"]`);
     await anotherNode.click({ modifiers: ['Control'] });
@@ -602,8 +607,10 @@ test.describe('複数選択機能', () => {
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
-    const expandButton = parentNode.locator('[data-testid="expand-button"]');
-    await expandButton.click();
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlay2 = parentNode.locator('[data-testid="expand-overlay"]');
+    await expandOverlay2.click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: tabA, depth: 0 },
@@ -615,6 +622,8 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.evaluate(() => window.focus());
 
     const tabNodeA = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`);
+    // ホバーを外してからクリック
+    await tabNodeA.hover();
     await tabNodeA.click();
     await expect(tabNodeA).toHaveClass(/bg-gray-500/);
 

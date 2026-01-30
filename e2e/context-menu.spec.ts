@@ -117,8 +117,10 @@ test.describe('コンテキストメニュー操作', () => {
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-    const expandButton = parentNode.locator('[data-testid="expand-button"]');
-    await expandButton.click();
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
+    await expandOverlay.click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: parentTabId, depth: 0, expanded: false },

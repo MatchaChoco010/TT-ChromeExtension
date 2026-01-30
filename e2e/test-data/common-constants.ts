@@ -27,7 +27,7 @@ export const COMMON_SELECTORS = {
   treeNodePrefix: '[data-testid^="tree-node-"]',
   /** グループノードのプレフィックス（groupIdが続く） */
   groupNodePrefix: '[data-testid^="group-node-"]',
-  expandButton: '[data-testid="expand-button"]',
+  expandOverlay: '[data-testid="expand-overlay"]',
   /** 閉じるボタンのプレフィックス（idが続く） */
   closeButtonPrefix: '[data-testid^="close-button-"]',
 

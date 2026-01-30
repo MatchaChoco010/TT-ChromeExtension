@@ -41,11 +41,13 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    const expandButton = parentNode.locator('[data-testid="expand-button"]');
-    await expect(expandButton.first()).toBeVisible({ timeout: 3000 });
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
+    await expect(expandOverlay.first()).toBeVisible({ timeout: 3000 });
   });
 
-  test('子タブを持たないタブに初めて子タブを追加した場合、親タブに展開/折りたたみアイコンが表示されること', async ({
+  test('子タブを持たないタブに初めて子タブを追加した場合、親タブに展開/折りたたみオーバーレイが表示されること', async ({
     extensionContext,
     serviceWorker,
   }) => {
@@ -70,8 +72,10 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    const expandButtonBefore = parentNode.locator('[data-testid="expand-button"]');
-    const hasExpandButtonBefore = (await expandButtonBefore.count()) > 0;
+    // 子タブがない状態ではオーバーレイは表示されない
+    await parentNode.hover();
+    const expandOverlayBefore = parentNode.locator('[data-testid="expand-overlay"]');
+    const hasExpandOverlayBefore = (await expandOverlayBefore.count()) > 0;
 
     await moveTabToParent(sidePanelPage, childTab, parentTab, serviceWorker);
 
@@ -81,14 +85,16 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    const expandButtonAfter = parentNode.locator('[data-testid="expand-button"]');
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlayAfter = parentNode.locator('[data-testid="expand-overlay"]');
 
-    if (!hasExpandButtonBefore) {
-      await expect(expandButtonAfter.first()).toBeVisible({ timeout: 5000 });
+    if (!hasExpandOverlayBefore) {
+      await expect(expandOverlayAfter.first()).toBeVisible({ timeout: 5000 });
     } else {
       await expect(async () => {
-        const hasExpandButtonAfter = (await expandButtonAfter.count()) > 0;
-        expect(hasExpandButtonAfter).toBe(true);
+        const hasExpandOverlayAfter = (await expandOverlayAfter.count()) > 0;
+        expect(hasExpandOverlayAfter).toBe(true);
       }).toPass({ timeout: 3000 });
     }
   });
@@ -125,10 +131,12 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    const expandButton = parentNode.locator('[data-testid="expand-button"]').first();
-    await expect(expandButton).toBeVisible({ timeout: 5000 });
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]').first();
+    await expect(expandOverlay).toBeVisible({ timeout: 5000 });
 
-    await expandButton.click();
+    await expandOverlay.click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
       { tabId: parentTab, depth: 0, expanded: false },
@@ -463,9 +471,11 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     );
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    const expandButtonAfterNewTab = parentNode.locator('[data-testid="expand-button"]');
-    const hasExpandButton = await expandButtonAfterNewTab.count() > 0;
-    expect(hasExpandButton).toBe(true);
+    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
+    await parentNode.hover();
+    const expandOverlayAfterNewTab = parentNode.locator('[data-testid="expand-overlay"]');
+    const hasExpandOverlay = await expandOverlayAfterNewTab.count() > 0;
+    expect(hasExpandOverlay).toBe(true);
 
     const relationsStillValid = await serviceWorker.evaluate(
       async ({ parentTabId, childTabId }) => {
