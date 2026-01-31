@@ -5,6 +5,7 @@ import CloseButton from './CloseButton';
 import ConfirmDialog from './ConfirmDialog';
 import { ContextMenu } from './ContextMenu';
 import { TREE_INDENT_WIDTH_PX } from '../utils';
+import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
 
 interface TreeNodeProps {
   node: UITabNode;
@@ -25,9 +26,15 @@ interface TreeNodeProps {
 /**
  * スタートページURLを判定するヘルパー関数
  * Vivaldi/Chromeのスタートページ関連のURLを検出
+ *
+ * 注意: chrome://vivaldi-webui/startpage?section=XXX はセクションページなので
+ * スタートページとは判定しない（カレンダー、メールなど個別の機能ページ）
  */
 const isStartPageUrl = (url: string): boolean => {
   if (!url) return false;
+
+  // ?section= パラメータがある場合は、セクションページなのでスタートページではない
+  if (url.includes('?section=')) return false;
 
   const startPageUrlPatterns = [
     /^chrome:\/\/vivaldi-webui\/startpage/,
@@ -117,6 +124,12 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
 
   if (isNewTabUrl(url) || isNewTabUrl(title)) {
     return '新しいタブ';
+  }
+
+  // Vivaldi内部ページ（設定、カレンダーなど）のタイトル生成
+  const vivaldiTitle = getVivaldiInternalPageTitle(url);
+  if (vivaldiTitle) {
+    return vivaldiTitle;
   }
 
   for (const [urlPattern, friendlyName] of Object.entries(SYSTEM_URL_FRIENDLY_NAMES)) {

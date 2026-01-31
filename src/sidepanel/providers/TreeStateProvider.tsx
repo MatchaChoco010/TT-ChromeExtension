@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, SiblingDropInfo, DragEndEvent, ViewState, WindowState } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
+import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
 
 interface TreeStateContextType {
   treeState: TreeState | null;
@@ -139,7 +140,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       for (const tab of tabs) {
         if (tab.id !== undefined) {
           const persistedTitle = persistedTitles[tab.id];
-          const title = tab.title || persistedTitle || '';
+          // Vivaldi内部ページはURLからフレンドリーなタイトルを生成
+          const vivaldiTitle = tab.url ? getVivaldiInternalPageTitle(tab.url) : null;
+          const title = vivaldiTitle || tab.title || persistedTitle || '';
 
           const persistedFavicon = tab.url ? persistedFavicons[tab.url] : undefined;
           const favIconUrl = tab.favIconUrl || persistedFavicon;

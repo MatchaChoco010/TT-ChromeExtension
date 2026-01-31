@@ -15,6 +15,7 @@ import {
   type TabPosition,
 } from './GapDropDetection';
 import { TREE_INDENT_WIDTH_PX, calculateDepthRange } from '../utils';
+import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
 
 /**
  * ノードとその子孫の数を再帰的にカウント
@@ -32,9 +33,15 @@ const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 /**
  * スタートページURLを判定するヘルパー関数
  * Vivaldi/Chromeのスタートページ関連のURLを検出
+ *
+ * 注意: chrome://vivaldi-webui/startpage?section=XXX はセクションページなので
+ * スタートページとは判定しない（カレンダー、メールなど個別の機能ページ）
  */
 const isStartPageUrl = (url: string): boolean => {
   if (!url) return false;
+
+  // ?section= パラメータがある場合は、セクションページなのでスタートページではない
+  if (url.includes('?section=')) return false;
 
   const startPageUrlPatterns = [
     /^chrome:\/\/vivaldi-webui\/startpage/,
@@ -84,6 +91,12 @@ const getDisplayTitle = (tab: { title: string; url: string; status?: 'loading' |
 
   if (isNewTabUrl(tab.url) || isNewTabUrl(tab.title)) {
     return '新しいタブ';
+  }
+
+  // Vivaldi内部ページ（設定、カレンダーなど）のタイトル生成
+  const vivaldiTitle = getVivaldiInternalPageTitle(tab.url);
+  if (vivaldiTitle) {
+    return vivaldiTitle;
   }
 
   return tab.title;
