@@ -16,6 +16,7 @@ describe('タブにホバー時の閉じるボタンを実装する', () => {
       },
       runtime: {
         sendMessage: mockSendMessage,
+        getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
       },
     } as unknown as typeof chrome;
   });

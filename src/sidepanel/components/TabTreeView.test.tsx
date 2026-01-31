@@ -309,7 +309,7 @@ describe('TabTreeView', () => {
       expect(favicon).toHaveAttribute('src', 'https://example.com/favicon.ico');
     });
 
-    it('ファビコンが取得できない場合、デフォルトアイコンを表示すること', () => {
+    it('favIconUrlがない場合、_favicon APIを使用してファビコンを取得しようとすること', () => {
       const node = createMockNode(1, 0);
       const tabInfo = createMockTabInfo(1, 'Example Page', undefined);
       mockGetTabInfo.mockReturnValue(tabInfo);
@@ -324,8 +324,11 @@ describe('TabTreeView', () => {
         />
       );
 
-      expect(screen.queryByRole('img', { name: /favicon/i })).not.toBeInTheDocument();
-      expect(screen.getByTestId('default-icon')).toBeInTheDocument();
+      // MV3の_favicon APIを使用してファビコンを取得しようとする
+      const favicon = screen.getByRole('img', { name: /favicon/i });
+      expect(favicon).toBeInTheDocument();
+      expect(favicon).toHaveAttribute('src', expect.stringContaining('/_favicon/'));
+      expect(favicon).toHaveAttribute('src', expect.stringContaining('pageUrl='));
     });
 
     it('タブ情報がロード中の場合、Loading...プレースホルダーを表示すること', () => {

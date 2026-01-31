@@ -5,25 +5,24 @@ import { DragOverlay } from './DragOverlay';
 import HorizontalDropIndicator from './HorizontalDropIndicator';
 
 /**
- * 内部ページのデフォルトファビコンを取得するヘルパー関数
+ * ファビコンURLを取得するヘルパー関数
+ * MV3の新しい_favicon APIを使用する
+ * 参考: https://developer.chrome.com/docs/extensions/how-to/ui/favicons
  */
-const getInternalPageFavicon = (url: string): string | null => {
+const getFaviconUrl = (url: string): string | null => {
   if (!url) return null;
 
-  if (url.startsWith('chrome://') ||
-      url.startsWith('vivaldi://') ||
-      url.startsWith('chrome-extension://') ||
-      url.startsWith('about:') ||
-      url.startsWith('edge://') ||
-      url.startsWith('brave://')) {
-    return `chrome://favicon/size/16@2x/${url}`;
-  }
-
-  return null;
+  const faviconApiUrl = new URL(chrome.runtime.getURL("/_favicon/"));
+  faviconApiUrl.searchParams.set("pageUrl", url);
+  faviconApiUrl.searchParams.set("size", "32");
+  return faviconApiUrl.toString();
 };
 
 /**
  * タブ情報から表示用ファビコンURLを取得するヘルパー関数
+ * 優先順位:
+ * 1. tabInfo.favIconUrl（Chromeから取得したファビコン）
+ * 2. _favicon API（MV3形式）を使用してフォールバック
  */
 const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
   if (tabInfo.favIconUrl) {
@@ -31,10 +30,7 @@ const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): stri
   }
 
   if (tabInfo.url) {
-    const internalFavicon = getInternalPageFavicon(tabInfo.url);
-    if (internalFavicon) {
-      return internalFavicon;
-    }
+    return getFaviconUrl(tabInfo.url);
   }
 
   return null;

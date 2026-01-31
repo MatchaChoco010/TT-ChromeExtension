@@ -27,6 +27,7 @@ beforeEach(() => {
     },
     runtime: {
       sendMessage: vi.fn(),
+      getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
     },
   });
 });

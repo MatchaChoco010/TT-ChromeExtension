@@ -392,9 +392,17 @@ test.describe('ファビコンの永続化復元', () => {
 
       await waitForTabInTreeState(serviceWorker, tabId);
 
+      // favIconUrlがない場合、MV3の_favicon APIを使用してファビコンを取得しようとする
+      // 初期状態ではファビコン画像要素が存在し、_favicon API経由のURLが設定されている
       const treeNode = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"]`);
-      const defaultIcon = treeNode.locator('[data-testid="default-icon"]');
-      await expect(defaultIcon).toBeVisible({ timeout: 5000 });
+      const faviconImgInitial = treeNode.locator('img[alt="Favicon"]');
+      await waitForCondition(async () => {
+        const count = await faviconImgInitial.count();
+        if (count === 0) return false;
+        const src = await faviconImgInitial.getAttribute('src');
+        // _favicon API経由のURLが設定されていることを確認
+        return src !== null && src.includes('/_favicon/');
+      }, { timeout: 5000, timeoutMessage: `Favicon img with _favicon API URL not found for tab ${tabId}` });
 
       const testFaviconUrl = 'http://127.0.0.1/test-favicon.png';
       await serviceWorker.evaluate(

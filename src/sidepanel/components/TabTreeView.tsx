@@ -90,31 +90,24 @@ const getDisplayTitle = (tab: { title: string; url: string; status?: 'loading' |
 };
 
 /**
- * 内部ページのデフォルトファビコンを取得するヘルパー関数
- * chrome://, vivaldi://, about:等の内部ページにはブラウザがファビコンURLを提供しないため、
- * chrome://favicon/を使用するか、デフォルトアイコンを返す
+ * ファビコンURLを取得するヘルパー関数
+ * MV3の新しい_favicon APIを使用する
+ * 参考: https://developer.chrome.com/docs/extensions/how-to/ui/favicons
  */
-const getInternalPageFavicon = (url: string): string | null => {
+const getFaviconUrl = (url: string): string | null => {
   if (!url) return null;
 
-  if (url.startsWith('chrome://') ||
-      url.startsWith('vivaldi://') ||
-      url.startsWith('chrome-extension://') ||
-      url.startsWith('about:') ||
-      url.startsWith('edge://') ||
-      url.startsWith('brave://')) {
-    return `chrome://favicon/size/16@2x/${url}`;
-  }
-
-  return null;
+  const faviconApiUrl = new URL(chrome.runtime.getURL("/_favicon/"));
+  faviconApiUrl.searchParams.set("pageUrl", url);
+  faviconApiUrl.searchParams.set("size", "32");
+  return faviconApiUrl.toString();
 };
 
 /**
  * タブ情報から表示用ファビコンURLを取得するヘルパー関数
  * 優先順位:
- * 1. tabInfo.favIconUrl（通常のウェブページのファビコン）
- * 2. 内部ページの場合はchrome://favicon/ APIを使用
- * 3. null（デフォルトアイコンを表示）
+ * 1. tabInfo.favIconUrl（Chromeから取得したファビコン）
+ * 2. _favicon API（MV3形式）を使用してフォールバック
  */
 const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
   if (tabInfo.favIconUrl) {
@@ -122,10 +115,7 @@ const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): stri
   }
 
   if (tabInfo.url) {
-    const internalFavicon = getInternalPageFavicon(tabInfo.url);
-    if (internalFavicon) {
-      return internalFavicon;
-    }
+    return getFaviconUrl(tabInfo.url);
   }
 
   return null;

@@ -182,6 +182,7 @@ export class ChromeMock {
     this.storageData = {};
 
     this.runtime.sendMessage.mockImplementation(() => Promise.resolve());
+    this.runtime.getURL.mockImplementation((path: string) => `chrome-extension://test-extension-id/${path}`);
     this.runtime.lastError = undefined;
 
     // Re-apply storage mock implementations (may be cleared by vi.clearAllMocks())
