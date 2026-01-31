@@ -1545,18 +1545,20 @@ export class TreeStateManager {
 
   /**
    * ノードを兄弟として移動
+   * @param targetDepth - キーボードで選択されたdepth（指定された場合、その深さに配置）
    */
   async moveNodeAsSibling(
     tabId: number,
     aboveTabId: number | undefined,
     belowTabId: number | undefined,
-    selectedTabIds: number[]
+    selectedTabIds: number[],
+    targetDepth?: number
   ): Promise<void> {
     const isSelected = selectedTabIds.includes(tabId);
     const tabIdsToMove = isSelected ? selectedTabIds : [tabId];
     const tabIdSet = new Set(tabIdsToMove);
 
-    // 挿入先の親を決定
+    // 挿入先の親とViewStateを決定
     let targetParent: TabNode | null = null;
     let targetViewState: ViewState | null = null;
 
@@ -1575,6 +1577,20 @@ export class TreeStateManager {
     }
 
     if (!targetViewState) return;
+
+    // targetDepthが指定されている場合、適切な親を計算
+    if (targetDepth !== undefined && aboveTabId !== undefined) {
+      const aboveResult = this.findNodeByTabId(aboveTabId);
+      if (aboveResult) {
+        // targetDepthを適用するための親を見つける
+        targetParent = this.findParentAtDepth(
+          aboveResult.node,
+          aboveResult.parent,
+          targetViewState,
+          targetDepth
+        );
+      }
+    }
 
     // 親が選択されているタブは移動対象から除外
     const topLevelTabIds = tabIdsToMove.filter((id) => {
@@ -1605,13 +1621,16 @@ export class TreeStateManager {
       : targetViewState.rootNodes;
 
     if (belowTabId !== undefined) {
+      // belowTabIdがあれば常にその前に挿入（targetDepthの有無に関わらず）
       const insertIndex = targetSiblings.findIndex((n) => n.tabId === belowTabId);
       if (insertIndex !== -1) {
         targetSiblings.splice(insertIndex, 0, ...nodesToMove);
       } else {
+        // belowTabIdがtargetSiblingsに見つからない場合（親が変わった場合）は末尾に追加
         targetSiblings.push(...nodesToMove);
       }
     } else if (aboveTabId !== undefined) {
+      // belowTabIdがない場合はaboveTabIdの後に挿入
       const insertIndex = targetSiblings.findIndex((n) => n.tabId === aboveTabId);
       if (insertIndex !== -1) {
         targetSiblings.splice(insertIndex + 1, 0, ...nodesToMove);
@@ -1623,6 +1642,67 @@ export class TreeStateManager {
     }
 
     await this.persistState();
+  }
+
+  /**
+   * targetDepthに対応する親ノードを見つける
+   * aboveNodeの深さからtargetDepthの差分だけ親を辿る
+   *
+   * @param aboveNode - 上のノード
+   * @param aboveParent - 上のノードの親
+   * @param viewState - ビュー状態
+   * @param targetDepth - 目標depth
+   * @returns 目標depthに対応する親ノード（nullはルート）
+   */
+  private findParentAtDepth(
+    aboveNode: TabNode,
+    aboveParent: TabNode | null,
+    viewState: ViewState,
+    targetDepth: number
+  ): TabNode | null {
+    // aboveNodeのdepthを計算
+    const getNodeDepth = (targetTabId: number): number => {
+      let depth = 0;
+      const findDepth = (nodes: TabNode[], currentDepth: number): boolean => {
+        for (const node of nodes) {
+          if (node.tabId === targetTabId) {
+            depth = currentDepth;
+            return true;
+          }
+          if (findDepth(node.children, currentDepth + 1)) return true;
+        }
+        return false;
+      };
+      findDepth(viewState.rootNodes, 0);
+      return depth;
+    };
+
+    const aboveDepth = getNodeDepth(aboveNode.tabId);
+
+    // targetDepth === aboveDepth + 1 の場合、aboveNodeの子として配置
+    if (targetDepth === aboveDepth + 1) {
+      return aboveNode;
+    }
+
+    // targetDepth <= aboveDepth の場合、親を辿る
+    // diff = aboveDepth - targetDepth の回数だけ親を辿る
+    let currentParent = aboveParent;
+    let currentDepth = aboveDepth;
+
+    while (currentDepth > targetDepth && currentParent !== null) {
+      // 親の親を探す
+      const parentResult = this.findNodeByTabId(currentParent.tabId);
+      if (!parentResult) break;
+      currentParent = parentResult.parent;
+      currentDepth--;
+    }
+
+    // targetDepth === 0 の場合はルート（null）
+    if (targetDepth === 0) {
+      return null;
+    }
+
+    return currentParent;
   }
 
   // ========================================

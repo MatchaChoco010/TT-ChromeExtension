@@ -1129,6 +1129,7 @@ function handleMessage(
           message.payload.belowTabId,
           message.payload.windowId,
           message.payload.selectedTabIds,
+          message.payload.targetDepth,
           sendResponse
         ));
         break;
@@ -2316,10 +2317,11 @@ async function handleMoveNodeAsSibling(
   belowTabId: number | undefined,
   _windowId: number,
   selectedTabIds: number[],
+  targetDepth: number | undefined,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): Promise<void> {
   try {
-    await treeStateManager.moveNodeAsSibling(tabId, aboveTabId, belowTabId, selectedTabIds);
+    await treeStateManager.moveNodeAsSibling(tabId, aboveTabId, belowTabId, selectedTabIds, targetDepth);
     await treeStateManager.syncTreeStateToChromeTabs();
     treeStateManager.notifyStateChanged();
     sendResponse({ success: true, data: null });

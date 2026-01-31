@@ -395,7 +395,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   const handleSiblingDrop = useCallback(
     async (info: SiblingDropInfo) => {
-      const { activeTabId, aboveTabId, belowTabId } = info;
+      const { activeTabId, aboveTabId, belowTabId, targetDepth } = info;
 
       await chrome.runtime.sendMessage({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -406,6 +406,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
           windowId: currentWindowId,
           viewIndex: currentViewIndex,
           selectedTabIds: Array.from(selectedTabIds),
+          targetDepth,
         },
       });
     },

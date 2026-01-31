@@ -274,6 +274,7 @@ export type MessageType =
         belowTabId?: number;
         windowId: number;
         selectedTabIds: number[];
+        targetDepth?: number;
       };
     }
   | {
@@ -379,6 +380,8 @@ export interface SiblingDropInfo {
   aboveTabId?: number;
   /** 下のタブID（リスト末尾の場合はundefined） */
   belowTabId?: number;
+  /** キーボードで選択されたdepth（左右キーで変更） */
+  targetDepth?: number;
 }
 
 export interface TabTreeViewProps {

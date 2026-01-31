@@ -14,7 +14,7 @@ import {
   calculateIndicatorYByNodeIds,
   type TabPosition,
 } from './GapDropDetection';
-import { TREE_INDENT_WIDTH_PX } from '../utils';
+import { TREE_INDENT_WIDTH_PX, calculateDepthRange } from '../utils';
 
 /**
  * ノードとその子孫の数を再帰的にカウント
@@ -984,10 +984,16 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
   const [activeTabIdForDrag, setActiveTabIdForDrag] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [overrideDepth, setOverrideDepth] = useState<number | null>(null);
+  const overrideDepthRef = useRef<number | null>(null);
   const tabPositionsRef = useRef<TabPosition[]>([]);
   const isOutsideTreeRef = useRef<boolean>(false);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastHoverTabIdRef = useRef<number | null>(null);
+  const depthBaseXRef = useRef<number>(0);
+  const currentDepthForMouseRef = useRef<number>(0);
+  const currentGapIndexRef = useRef<number | null>(null);
+  const gapDepthOffsetRef = useRef<number>(0);
 
   // SidePanelRoot.buildTree() で既に現在のビューのノードのみがフィルタされているため、
   // ここでの追加フィルタリングは不要
@@ -997,6 +1003,8 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
   const handleDropTargetChange = useCallback((target: DropTarget | null, newTabPositions?: TabPosition[]) => {
     setDropTarget(target);
+    setOverrideDepth(null);
+    overrideDepthRef.current = null;
     if (newTabPositions) {
       tabPositionsRef.current = newTabPositions;
     }
@@ -1055,7 +1063,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   const {
     dragState,
     getItemProps,
-    cancelDrag,
   } = useDragDrop({
     containerRef,
     items,
@@ -1075,7 +1082,49 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       }
     }, [onDragStartProp]),
     onDragMove: useCallback((position: { x: number; y: number }, newDropTarget: DropTarget | null) => {
-      handleDropTargetChange(newDropTarget, tabPositionsRef.current);
+      const newGapIndex = newDropTarget?.type === DropTargetType.Gap ? (newDropTarget.gapIndex ?? null) : null;
+
+      if (newDropTarget?.type === DropTargetType.Gap) {
+        const defaultDepth = newDropTarget.adjacentDepths?.below ?? newDropTarget.adjacentDepths?.above ?? 0;
+
+        if (newGapIndex !== currentGapIndexRef.current) {
+          // 別の隙間に移動した場合のみリセット
+          depthBaseXRef.current = position.x;
+          gapDepthOffsetRef.current = 0;
+          currentDepthForMouseRef.current = defaultDepth;
+          currentGapIndexRef.current = newGapIndex;
+        }
+        // 同じ隙間の場合（タブ上ドロップから戻った場合も含む）は基準点とオフセットを維持
+
+        // 現在のdepthを計算
+        const deltaX = position.x - depthBaseXRef.current;
+        const depthChange = Math.floor(deltaX / INDENT_WIDTH);
+        const { minDepth, maxDepth } = calculateDepthRange(
+          newDropTarget.adjacentDepths?.above,
+          newDropTarget.adjacentDepths?.below
+        );
+
+        const rawDepth = defaultDepth + depthChange + gapDepthOffsetRef.current;
+        const clampedDepth = Math.max(minDepth, Math.min(maxDepth, rawDepth));
+
+        // clampされた場合、オフセットと基準点を調整
+        if (clampedDepth !== rawDepth) {
+          gapDepthOffsetRef.current = clampedDepth - defaultDepth;
+          depthBaseXRef.current = position.x;
+        }
+
+        if (clampedDepth !== overrideDepthRef.current) {
+          setOverrideDepth(clampedDepth);
+          overrideDepthRef.current = clampedDepth;
+          currentDepthForMouseRef.current = clampedDepth;
+        }
+
+        setDropTarget(newDropTarget);
+      } else {
+        // タブ上ドロップまたはターゲットなし
+        // currentGapIndexRefとgapDepthOffsetRefは維持（同じ隙間に戻る可能性があるため）
+        handleDropTargetChange(newDropTarget, tabPositionsRef.current);
+      }
 
       const boundary = sidePanelRef?.current ?? containerRef.current;
       if (boundary) {
@@ -1187,11 +1236,13 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           }
         }
 
+        const targetDepth = overrideDepthRef.current ?? undefined;
         await onSiblingDrop({
           activeTabId: draggedTabId,
           insertIndex: gapIndex,
           aboveTabId,
           belowTabId,
+          targetDepth,
         });
         handleDropTargetChange(null);
         setGlobalIsDragging(false);
@@ -1277,19 +1328,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     }
   }, [dragState.isDragging, dragState.currentPosition]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dragState.isDragging) {
-        cancelDrag();
-      }
-    };
-
-    if (dragState.isDragging) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [dragState.isDragging, cancelDrag]);
-
   const getItemPropsForNode = useCallback((tabId: number) => {
     return getItemProps(tabId.toString(), tabId);
   }, [getItemProps]);
@@ -1311,12 +1349,16 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     // eslint-disable-next-line react-hooks/refs -- ドロップターゲット変更時の位置計算に現在値が必要
     const topY = calculateIndicatorYByNodeIds(aboveNodeId, belowNodeId, tabPositionsRef.current);
 
+    // overrideDepthが指定されている場合はそれを使用、なければデフォルト値
+    const defaultDepth = dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0;
+    const depth = overrideDepth ?? defaultDepth;
+
     return {
       index: gapIndex,
-      depth: dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0,
+      depth,
       topY,
     };
-  }, [dropTarget]);
+  }, [dropTarget, overrideDepth]);
 
   const containerClassName = useMemo(() => {
     const baseClass = 'relative';

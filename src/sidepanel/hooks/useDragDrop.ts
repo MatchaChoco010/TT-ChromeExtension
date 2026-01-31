@@ -340,11 +340,9 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
 
     const startPosition = { x: e.clientX, y: e.clientY };
 
-    const target = e.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
     const offset = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: 0,
+      y: 0,
     };
 
     const newState: DragState = {
