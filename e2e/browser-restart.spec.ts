@@ -961,7 +961,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     expect(groupCountAfter).toBe(groupCountBefore);
 
     // ======== 2回目のChrome再起動 ========
-    console.log('=== 2回目のChrome再起動開始 ===');
     const secondBrowserResult = await restartBrowser(browserResult.context, userDataDir, headless);
     browserResult = secondBrowserResult;
 
@@ -1031,8 +1030,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       }
       return count;
     });
-
-    console.log(`グループタブ数: 初期=${groupCountBefore}, 1回目再起動後=${groupCountAfter}, 2回目再起動後=${groupCountAfter2}`);
 
     // 2回目の再起動後もグループタブが増殖していないことを確認
     expect(groupCountAfter2).toBe(groupCountBefore);

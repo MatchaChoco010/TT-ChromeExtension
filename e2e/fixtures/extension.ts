@@ -124,6 +124,12 @@ const createDownloadDir = (userDataDir: string): string => {
   return downloadDir;
 };
 
+const createCrashDumpsDir = (userDataDir: string): string => {
+  const crashDumpsDir = path.join(userDataDir, 'crash-dumps');
+  fs.mkdirSync(crashDumpsDir, { recursive: true });
+  return crashDumpsDir;
+};
+
 const createExtensionContext = async (
   extensionPath: string,
   headless: boolean
@@ -135,6 +141,7 @@ const createExtensionContext = async (
 
   const userDataDir = createUniqueUserDataDir();
   const downloadDir = createDownloadDir(userDataDir);
+  const crashDumpsDir = createCrashDumpsDir(userDataDir);
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false,
@@ -147,6 +154,8 @@ const createExtensionContext = async (
       `--load-extension=${extensionPath}`,
       '--disable-gpu',
       '--no-sandbox',
+      '--disable-breakpad',
+      `--crash-dumps-dir=${crashDumpsDir}`,
       '--disable-background-networking',
       '--disable-default-apps',
       '--disable-sync',

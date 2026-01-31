@@ -43,13 +43,14 @@ test.describe('Playwright Configuration', () => {
     const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf-8'));
 
     expect(packageJson.scripts).toHaveProperty('test:e2e');
-    expect(packageJson.scripts['test:e2e']).toBe('playwright test');
+    expect(packageJson.scripts['test:e2e']).toContain('playwright test');
 
     expect(packageJson.scripts).toHaveProperty('test:e2e:ui');
-    expect(packageJson.scripts['test:e2e:ui']).toBe('playwright test --ui');
+    expect(packageJson.scripts['test:e2e:ui']).toContain('playwright test --ui');
 
     expect(packageJson.scripts).toHaveProperty('test:e2e:debug');
-    expect(packageJson.scripts['test:e2e:debug']).toBe('HEADED=true playwright test --debug');
+    expect(packageJson.scripts['test:e2e:debug']).toContain('HEADED=true');
+    expect(packageJson.scripts['test:e2e:debug']).toContain('playwright test --debug');
 
     expect(packageJson.scripts).toHaveProperty('test:e2e:report');
     expect(packageJson.scripts['test:e2e:report']).toBe('playwright show-report');

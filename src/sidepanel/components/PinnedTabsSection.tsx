@@ -2,6 +2,7 @@ import React, { useRef, useCallback } from 'react';
 import type { TabInfoMap } from '@/types';
 import { useDragDrop, DropTargetType } from '../hooks/useDragDrop';
 import { DragOverlay } from './DragOverlay';
+import HorizontalDropIndicator from './HorizontalDropIndicator';
 
 /**
  * 内部ページのデフォルトファビコンを取得するヘルパー関数
@@ -246,12 +247,42 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
   const draggedTabId = dragState.draggedTabId;
   const draggedTabInfo = draggedTabId ? tabInfoMap[draggedTabId] : null;
 
+  const getIndicatorInfo = useCallback((): { insertIndex: number; leftPosition: number } | null => {
+    if (!dragState.isDragging || !dragState.dropTarget) return null;
+    if (dragState.dropTarget.type !== DropTargetType.HorizontalGap) return null;
+
+    const insertIndex = dragState.dropTarget.insertIndex ?? 0;
+    const tabCount = validPinnedTabs.length;
+
+    if (tabCount === 0) return null;
+
+    const TAB_WIDTH = 28;
+    const GAP = 4;
+    const PADDING = 8;
+
+    let leftPosition: number;
+    if (insertIndex === 0) {
+      leftPosition = PADDING;
+    } else if (insertIndex >= tabCount) {
+      leftPosition = PADDING + tabCount * TAB_WIDTH + (tabCount - 1) * GAP + GAP / 2;
+    } else {
+      leftPosition = PADDING + insertIndex * TAB_WIDTH + (insertIndex - 1) * GAP + GAP / 2;
+    }
+
+    return {
+      insertIndex,
+      leftPosition,
+    };
+  }, [dragState.isDragging, dragState.dropTarget, validPinnedTabs.length]);
+
+  const indicatorInfo = getIndicatorInfo();
+
   return (
     <>
       <div
         ref={setContainerRef}
         data-testid="pinned-tabs-section"
-        className="flex flex-wrap gap-1 p-2"
+        className="relative flex flex-wrap gap-1 p-2"
       >
         {validPinnedTabs.map((tabId, index) => {
           const tabInfo = tabInfoMap[tabId];
@@ -275,6 +306,14 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
             />
           );
         })}
+
+        {isDraggable && indicatorInfo && (
+          <HorizontalDropIndicator
+            insertIndex={indicatorInfo.insertIndex}
+            isVisible={true}
+            leftPosition={indicatorInfo.leftPosition}
+          />
+        )}
       </div>
 
       {isDraggable && draggedTabInfo && (
