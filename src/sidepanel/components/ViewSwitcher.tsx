@@ -114,7 +114,7 @@ const ViewButton: React.FC<ViewButtonProps> = ({
       />
       {tabCount > 0 && (
         <span
-          className="absolute -top-0.5 -right-0.5 min-w-[20px] h-4 px-1 rounded-full bg-blue-500 text-white text-xs font-medium flex items-center justify-center"
+          className="absolute -top-0.5 -right-0.5 min-w-[18px] h-3.5 px-1 rounded-full bg-gray-600 text-white text-[10px] font-medium flex items-center justify-center"
           data-testid={`tab-count-badge-${index}`}
         >
           {tabCount}
