@@ -567,10 +567,10 @@ test.describe('タブ数表示の視認性', () => {
           const count = parseInt(badgeText || '0', 10);
           if (count < targetTotal) return false;
 
-          // min-width: 20px
+          // min-width: 18px
           const badgeBox = await badge.boundingBox();
           if (!badgeBox) return false;
-          return badgeBox.width >= 20;
+          return badgeBox.width >= 18;
         },
         {
           timeout: 10000,

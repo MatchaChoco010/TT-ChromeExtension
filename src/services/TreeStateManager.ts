@@ -203,6 +203,28 @@ export class TreeStateManager {
   }
 
   /**
+   * 指定ウィンドウ・ビューの全タブIDを取得（ピン留めタブ含む）
+   */
+  getViewTabIds(windowId: number, viewIndex?: number): number[] {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return [];
+    const vi = viewIndex ?? windowState.activeViewIndex;
+    const viewState = windowState.views[vi];
+    if (!viewState) return [];
+
+    const collectTabIds = (nodes: TabNode[]): number[] => {
+      const result: number[] = [];
+      for (const node of nodes) {
+        result.push(node.tabId);
+        result.push(...collectTabIds(node.children));
+      }
+      return result;
+    };
+
+    return [...viewState.pinnedTabIds, ...collectTabIds(viewState.rootNodes)];
+  }
+
+  /**
    * tabIdからTabNodeを取得
    */
   getNodeByTabId(

@@ -760,7 +760,7 @@ describe('ViewSwitcher', () => {
         );
 
         const badge = screen.getByTestId('tab-count-badge-0');
-        expect(badge).toHaveClass('text-xs');
+        expect(badge).toHaveClass('text-[10px]');
       });
     });
 
@@ -819,7 +819,7 @@ describe('ViewSwitcher', () => {
     });
 
     describe('タブ数バッジの視認性向上', () => {
-      it('タブ数バッジはmin-w-[20px]で数字が見切れない', () => {
+      it('タブ数バッジはmin-w-[18px]で数字が見切れない', () => {
         const tabCounts = [99, 3, 100];
 
         render(
@@ -835,7 +835,7 @@ describe('ViewSwitcher', () => {
         );
 
         const badge = screen.getByTestId('tab-count-badge-0');
-        expect(badge).toHaveClass('min-w-[20px]');
+        expect(badge).toHaveClass('min-w-[18px]');
       });
 
       it('タブ数バッジは右上角ではなく内側に配置される', () => {

@@ -702,6 +702,24 @@ export async function handleTabRemoved(
   // syncTreeStateToChromeTabs内でcloseEmptyWindowsが呼ばれ、空ウィンドウが自動クローズされる
   await treeStateManager.syncTreeStateToChromeTabs();
 
+  // アクティブタブがビュー外になった場合、ビュー内のタブをアクティブにする
+  // ビューの最後のタブを閉じたとき、Chromeが自動的に隣のタブ（別ビューのタブ）を
+  // アクティブにしてしまう問題を修正
+  const { windowId } = removeInfo;
+  const viewTabIds = treeStateManager.getViewTabIds(windowId);
+  if (viewTabIds.length > 0) {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId });
+      if (activeTab && activeTab.id !== undefined && !viewTabIds.includes(activeTab.id)) {
+        // ビュー内の最後のタブをアクティブにする
+        const lastTabId = viewTabIds[viewTabIds.length - 1];
+        await chrome.tabs.update(lastTabId, { active: true });
+      }
+    } catch {
+      // タブが存在しない場合は無視
+    }
+  }
+
   treeStateManager.notifyStateChanged();
 }
 
