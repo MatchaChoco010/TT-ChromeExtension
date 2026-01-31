@@ -1110,6 +1110,44 @@ export class TreeStateManager {
   }
 
   /**
+   * ビューの順序を変更
+   * activeViewIndexも適切に調整する
+   */
+  async reorderView(
+    viewIndex: number,
+    newIndex: number,
+    windowId: number
+  ): Promise<void> {
+    const windowState = this.getWindowState(windowId);
+    if (!windowState) return;
+
+    const viewsCount = windowState.views.length;
+    if (viewIndex < 0 || viewIndex >= viewsCount) return;
+    if (newIndex < 0 || newIndex >= viewsCount) return;
+    if (viewIndex === newIndex) return;
+
+    const activeViewIndex = windowState.activeViewIndex;
+
+    // 配列からビューを取り出して新しい位置に挿入
+    const [movedView] = windowState.views.splice(viewIndex, 1);
+    windowState.views.splice(newIndex, 0, movedView);
+
+    // activeViewIndexを調整
+    if (viewIndex === activeViewIndex) {
+      // ドラッグしたビューがアクティブ → 新しい位置に追従
+      windowState.activeViewIndex = newIndex;
+    } else if (viewIndex < activeViewIndex && newIndex >= activeViewIndex) {
+      // アクティブビューより前のビューを後ろに移動 → activeViewIndex - 1
+      windowState.activeViewIndex = activeViewIndex - 1;
+    } else if (viewIndex > activeViewIndex && newIndex <= activeViewIndex) {
+      // アクティブビューより後のビューを前に移動 → activeViewIndex + 1
+      windowState.activeViewIndex = activeViewIndex + 1;
+    }
+
+    await this.persistState();
+  }
+
+  /**
    * 指定したタブがピン留めタブかどうかを確認
    * viewIndexを省略した場合はアクティブビューで確認
    */

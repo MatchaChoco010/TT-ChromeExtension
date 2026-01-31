@@ -320,7 +320,11 @@ export type MessageType =
       payload: { settings: UserSettings };
     }
   | { type: 'CREATE_NEW_TAB' }
-  | { type: 'OPEN_SETTINGS_TAB' };
+  | { type: 'OPEN_SETTINGS_TAB' }
+  | {
+      type: 'REORDER_VIEW';
+      payload: { viewIndex: number; newIndex: number; windowId: number };
+    };
 
 export type MessageResponse<T> =
   | { success: true; data: T }

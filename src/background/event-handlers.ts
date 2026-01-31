@@ -1090,6 +1090,10 @@ function handleMessage(
         trackHandler(() => handleReorderPinnedTab(message.payload.tabId, message.payload.newIndex, sendResponse));
         break;
 
+      case 'REORDER_VIEW':
+        trackHandler(() => handleReorderView(message.payload.viewIndex, message.payload.newIndex, message.payload.windowId, sendResponse));
+        break;
+
       case 'MOVE_NODE':
         trackHandler(() => handleMoveNode(
           message.payload.tabId,
@@ -2236,6 +2240,28 @@ async function handleReorderPinnedTab(
     sendResponse({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to reorder pinned tab',
+    });
+  }
+}
+
+/**
+ * ビューの順序を変更
+ */
+async function handleReorderView(
+  viewIndex: number,
+  newIndex: number,
+  windowId: number,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): Promise<void> {
+  try {
+    await treeStateManager.reorderView(viewIndex, newIndex, windowId);
+    await treeStateManager.syncTreeStateToChromeTabs();
+    treeStateManager.notifyStateChanged();
+    sendResponse({ success: true, data: null });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to reorder view',
     });
   }
 }

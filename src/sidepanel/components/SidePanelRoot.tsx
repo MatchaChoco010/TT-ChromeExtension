@@ -33,6 +33,7 @@ const TreeViewContent: React.FC = () => {
     pinnedTabIds,
     tabInfoMap,
     handlePinnedTabReorder,
+    handleViewReorder,
     getTabInfo,
     isNodeSelected,
     selectNode,
@@ -298,6 +299,7 @@ const TreeViewContent: React.FC = () => {
             onViewCreate={createView}
             onViewDelete={deleteView}
             onViewUpdate={updateView}
+            onViewReorder={handleViewReorder}
           />
         )}
         <PinnedTabsSection

@@ -29,6 +29,7 @@ interface TreeStateContextType {
   getTabInfo: (tabId: number) => ExtendedTabInfo | undefined;
   pinnedTabIds: number[];
   handlePinnedTabReorder: (tabId: number, newIndex: number) => Promise<void>;
+  handleViewReorder: (viewIndex: number, newIndex: number) => Promise<void>;
   selectedTabIds: Set<number>;
   lastSelectedTabId: number | null;
   selectNode: (tabId: number, modifiers: { shift: boolean; ctrl: boolean }) => void;
@@ -542,6 +543,19 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     }
   }, [currentWindowId]);
 
+  const handleViewReorder = useCallback(async (viewIndex: number, newIndex: number): Promise<void> => {
+    if (currentWindowId === null) return;
+
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'REORDER_VIEW',
+        payload: { viewIndex, newIndex, windowId: currentWindowId },
+      });
+    } catch (error) {
+      console.error('Failed to reorder view:', error);
+    }
+  }, [currentWindowId]);
+
   const selectNode = useCallback((tabId: number, modifiers: { shift: boolean; ctrl: boolean }) => {
     if (!currentViewState) return;
 
@@ -702,6 +716,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         getTabInfo,
         pinnedTabIds,
         handlePinnedTabReorder,
+        handleViewReorder,
         selectedTabIds,
         lastSelectedTabId,
         selectNode,
