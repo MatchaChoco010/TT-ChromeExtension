@@ -3,6 +3,9 @@
   "name": "Vivaldi-TT",
   "version": "1.0.0",
   "description": "Tree-style tab manager for Vivaldi browser",
+  "icons": {
+    "128": "icon.png"
+  },
   "permissions": [
     "sidePanel",
     "tabs",
