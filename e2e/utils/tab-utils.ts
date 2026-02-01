@@ -234,26 +234,35 @@ export async function activateTab(
   serviceWorker: Worker,
   tabId: number
 ): Promise<void> {
-  await serviceWorker.evaluate((tabId) => {
-    return chrome.tabs.update(tabId, { active: true });
-  }, tabId);
-
+  // タブをアクティブにする際は、そのウィンドウもフォーカスする必要がある
+  // そうしないと、タブはウィンドウ内でアクティブになるが、
+  // chrome.tabs.getで取得したactive状態が正しく反映されない場合がある
   const result = await serviceWorker.evaluate(
     async (tabId) => {
-      for (let i = 0; i < 100; i++) {
+      try {
         const tab = await chrome.tabs.get(tabId);
-        if (tab.active) {
-          return { success: true };
+        // ウィンドウをフォーカスしてからタブをアクティブにする
+        await chrome.windows.update(tab.windowId, { focused: true });
+        await chrome.tabs.update(tabId, { active: true });
+
+        // タブがアクティブになったことを確認
+        for (let i = 0; i < 100; i++) {
+          const updatedTab = await chrome.tabs.get(tabId);
+          if (updatedTab.active) {
+            return { success: true };
+          }
+          await new Promise(resolve => setTimeout(resolve, 20));
         }
-        await new Promise(resolve => setTimeout(resolve, 20));
+        return { success: false, reason: 'timeout' };
+      } catch (error) {
+        return { success: false, reason: String(error) };
       }
-      return { success: false };
     },
     tabId
   );
 
   if (!result.success) {
-    throw new Error(`Timeout waiting for tab ${tabId} to become active`);
+    throw new Error(`Failed to activate tab ${tabId}: ${result.reason}`);
   }
 }
 
