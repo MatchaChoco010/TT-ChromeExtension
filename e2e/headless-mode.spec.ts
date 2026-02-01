@@ -1,6 +1,3 @@
-/**
- * headlessモードのデフォルト設定の検証テスト
- */
 import { test, chromium } from '@playwright/test';
 import { expect } from '@playwright/test';
 import path from 'path';
@@ -9,11 +6,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * Service Workerの起動を待機するヘルパー関数
- * @param context - ブラウザコンテキスト
- * @param timeout - タイムアウト時間（ミリ秒）
- */
 async function waitForServiceWorkerReady(
   context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>,
   timeout = 30000

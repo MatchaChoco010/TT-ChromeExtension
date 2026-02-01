@@ -23,17 +23,10 @@ interface TreeNodeProps {
   onContextMenu?: (action: MenuAction, tabIds: number[]) => void;
 }
 
-/**
- * スタートページURLを判定するヘルパー関数
- * Vivaldi/Chromeのスタートページ関連のURLを検出
- *
- * 注意: chrome://vivaldi-webui/startpage?section=XXX はセクションページなので
- * スタートページとは判定しない（カレンダー、メールなど個別の機能ページ）
- */
 const isStartPageUrl = (url: string): boolean => {
   if (!url) return false;
 
-  // ?section= パラメータがある場合は、セクションページなのでスタートページではない
+  // ?section=はカレンダー等の個別機能ページなのでスタートページとしない
   if (url.includes('?section=')) return false;
 
   const startPageUrlPatterns = [
@@ -44,10 +37,6 @@ const isStartPageUrl = (url: string): boolean => {
   return startPageUrlPatterns.some(pattern => pattern.test(url));
 };
 
-/**
- * 新しいタブURLを判定するヘルパー関数
- * Vivaldi/Chromeの新しいタブ関連のURLを検出（スタートページ以外）
- */
 const isNewTabUrl = (url: string): boolean => {
   if (!url) return false;
 
@@ -61,17 +50,10 @@ const isNewTabUrl = (url: string): boolean => {
   return newTabUrlPatterns.some(pattern => pattern.test(url));
 };
 
-/**
- * タイトルがURL形式かどうかを判定
- * PDFなど、file://でも正しいタイトルが設定されている場合がある
- */
 const isTitleUrlFormat = (title: string): boolean => {
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(title);
 };
 
-/**
- * システムURLのフレンドリー名マッピング
- */
 const SYSTEM_URL_FRIENDLY_NAMES: Record<string, string> = {
   'chrome://settings': '設定',
   'chrome://extensions': '拡張機能',
@@ -84,28 +66,6 @@ const SYSTEM_URL_FRIENDLY_NAMES: Record<string, string> = {
   'chrome://newtab': '新しいタブ',
 };
 
-/**
- * 表示するタブタイトルを決定するヘルパー関数
- *
- * 処理優先順位:
- * 1. Loading状態の場合: 「Loading...」
- * 2. タイトルがURL形式でない場合: そのまま表示（settings.html等の拡張機能ページを含む）
- * 3. スタートページURLの場合: 「スタートページ」
- * 4. 新しいタブURLの場合: 「新しいタブ」
- * 5. システムページでタイトルがURL形式の場合: フレンドリー名に置換
- * 6. file://でタイトルがURL形式の場合: ファイル名に置換
- * 7. それ以外: 元のタイトル
- *
- * chrome.tabs.Tab.titleをそのまま使用することを優先
- * - settings.htmlやgroup.htmlはHTMLの<title>タグで適切なタイトルを提供
- * - タイトルが正しく設定されている場合はそのまま表示
- *
- * Vivaldi専用URL（chrome://vivaldi-webui/startpage）の場合、
- * 拡張機能にはURLが公開されないことがあるため、タイトルもチェックする
- *
- * タイトルがURL形式の場合のみフレンドリー名に置き換え。
- * PDFなど既にタイトルが設定されている場合はそのまま表示。
- */
 const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 'complete' }): string => {
   const title = tab.title || '';
   const url = tab.url || '';
@@ -126,7 +86,6 @@ const getDisplayTitle = (tab: { title: string; url: string; status: 'loading' | 
     return '新しいタブ';
   }
 
-  // Vivaldi内部ページ（設定、カレンダーなど）のタイトル生成
   const vivaldiTitle = getVivaldiInternalPageTitle(url);
   if (vivaldiTitle) {
     return vivaldiTitle;

@@ -115,7 +115,6 @@ describe('DropIndicator', () => {
       render(<DropIndicator {...defaultProps} />);
 
       const indicator = screen.getByTestId('drop-indicator');
-      // ちらつき防止のためのスムーズな遷移
       expect(indicator).toHaveClass('transition-all');
     });
   });

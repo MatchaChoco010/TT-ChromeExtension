@@ -62,8 +62,6 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     const childTabElement = sidePanelPage.locator(childTabSelector).first();
     await childTabElement.waitFor({ state: 'visible', timeout: AUTO_EXPAND_HOVER_DELAY_MS + 5000 });
 
-    // 自動展開されたことを確認（childTabが表示される）
-    // そのままparentTabの上でドロップしてparentTabの子にする
     await dropTab(sidePanelPage);
 
     await assertTabStructure(sidePanelPage, windowId, [
@@ -209,8 +207,6 @@ test.describe('ドラッグ&ドロップのホバー自動展開', () => {
     const level1Element = sidePanelPage.locator(level1Selector).first();
     await level1Element.waitFor({ state: 'visible', timeout: AUTO_EXPAND_HOVER_DELAY_MS + 5000 });
 
-    // 自動展開されたことを確認（level1が表示される）
-    // そのままlevel0の上でドロップしてlevel0の子にする
     await dropTab(sidePanelPage);
 
     await assertTabStructure(sidePanelPage, windowId, [

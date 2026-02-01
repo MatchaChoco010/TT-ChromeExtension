@@ -45,17 +45,6 @@ export function useAutoScroll(
 
   const animationFrameRef = useRef<number | null>(null);
 
-  /**
-   * 自動スクロール処理
-   *
-   * マウス位置に基づいてスクロールを実行する。
-   * - 上端近く: 上にスクロール
-   * - 下端近く: 下にスクロール
-   * - それ以外: スクロールなし
-   *
-   * @param mouseY マウスのY座標（スクリーン座標）
-   * @param containerRect コンテナのBoundingClientRect
-   */
   const handleAutoScroll = useCallback(
     (mouseY: number, containerRect: DOMRect) => {
       const container = containerRef.current;

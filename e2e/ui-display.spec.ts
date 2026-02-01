@@ -10,9 +10,6 @@ import {
 import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 
-/**
- * 設定ページを新規タブで開くヘルパー関数
- */
 async function openSettingsInNewTab(
   extensionContext: import('@playwright/test').BrowserContext,
   extensionId: string
@@ -77,7 +74,6 @@ test.describe('UI表示の一貫性', () => {
         expect(titleFontSize).toBe('18px');
       }).toPass({ timeout: COMMON_TIMEOUTS.medium });
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -129,7 +125,6 @@ test.describe('UI表示の一貫性', () => {
         expect(titleFontSize).toBe('16px');
       }).toPass({ timeout: COMMON_TIMEOUTS.medium });
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -343,7 +338,6 @@ test.describe('UI表示の一貫性', () => {
         expect(titleText).not.toBe('新しいタブ');
       }).toPass({ timeout: COMMON_TIMEOUTS.medium });
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -390,7 +384,6 @@ test.describe('UI表示の一貫性', () => {
         }
       }).toPass({ timeout: COMMON_TIMEOUTS.long });
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },

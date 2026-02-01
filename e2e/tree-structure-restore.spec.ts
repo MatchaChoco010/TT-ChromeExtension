@@ -101,12 +101,10 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
           return { valid: false, reason: 'Child not found', childFound: false };
         }
 
-        // Parent should be root (no parent)
         if (parentResult.parent !== null) {
           return { valid: false, reason: 'Parent should be root' };
         }
 
-        // Child should be child of parent
         if (childResult.parent?.tabId !== parentTabId) {
           return {
             valid: false,
@@ -239,22 +237,18 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
           return { valid: false, reason: 'Not all tabs found' };
         }
 
-        // A should be root (no parent)
         if (resultA.parent !== null) {
           return { valid: false, reason: 'A should be root', tabAParent: resultA.parent?.tabId };
         }
 
-        // B should be child of A
         if (resultB.parent?.tabId !== tabAId) {
           return { valid: false, reason: 'B should be child of A', tabBParent: resultB.parent?.tabId ?? null };
         }
 
-        // C should be child of B
         if (resultC.parent?.tabId !== tabBId) {
           return { valid: false, reason: 'C should be child of B', tabCParent: resultC.parent?.tabId ?? null };
         }
 
-        // D should be child of C
         if (resultD.parent?.tabId !== tabCId) {
           return { valid: false, reason: 'D should be child of C', tabDParent: resultD.parent?.tabId ?? null };
         }
@@ -306,7 +300,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: grandchildTabId, depth: 2 },
     ], 0);
 
-    // ストレージに親子関係が保存されていることを確認
     await waitForCondition(async () => {
       const hasTabsInTree = await serviceWorker.evaluate(async () => {
         interface TabNode {
@@ -344,7 +337,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       return Boolean(hasTabsInTree);
     }, { timeout: 5000, timeoutMessage: 'Tree state was not saved to storage' });
 
-    // TreeStateManagerのメモリ状態をクリアして再読み込み
     await serviceWorker.evaluate(async () => {
       // @ts-expect-error accessing global treeStateManager
       if (globalThis.treeStateManager) {
@@ -562,12 +554,10 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
           return { valid: false, reason: 'Child not found', childFound: false };
         }
 
-        // Parent should be root
         if (parentResult.parent !== null) {
           return { valid: false, reason: 'Parent should be root' };
         }
 
-        // Child should be child of parent
         if (childResult.parent?.tabId !== parentTabId) {
           return {
             valid: false,
@@ -581,7 +571,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       return dndSaveResult.valid;
     }, { timeout: 5000, timeoutMessage: 'D&D parent-child relation was not saved correctly' });
 
-    // TreeStateManagerのメモリ状態をクリアして再読み込み
     await serviceWorker.evaluate(async () => {
       // @ts-expect-error accessing global treeStateManager
       if (globalThis.treeStateManager) {
@@ -627,7 +616,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
             return { valid: false, reason: 'No tree state' };
           }
 
-          // Find a node and its parent by tabId
           const findNodeWithParent = (
             nodes: TabNode[],
             targetTabId: number,
@@ -662,12 +650,10 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
             };
           }
 
-          // Parent should be root
           if (parentResult.parent !== null) {
             return { valid: false, reason: 'Parent should be root' };
           }
 
-          // Child should be child of parent
           if (childResult.parent?.tabId !== parentTabId) {
             return {
               valid: false,
@@ -714,7 +700,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       { tabId: tabAId, depth: 0 },
     ], 0);
 
-    // Wait for the tab to be saved in storage
     await waitForCondition(async () => {
       const found = await serviceWorker.evaluate(async ({ tabAId }) => {
         interface TabNode {
@@ -797,14 +782,12 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
 
       const tabNode = findAndRemove(windowState.views[0].rootNodes, tabAId);
       if (tabNode) {
-        // Move to the second view
         windowState.views[1].rootNodes.push(tabNode);
       }
 
       await chrome.storage.local.set({ tree_state: treeState });
     }, { tabAId });
 
-    // TreeStateManagerのメモリ状態をクリアして再読み込み
     await serviceWorker.evaluate(async () => {
       // @ts-expect-error accessing global treeStateManager
       if (globalThis.treeStateManager) {
@@ -815,7 +798,6 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
       }
     });
 
-    // Verify the tab is in the correct view (viewIndex=1)
     interface ViewIndexResult {
       valid: boolean;
       reason?: string;

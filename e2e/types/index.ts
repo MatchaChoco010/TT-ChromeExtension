@@ -1,10 +1,3 @@
-/**
- * E2E テスト用型定義
- *
- * src/types/index.ts の型定義を E2E テストで利用するためのエクスポート
- * evaluate() 内では使用できないが、戻り値のキャストに使用する
- */
-
 export type {
   TabNode,
   TreeState,
@@ -15,9 +8,6 @@ export type {
   StorageSchema,
 } from '../../src/types';
 
-/**
- * TabNode 型を再定義（evaluate 内で使用するため）
- */
 export interface E2ETabNode {
   id: string;
   tabId: number;
@@ -45,18 +35,12 @@ export interface E2EViewInfo {
   icon?: string;
 }
 
-/**
- * ViewState 型を再定義（evaluate 内で使用するため）
- */
 export interface E2EViewState {
   info: E2EViewInfo;
   rootNodeIds: string[];
   nodes: Record<string, E2ETabNode>;
 }
 
-/**
- * E2EタブノードType (新構造)
- */
 export interface E2ENewTabNode {
   tabId: number;
   isExpanded: boolean;
@@ -64,9 +48,6 @@ export interface E2ENewTabNode {
   children: E2ENewTabNode[];
 }
 
-/**
- * E2Eビュー State (新構造)
- */
 export interface E2ENewViewState {
   name: string;
   color: string;
@@ -74,9 +55,6 @@ export interface E2ENewViewState {
   rootNodes: E2ENewTabNode[];
 }
 
-/**
- * E2Eウィンドウ State (新構造)
- */
 export interface E2ENewWindowState {
   windowId: number;
   views: E2ENewViewState[];
@@ -84,10 +62,6 @@ export interface E2ENewWindowState {
   pinnedTabIds: number[];
 }
 
-/**
- * TreeState 型を再定義（evaluate 内で使用するため）
- * 新アーキテクチャ: Window → View → Tab の階層構造
- */
 export interface E2ETreeState {
   windows: E2ENewWindowState[];
 }

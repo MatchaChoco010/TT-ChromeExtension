@@ -170,14 +170,12 @@ test.describe('ピン留めタブの並び替え', () => {
         await expect(section).toBeVisible();
       }).toPass({ timeout: 10000 });
 
-      // Chrome APIでタブを移動しても、TreeStateの順序が維持される
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 0 });
       }, tabId2);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
       ], 0);
-      // TreeStateの順序が維持される（tabId1, tabId2の順）
       await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }, { tabId: tabId2 }], 0);
 
       await closeTab(serviceWorker, tabId1);
@@ -262,7 +260,6 @@ test.describe('ピン留めタブの並び替え', () => {
         await expect(section).toBeVisible();
       }).toPass({ timeout: 10000 });
 
-      // Chrome APIでタブを移動しても、TreeStateの順序（tabId1, tabId2, tabId3）が維持される
       await serviceWorker.evaluate(async (tabId) => {
         await chrome.tabs.move(tabId, { index: 2 });
       }, tabId1);

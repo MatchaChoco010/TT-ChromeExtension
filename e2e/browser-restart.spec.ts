@@ -66,7 +66,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: childTabId, depth: 1 },
     ], 0);
 
-    // 永続化を待つ
     await waitForCondition(async () => {
       const hasTabsInTree = await serviceWorker.evaluate(async () => {
         interface TabNode {
@@ -150,10 +149,8 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return hasTabsRestored;
     }, { timeout: 10000, timeoutMessage: 'Tabs not restored after browser restart' });
 
-    // 再起動後の初期化
     const newWindowId = await getCurrentWindowId(newServiceWorker);
 
-    // URLから新しいタブIDを取得
     const newParentTabId = await newServiceWorker.evaluate(async (url) => {
       const tabs = await chrome.tabs.query({ url });
       return tabs[0]?.id;
@@ -167,7 +164,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     expect(newParentTabId).toBeDefined();
     expect(newChildTabId).toBeDefined();
 
-    // assertTabStructureで全体構造を検証
     await assertTabStructure(newSidePanelPage, newWindowId, [
       { tabId: newParentTabId!, depth: 0, expanded: true },
       { tabId: newChildTabId!, depth: 1 },
@@ -187,20 +183,17 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await closeTab(serviceWorker, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [], 0);
 
-    // ビュー1を追加
     const addViewButton = sidePanelPage.locator('[aria-label="Add new view"]');
     await expect(addViewButton).toBeVisible({ timeout: 5000 });
     await addViewButton.click();
     const view1Button = sidePanelPage.locator('[aria-label="Switch to View view"]');
     await expect(view1Button).toBeVisible({ timeout: 5000 });
 
-    // テストタブを作成（ビュー0）
     const testTabId = await createTab(serviceWorker, getTestServerUrl('/view-test-page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: testTabId, depth: 0 },
     ], 0);
 
-    // タブをビュー1に移動
     const tabItem = sidePanelPage.locator(`[data-testid="tree-node-${testTabId}"]`);
     await tabItem.click({ button: 'right' });
 
@@ -214,16 +207,13 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const viewMenuItem = subMenu.locator('button', { hasText: 'View' });
     await viewMenuItem.click();
 
-    // タブがビュー0から消えたことを確認
     await assertTabStructure(sidePanelPage, windowId, [], 0);
 
-    // ビュー1に切り替えてタブを確認
     await view1Button.click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: testTabId, depth: 0 },
     ], 1);
 
-    // 永続化を待つ
     const testUrl = getTestServerUrl('/view-test-page');
     await waitForCondition(async () => {
       const tabViewIndex = await serviceWorker.evaluate(async ({ tabId }) => {
@@ -300,10 +290,8 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return nodesExist;
     }, { timeout: 10000, timeoutMessage: 'Nodes not restored after browser restart' });
 
-    // 再起動後の初期化
     const newWindowId = await getCurrentWindowId(newServiceWorker);
 
-    // 再起動後、URLから新しいタブIDを取得
     const newTestTabId = await newServiceWorker.evaluate(async (url) => {
       const tabs = await chrome.tabs.query({ url });
       return tabs[0]?.id;
@@ -311,7 +299,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
 
     expect(newTestTabId).toBeDefined();
 
-    // ビュー1に切り替えてタブが表示されることを確認
     const newView1Button = newSidePanelPage.locator('[aria-label="Switch to View view"]');
     await newView1Button.click();
 
@@ -332,31 +319,26 @@ test.describe('ブラウザ再起動時の状態復元', () => {
 
     const windowId = await getCurrentWindowId(serviceWorker);
 
-    // 初期タブを閉じる（handleTabCreatedが呼ばれる前に作成されたタブはTreeStateに入っていない）
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
     await closeTab(serviceWorker, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [], 0);
 
-    // タブAを作成（ビュー0）
     const tabA = await createTab(serviceWorker, getTestServerUrl('/page-a'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: tabA, depth: 0 },
     ], 0);
 
-    // タブBを作成（ビュー0）
     const tabB = await createTab(serviceWorker, getTestServerUrl('/page-b'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: tabA, depth: 0 },
       { tabId: tabB, depth: 0 },
     ], 0);
 
-    // ビュー1を追加
     const addViewButton = sidePanelPage.locator('[aria-label="Add new view"]');
     await addViewButton.click();
     const view1Button = sidePanelPage.locator('[aria-label="Switch to View view"]');
     await expect(view1Button).toBeVisible({ timeout: 5000 });
 
-    // タブCを作成（まだビュー0にいる）
     const tabC = await createTab(serviceWorker, getTestServerUrl('/page-c'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: tabA, depth: 0 },
@@ -364,7 +346,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: tabC, depth: 0 },
     ], 0);
 
-    // タブCをビュー1に移動
     const tabCItem = sidePanelPage.locator(`[data-testid="tree-node-${tabC}"]`);
     await tabCItem.click({ button: 'right' });
     const moveToViewOption = sidePanelPage.locator('text=別のビューへ移動');
@@ -374,19 +355,16 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const viewMenuItem = subMenu.locator('button', { hasText: 'View' });
     await viewMenuItem.click();
 
-    // タブCがビュー0から消えたことを確認
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: tabA, depth: 0 },
       { tabId: tabB, depth: 0 },
     ], 0);
 
-    // ビュー1に切り替えてタブCを確認
     await view1Button.click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: tabC, depth: 0 },
     ], 1);
 
-    // ビュー0に戻る
     const defaultViewButton = sidePanelPage.locator('[aria-label="Switch to Default view"]');
     await defaultViewButton.click();
     await assertTabStructure(sidePanelPage, windowId, [
@@ -394,7 +372,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: tabB, depth: 0 },
     ], 0);
 
-    // 永続化を待つ
     await waitForCondition(async () => {
       const persisted = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
@@ -403,7 +380,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return persisted;
     }, { timeout: 20000, timeoutMessage: 'Tree state not persisted' });
 
-    // ======== Chrome再起動 ========
     const headless = process.env.HEADED !== 'true';
     const newBrowserResult = await restartBrowser(context, userDataDir, headless);
     browserResult = newBrowserResult;
@@ -413,10 +389,8 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const newSidePanelRoot = newSidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(newSidePanelRoot).toBeVisible({ timeout: 10000 });
 
-    // 再起動後の初期化
     const newWindowId = await getCurrentWindowId(newServiceWorker);
 
-    // 再起動後、URLから新しいタブIDを取得
     const newTabA = await newServiceWorker.evaluate(async (url) => {
       const tabs = await chrome.tabs.query({ url });
       return tabs[0]?.id;
@@ -432,7 +406,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return tabs[0]?.id;
     }, getTestServerUrl('/page-c'));
 
-    // ビュー0でタブA, Bが表示されることを確認（タブCはビュー1に残っているべき）
     await assertTabStructure(
       newSidePanelPage,
       newWindowId,
@@ -443,7 +416,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       0
     );
 
-    // ビュー1に切り替えてタブCが表示されることを確認
     const newView1Button = newSidePanelPage.locator('[aria-label="Switch to View view"]');
     await newView1Button.click();
 
@@ -470,7 +442,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await closeTab(serviceWorker, initialBrowserTabId);
     await assertTabStructure(sidePanelPage, windowId, [], 0);
 
-    // テスト用タブを作成
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page?id=tab1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: tabId1, depth: 0 },
@@ -482,7 +453,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: tabId2, depth: 0 },
     ], 0);
 
-    // タブをグループ化
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
@@ -500,14 +470,12 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await groupMenuItem.click({ force: true, noWaitAfter: true });
     await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-    // グループ名入力モーダルを確認して確定
     const modal = sidePanelPage.locator('[data-testid="group-name-modal"]');
     await expect(modal).toBeVisible({ timeout: 5000 });
     const confirmButton = modal.getByRole('button', { name: '作成' });
     await confirmButton.click({ force: true });
     await expect(modal).not.toBeVisible({ timeout: 3000 });
 
-    // グループタブが作成されるまで待機
     let groupTabId: number | undefined;
     await waitForCondition(
       async () => {
@@ -554,7 +522,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: tabId2, depth: 1 },
     ], 0);
 
-    // 再起動前のグループタブ数をカウント
     const groupCountBefore = await serviceWorker.evaluate(async () => {
       interface TabNode {
         tabId: number;
@@ -586,7 +553,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
 
     expect(groupCountBefore).toBe(1);
 
-    // 永続化を待つ
     await waitForCondition(async () => {
       const persisted = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
@@ -595,7 +561,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return persisted;
     }, { timeout: 20000, timeoutMessage: 'Tree state not persisted' });
 
-    // ======== Chrome再起動 ========
     const headless = process.env.HEADED !== 'true';
     const newBrowserResult = await restartBrowser(context, userDataDir, headless);
     browserResult = newBrowserResult;
@@ -605,7 +570,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const newSidePanelRoot = newSidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(newSidePanelRoot).toBeVisible({ timeout: 10000 });
 
-    // 再起動後のグループタブ数をカウント
     await waitForCondition(async () => {
       const count = await newServiceWorker.evaluate(async () => {
         interface TabNode {
@@ -667,7 +631,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return count;
     });
 
-    // グループタブが増殖していないことを確認
     expect(groupCountAfter).toBe(groupCountBefore);
   });
 
@@ -682,7 +645,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const windowId = await getCurrentWindowId(serviceWorker);
     const initialBrowserTabId = await getInitialBrowserTabId(serviceWorker, windowId);
 
-    // 1. グループ化するためのタブを作成
     const tab1 = await createTab(serviceWorker, getTestServerUrl('/page?id=tab1'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -696,7 +658,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: tab2, depth: 0 },
     ], 0);
 
-    // 2. 複数タブを選択してグループ化
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
@@ -730,10 +691,8 @@ test.describe('ブラウザ再起動時の状態復元', () => {
 
     await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-    // グループ名モーダルを確認して保存
     await confirmGroupNameModal(sidePanelPage);
 
-    // グループタブが作成されるまで待つ
     await waitForCondition(
       async () => {
         interface TabNode {
@@ -769,7 +728,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { timeout: 10000, timeoutMessage: 'Group tab was not created' }
     );
 
-    // グループタブのIDを取得
     const groupTabId = await serviceWorker.evaluate(async () => {
       interface TabNode {
         tabId: number;
@@ -808,14 +766,12 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: tab2, depth: 1 },
     ], 0);
 
-    // 3. 新しいビューを作成
     const addViewButton = sidePanelPage.locator('[aria-label="Add new view"]');
     await expect(addViewButton).toBeVisible({ timeout: 5000 });
     await addViewButton.click();
     const viewButton = sidePanelPage.locator('[aria-label="Switch to View view"]');
     await expect(viewButton).toBeVisible({ timeout: 5000 });
 
-    // 4. グループをビュー1に移動（コンテキストメニュー経由）
     const groupNode = sidePanelPage.locator(`[data-testid="tree-node-${groupTabId}"]`);
     await groupNode.click({ button: 'right', force: true, noWaitAfter: true });
     await expect(contextMenu).toBeVisible({ timeout: 5000 });
@@ -831,12 +787,10 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     await viewMenuItem.click();
     await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
 
-    // Defaultビューにはグループがなくなる
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
     ], 0);
 
-    // Viewビューに切り替え
     await viewButton.click();
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: groupTabId!, depth: 0, expanded: true },
@@ -844,7 +798,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       { tabId: tab2, depth: 1 },
     ], 1);
 
-    // 5. 再起動前のグループタブ数をカウント
     const groupCountBefore = await serviceWorker.evaluate(async () => {
       interface TabNode {
         tabId: number;
@@ -876,7 +829,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
 
     expect(groupCountBefore).toBe(1);
 
-    // 永続化を待つ
     await waitForCondition(async () => {
       const persisted = await serviceWorker.evaluate(async () => {
         const result = await chrome.storage.local.get('tree_state');
@@ -885,7 +837,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return persisted;
     }, { timeout: 20000, timeoutMessage: 'Tree state not persisted' });
 
-    // ======== Chrome再起動 ========
     const headless = process.env.HEADED !== 'true';
     const newBrowserResult = await restartBrowser(context, userDataDir, headless);
     browserResult = newBrowserResult;
@@ -895,7 +846,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const newSidePanelRoot = newSidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(newSidePanelRoot).toBeVisible({ timeout: 10000 });
 
-    // 再起動後のグループタブ数をカウント
     await waitForCondition(async () => {
       const count = await newServiceWorker.evaluate(async () => {
         interface TabNode {
@@ -957,10 +907,8 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return count;
     });
 
-    // グループタブが増殖していないことを確認（1回目の再起動後）
     expect(groupCountAfter).toBe(groupCountBefore);
 
-    // ======== 2回目のChrome再起動 ========
     const secondBrowserResult = await restartBrowser(browserResult.context, userDataDir, headless);
     browserResult = secondBrowserResult;
 
@@ -969,7 +917,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
     const secondSidePanelRoot = secondSidePanelPage.locator('[data-testid="side-panel-root"]');
     await expect(secondSidePanelRoot).toBeVisible({ timeout: 10000 });
 
-    // 2回目の再起動後のグループタブ数をカウント
     await waitForCondition(async () => {
       const count = await secondServiceWorker.evaluate(async () => {
         interface TabNode {
@@ -1031,7 +978,6 @@ test.describe('ブラウザ再起動時の状態復元', () => {
       return count;
     });
 
-    // 2回目の再起動後もグループタブが増殖していないことを確認
     expect(groupCountAfter2).toBe(groupCountBefore);
   });
 });

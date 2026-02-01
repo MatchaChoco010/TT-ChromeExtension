@@ -944,7 +944,6 @@ test.describe('chrome.tabs API統合', () => {
         await chrome.tabs.move(tabId, { index: targetIndex });
       }, { tabId: childTab, targetIndex: 0 });
 
-      // ツリービューの親子関係は維持される
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: parentTab, depth: 0, expanded: true },

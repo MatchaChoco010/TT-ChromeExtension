@@ -279,7 +279,6 @@ test.describe('ドラッグ&ドロップ改善', () => {
       await startDrag(sidePanelPage, tab2);
 
       const tab2Box = await getTabNodeBoundingBox(sidePanelPage, tab2);
-      // 左右に大きく移動（横スクロールしないことを確認）
       await sidePanelPage.mouse.move(tab2Box.x - 100, tab2Box.y, { steps: 1 });
       await sidePanelPage.mouse.move(tab2Box.x + 200, tab2Box.y, { steps: 1 });
       // 左端に戻してドロップ（depth=0を維持するため左端に移動）

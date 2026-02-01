@@ -4,14 +4,6 @@ import userEvent from '@testing-library/user-event';
 import TreeNode from './TreeNode';
 import type { UITabNode, TabInfo } from '@/types';
 
-/**
- * タブ閉じる機能のテスト
- *
- * 統合テスト: TreeNode + CloseButton + ConfirmDialog + UserSettings
- *
- * - マウスホバー時に閉じるボタンが表示される
- * - 折りたたまれたブランチを持つ親タブ閉じ時に確認ダイアログが表示される
- */
 describe('タブ閉じる機能の統合テスト', () => {
   let user: ReturnType<typeof userEvent.setup>;
 

@@ -1,12 +1,5 @@
 /**
- * TabTestUtils
- *
  * タブ操作（作成、削除、アクティブ化、検証）の共通ヘルパー関数
- *
- * 重要: すべての関数は Worker を直接受け取る。
- * context.serviceWorkers()[0] から新しい参照を取得する getServiceWorker() は廃止。
- * これにより、Service Worker が再起動された場合に即座にエラーが発生し、
- * 根本原因が明確になる。
  */
 import type { Page, Worker } from '@playwright/test';
 import type { TestGlobals } from '../types';
@@ -101,7 +94,6 @@ export async function createTab(
     { url, parentTabId, active, index, windowId }
   );
 
-  // まずタブがツリーに追加されるまで待機（parentTabId有無に関わらず必須）
   await waitForTabInTreeState(serviceWorker, tab.id!);
 
   if (parentTabId !== undefined) {
@@ -139,8 +131,6 @@ export async function createTab(
     // ピン留めタブが親の場合、親子関係の確認はスキップ
     // （新しいタブはルートノードとして追加されているはず）
     if (!isParentPinned) {
-      // handleTabCreatedがpendingTabParentsを使用して親子関係を設定する
-      // タブがツリーに追加された後、親子関係が正しく設定されるまで待機
       const parentChildSet = await serviceWorker.evaluate(
         async ({ parentTabId, childTabId }) => {
           interface TabNode {
@@ -241,11 +231,9 @@ export async function activateTab(
     async (tabId) => {
       try {
         const tab = await chrome.tabs.get(tabId);
-        // ウィンドウをフォーカスしてからタブをアクティブにする
         await chrome.windows.update(tab.windowId, { focused: true });
         await chrome.tabs.update(tabId, { active: true });
 
-        // タブがアクティブになったことを確認
         for (let i = 0; i < 100; i++) {
           const updatedTab = await chrome.tabs.get(tabId);
           if (updatedTab.active) {
@@ -584,7 +572,6 @@ export async function confirmGroupNameModal(page: Page): Promise<void> {
   const modal = page.locator('[data-testid="group-name-modal"]');
   await modal.waitFor({ state: 'visible', timeout: 5000 });
   const saveButton = page.locator('[data-testid="group-name-save-button"]');
-  // ボタンが完全にクリック可能になるまで待つ
   await saveButton.waitFor({ state: 'visible', timeout: 3000 });
   await saveButton.click({ noWaitAfter: true });
   await modal.waitFor({ state: 'hidden', timeout: 5000 });

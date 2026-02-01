@@ -204,7 +204,6 @@ const isWorkerAlive = async (worker: Worker, timeout: number = 2000): Promise<bo
 };
 
 export const test = base.extend<TestFixtures, ExtensionFixtures>({
-  // 自動リセットフィクスチャ: 各テスト前に状態をリセット
   autoReset: [async ({ extensionContext, serviceWorker }, use, testInfo) => {
     const workerId = testInfo.parallelIndex;
     const testTitle = `${testInfo.file}:${testInfo.line} - ${testInfo.title}`;

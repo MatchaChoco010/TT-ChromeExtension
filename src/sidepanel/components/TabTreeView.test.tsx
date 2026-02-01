@@ -132,7 +132,6 @@ describe('TabTreeView', () => {
   it('展開/折りたたみオーバーレイクリック時にonToggleExpandが呼ばれること', async () => {
     const user = userEvent.setup();
     const childNode = createMockNode(2, 1);
-    // 折りたたみ中のノードを作成（オーバーレイが常に表示される）
     const parentNode = { ...createMockNode(1, 0, [childNode]), isExpanded: false };
 
     const mockGetTabInfo = vi.fn().mockImplementation((tabId: number) => {
@@ -151,7 +150,6 @@ describe('TabTreeView', () => {
       />
     );
 
-    // 折りたたみ中はオーバーレイが常に表示される
     const toggleOverlay = screen.getByTestId('expand-overlay');
     await user.click(toggleOverlay);
 
@@ -324,7 +322,6 @@ describe('TabTreeView', () => {
         />
       );
 
-      // MV3の_favicon APIを使用してファビコンを取得しようとする
       const favicon = screen.getByRole('img', { name: /favicon/i });
       expect(favicon).toBeInTheDocument();
       expect(favicon).toHaveAttribute('src', expect.stringContaining('/_favicon/'));
@@ -1327,7 +1324,6 @@ describe('TabTreeView', () => {
     it('グループノードの展開/折りたたみオーバーレイクリック時にonToggleExpandが呼ばれること', async () => {
       const user = userEvent.setup();
       const childNode = createMockNode(1, 1);
-      // 折りたたみ中のグループノードを作成（オーバーレイが常に表示される）
       const groupNode: UITabNode = {
         ...createMockGroupNode(100, 0, [childNode]),
         isExpanded: false,
@@ -1350,7 +1346,6 @@ describe('TabTreeView', () => {
       );
 
       const groupNodeElement = screen.getByTestId('tree-node-100');
-      // 折りたたみ中はオーバーレイが常に表示される
       const toggleOverlay = groupNodeElement.querySelector('[data-testid="expand-overlay"]');
       expect(toggleOverlay).not.toBeNull();
       await user.click(toggleOverlay!);

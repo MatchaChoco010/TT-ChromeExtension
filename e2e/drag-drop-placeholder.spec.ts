@@ -71,7 +71,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -104,10 +103,8 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const gapY = (tab1Box.y + tab1Box.height + tab2Box.y) / 2;
       await sidePanelPage.mouse.move(tab1Box.x + tab1Box.width / 2, gapY, { steps: 10 });
 
-      // プレースホルダー表示をポーリングで待機
       await waitForDropIndicatorVisible(sidePanelPage);
 
-      // ドロップを実行
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -125,7 +122,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -157,10 +153,8 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const topGapY = tab1Box.y + (tab1Box.height * 0.1);
       await sidePanelPage.mouse.move(tab1Box.x + tab1Box.width / 2, topGapY, { steps: 10 });
 
-      // プレースホルダー表示をポーリングで待機
       await waitForDropIndicatorVisible(sidePanelPage);
 
-      // ドロップを実行
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -180,7 +174,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 準備: 2つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -209,7 +202,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
         expect(hasHighlight).toBe(true);
       }).toPass({ timeout: 5000, intervals: [50, 100, 200, 500] });
 
-      // ドロップを実行
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -226,7 +218,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -268,7 +259,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
         expect(hasHighlight).toBe(false);
       }).toPass({ timeout: 3000, intervals: [50, 100, 200, 500] });
 
-      // ドロップを実行
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -288,7 +278,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 準備: 3つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -333,7 +322,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
         expect(Math.abs(indicatorPosition.top - expectedY)).toBeLessThanOrEqual(tolerance + 20);
       }
 
-      // ドロップを実行
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -351,7 +339,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 準備: 4つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -409,7 +396,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
 
       expect(secondPosition.top).toBeGreaterThan(firstPosition!.top);
 
-      // ドロップを実行
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -428,7 +414,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      // 準備: 2つのタブを作成
       const tab1 = await createTab(serviceWorker, getTestServerUrl('/page1'));
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -471,7 +456,6 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
         await sidePanelPage.mouse.move(tab1Box.x + tab1Box.width / 2, tab1Box.y + tab1Box.height * 0.9, { steps: 1 });
       }
 
-      // ドロップを実行
       await dropTab(sidePanelPage);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },

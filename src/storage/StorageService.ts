@@ -18,11 +18,6 @@ export const STORAGE_KEYS = {
  * chrome.storage.local の型安全なラッパー
  */
 export class StorageService implements IStorageService {
-  /**
-   * ストレージから値を取得
-   * @param key - ストレージキー
-   * @returns 値または null（存在しない場合）
-   */
   async get<K extends StorageKey>(
     key: K,
   ): Promise<StorageSchema[K] | null> {
@@ -34,11 +29,6 @@ export class StorageService implements IStorageService {
     }
   }
 
-  /**
-   * ストレージに値を保存
-   * @param key - ストレージキー
-   * @param value - 保存する値
-   */
   async set<K extends StorageKey>(
     key: K,
     value: StorageSchema[K],
@@ -46,19 +36,11 @@ export class StorageService implements IStorageService {
     await chrome.storage.local.set({ [key]: value });
   }
 
-  /**
-   * ストレージから値を削除
-   * @param key - ストレージキー
-   */
   async remove(key: StorageKey): Promise<void> {
     await chrome.storage.local.remove(key);
   }
 
-  /**
-   * ストレージの変更を監視
-   * @param callback - 変更時に呼び出されるコールバック
-   * @returns リスナーを解除する関数
-   */
+  /** @returns リスナーを解除する関数 */
   onChange(callback: (changes: StorageChanges) => void): () => void {
     const listener = (
       changes: { [key: string]: chrome.storage.StorageChange },

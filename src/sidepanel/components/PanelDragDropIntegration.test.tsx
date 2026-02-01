@@ -492,7 +492,6 @@ describe('パネル内D&Dの統合テスト', () => {
         expect(testHandleDragEnd).toBeDefined();
       });
 
-      // Clear mock calls before the drag event to check MOVE_NODE is not called
       sendMessageMock.mockClear();
 
       const dragEndEvent = {

@@ -35,9 +35,6 @@ export class DownloadService implements IDownloadService {
     return downloadId;
   }
 
-  /**
-   * ダウンロードが完了するまで待機
-   */
   private async waitForDownloadComplete(downloadId: number): Promise<void> {
     return new Promise((resolve, reject) => {
       let resolved = false;
@@ -60,7 +57,6 @@ export class DownloadService implements IDownloadService {
         }
       };
 
-      // リスナーを先に追加
       chrome.downloads.onChanged.addListener(listener);
 
       // リスナー追加後に現在の状態を確認（既に完了している場合への対応）

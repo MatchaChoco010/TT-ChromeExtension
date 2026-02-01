@@ -400,11 +400,9 @@ export class TreeStateManager {
 
     const { viewState, node, parent, nodeIndex } = result;
 
-    // 現在の位置から削除
     const siblings = parent ? parent.children : viewState.rootNodes;
     siblings.splice(nodeIndex, 1);
 
-    // 新しい位置に挿入
     if (newParentTabId !== null) {
       const newParentResult = this.findNodeByTabId(newParentTabId);
       if (newParentResult) {
@@ -429,19 +427,16 @@ export class TreeStateManager {
 
     const { viewState, node, parent, nodeIndex } = result;
 
-    // 現在の位置から削除
     const siblings = parent ? parent.children : viewState.rootNodes;
     siblings.splice(nodeIndex, 1);
 
     if (targetWindowId !== undefined) {
-      // 新しいウィンドウに移動
       const targetWindowState = this.getOrCreateWindowState(targetWindowId);
       const targetViewState = targetWindowState.views[targetWindowState.activeViewIndex];
       if (targetViewState) {
         targetViewState.rootNodes.push(node);
       }
     } else {
-      // 同じビューのルートの最後に追加
       viewState.rootNodes.push(node);
     }
 
@@ -528,11 +523,9 @@ export class TreeStateManager {
 
     const { viewState, node, parent, nodeIndex } = result;
 
-    // 元の位置から削除
     const siblings = parent ? parent.children : viewState.rootNodes;
     siblings.splice(nodeIndex, 1);
 
-    // 移動先のウィンドウ・ビューを取得
     const targetWindowState = this.getOrCreateWindowState(targetWindowId);
     while (targetWindowState.views.length <= targetViewIndex) {
       targetWindowState.views.push({
@@ -544,7 +537,6 @@ export class TreeStateManager {
     }
     const targetViewState = targetWindowState.views[targetViewIndex];
 
-    // 移動先のルートに追加
     targetViewState.rootNodes.push(node);
 
     await this.persistState();
@@ -637,11 +629,9 @@ export class TreeStateManager {
     const deletedView = windowState.views[viewIndex];
     windowState.views.splice(viewIndex, 1);
 
-    // 削除されたビューのタブを一つ前のビューに移動
     const targetViewIndex = viewIndex - 1;
     windowState.views[targetViewIndex].rootNodes.push(...deletedView.rootNodes);
 
-    // アクティブビューの調整
     if (windowState.activeViewIndex >= viewIndex) {
       windowState.activeViewIndex = Math.max(0, windowState.activeViewIndex - 1);
     }
@@ -700,16 +690,13 @@ export class TreeStateManager {
     }
     const targetViewState = targetWindowState.views[targetViewIndex];
 
-    // ピン留めタブの移動処理
     for (const tabId of tabIds) {
       for (let i = 0; i < targetWindowState.views.length; i++) {
         if (i === targetViewIndex) continue;
         const viewState = targetWindowState.views[i];
         const pinnedIndex = viewState.pinnedTabIds.indexOf(tabId);
         if (pinnedIndex !== -1) {
-          // 元のビューから削除
           viewState.pinnedTabIds.splice(pinnedIndex, 1);
-          // 移動先のビューに追加（重複チェック）
           if (!targetViewState.pinnedTabIds.includes(tabId)) {
             targetViewState.pinnedTabIds.push(tabId);
           }
@@ -718,7 +705,6 @@ export class TreeStateManager {
       }
     }
 
-    // 親が選択されているタブは移動対象から除外（親の移動で一緒に移動するため）
     const tabIdSet = new Set(tabIds);
     const topLevelTabIds: number[] = [];
     for (const tabId of tabIds) {
@@ -740,7 +726,6 @@ export class TreeStateManager {
       const result = this.findNodeByTabId(tabId);
       if (!result) continue;
 
-      // 元の位置から削除
       const siblings = result.parent
         ? result.parent.children
         : result.viewState.rootNodes;
@@ -749,7 +734,6 @@ export class TreeStateManager {
         siblings.splice(nodeIndex, 1);
       }
 
-      // 移動先に追加
       targetViewState.rootNodes.push(result.node);
     }
 
@@ -807,7 +791,6 @@ export class TreeStateManager {
     const result = this.findNodeByTabId(tabId);
     if (!result) return undefined;
 
-    // 元の位置から削除
     const siblings = result.parent
       ? result.parent.children
       : result.viewState.rootNodes;
@@ -816,11 +799,9 @@ export class TreeStateManager {
       siblings.splice(nodeIndex, 1);
     }
 
-    // 新しいウィンドウを作成
     const newWindow = await chrome.windows.create({ tabId });
     if (!newWindow || newWindow.id === undefined) return undefined;
 
-    // 新しいウィンドウ状態を作成
     const newWindowState: WindowState = {
       windowId: newWindow.id,
       views: [
@@ -850,7 +831,6 @@ export class TreeStateManager {
     const subtree = this.getSubtree(tabId);
     if (subtree.length === 0) return undefined;
 
-    // 元の位置から削除
     const siblings = result.parent
       ? result.parent.children
       : result.viewState.rootNodes;
@@ -859,20 +839,17 @@ export class TreeStateManager {
       siblings.splice(nodeIndex, 1);
     }
 
-    // 新しいウィンドウを作成
     const newWindow = await chrome.windows.create({ tabId });
     if (!newWindow || newWindow.id === undefined) return undefined;
 
-    // 子タブも移動
     for (const node of subtree.slice(1)) {
       try {
         await chrome.tabs.move(node.tabId, { windowId: newWindow.id, index: -1 });
       } catch {
-        // 移動失敗は無視
+        // タブ移動失敗は無視（タブが既に閉じられている場合など）
       }
     }
 
-    // 新しいウィンドウ状態を作成
     const newWindowState: WindowState = {
       windowId: newWindow.id,
       views: [
@@ -902,7 +879,6 @@ export class TreeStateManager {
     const subtree = this.getSubtree(tabId);
     if (subtree.length === 0) return;
 
-    // 元の位置から削除
     const siblings = result.parent
       ? result.parent.children
       : result.viewState.rootNodes;
@@ -911,16 +887,14 @@ export class TreeStateManager {
       siblings.splice(nodeIndex, 1);
     }
 
-    // タブを移動
     for (const node of subtree) {
       try {
         await chrome.tabs.move(node.tabId, { windowId: targetWindowId, index: -1 });
       } catch {
-        // 移動失敗は無視
+        // タブ移動失敗は無視（タブが既に閉じられている場合など）
       }
     }
 
-    // 移動先ウィンドウのアクティブビューに追加
     const targetWindowState = this.getOrCreateWindowState(targetWindowId);
     const targetViewState = targetWindowState.views[targetWindowState.activeViewIndex];
     targetViewState.rootNodes.push(result.node);
@@ -938,13 +912,11 @@ export class TreeStateManager {
     const nodesToMove: TabNode[] = [];
     const tabIdSet = new Set(tabIds);
 
-    // 親が選択されているタブは移動対象から除外
     for (const tabId of tabIds) {
       const result = this.findNodeByTabId(tabId);
       if (!result) continue;
       if (result.parent && tabIdSet.has(result.parent.tabId)) continue;
 
-      // 元の位置から削除
       const siblings = result.parent
         ? result.parent.children
         : result.viewState.rootNodes;
@@ -957,7 +929,6 @@ export class TreeStateManager {
 
     if (nodesToMove.length === 0) return undefined;
 
-    // 新しいウィンドウを作成（最初のタブで）
     const newWindow = await chrome.windows.create({ tabId: nodesToMove[0].tabId });
     if (!newWindow || newWindow.id === undefined) return undefined;
 
@@ -965,10 +936,8 @@ export class TreeStateManager {
       return [node.tabId, ...node.children.flatMap(collectTabIds)];
     };
 
-    // 全ノードのタブを移動
     for (let i = 0; i < nodesToMove.length; i++) {
-      // 最初のノードは子のみ移動（自身はwindows.createで移動済み）
-      // 残りのノードは自身と子を全て移動
+      // 最初のノードは子のみ移動（自身はwindows.createで移動済み）、残りは自身と子を全て移動
       const tabIdsToMove =
         i === 0
           ? nodesToMove[0].children.flatMap(collectTabIds)
@@ -977,12 +946,11 @@ export class TreeStateManager {
         try {
           await chrome.tabs.move(tid, { windowId: newWindow.id, index: -1 });
         } catch {
-          // 移動失敗は無視
+          // タブ移動失敗は無視（タブが既に閉じられている場合など）
         }
       }
     }
 
-    // 新しいウィンドウ状態を作成
     const newWindowState: WindowState = {
       windowId: newWindow.id,
       views: [
@@ -1009,7 +977,6 @@ export class TreeStateManager {
     const result = this.findNodeByTabId(tabId);
     if (!result) return;
 
-    // 元の位置から削除
     const siblings = result.parent
       ? result.parent.children
       : result.viewState.rootNodes;
@@ -1018,16 +985,14 @@ export class TreeStateManager {
       siblings.splice(nodeIndex, 1);
     }
 
-    // 移動先ウィンドウのアクティブビューに追加
     const targetWindowState = this.getOrCreateWindowState(targetWindowId);
     const targetViewState = targetWindowState.views[targetWindowState.activeViewIndex];
     targetViewState.rootNodes.push(result.node);
 
-    // Chromeタブも移動
     try {
       await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
     } catch {
-      // タブが存在しない場合は無視
+      // タブが存在しない場合は無視（既に閉じられている場合など）
     }
 
     await this.persistState();
@@ -1065,7 +1030,6 @@ export class TreeStateManager {
       if (!viewState.pinnedTabIds.includes(tabId)) {
         viewState.pinnedTabIds.push(tabId);
       }
-      // rootNodesから削除（子ノードは昇格させる）
       this.removeTabFromTree(tabId, 'promote');
     }
 
@@ -1091,7 +1055,6 @@ export class TreeStateManager {
       (id) => !tabIdSet.has(id)
     );
 
-    // ピン留め解除されたタブをrootNodesに追加
     for (const tabId of unpinnedTabIds) {
       const newNode: TabNode = {
         tabId,
@@ -1150,19 +1113,14 @@ export class TreeStateManager {
 
     const activeViewIndex = windowState.activeViewIndex;
 
-    // 配列からビューを取り出して新しい位置に挿入
     const [movedView] = windowState.views.splice(viewIndex, 1);
     windowState.views.splice(newIndex, 0, movedView);
 
-    // activeViewIndexを調整
     if (viewIndex === activeViewIndex) {
-      // ドラッグしたビューがアクティブ → 新しい位置に追従
       windowState.activeViewIndex = newIndex;
     } else if (viewIndex < activeViewIndex && newIndex >= activeViewIndex) {
-      // アクティブビューより前のビューを後ろに移動 → activeViewIndex - 1
       windowState.activeViewIndex = activeViewIndex - 1;
     } else if (viewIndex > activeViewIndex && newIndex <= activeViewIndex) {
-      // アクティブビューより後のビューを前に移動 → activeViewIndex + 1
       windowState.activeViewIndex = activeViewIndex + 1;
     }
 
@@ -1218,14 +1176,12 @@ export class TreeStateManager {
 
     if (isPinned && !isInList) {
       viewState.pinnedTabIds.push(tabId);
-      // rootNodesから削除（子ノードは昇格させる）
       this.removeTabFromTree(tabId, 'promote');
     } else if (!isPinned && isInList) {
       viewState.pinnedTabIds = viewState.pinnedTabIds.filter(
         (id) => id !== tabId
       );
 
-      // ピン留め解除されたタブをアクティブビューのrootNodesに追加
       const newNode: TabNode = {
         tabId,
         isExpanded: true,
@@ -1257,7 +1213,6 @@ export class TreeStateManager {
     const windowState = this.getOrCreateWindowState(windowId);
     const viewState = windowState.views[windowState.activeViewIndex];
 
-    // グループノードを作成
     const groupNode: TabNode = {
       tabId: groupTabId,
       isExpanded: true,
@@ -1268,8 +1223,6 @@ export class TreeStateManager {
       children: [],
     };
 
-    // コンテキストメニューを開いたタブの位置を特定
-    // 親が選択されている場合は、最上位の選択タブを使用
     const tabIdSet = new Set(tabIds);
     let targetTabId = contextMenuTabId ?? tabIds[0];
     let targetResult = this.findNodeByTabId(targetTabId);
@@ -1289,16 +1242,13 @@ export class TreeStateManager {
       insertAtIndex = insertParentChildren.findIndex((n) => n.tabId === targetTabId);
     }
 
-    // 選択されたタブをグループの子として追加
     const nodesToMove: TabNode[] = [];
 
-    // 親が選択されていないタブのみ移動対象
     for (const tabId of tabIds) {
       const result = this.findNodeByTabId(tabId);
       if (!result) continue;
       if (result.parent && tabIdSet.has(result.parent.tabId)) continue;
 
-      // 元の位置から削除
       const siblings = result.parent
         ? result.parent.children
         : result.viewState.rootNodes;
@@ -1306,17 +1256,14 @@ export class TreeStateManager {
       if (nodeIndex !== -1) {
         siblings.splice(nodeIndex, 1);
         nodesToMove.push(result.node);
-        // 削除によってインデックスがずれるので調整
         if (insertParentChildren === siblings && insertAtIndex !== null && nodeIndex < insertAtIndex) {
           insertAtIndex--;
         }
       }
     }
 
-    // グループの子として追加
     groupNode.children = nodesToMove;
 
-    // グループを記録した位置に挿入（なければ末尾に追加）
     if (insertAtIndex !== null && insertParentChildren !== null && insertAtIndex >= 0) {
       insertParentChildren.splice(insertAtIndex, 0, groupNode);
     } else if (insertParent !== null) {
@@ -1345,7 +1292,6 @@ export class TreeStateManager {
       groupNodeIndex = result.nodeIndex;
     } else if (result.parent?.groupInfo) {
       groupNode = result.parent;
-      // 親のグループノードの親を探す
       const grandparentResult = this.findNodeByTabId(groupNode.tabId);
       if (!grandparentResult) throw new Error('Group not found');
       groupParent = grandparentResult.parent;
@@ -1354,7 +1300,6 @@ export class TreeStateManager {
       throw new Error('Group not found');
     }
 
-    // グループの子を昇格
     const siblings = groupParent
       ? groupParent.children
       : result.viewState.rootNodes;
@@ -1384,7 +1329,7 @@ export class TreeStateManager {
           url: tab.url || '',
         });
       } catch {
-        // タブが存在しない場合は無視
+        // タブが存在しない場合はスキップ（TreeStateに残っているが実際のタブは閉じられている）
       }
     }
 
@@ -1417,7 +1362,6 @@ export class TreeStateManager {
     const groupResult = this.findNodeByTabId(targetGroupTabId);
     if (!result || !groupResult) return;
 
-    // 元の位置から削除
     const siblings = result.parent
       ? result.parent.children
       : result.viewState.rootNodes;
@@ -1426,7 +1370,6 @@ export class TreeStateManager {
       siblings.splice(nodeIndex, 1);
     }
 
-    // グループに追加
     groupResult.node.children.push(result.node);
 
     await this.persistState();
@@ -1439,7 +1382,6 @@ export class TreeStateManager {
     const result = this.findNodeByTabId(tabId);
     if (!result || !result.parent?.groupInfo) return;
 
-    // グループから削除
     const nodeIndex = result.parent.children.findIndex(
       (n) => n.tabId === tabId
     );
@@ -1447,7 +1389,6 @@ export class TreeStateManager {
       result.parent.children.splice(nodeIndex, 1);
     }
 
-    // ルートに移動
     result.viewState.rootNodes.push(result.node);
 
     await this.persistState();
@@ -1470,9 +1411,7 @@ export class TreeStateManager {
     const tabIdsToMove = isSelected ? selectedTabIds : [tabId];
     const tabIdSet = new Set(tabIdsToMove);
 
-    // ルートへの移動
     if (targetParentTabId === null) {
-      // 親が選択されているタブは移動対象から除外
       const topLevelTabIds = tabIdsToMove.filter((id) => {
         const result = this.findNodeByTabId(id);
         if (!result || !result.parent) return true;
@@ -1483,7 +1422,6 @@ export class TreeStateManager {
         const result = this.findNodeByTabId(id);
         if (!result) continue;
 
-        // 元の位置から削除
         const siblings = result.parent
           ? result.parent.children
           : result.viewState.rootNodes;
@@ -1492,7 +1430,6 @@ export class TreeStateManager {
           siblings.splice(nodeIndex, 1);
         }
 
-        // ルートに追加
         result.viewState.rootNodes.push(result.node);
       }
 
@@ -1503,7 +1440,6 @@ export class TreeStateManager {
     const targetResult = this.findNodeByTabId(targetParentTabId);
     if (!targetResult) return;
 
-    // 自身の子孫への移動を防ぐ
     for (const id of tabIdsToMove) {
       const result = this.findNodeByTabId(id);
       if (result) {
@@ -1515,7 +1451,6 @@ export class TreeStateManager {
       }
     }
 
-    // 親が選択されているタブは移動対象から除外
     const topLevelTabIds = tabIdsToMove.filter((id) => {
       const result = this.findNodeByTabId(id);
       if (!result || !result.parent) return true;
@@ -1526,7 +1461,6 @@ export class TreeStateManager {
       const result = this.findNodeByTabId(id);
       if (!result) continue;
 
-      // 元の位置から削除
       const siblings = result.parent
         ? result.parent.children
         : result.viewState.rootNodes;
@@ -1535,7 +1469,6 @@ export class TreeStateManager {
         siblings.splice(nodeIndex, 1);
       }
 
-      // ターゲットの子として追加
       targetResult.node.children.push(result.node);
     }
 
@@ -1558,7 +1491,6 @@ export class TreeStateManager {
     const tabIdsToMove = isSelected ? selectedTabIds : [tabId];
     const tabIdSet = new Set(tabIdsToMove);
 
-    // 挿入先の親とViewStateを決定
     let targetParent: TabNode | null = null;
     let targetViewState: ViewState | null = null;
 
@@ -1578,11 +1510,9 @@ export class TreeStateManager {
 
     if (!targetViewState) return;
 
-    // targetDepthが指定されている場合、適切な親を計算
     if (targetDepth !== undefined && aboveTabId !== undefined) {
       const aboveResult = this.findNodeByTabId(aboveTabId);
       if (aboveResult) {
-        // targetDepthを適用するための親を見つける
         targetParent = this.findParentAtDepth(
           aboveResult.node,
           aboveResult.parent,
@@ -1592,14 +1522,12 @@ export class TreeStateManager {
       }
     }
 
-    // 親が選択されているタブは移動対象から除外
     const topLevelTabIds = tabIdsToMove.filter((id) => {
       const result = this.findNodeByTabId(id);
       if (!result || !result.parent) return true;
       return !tabIdSet.has(result.parent.tabId);
     });
 
-    // 移動するノードを収集しつつ、元の位置から削除
     const nodesToMove: TabNode[] = [];
     for (const id of topLevelTabIds) {
       const result = this.findNodeByTabId(id);
@@ -1615,22 +1543,18 @@ export class TreeStateManager {
       }
     }
 
-    // 挿入先を決定
     const targetSiblings = targetParent
       ? targetParent.children
       : targetViewState.rootNodes;
 
     if (belowTabId !== undefined) {
-      // belowTabIdがあれば常にその前に挿入（targetDepthの有無に関わらず）
       const insertIndex = targetSiblings.findIndex((n) => n.tabId === belowTabId);
       if (insertIndex !== -1) {
         targetSiblings.splice(insertIndex, 0, ...nodesToMove);
       } else {
-        // belowTabIdがtargetSiblingsに見つからない場合（親が変わった場合）は末尾に追加
         targetSiblings.push(...nodesToMove);
       }
     } else if (aboveTabId !== undefined) {
-      // belowTabIdがない場合はaboveTabIdの後に挿入
       const insertIndex = targetSiblings.findIndex((n) => n.tabId === aboveTabId);
       if (insertIndex !== -1) {
         targetSiblings.splice(insertIndex + 1, 0, ...nodesToMove);
@@ -1660,7 +1584,6 @@ export class TreeStateManager {
     viewState: ViewState,
     targetDepth: number
   ): TabNode | null {
-    // aboveNodeのdepthを計算
     const getNodeDepth = (targetTabId: number): number => {
       let depth = 0;
       const findDepth = (nodes: TabNode[], currentDepth: number): boolean => {
@@ -1679,25 +1602,20 @@ export class TreeStateManager {
 
     const aboveDepth = getNodeDepth(aboveNode.tabId);
 
-    // targetDepth === aboveDepth + 1 の場合、aboveNodeの子として配置
     if (targetDepth === aboveDepth + 1) {
       return aboveNode;
     }
 
-    // targetDepth <= aboveDepth の場合、親を辿る
-    // diff = aboveDepth - targetDepth の回数だけ親を辿る
     let currentParent = aboveParent;
     let currentDepth = aboveDepth;
 
     while (currentDepth > targetDepth && currentParent !== null) {
-      // 親の親を探す
       const parentResult = this.findNodeByTabId(currentParent.tabId);
       if (!parentResult) break;
       currentParent = parentResult.parent;
       currentDepth--;
     }
 
-    // targetDepth === 0 の場合はルート（null）
     if (targetDepth === 0) {
       return null;
     }
@@ -1765,7 +1683,6 @@ export class TreeStateManager {
 
       const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
 
-      // ウィンドウIDの対応付け
       // ブラウザ再起動でwindowIdが変わるため、配列順序でマッチング
       const chromeWindowIds = windows
         .filter((w) => w.id !== undefined)
@@ -1777,23 +1694,18 @@ export class TreeStateManager {
         this.windows[i].windowId = chromeWindowIds[i];
       }
 
-      // 新しいウィンドウを追加
       for (const windowId of chromeWindowIds) {
         if (!this.windows.some((w) => w.windowId === windowId)) {
           this.addWindow(windowId);
         }
       }
 
-      // 存在しないウィンドウを削除
       this.windows = this.windows.filter((w) =>
         chromeWindowIds.includes(w.windowId)
       );
 
-      // グループタブの再作成（足りないグループタブを正しい位置に作成）
       await this.restoreGroupTabs();
 
-      // tabIdのマッチング（tabIdのみを更新、タブの追加・削除は行わない）
-      // pinnedTabIdsのマッチングもここで行う
       await this.rebuildTabIds();
 
       await this.persistState();
@@ -1860,7 +1772,7 @@ export class TreeStateManager {
                 .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
               chromeIndex++;
             } catch {
-              // ウィンドウが存在しない場合は無視
+              // ウィンドウが閉じられている場合はグループタブの作成をスキップ
             }
           }
         } else {
@@ -1875,8 +1787,6 @@ export class TreeStateManager {
    * ブラウザ再起動後はtabIdが変わるため、インデックスベースでマッチングを行う
    */
   private async rebuildTabIds(): Promise<void> {
-    // サイドパネルURLを除外するためのプレフィックス
-    // サイドパネルはUIパネルであり、TreeStateには含めない
     const sidePanelUrlPrefix = `chrome-extension://${chrome.runtime.id}/sidepanel.html`;
 
     const isSidePanelTab = (tab: chrome.tabs.Tab): boolean => {
@@ -1887,13 +1797,10 @@ export class TreeStateManager {
     for (const windowState of this.windows) {
       const windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
 
-      // ピン留めタブのtabIdマッチング（インデックスベース）
-      // サイドパネルタブは除外
       const chromePinnedTabs = windowTabs
         .filter((t) => t.id !== undefined && t.pinned && !isSidePanelTab(t))
         .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 
-      // 全ビューのpinnedTabIdsをビュー順序でフラット化
       const orderedOldPinnedIds: number[] = [];
       for (const viewState of windowState.views) {
         for (const id of viewState.pinnedTabIds) {
@@ -1901,25 +1808,21 @@ export class TreeStateManager {
         }
       }
 
-      // ピン留めタブのマッピング表作成
       const pinnedIdMap = new Map<number, number>();
       for (let i = 0; i < orderedOldPinnedIds.length && i < chromePinnedTabs.length; i++) {
         pinnedIdMap.set(orderedOldPinnedIds[i], chromePinnedTabs[i].id!);
       }
 
-      // 各ビューのpinnedTabIdsを新しいtabIdで更新
       for (const viewState of windowState.views) {
         viewState.pinnedTabIds = viewState.pinnedTabIds
           .map((id) => pinnedIdMap.get(id))
           .filter((id): id is number => id !== undefined);
       }
 
-      // 全Chromeタブ（ピン留め除く、sidepanel含む）をインデックス順にソート
       const chromeAllNonPinned = windowTabs
         .filter((t) => t.id !== undefined && !t.pinned)
         .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 
-      // TreeStateのノードを深さ優先でフラット化
       const flattenNodes: TabNode[] = [];
       const flattenInNodes = (nodes: TabNode[]): void => {
         for (const node of nodes) {
@@ -1931,10 +1834,7 @@ export class TreeStateManager {
         flattenInNodes(viewState.rootNodes);
       }
 
-
-      // Step 1: sidepanelタブに対応するノードを特定して削除
-      // TreeStateノードとChromeタブをインデックスベースで照合し、
-      // sidepanelタブに対応するノードをTreeStateから削除する
+      // sidepanelタブに対応するノードを特定してTreeStateから削除
       const sidepanelNodeTabIds: number[] = [];
       for (let i = 0; i < flattenNodes.length && i < chromeAllNonPinned.length; i++) {
         const chromeTab = chromeAllNonPinned[i];
@@ -1943,12 +1843,10 @@ export class TreeStateManager {
         }
       }
 
-      // sidepanelノードをTreeStateから削除
       for (const tabId of sidepanelNodeTabIds) {
         this.removeTabFromTree(tabId, 'close_all');
       }
 
-      // Step 2: 削除後のTreeStateを再度フラット化
       const cleanFlattenNodes: TabNode[] = [];
       const flattenClean = (nodes: TabNode[]): void => {
         for (const node of nodes) {
@@ -1960,10 +1858,8 @@ export class TreeStateManager {
         flattenClean(viewState.rootNodes);
       }
 
-      // sidepanel除外後のChromeタブ
       const chromeNonPinnedTabs = chromeAllNonPinned.filter((t) => !isSidePanelTab(t));
 
-      // インデックスベースでマッチング
       for (let i = 0; i < cleanFlattenNodes.length && i < chromeNonPinnedTabs.length; i++) {
         const newTabId = chromeNonPinnedTabs[i].id!;
         cleanFlattenNodes[i].tabId = newTabId;
@@ -2024,7 +1920,6 @@ export class TreeStateManager {
     const windowState = this.getWindowState(windowId);
     if (!windowState) return;
 
-    // すべてのビューのpinnedTabIdsをビュー順序で集約
     const expectedPinnedIds = new Set<number>();
     const orderedPinnedIds: number[] = [];
 
@@ -2044,30 +1939,26 @@ export class TreeStateManager {
       }
     }
 
-    // ピン留めすべきタブをピン留め
     for (const tabId of expectedPinnedIds) {
       if (!actuallyPinnedIds.has(tabId)) {
         try {
           await chrome.tabs.update(tabId, { pinned: true });
         } catch {
-          // タブが存在しない場合は無視
+          // タブが存在しない場合は無視（既に閉じられている場合など）
         }
       }
     }
 
-    // ピン留め解除すべきタブを解除
     for (const tabId of actuallyPinnedIds) {
       if (!expectedPinnedIds.has(tabId)) {
         try {
           await chrome.tabs.update(tabId, { pinned: false });
         } catch {
-          // タブが存在しない場合は無視
+          // タブが存在しない場合は無視（既に閉じられている場合など）
         }
       }
     }
 
-    // ピン留めタブの順序を同期（ビュー順序で）
-    // 現在のインデックスマップを作成
     const currentIndexMap = new Map<number, number>();
     for (const tab of windowTabs) {
       if (tab.id !== undefined) {
@@ -2078,11 +1969,9 @@ export class TreeStateManager {
     for (let i = 0; i < orderedPinnedIds.length; i++) {
       const tabId = orderedPinnedIds[i];
       const currentIndex = currentIndexMap.get(tabId);
-      // 既に正しい位置にいる場合は移動しない
       if (currentIndex !== undefined && currentIndex !== i) {
         try {
           await chrome.tabs.move(tabId, { index: i });
-          // 移動後にインデックスマップを更新
           const updatedTabs = await chrome.tabs.query({ windowId });
           currentIndexMap.clear();
           for (const tab of updatedTabs) {
@@ -2091,7 +1980,7 @@ export class TreeStateManager {
             }
           }
         } catch {
-          // タブが存在しない場合は無視
+          // タブが存在しない場合は無視（既に閉じられている場合など）
         }
       }
     }
@@ -2115,7 +2004,6 @@ export class TreeStateManager {
     const windowState = this.getWindowState(windowId);
     if (!windowState) return;
 
-    // 深さ優先でタブIDを収集
     const orderedTabIds: number[] = [];
     const traverse = (node: TabNode): void => {
       if (!pinnedSet.has(node.tabId) && currentWindowTabIds.has(node.tabId)) {
@@ -2157,7 +2045,7 @@ export class TreeStateManager {
             }
           }
         } catch {
-          // タブが存在しない場合は無視
+          // タブが存在しない場合は無視（既に閉じられている場合など）
         }
       }
     }
@@ -2184,7 +2072,7 @@ export class TreeStateManager {
         }
       }
     } catch {
-      // ウィンドウクローズ失敗は無視
+      // ウィンドウクローズ失敗は無視（既に閉じられている場合など）
     }
   }
 
@@ -2192,7 +2080,7 @@ export class TreeStateManager {
     try {
       await this.persistState();
     } catch {
-      // 永続化失敗は無視
+      // 永続化失敗は無視（次回の自動保存で再試行される）
     }
   }
 
@@ -2224,28 +2112,23 @@ export class TreeStateManager {
     closeCurrentTabs: boolean,
     windowIndexToNewWindowId: Map<number, number>
   ): Promise<void> {
-    // windowIndexごとにウィンドウ状態を構築
     const windowIndexSet = new Set<number>();
     for (const [, snapshot] of indexToSnapshot) {
       windowIndexSet.add(snapshot.windowIndex ?? 0);
     }
 
-    // 既存ウィンドウをクリア（closeCurrentTabsの場合）
     if (closeCurrentTabs) {
       this.windows = [];
     }
 
-    // ビューIDからビュー情報のマップを構築
     const viewIdToView = new Map<string, { name: string; color: string; icon?: string }>();
     for (const view of snapshotViews) {
       viewIdToView.set(view.id, { name: view.name, color: view.color, icon: view.icon });
     }
 
-    // 各ウィンドウのツリーを構築
     for (const [windowIndex, windowId] of windowIndexToNewWindowId) {
       const windowState = this.getOrCreateWindowState(windowId);
 
-      // ウィンドウ内のビューを構築（ピン留めタブも含める）
       const viewIdSet = new Set<string>();
       for (const [, snapshot] of indexToSnapshot) {
         if ((snapshot.windowIndex ?? 0) === windowIndex) {
@@ -2253,7 +2136,6 @@ export class TreeStateManager {
         }
       }
 
-      // 既存のビューをクリアして再構築
       windowState.views = [];
       for (const viewId of viewIdSet) {
         const viewInfo = viewIdToView.get(viewId);
@@ -2274,7 +2156,6 @@ export class TreeStateManager {
         });
       }
 
-      // viewIdからviewIndexへのマッピング
       const viewIdToIndex = new Map<string, number>();
       let vi = 0;
       for (const viewId of viewIdSet) {
@@ -2282,17 +2163,14 @@ export class TreeStateManager {
         vi++;
       }
 
-      // indexToNewTabIdをparentIndexでソート（親が先に処理されるよう）
       const sortedEntries = [...indexToSnapshot.entries()].sort(([indexA], [indexB]) => {
         const snapshotA = indexToSnapshot.get(indexA)!;
         const snapshotB = indexToSnapshot.get(indexB)!;
-        // 親がないタブを先に
         if (snapshotA.parentIndex === null && snapshotB.parentIndex !== null) return -1;
         if (snapshotA.parentIndex !== null && snapshotB.parentIndex === null) return 1;
         return indexA - indexB;
       });
 
-      // タブノードを構築
       const indexToNode = new Map<number, TabNode>();
 
       for (const [index, snapshot] of sortedEntries) {
@@ -2327,7 +2205,6 @@ export class TreeStateManager {
           }
         }
 
-        // ルートノードとして追加
         if (viewIndex < windowState.views.length) {
           windowState.views[viewIndex].rootNodes.push(node);
         }
@@ -2344,14 +2221,12 @@ export class TreeStateManager {
     const result = this.findNodeByTabId(tabId);
     if (!result || !result.node.groupInfo) return;
 
-    // グループタブを閉じる
     try {
       await chrome.tabs.remove(tabId);
     } catch {
-      // タブが存在しない場合は無視
+      // タブが存在しない場合は無視（既に閉じられている場合など）
     }
 
-    // 子を昇格
     const siblings = result.parent
       ? result.parent.children
       : result.viewState.rootNodes;
@@ -2409,7 +2284,7 @@ export class TreeStateManager {
         payload,
       })
       .catch(() => {
-        // メッセージ送信失敗は無視
+        // Side Panelが開かれていない場合は無視
       });
   }
 
@@ -2456,7 +2331,7 @@ export class TreeStateManager {
         activeViewIndex: w.activeViewIndex,
       }));
     } catch {
-      // 復元失敗は無視
+      // ストレージが破損している場合は初期状態で継続
     }
   }
 

@@ -394,7 +394,6 @@ test.describe('ビューへの新規タブ追加', () => {
 
       await newTabButton.click();
 
-      // TreeStateにタブが追加されるまで待機し、新しいタブIDを取得
       let newTabId: number | undefined;
       await waitForCondition(
         async () => {

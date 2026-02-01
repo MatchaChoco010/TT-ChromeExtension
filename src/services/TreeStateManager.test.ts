@@ -177,7 +177,6 @@ describe('TreeStateManager', () => {
       await manager.addTab(tab1, null, defaultWindowId);
       await manager.addTab(tab2, null, defaultWindowId);
 
-      // tab2をtab1の子として移動
       await manager.moveNode(tab2.id!, tab1.id!, 0);
 
       const result1 = manager.getNodeByTabId(tab1.id!);
@@ -207,7 +206,6 @@ describe('TreeStateManager', () => {
       await manager.addTab(tab3, tab2.id!, defaultWindowId);
       await manager.addTab(tab4, null, defaultWindowId);
 
-      // tab2（とその子孫）をtab4の下に移動
       await manager.moveNode(tab2.id!, tab4.id!, 0);
 
       const root2 = manager.getNodeByTabId(tab4.id!);
@@ -372,7 +370,6 @@ describe('TreeStateManager', () => {
         const child = manager.getNodeByTabId(childTab.id!);
         expect(child).toBeDefined();
 
-        // ルートに昇格
         const tree = manager.getTree(defaultWindowId);
         expect(tree.some(n => n.tabId === childTab.id)).toBe(true);
       });
@@ -394,7 +391,6 @@ describe('TreeStateManager', () => {
       expect(groupResult).toBeDefined();
       expect(groupResult?.node.tabId).toBe(groupTabId);
 
-      // 子タブがグループの子になっている
       expect(groupResult?.node.children.some(c => c.tabId === 1)).toBe(true);
       expect(groupResult?.node.children.some(c => c.tabId === 2)).toBe(true);
     });

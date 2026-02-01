@@ -17,9 +17,6 @@ import {
 import { TREE_INDENT_WIDTH_PX, calculateDepthRange } from '../utils';
 import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
 
-/**
- * ノードとその子孫の数を再帰的にカウント
- */
 const countSubtreeNodes = (node: UITabNode): number => {
   let count = 1;
   for (const child of node.children) {
@@ -31,16 +28,12 @@ const countSubtreeNodes = (node: UITabNode): number => {
 const AUTO_EXPAND_HOVER_DELAY_MS = 1000;
 
 /**
- * スタートページURLを判定するヘルパー関数
- * Vivaldi/Chromeのスタートページ関連のURLを検出
- *
  * 注意: chrome://vivaldi-webui/startpage?section=XXX はセクションページなので
  * スタートページとは判定しない（カレンダー、メールなど個別の機能ページ）
  */
 const isStartPageUrl = (url: string): boolean => {
   if (!url) return false;
 
-  // ?section= パラメータがある場合は、セクションページなのでスタートページではない
   if (url.includes('?section=')) return false;
 
   const startPageUrlPatterns = [
@@ -52,9 +45,6 @@ const isStartPageUrl = (url: string): boolean => {
 };
 
 /**
- * 新しいタブURLを判定するヘルパー関数
- * Vivaldi/Chromeの新しいタブ関連のURLを検出（スタートページ以外）
- *
  * chrome-extension://URLは新しいタブと判定しない
  * 拡張機能ページ（settings.html, group.html等）は独自のタイトルを持つため
  */
@@ -71,12 +61,6 @@ const isNewTabUrl = (url: string): boolean => {
 };
 
 /**
- * 表示するタブタイトルを決定するヘルパー関数
- * - Loading状態の場合: 「Loading...」
- * - スタートページURLの場合: 「スタートページ」
- * - 新しいタブURLの場合: 「新しいタブ」
- * - それ以外: 元のタイトル
- *
  * Vivaldi専用URL（chrome://vivaldi-webui/startpage）の場合、
  * 拡張機能にはURLが公開されないことがあるため、タイトルもチェックする
  */
@@ -93,7 +77,6 @@ const getDisplayTitle = (tab: { title: string; url: string; status?: 'loading' |
     return '新しいタブ';
   }
 
-  // Vivaldi内部ページ（設定、カレンダーなど）のタイトル生成
   const vivaldiTitle = getVivaldiInternalPageTitle(tab.url);
   if (vivaldiTitle) {
     return vivaldiTitle;
@@ -102,11 +85,7 @@ const getDisplayTitle = (tab: { title: string; url: string; status?: 'loading' |
   return tab.title;
 };
 
-/**
- * ファビコンURLを取得するヘルパー関数
- * MV3の新しい_favicon APIを使用する
- * 参考: https://developer.chrome.com/docs/extensions/how-to/ui/favicons
- */
+// https://developer.chrome.com/docs/extensions/how-to/ui/favicons
 const getFaviconUrl = (url: string): string | null => {
   if (!url) return null;
 
@@ -116,12 +95,6 @@ const getFaviconUrl = (url: string): string | null => {
   return faviconApiUrl.toString();
 };
 
-/**
- * タブ情報から表示用ファビコンURLを取得するヘルパー関数
- * 優先順位:
- * 1. tabInfo.favIconUrl（Chromeから取得したファビコン）
- * 2. _favicon API（MV3形式）を使用してフォールバック
- */
 const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
   if (tabInfo.favIconUrl) {
     return tabInfo.favIconUrl;
@@ -316,16 +289,12 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
       const isRightClickedTabSelected = selectedIds.includes(node.tabId);
 
       if (selectedIds.length > 1) {
-        // 複数選択時
         if (isRightClickedTabSelected) {
-          // 右クリックしたタブが選択中 → 選択タブをグループ化、右クリック位置に挿入
           onGroupRequest(selectedIds, node.tabId);
         } else {
-          // 右クリックしたタブが選択中ではない → 選択タブをグループ化、選択タブの最後の位置に挿入
           onGroupRequest(selectedIds, selectedIds[selectedIds.length - 1]);
         }
       } else {
-        // 単一選択または選択なし → 右クリックしたタブのみをグループ化、その位置に挿入
         onGroupRequest([node.tabId], node.tabId);
       }
 
@@ -378,8 +347,6 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
   }, [isEditingGroupTitle]);
 
   const handleNodeClick = (e: React.MouseEvent) => {
-    // 注: stopPropagationは不要。SidePanelRootのonClickは
-    // data-tab-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
     if (onSelect) {
       onSelect(node.tabId, {
         shift: e.shiftKey,
@@ -709,16 +676,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
       const isRightClickedTabSelected = selectedIds.includes(node.tabId);
 
       if (selectedIds.length > 1) {
-        // 複数選択時
         if (isRightClickedTabSelected) {
-          // 右クリックしたタブが選択中 → 選択タブをグループ化、右クリック位置に挿入
           onGroupRequest(selectedIds, node.tabId);
         } else {
-          // 右クリックしたタブが選択中ではない → 選択タブをグループ化、選択タブの最後の位置に挿入
           onGroupRequest(selectedIds, selectedIds[selectedIds.length - 1]);
         }
       } else {
-        // 単一選択または選択なし → 右クリックしたタブのみをグループ化、その位置に挿入
         onGroupRequest([node.tabId], node.tabId);
       }
 
@@ -771,8 +734,6 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
   }, [isEditingGroupTitle]);
 
   const handleNodeClick = (e: React.MouseEvent) => {
-    // 注: stopPropagationは不要。SidePanelRootのonClickは
-    // data-tab-id属性をチェックしてタブノードクリック時はclearSelectionを呼ばない。
     if (onSelect) {
       onSelect(node.tabId, {
         shift: e.shiftKey,
@@ -998,8 +959,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   const currentGapIndexRef = useRef<number | null>(null);
   const gapDepthOffsetRef = useRef<number>(0);
 
-  // SidePanelRoot.buildTree() で既に現在のビューのノードのみがフィルタされているため、
-  // ここでの追加フィルタリングは不要
   const filteredNodes = nodes;
 
   const isDraggable = !!onDragEnd;
@@ -1099,7 +1058,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         }
         // 同じ隙間の場合（タブ上ドロップから戻った場合も含む）は基準点とオフセットを維持
 
-        // 現在のdepthを計算
         const deltaX = position.x - depthBaseXRef.current;
         const depthChange = Math.floor(deltaX / INDENT_WIDTH);
         const { minDepth, maxDepth } = calculateDepthRange(
@@ -1124,7 +1082,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
         setDropTarget(newDropTarget);
       } else {
-        // タブ上ドロップまたはターゲットなし
         // currentGapIndexRefとgapDepthOffsetRefは維持（同じ隙間に戻る可能性があるため）
         handleDropTargetChange(newDropTarget, tabPositionsRef.current);
       }
@@ -1352,7 +1309,6 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     // eslint-disable-next-line react-hooks/refs -- ドロップターゲット変更時の位置計算に現在値が必要
     const topY = calculateIndicatorYByNodeIds(aboveNodeId, belowNodeId, tabPositionsRef.current);
 
-    // overrideDepthが指定されている場合はそれを使用、なければデフォルト値
     const defaultDepth = dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0;
     const depth = overrideDepth ?? defaultDepth;
 

@@ -2,13 +2,6 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * ビルドプロセス統合のテスト
- *
- * Note: このテストスイートはPlaywrightのglobalSetup実行後に実行されます。
- * globalSetupがテスト実行前に拡張機能をビルドするため、dist/ディレクトリと
- * ビルド成果物が存在することを検証できます。
- */
 test.describe('ビルドプロセス統合', () => {
   test('dist/ディレクトリが存在し、ビルド成果物が含まれていること', () => {
     const distPath = path.join(process.cwd(), 'dist');

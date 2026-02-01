@@ -460,7 +460,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
 
       await newTabButton.click();
 
-      // TreeStateのタブ数が2になるまで待機し、新しいタブIDを取得
       let newTabId: number | undefined;
       await waitForCondition(
         async () => {
@@ -529,7 +528,6 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await expect(newTabButton).toBeVisible({ timeout: 5000 });
       await newTabButton.click();
 
-      // TreeStateのタブ数が2になるまで待機し、新しいタブIDを取得
       let newTabId: number | undefined;
       await waitForCondition(
         async () => {

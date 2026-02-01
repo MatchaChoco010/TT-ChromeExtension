@@ -75,7 +75,6 @@ export async function waitForSnapshotFile(
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeout) {
-    // まずファイル名パターンで検索
     const files = findDownloadedFiles(downloadDir, pattern);
     if (files.length > 0) {
       return files[files.length - 1];

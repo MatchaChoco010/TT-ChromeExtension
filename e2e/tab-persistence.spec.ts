@@ -452,7 +452,6 @@ test.describe('Tab Persistence', () => {
         { tabId: initialBrowserTabId, depth: 0 },
       ], 0);
 
-      // テスト用に手動でクリーンアップをシミュレート
       await serviceWorker.evaluate(async (id) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = (result.tab_favicons as Record<number, string>) || {};
@@ -494,7 +493,6 @@ test.describe('Tab Persistence', () => {
           interface TreeState {
             windows: { windowId: number; views: { rootNodes: TabNode[] }[] }[];
           }
-          // tree_state にゴーストノードを追加
           const treeResult = await chrome.storage.local.get('tree_state');
           const treeState = treeResult.tree_state as TreeState;
 
@@ -507,13 +505,11 @@ test.describe('Tab Persistence', () => {
           }
           await chrome.storage.local.set({ tree_state: treeState });
 
-          // tab_titles にゴーストエントリを追加
           const titlesResult = await chrome.storage.local.get('tab_titles');
           const titles = (titlesResult.tab_titles as Record<number, string>) || {};
           titles[ghostTabId] = 'Ghost Tab Title';
           await chrome.storage.local.set({ tab_titles: titles });
 
-          // tab_favicons にゴーストエントリを追加
           const faviconsResult = await chrome.storage.local.get('tab_favicons');
           const favicons = (faviconsResult.tab_favicons as Record<number, string>) || {};
           favicons[ghostTabId] = 'http://127.0.0.1/ghost-favicon.ico';
@@ -565,7 +561,6 @@ test.describe('Tab Persistence', () => {
         const existingTabIds = tabs.filter(t => t.id).map(t => t.id!);
         const existingTabIdSet = new Set(existingTabIds);
 
-        // tree_state のクリーンアップ
         const treeResult = await chrome.storage.local.get('tree_state');
         const treeState = treeResult.tree_state as TreeState;
 
@@ -585,7 +580,6 @@ test.describe('Tab Persistence', () => {
         }
         await chrome.storage.local.set({ tree_state: treeState });
 
-        // tab_titles のクリーンアップ
         const titlesResult = await chrome.storage.local.get('tab_titles');
         const titles = (titlesResult.tab_titles as Record<number, string>) || {};
         for (const tabIdStr of Object.keys(titles)) {
@@ -596,7 +590,6 @@ test.describe('Tab Persistence', () => {
         }
         await chrome.storage.local.set({ tab_titles: titles });
 
-        // tab_favicons のクリーンアップ
         const faviconsResult = await chrome.storage.local.get('tab_favicons');
         const favicons = (faviconsResult.tab_favicons as Record<number, string>) || {};
         for (const tabIdStr of Object.keys(favicons)) {

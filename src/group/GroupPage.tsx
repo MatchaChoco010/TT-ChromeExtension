@@ -97,7 +97,7 @@ export const GroupPage: React.FC = () => {
       });
       await loadGroupInfo();
     } catch {
-      // エラーは無視
+      // グループ名保存失敗は無視（次回ポーリングで正しい状態に復元される）
     }
     setIsEditing(false);
   }, [state, editedTitle, loadGroupInfo, tabId]);

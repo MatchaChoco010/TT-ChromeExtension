@@ -1,6 +1,3 @@
-/**
- * ExtensionFixtureのテスト
- */
 import { test, expect } from './fixtures/extension';
 import { waitForCondition } from './utils/polling-utils';
 import { getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';

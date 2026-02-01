@@ -152,7 +152,6 @@ test.describe('新規タブ追加ボタン', () => {
       await newTabButton.click();
 
       let newTabId: number | undefined;
-      // TreeStateのタブ数が3になるまで待機し、新しいタブIDを取得
       await waitForCondition(
         async () => {
           const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; excludeTabIds: number[] }) => {
@@ -233,7 +232,6 @@ test.describe('新規タブ追加ボタン', () => {
 
       await newTabButton.click();
 
-      // TreeStateのタブ数が3になるまで待機し、2番目の新しいタブIDを取得
       let secondNewTabId: number | undefined;
       await waitForCondition(
         async () => {

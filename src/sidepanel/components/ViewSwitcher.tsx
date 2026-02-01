@@ -7,21 +7,13 @@ import { useDragDrop, DropTargetType } from '../hooks/useDragDrop';
 import { DragOverlay } from './DragOverlay';
 
 export interface ViewSwitcherProps {
-  /** すべてのビュー */
   views: View[];
-  /** 現在アクティブなビューのインデックス */
   currentViewIndex: number;
-  /** 各ビューのタブ数（インデックスベース） */
   tabCounts?: number[];
-  /** ビュー切り替え時のコールバック */
   onViewSwitch: (viewIndex: number) => void;
-  /** 新しいビュー作成時のコールバック */
   onViewCreate: () => void;
-  /** ビュー削除時のコールバック */
   onViewDelete: (viewIndex: number) => void;
-  /** ビュー更新時のコールバック */
   onViewUpdate: (viewIndex: number, updates: Partial<View>) => void;
-  /** ビュー並び替え時のコールバック */
   onViewReorder?: (viewIndex: number, newIndex: number) => void;
 }
 

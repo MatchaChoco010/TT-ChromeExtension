@@ -2,12 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TreeStateManager } from './TreeStateManager';
 import { StorageService } from '@/storage/StorageService';
 
-/**
- * サブツリー全体の移動
- *
- * このテストは、親タブとその子孫タブすべてを取得し、
- * ツリー構造を維持したまま別のウィンドウに移動できることを確認します。
- */
 describe('TreeStateManager - Subtree Operations', () => {
   let treeStateManager: TreeStateManager;
   let storageService: StorageService;
@@ -98,7 +92,6 @@ describe('TreeStateManager - Subtree Operations', () => {
       expect(tab2Node).toBeDefined();
       expect(tab3Node).toBeDefined();
 
-      // In new structure, parent-child is expressed via children array
       expect(tab1Node!.children.some(c => c.tabId === 2)).toBe(true);
       expect(tab2Node!.children.some(c => c.tabId === 3)).toBe(true);
     });

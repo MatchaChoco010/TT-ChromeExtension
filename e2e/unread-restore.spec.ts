@@ -17,7 +17,6 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
 
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${initialBrowserTabId}"]`);
 
-      // ブラウザ起動時の既存タブには未読インジケーターを付けない
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toHaveCount(0);
     }
@@ -83,7 +82,6 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
 
-      // activateTabはアクティブタブを変更するだけなのでツリー構造は変わらない
       await activateTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -175,7 +173,6 @@ extensionTest.describe('未読インジケーター復元時制御', () => {
         { tabId: activeTabId, depth: 0 },
       ], 0);
 
-      // アクティブなタブには未読インジケーターを付けない
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${activeTabId}"]`);
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toHaveCount(0);

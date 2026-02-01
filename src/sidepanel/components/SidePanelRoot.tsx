@@ -141,9 +141,6 @@ const TreeViewContent: React.FC = () => {
     return currentWindowState.views[currentViewIndex] || null;
   }, [currentWindowState, currentViewIndex]);
 
-  /**
-   * TabNodeからUITabNodeを構築（depthを計算）
-   */
   const buildTree = (): UITabNode[] => {
     if (!currentViewState) return [];
 

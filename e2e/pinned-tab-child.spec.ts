@@ -27,7 +27,6 @@ test.describe('ピン留めタブから開いたページの表示', () => {
     ], 0);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: initialBrowserTabId }], 0);
 
-    // ピン留めタブから新しいタブを開く（リンククリックをシミュレート）
     const childTabId = await createTab(serviceWorker, getTestServerUrl('/page?child'), initialBrowserTabId);
 
     // 親がピン留めタブ（フィルタリングされる）なので、子タブはルートノードとして表示されるべき

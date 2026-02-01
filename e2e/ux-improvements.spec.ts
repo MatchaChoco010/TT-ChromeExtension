@@ -34,11 +34,9 @@ test.describe('UX改善機能', () => {
       const closeButton = pinnedTab.locator('[data-testid*="close-button"]');
       await expect(closeButton).not.toBeVisible();
 
-      // ホバーしても閉じるボタンが表示されないことを確認（機能テスト固有の検証）
       await pinnedTab.hover();
       await expect(closeButton).not.toBeVisible();
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -74,7 +72,6 @@ test.describe('UX改善機能', () => {
       const closeButtonInPinned = pinnedTab.locator('[data-testid*="close-button"]');
       await expect(closeButtonInPinned).not.toBeVisible();
 
-      // クリーンアップ
       await closeTab(serviceWorker, tabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -97,7 +94,6 @@ test.describe('UX改善機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
-      // ビュー追加後の構造を検証（デフォルトビューがアクティブ）
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -106,7 +102,6 @@ test.describe('UX改善機能', () => {
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: 100 });
 
-      // 次のビュー（View）がアクティブになることを確認
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -126,7 +121,6 @@ test.describe('UX改善機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
-      // ビュー追加後の構造を検証（デフォルトビューがアクティブ）
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -144,7 +138,6 @@ test.describe('UX改善機能', () => {
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: -100 });
 
-      // 前のビュー（Default）がアクティブになることを確認
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -164,7 +157,6 @@ test.describe('UX改善機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
-      // ビュー追加後の構造を検証（デフォルトビューがアクティブ）
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -173,7 +165,6 @@ test.describe('UX改善機能', () => {
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: -100 });
 
-      // デフォルトビューがまだアクティブ（変化なし）
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -193,7 +184,6 @@ test.describe('UX改善機能', () => {
       const addButton = sidePanelPage.locator('[aria-label="Add new view"]');
       await addButton.click();
 
-      // ビュー追加後の構造を検証（デフォルトビューがアクティブ）
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -211,7 +201,6 @@ test.describe('UX改善機能', () => {
       const viewSwitcher = sidePanelPage.locator('[data-testid="view-switcher-container"]');
       await viewSwitcher.dispatchEvent('wheel', { deltaY: 100 });
 
-      // Viewがまだアクティブ（変化なし）
       await assertViewStructure(sidePanelPage, windowId, [
         { viewIdentifier: '#3B82F6' },
         { viewIdentifier: '#10B981' },
@@ -264,7 +253,6 @@ test.describe('UX改善機能', () => {
       await expect(moveToViewItem).toBeVisible({ timeout: 5000 });
       await moveToViewItem.hover();
 
-      // サブメニューが表示され、Viewが存在することを確認（機能テスト固有の検証）
       const subMenu = sidePanelPage.locator('[data-testid="submenu"]');
       await expect(subMenu).toBeVisible({ timeout: 5000 });
       const subMenuItem = subMenu.locator('text=View');
@@ -385,7 +373,6 @@ test.describe('UX改善機能', () => {
       const subMenu = sidePanelPage.locator('[data-testid="submenu"]');
       await expect(subMenu).toBeVisible({ timeout: 5000 });
 
-      // サブメニュー内に "Default"（現在のビュー）が表示されていないことを確認（機能テスト固有の検証）
       const defaultMenuItem = subMenu.locator('button:has-text("Default")');
       await expect(defaultMenuItem).not.toBeVisible();
 

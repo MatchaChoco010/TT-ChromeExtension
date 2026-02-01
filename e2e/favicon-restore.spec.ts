@@ -400,7 +400,6 @@ test.describe('ファビコンの永続化復元', () => {
         const count = await faviconImgInitial.count();
         if (count === 0) return false;
         const src = await faviconImgInitial.getAttribute('src');
-        // _favicon API経由のURLが設定されていることを確認
         return src !== null && src.includes('/_favicon/');
       }, { timeout: 5000, timeoutMessage: `Favicon img with _favicon API URL not found for tab ${tabId}` });
 
@@ -682,7 +681,6 @@ test.describe('ファビコンの永続化復元', () => {
         { tabId: initialBrowserTabId, depth: 0 },
       ], 0);
 
-      // タブを閉じた後もファビコンがキャッシュとして保持されていることを確認
       const storedAfter = await serviceWorker.evaluate(async (url) => {
         const result = await chrome.storage.local.get('tab_favicons');
         const favicons = result.tab_favicons as Record<string, string> | undefined;

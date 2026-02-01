@@ -4,11 +4,6 @@ import { useDragDrop, DropTargetType } from '../hooks/useDragDrop';
 import { DragOverlay } from './DragOverlay';
 import HorizontalDropIndicator from './HorizontalDropIndicator';
 
-/**
- * ファビコンURLを取得するヘルパー関数
- * MV3の新しい_favicon APIを使用する
- * 参考: https://developer.chrome.com/docs/extensions/how-to/ui/favicons
- */
 const getFaviconUrl = (url: string): string | null => {
   if (!url) return null;
 
@@ -18,12 +13,6 @@ const getFaviconUrl = (url: string): string | null => {
   return faviconApiUrl.toString();
 };
 
-/**
- * タブ情報から表示用ファビコンURLを取得するヘルパー関数
- * 優先順位:
- * 1. tabInfo.favIconUrl（Chromeから取得したファビコン）
- * 2. _favicon API（MV3形式）を使用してフォールバック
- */
 const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
   if (tabInfo.favIconUrl) {
     return tabInfo.favIconUrl;
@@ -40,11 +29,8 @@ interface PinnedTabsSectionProps {
   pinnedTabIds: number[];
   tabInfoMap: TabInfoMap;
   onTabClick: (tabId: number) => void;
-  /** ピン留めタブの右クリック時に呼ばれるコールバック */
   onContextMenu?: (tabId: number, position: { x: number; y: number }) => void;
-  /** アクティブタブID（ハイライト表示用） */
   activeTabId?: number | null;
-  /** ピン留めタブの並び替えコールバック */
   onPinnedTabReorder?: (tabId: number, newIndex: number) => void;
 }
 

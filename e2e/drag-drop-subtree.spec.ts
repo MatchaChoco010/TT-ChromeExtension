@@ -80,7 +80,6 @@ test.describe('ドラッグ&ドロップによるサブツリー移動', () => {
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${tab1}"]`).first();
-    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
     await parentNode.hover();
     const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
     await expandOverlay.first().click();

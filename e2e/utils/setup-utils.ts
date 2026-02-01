@@ -12,21 +12,14 @@ import { waitForSidePanelReady, waitForInitialized } from './polling-utils';
  * ウィンドウセットアップ情報
  */
 export interface WindowSetup {
-  /** ウィンドウID */
   windowId: number;
   /** ブラウザ起動時のデフォルトタブID */
   initialBrowserTabId: number;
-  /** サイドパネルのPage */
   sidePanelPage: Page;
 }
 
 /**
  * ウィンドウのセットアップを行う
- *
- * @param context - ブラウザコンテキスト
- * @param serviceWorker - Service Worker
- * @param windowId - セットアップするウィンドウID
- * @returns セットアップ情報
  */
 export async function setupWindow(
   context: BrowserContext,
@@ -44,10 +37,6 @@ export async function setupWindow(
 
 /**
  * 新しいウィンドウを作成してセットアップを行う
- *
- * @param context - ブラウザコンテキスト
- * @param serviceWorker - Service Worker
- * @returns セットアップ情報
  */
 export async function createAndSetupWindow(
   context: BrowserContext,

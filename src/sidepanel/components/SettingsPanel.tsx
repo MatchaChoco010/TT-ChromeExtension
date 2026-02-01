@@ -69,8 +69,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setIsProcessing(true);
       setShowRestoreOptions(false);
 
-      // バックグラウンドスクリプトに復元を依頼
-      // これにより、handleTabCreatedとの競合を回避し、親子関係とビュー配置を正しく復元
       const response = await chrome.runtime.sendMessage({
         type: 'RESTORE_SNAPSHOT',
         payload: { jsonData: pendingJsonData, closeCurrentTabs },

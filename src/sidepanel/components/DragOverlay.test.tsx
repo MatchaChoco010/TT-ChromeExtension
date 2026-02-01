@@ -1,9 +1,3 @@
-/**
- * DragOverlayコンポーネントのテスト
- *
- * ドラッグ中の要素をマウスカーソルに追従させること
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { DragOverlay } from './DragOverlay';

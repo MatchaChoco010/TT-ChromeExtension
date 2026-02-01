@@ -440,8 +440,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     };
   }, []);
 
-  // DRAG_SESSION_ENDEDメッセージを受信したらドラッグをキャンセル
-  // クロスウィンドウドラッグ終了時に元ウィンドウのプレースホルダーをクリーンアップ
+  // クロスウィンドウドラッグ終了時に元ウィンドウのドラッグ状態をクリーンアップ
   useEffect(() => {
     const handleMessage = (message: { type: string }) => {
       if (message.type === 'DRAG_SESSION_ENDED') {
@@ -455,8 +454,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       }
     };
 
-    // chrome.runtime.onMessage が存在する場合のみリスナーを追加
-    // テスト環境では存在しない場合がある
+    // テスト環境ではchrome.runtime.onMessageが存在しない場合がある
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener(handleMessage);
       return () => {

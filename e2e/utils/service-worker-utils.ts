@@ -5,9 +5,6 @@
  */
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 
-/**
- * メッセージ送信オプション
- */
 export interface MessageOptions {
   /**
    * タイムアウト時間（ミリ秒）
@@ -102,11 +99,6 @@ export async function waitForMessageFromServiceWorker(
   return Promise.race([messagePromise, timeoutPromise]);
 }
 
-/**
- * Service Workerのイベントリスナーが登録されていることを検証
- *
- * @param worker - Service Worker
- */
 export async function assertEventListenersRegistered(
   worker: Worker
 ): Promise<void> {
@@ -128,11 +120,6 @@ export async function assertEventListenersRegistered(
   }
 }
 
-/**
- * Service Workerのライフサイクルを検証
- *
- * @param context - ブラウザコンテキスト
- */
 export async function assertServiceWorkerLifecycle(
   context: BrowserContext
 ): Promise<void> {

@@ -89,11 +89,6 @@ export class SnapshotManager {
     return snapshot;
   }
 
-  /**
-   * JSON文字列からタブを復元
-   *
-   * @param jsonData - JSON文字列
-   */
   async restoreFromJson(jsonData: string): Promise<void> {
     const parsed = JSON.parse(jsonData);
 
@@ -105,12 +100,6 @@ export class SnapshotManager {
     await this.restoreTabsFromSnapshot(snapshot.data.tabs, snapshot.data.views);
   }
 
-  /**
-   * タブノードからタブスナップショットを作成
-   *
-   * @param treeState - ツリー状態
-   * @returns タブスナップショット配列
-   */
   private async createTabSnapshots(
     treeState: TreeState,
   ): Promise<TabSnapshot[]> {
@@ -211,12 +200,6 @@ export class SnapshotManager {
     return tabSnapshots;
   }
 
-  /**
-   * スナップショットからタブを復元
-   *
-   * @param tabs - タブスナップショット配列
-   * @param views - ビュー配列
-   */
   private async restoreTabsFromSnapshot(
     tabs: TabSnapshot[],
     views: View[],
@@ -252,6 +235,7 @@ export class SnapshotManager {
             const blankTabId = newWindow.tabs[0].id;
             if (blankTabId !== undefined) {
               setTimeout(() => {
+                // 空白タブの削除失敗は無視（既に閉じられている場合がある）
                 chrome.tabs.remove(blankTabId).catch(() => {});
               }, 1000);
             }
@@ -394,24 +378,12 @@ export class SnapshotManager {
     await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);
   }
 
-  /**
-   * ユニークなスナップショットIDを生成
-   *
-   * @returns スナップショットID
-   */
   private generateSnapshotId(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 9);
     return `${SnapshotManager.SNAPSHOT_ID_PREFIX}${timestamp}-${random}`;
   }
 
-  /**
-   * スナップショットファイル名を生成
-   *
-   * @param name - スナップショット名
-   * @param isAutoSave - 自動保存フラグ
-   * @returns ファイル名
-   */
   private generateFilename(name: string, isAutoSave: boolean): string {
     const timestamp = new Date()
       .toISOString()
@@ -424,9 +396,6 @@ export class SnapshotManager {
   }
 
   /**
-   * 自動スナップショット機能を開始
-   * 定期的な自動スナップショット機能を提供する
-   *
    * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
    */
   startAutoSnapshot(intervalMinutes: number): void {
@@ -460,18 +429,12 @@ export class SnapshotManager {
   }
 
   /**
-   * 自動スナップショット設定を更新
-   * 設定変更時にアラームを再設定する
-   *
    * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
    */
   updateAutoSnapshotSettings(intervalMinutes: number): void {
     this.startAutoSnapshot(intervalMinutes);
   }
 
-  /**
-   * 自動スナップショット機能を停止
-   */
   async stopAutoSnapshot(): Promise<void> {
     await chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
 

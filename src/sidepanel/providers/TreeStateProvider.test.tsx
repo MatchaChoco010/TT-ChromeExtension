@@ -202,9 +202,6 @@ describe('TreeStateProvider リアルタイム更新', () => {
   });
 });
 
-/**
- * TabInfo マップ管理機能のテスト
- */
 describe('TreeStateProvider TabInfoMap管理', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
@@ -370,7 +367,6 @@ describe('TreeStateProvider TabInfoMap管理', () => {
       );
     });
 
-    // タブ情報がロードされるのを待つ
     await waitFor(() => {
       expect(screen.getByTestId('tab-info-map-size')).toHaveTextContent('2');
     });
@@ -394,7 +390,6 @@ describe('TreeStateProvider TabInfoMap管理', () => {
   });
 
   it('存在しないタブIDでgetTabInfoを呼ぶとundefinedを返す', async () => {
-    // 存在しないタブIDをテストするコンポーネント
     function NonExistentTabTestComponent() {
       const { isLoading, getTabInfo } = useTreeState();
 
@@ -423,16 +418,12 @@ describe('TreeStateProvider TabInfoMap管理', () => {
   });
 });
 
-/**
- * ピン留めタブ専用リスト管理機能のテスト
- */
 describe('TreeStateProvider pinnedTabIds管理', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
   let mockTabsUpdatedListeners: Array<(tabId: number, changeInfo: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => void> = [];
   let mockChrome: MockChrome;
 
-  // ピン留めタブ情報を表示するテストコンポーネント
   function PinnedTabsTestComponent() {
     const { isLoading, pinnedTabIds, tabInfoMap } = useTreeState();
 
@@ -646,9 +637,6 @@ describe('TreeStateProvider pinnedTabIds管理', () => {
   });
 });
 
-/**
- * 複数選択状態の管理機能のテスト
- */
 describe('TreeStateProvider 複数選択状態管理', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
@@ -841,7 +829,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('selected-count')).toHaveTextContent('0');
     });
 
-    // Node 1を選択
     await act(async () => {
       screen.getByTestId('select-node-1').click();
     });
@@ -862,7 +849,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       );
     });
 
-    // Node 1を選択
     await act(async () => {
       screen.getByTestId('select-node-1').click();
     });
@@ -871,7 +857,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('node-1-selected')).toHaveTextContent('true');
     });
 
-    // Node 2を通常クリックで選択
     await act(async () => {
       screen.getByTestId('select-node-2').click();
     });
@@ -893,7 +878,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       );
     });
 
-    // Node 1を選択
     await act(async () => {
       screen.getByTestId('select-node-1').click();
     });
@@ -902,7 +886,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('node-1-selected')).toHaveTextContent('true');
     });
 
-    // Ctrl+クリックでNode 2を追加選択
     await act(async () => {
       screen.getByTestId('select-node-2-ctrl').click();
     });
@@ -913,7 +896,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('node-2-selected')).toHaveTextContent('true');
     });
 
-    // もう一度Ctrl+クリックでNode 2を選択解除
     await act(async () => {
       screen.getByTestId('select-node-2-ctrl').click();
     });
@@ -934,7 +916,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       );
     });
 
-    // Node 1を選択
     await act(async () => {
       screen.getByTestId('select-node-1').click();
     });
@@ -943,7 +924,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('node-1-selected')).toHaveTextContent('true');
     });
 
-    // Shift+クリックでNode 3を選択（Node 1からNode 3までの範囲を選択）
     await act(async () => {
       screen.getByTestId('select-node-3-shift').click();
     });
@@ -965,7 +945,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       );
     });
 
-    // Node 1を選択
     await act(async () => {
       screen.getByTestId('select-node-1').click();
     });
@@ -974,7 +953,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('selected-count')).toHaveTextContent('1');
     });
 
-    // 選択をクリア
     await act(async () => {
       screen.getByTestId('clear-selection').click();
     });
@@ -1000,7 +978,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('node-2-selected')).toHaveTextContent('false');
     });
 
-    // Node 1を選択
     await act(async () => {
       screen.getByTestId('select-node-1').click();
     });
@@ -1024,7 +1001,6 @@ describe('TreeStateProvider 複数選択状態管理', () => {
       expect(screen.getByTestId('last-selected')).toHaveTextContent('null');
     });
 
-    // lastSelectedNodeIdがnullの状態でShift+クリック
     await act(async () => {
       screen.getByTestId('select-node-3-shift').click();
     });
@@ -1036,16 +1012,11 @@ describe('TreeStateProvider 複数選択状態管理', () => {
   });
 });
 
-/**
- * handleSiblingDropのテスト
- * 兄弟としてドロップ（Gapドロップ）時のハンドラのテスト
- */
 describe('TreeStateProvider handleSiblingDrop', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
   let mockChrome: MockChrome;
 
-  // handleSiblingDropを呼び出すテストコンポーネント
   function SiblingDropTestComponent({ onReady }: { onReady?: (handleSiblingDrop: (info: SiblingDropInfo) => Promise<void>) => void }) {
     const { treeState, isLoading, handleSiblingDrop, currentWindowId } = useTreeState();
 
@@ -1058,12 +1029,10 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     if (isLoading) return <div>Loading...</div>;
     if (!treeState) return <div>No state</div>;
 
-    // Get nodes from the current window's current view
     const currentWindowState = treeState.windows.find(w => w.windowId === currentWindowId);
     const currentViewState = currentWindowState?.views[currentWindowState.activeViewIndex];
     const rootNodes = currentViewState?.rootNodes ?? [];
 
-    // Flatten tree to get all nodes with their info
     const flattenNodes = (nodes: TabNode[], depth = 0): Array<{ tabId: number; depth: number; children: TabNode[] }> => {
       const result: Array<{ tabId: number; depth: number; children: TabNode[] }> = [];
       for (const node of nodes) {
@@ -1238,7 +1207,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // tab2をtab3の上（兄弟として）にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
@@ -1250,7 +1218,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1285,7 +1252,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // tab2をリストの最初にドロップ（tab1の上）
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
@@ -1297,7 +1263,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1316,7 +1281,7 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   it('自分自身の子孫への移動でもMOVE_NODE_AS_SIBLINGメッセージが送信される（検証はServiceWorker側で行う）', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
-    // tab1 → tab2 (子) → tab4 (孫) の構造を持つツリー状態
+    // tab1 → tab2 (child) → tab4 (grandchild)
     const treeStateWithGrandchild: TreeState = {
       windows: [{
         windowId: 1,
@@ -1367,7 +1332,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // tab1をtab4の隣に移動しようとする（自分の孫の隣 = 無効な操作だが、メッセージは送信される）
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
@@ -1379,7 +1343,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // メッセージは送信される（循環参照のチェックはServiceWorker側で行われる）
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1395,10 +1358,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
   });
 
-  /**
-   * ドロップ位置への正確な挿入テスト
-   * insertIndexを含むMOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
-   */
   it('insertIndexを含むMOVE_NODE_AS_SIBLINGメッセージが送信される', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
@@ -1418,7 +1377,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // tab2をtab1とtab3の間にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
@@ -1430,7 +1388,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1446,10 +1403,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
   });
 
-  /**
-   * 異なる深度のタブ間へのドロップテスト
-   * MOVE_NODE_AS_SIBLINGメッセージが正しく送信されることを検証
-   */
   it('異なる深度のタブ間にドロップした場合もMOVE_NODE_AS_SIBLINGメッセージが送信される', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
@@ -1469,7 +1422,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // tab2をtab1とtab3の間にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
@@ -1481,7 +1433,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1497,10 +1448,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
   });
 
-  /**
-   * 子タブの下への隙間ドロップテスト
-   * MOVE_NODE_AS_SIBLINGメッセージが正しく送信されることを検証
-   */
   it('親タブの子の下にドロップした場合、MOVE_NODE_AS_SIBLINGメッセージが送信される', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
@@ -1531,7 +1478,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1547,10 +1493,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
   });
 
-  /**
-   * リスト先頭へのドロップテスト
-   * belowTabIdのみ指定された場合（aboveTabIdがundefined）のメッセージを検証
-   */
   it('リスト先頭にドロップした場合、MOVE_NODE_AS_SIBLINGメッセージが送信される', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
@@ -1581,7 +1523,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1597,10 +1538,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
   });
 
-  /**
-   * タブ間ドロップ時のメッセージテスト
-   * タブ間にドロップした場合、正しいメッセージが送信されることを検証
-   */
   it('タブ間にドロップした場合、MOVE_NODE_AS_SIBLINGメッセージが送信される（タブ移動はServiceWorker側で実行）', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
@@ -1620,7 +1557,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       expect(handleSiblingDrop).not.toBeNull();
     });
 
-    // node-2をnode-1とnode-3の間にドロップ
     await act(async () => {
       if (handleSiblingDrop) {
         await handleSiblingDrop({
@@ -1632,7 +1568,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1648,10 +1583,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
     });
   });
 
-  /**
-   * リスト末尾へのドロップテスト
-   * belowNodeがundefinedの場合（リスト末尾へのドロップ）のメッセージを検証
-   */
   it('リスト末尾にドロップした場合、MOVE_NODE_AS_SIBLINGメッセージが送信される（belowNodeId=undefined）', async () => {
     let handleSiblingDrop: ((info: SiblingDropInfo) => Promise<void>) | null = null;
 
@@ -1682,7 +1613,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
       }
     });
 
-    // MOVE_NODE_AS_SIBLINGメッセージが送信されることを検証
     await waitFor(() => {
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'MOVE_NODE_AS_SIBLING',
@@ -1699,15 +1629,11 @@ describe('TreeStateProvider handleSiblingDrop', () => {
   });
 });
 
-/**
- * 複数ウィンドウ対応のテスト
- */
 describe('TreeStateProvider 複数ウィンドウ対応', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
   let mockChrome: MockChrome;
 
-  // ウィンドウIDを表示するテストコンポーネント
   function WindowIdTestComponent() {
     const { isLoading, currentWindowId, pinnedTabIds, tabInfoMap } = useTreeState();
 
@@ -1793,10 +1719,8 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
       tabs: {
         get: vi.fn(),
         query: vi.fn().mockResolvedValue([
-          // ウィンドウ1のタブ
           { id: 1, title: 'Tab 1', url: 'https://tab1.com', pinned: false, frozen: false, active: true, windowId: 1 },
           { id: 2, title: 'Tab 2', url: 'https://tab2.com', pinned: true, frozen: false, active: false, windowId: 1 },
-          // ウィンドウ2のタブ
           { id: 3, title: 'Tab 3', url: 'https://tab3.com', pinned: false, frozen: false, active: false, windowId: 2 },
           { id: 4, title: 'Tab 4', url: 'https://tab4.com', pinned: true, frozen: false, active: false, windowId: 2 },
         ]),
@@ -1845,12 +1769,10 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
       );
     });
 
-    // currentWindowIdが1（モックで設定した値）であることを確認
     await waitFor(() => {
       expect(screen.getByTestId('current-window-id')).toHaveTextContent('1');
     });
 
-    // chrome.windows.getCurrent()が呼び出されたことを確認
     expect(chrome.windows.getCurrent).toHaveBeenCalled();
   });
 
@@ -1863,16 +1785,14 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
       );
     });
 
-    // ウィンドウ1のピン留めタブ（id: 2）のみがpinnedTabIdsに含まれることを確認
     await waitFor(() => {
       const pinnedTabIds = JSON.parse(screen.getByTestId('pinned-tab-ids').textContent || '[]');
       expect(pinnedTabIds).toContain(2);
-      expect(pinnedTabIds).not.toContain(4); // ウィンドウ2のピン留めタブは含まれない
+      expect(pinnedTabIds).not.toContain(4);
     });
   });
 
   it('URLパラメータでwindowIdが指定されている場合、そのウィンドウIDを使用する', async () => {
-    // URLパラメータをモック
     const originalLocation = window.location;
     Object.defineProperty(window, 'location', {
       value: { ...originalLocation, search: '?windowId=2' },
@@ -1887,19 +1807,16 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
       );
     });
 
-    // currentWindowIdがURLパラメータで指定した2であることを確認
     await waitFor(() => {
       expect(screen.getByTestId('current-window-id')).toHaveTextContent('2');
     });
 
-    // ウィンドウ2のピン留めタブ（id: 4）のみがpinnedTabIdsに含まれることを確認
     await waitFor(() => {
       const pinnedTabIds = JSON.parse(screen.getByTestId('pinned-tab-ids').textContent || '[]');
       expect(pinnedTabIds).toContain(4);
-      expect(pinnedTabIds).not.toContain(2); // ウィンドウ1のピン留めタブは含まれない
+      expect(pinnedTabIds).not.toContain(2);
     });
 
-    // 元に戻す
     Object.defineProperty(window, 'location', {
       value: originalLocation,
       writable: true,
@@ -1907,7 +1824,6 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
   });
 
   it('chrome.windows.getCurrent()がエラーの場合、currentWindowIdはnullのまま', async () => {
-    // chrome.windows.getCurrent()がエラーをスローするようにモック
     mockChrome.windows.getCurrent = vi.fn().mockRejectedValue(new Error('API not available'));
 
     await act(async () => {
@@ -1918,23 +1834,18 @@ describe('TreeStateProvider 複数ウィンドウ対応', () => {
       );
     });
 
-    // currentWindowIdがnullであることを確認
     await waitFor(() => {
       expect(screen.getByTestId('current-window-id')).toHaveTextContent('null');
     });
   });
 });
 
-/**
- * ファビコン永続化機能のテスト
- */
 describe('TreeStateProvider ファビコン永続化', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
   let mockTabsUpdatedListeners: Array<(tabId: number, changeInfo: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => void> = [];
   let mockChrome: MockChrome;
 
-  // ファビコン情報を表示するテストコンポーネント
   function FaviconTestComponent() {
     const { isLoading, tabInfoMap, getTabInfo } = useTreeState();
 
@@ -2101,15 +2012,12 @@ describe('TreeStateProvider ファビコン永続化', () => {
       );
     });
 
-    // 初期状態のファビコンを確認
     await waitFor(() => {
       expect(screen.getByTestId('tab-1-favicon')).toHaveTextContent('https://example.com/favicon.ico');
     });
 
-    // setの呼び出し回数をリセット
     mockChrome.storage.local.set.mockClear();
 
-    // ファビコンがundefinedに変更されるイベントを発火
     await act(async () => {
       mockTabsUpdatedListeners.forEach((listener) => {
         listener(
@@ -2136,16 +2044,12 @@ describe('TreeStateProvider ファビコン永続化', () => {
       });
     });
 
-    // tab_faviconsへのsetが呼び出されていないことを確認
-    // （undefinedになった場合は既存の永続化データを維持する）
     await waitFor(() => {
       const setCalls = mockChrome.storage.local.set.mock.calls;
       const faviconSetCall = setCalls.find(
         (call) => call[0] && typeof call[0] === 'object' && 'tab_favicons' in (call[0] as Record<string, unknown>)
       );
-      // undefinedの場合は永続化されない
       if (faviconSetCall) {
-        // 呼び出されていた場合、undefinedは含まれていないことを確認
         const faviconData = (faviconSetCall[0] as { tab_favicons: Record<number, string> }).tab_favicons;
         expect(faviconData[1]).not.toBeUndefined();
       }
@@ -2153,9 +2057,6 @@ describe('TreeStateProvider ファビコン永続化', () => {
   });
 });
 
-/**
- * 余分なLoadingタブ防止機能のテスト
- */
 describe('TreeStateProvider 余分なLoadingタブ防止', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
@@ -2336,9 +2237,7 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
       );
     });
 
-    // タブ情報がロードされるのを待つ
     await waitFor(() => {
-      // chrome.tabs.queryで1つのタブが返されるので、tabInfoMapには1つのタブ情報がある
       expect(screen.getByTestId('tab-info-map-size')).toHaveTextContent('1');
     });
   });
@@ -2352,18 +2251,15 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
       );
     });
 
-    // 初期状態を確認
     await waitFor(() => {
       expect(screen.getByTestId('tab-info-map-size')).toHaveTextContent('1');
     });
 
-    // 存在しないタブIDでstatus: loadingのみの変更イベントを発火
-    // これは余分なLoadingタブを生成しない
     await act(async () => {
       mockTabsUpdatedListeners.forEach((listener) => {
         listener(
-          999, // 存在しないタブID
-          { status: 'loading' }, // statusのみの変更
+          999,
+          { status: 'loading' },
           {
             id: 999,
             title: '',
@@ -2385,8 +2281,6 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
       });
     });
 
-    // tabInfoMapには依然として1つのタブ情報のみが存在する
-    // (status: loadingのみの変更では新しいエントリは追加されない)
     await waitFor(() => {
       expect(screen.getByTestId('tab-info-map-size')).toHaveTextContent('1');
     });
@@ -2401,17 +2295,15 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
       );
     });
 
-    // 初期状態を確認
     await waitFor(() => {
       expect(screen.getByTestId('tab-info-map-size')).toHaveTextContent('1');
     });
 
-    // 既存のタブID(1)でtitle変更イベントを発火
     await act(async () => {
       mockTabsUpdatedListeners.forEach((listener) => {
         listener(
-          1, // 既存のタブID
-          { title: 'Updated Title' }, // titleの変更
+          1,
+          { title: 'Updated Title' },
           {
             id: 1,
             title: 'Updated Title',
@@ -2433,23 +2325,18 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
       });
     });
 
-    // tabInfoMapには依然として1つのタブ情報のみ（更新はされるが増加しない）
     await waitFor(() => {
       expect(screen.getByTestId('tab-info-map-size')).toHaveTextContent('1');
     });
   });
 });
 
-/**
- * タブタイトル永続化更新機能のテスト
- */
 describe('TreeStateProvider タブタイトル永続化更新', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
   let mockTabsUpdatedListeners: Array<(tabId: number, changeInfo: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => void> = [];
   let mockChrome: MockChrome;
 
-  // タイトル情報を表示するテストコンポーネント
   function TitleTestComponent() {
     const { isLoading, tabInfoMap, getTabInfo } = useTreeState();
 
@@ -2616,15 +2503,12 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
       );
     });
 
-    // 初期状態のタイトルを確認
     await waitFor(() => {
       expect(screen.getByTestId('tab-1-title')).toHaveTextContent('Test Page');
     });
 
-    // setの呼び出し回数をリセット
     mockChrome.storage.local.set.mockClear();
 
-    // タイトルがundefinedに変更されるイベントを発火（ローディング中など）
     await act(async () => {
       mockTabsUpdatedListeners.forEach((listener) => {
         listener(
@@ -2651,14 +2535,11 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
       });
     });
 
-    // tab_titlesへのsetが呼び出されていないことを確認
-    // （undefinedになった場合は既存の永続化データを維持する）
     await waitFor(() => {
       const setCalls = mockChrome.storage.local.set.mock.calls;
       const titleSetCall = setCalls.find(
         (call) => call[0] && typeof call[0] === 'object' && 'tab_titles' in (call[0] as Record<string, unknown>)
       );
-      // undefinedの場合は永続化されない
       expect(titleSetCall).toBeUndefined();
     });
   });
@@ -2672,15 +2553,12 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
       );
     });
 
-    // 初期状態のタイトルを確認
     await waitFor(() => {
       expect(screen.getByTestId('tab-1-title')).toHaveTextContent('Test Page');
     });
 
-    // setの呼び出し回数をリセット
     mockChrome.storage.local.set.mockClear();
 
-    // タイトルが空文字列に変更されるイベントを発火
     await act(async () => {
       mockTabsUpdatedListeners.forEach((listener) => {
         listener(
@@ -2707,23 +2585,17 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
       });
     });
 
-    // tab_titlesへのsetが呼び出されていないことを確認
     await waitFor(() => {
       const setCalls = mockChrome.storage.local.set.mock.calls;
       const titleSetCall = setCalls.find(
         (call) => call[0] && typeof call[0] === 'object' && 'tab_titles' in (call[0] as Record<string, unknown>)
       );
-      // 空文字列の場合は永続化されない
       expect(titleSetCall).toBeUndefined();
     });
   });
 
 });
 
-/**
- * ビューのタブカウント正確性のテスト
- * 不整合タブ削除時にviewTabCountsが再計算されることをテスト
- */
 describe('TreeStateProvider viewTabCounts 正確性', () => {
   let mockMessageListeners: MessageListener[] = [];
   let mockStorageListeners: Array<(changes: StorageChanges, areaName: string) => void> = [];
@@ -2847,7 +2719,6 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
       },
       tabs: {
         get: vi.fn(),
-        // タブ1, 2, 4のみ存在（タブ3は存在しない）
         query: vi.fn().mockResolvedValue([
           { id: 1, title: 'Tab 1', url: 'https://example.com/1', pinned: false, windowId: 1, status: 'complete', frozen: false },
           { id: 2, title: 'Tab 2', url: 'https://example.com/2', pinned: false, windowId: 1, status: 'complete', frozen: false },
@@ -2899,12 +2770,10 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
       );
     });
 
-    // ノード数はツリー状態のまま4つ
     await waitFor(() => {
       expect(screen.getByTestId('node-count')).toHaveTextContent('4');
     });
 
-    // tabInfoMapには実際に存在するタブ1, 2, 4のみが含まれる
     await waitFor(() => {
       const tabInfoMapKeys = JSON.parse(screen.getByTestId('tab-info-map-keys').textContent || '[]');
       expect(tabInfoMapKeys).toEqual([1, 2, 4]);

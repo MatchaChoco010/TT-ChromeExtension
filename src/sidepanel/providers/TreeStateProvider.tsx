@@ -140,7 +140,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       for (const tab of tabs) {
         if (tab.id !== undefined) {
           const persistedTitle = persistedTitles[tab.id];
-          // Vivaldi内部ページはURLからフレンドリーなタイトルを生成
           const vivaldiTitle = tab.url ? getVivaldiInternalPageTitle(tab.url) : null;
           const title = vivaldiTitle || tab.title || persistedTitle || '';
 
@@ -644,7 +643,6 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       return [];
     }
 
-    // ツリーの深さ優先順序でソートされたタブIDリストを返す
     const tabIdsInTreeOrder: number[] = [];
     const collectNodesInOrder = (nodes: TabNode[]) => {
       for (const node of nodes) {

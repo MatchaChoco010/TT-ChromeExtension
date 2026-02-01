@@ -13,10 +13,6 @@ import type { UserSettings } from '@/types';
 
 const snapshotManager = testSnapshotManager;
 
-/**
- * 自動スナップショット機能を初期化
- * 設定に基づいてアラームを設定する
- */
 async function initializeAutoSnapshot(): Promise<void> {
   try {
     const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
@@ -32,10 +28,6 @@ async function initializeAutoSnapshot(): Promise<void> {
   }
 }
 
-/**
- * 設定変更を監視し、自動スナップショット設定を再適用
- * 設定変更時にアラームを再設定する
- */
 function registerSettingsChangeListener(): void {
   storageService.onChange((changes) => {
     if (changes[STORAGE_KEYS.USER_SETTINGS]) {
@@ -50,10 +42,6 @@ function registerSettingsChangeListener(): void {
 
 const PERIODIC_PERSIST_ALARM_NAME = 'periodic-tree-state-persist';
 
-/**
- * 定期的なツリー状態の永続化を開始
- * 15秒おきにツリー状態を保存し、ブラウザクラッシュ時のデータロスを最小化
- */
 function startPeriodicPersist(): void {
   chrome.alarms.create(PERIODIC_PERSIST_ALARM_NAME, {
     periodInMinutes: 0.25, // 15秒 = 0.25分
@@ -96,7 +84,6 @@ chrome.runtime.onInstalled.addListener((_details) => {
 
     await testTreeStateManager.loadState();
 
-    // 未読状態をクリア（ブラウザ起動時に復元されたタブには未読インジケーターを付けない）
     await testUnreadTracker.clear();
 
     const userSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
@@ -104,7 +91,6 @@ chrome.runtime.onInstalled.addListener((_details) => {
       newTabPositionManual: userSettings?.newTabPositionManual ?? 'end' as const,
     };
 
-    // インデックスベースの同期を実行（タブIDが変わっていても復元可能）
     await testTreeStateManager.restoreStateAfterRestart(syncSettings);
 
     testTreeStateManager.setRestoringState(false);

@@ -96,7 +96,6 @@ test.describe('ツリービュー外へのドラッグ&ドロップ', () => {
 
     await startDrag(sidePanelPage, tabId);
 
-    // サイドパネルの底から20px上の位置を使用（サイドパネル内であることを保証）
     const insideSidePanelX = sidePanelBox!.x + sidePanelBox!.width / 2;
     const insideSidePanelY = sidePanelBox!.y + sidePanelBox!.height - 20;
     await moveTo(sidePanelPage, insideSidePanelX, insideSidePanelY);

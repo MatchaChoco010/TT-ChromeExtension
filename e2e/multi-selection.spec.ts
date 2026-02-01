@@ -320,7 +320,6 @@ test.describe('複数選択機能', () => {
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTabId}"]`);
-    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
     await parentNode.hover();
     const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
     await expandOverlay.click();
@@ -333,7 +332,6 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.bringToFront();
     await sidePanelPage.evaluate(() => window.focus());
 
-    // ホバーを外してからクリック（ファビコン部分ではなく、タブノードをクリック）
     const anotherNodeForHover = sidePanelPage.locator(`[data-testid="tree-node-${anotherTabId}"]`);
     await anotherNodeForHover.hover();
     await parentNode.click();
@@ -607,7 +605,6 @@ test.describe('複数選択機能', () => {
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`);
-    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
     await parentNode.hover();
     const expandOverlay2 = parentNode.locator('[data-testid="expand-overlay"]');
     await expandOverlay2.click();
@@ -622,7 +619,6 @@ test.describe('複数選択機能', () => {
     await sidePanelPage.evaluate(() => window.focus());
 
     const tabNodeA = sidePanelPage.locator(`[data-testid="tree-node-${tabA}"]`);
-    // ホバーを外してからクリック
     await tabNodeA.hover();
     await tabNodeA.click();
     await expect(tabNodeA).toHaveClass(/bg-gray-500/);

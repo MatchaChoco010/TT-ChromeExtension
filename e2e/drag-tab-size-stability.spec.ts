@@ -1,6 +1,3 @@
-/**
- * ドラッグ中のタブサイズ安定性のE2Eテスト
- */
 import { test, expect } from './fixtures/extension';
 import { createTab, getCurrentWindowId } from './utils/tab-utils';
 import { assertTabStructure } from './utils/assertion-utils';

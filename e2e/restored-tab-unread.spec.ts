@@ -24,7 +24,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       const tabNode = sidePanelPage.locator(`[data-testid="tree-node-${initialBrowserTabId}"]`);
       await expect(tabNode).toBeVisible({ timeout: 10000 });
 
-      // 未読バッジが表示されていないことを確認（initialBrowserTabIdには未読マークは付かない）
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toHaveCount(0, { timeout: 5000 });
     }
@@ -58,7 +57,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
 
-      // クリーンアップ
       await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -91,7 +89,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toHaveCount(0, { timeout: 5000 });
 
-      // クリーンアップ
       await closeTab(serviceWorker, activeTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -125,9 +122,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       const unreadBadge = tabNode.locator('[data-testid="unread-badge"]');
       await expect(unreadBadge).toBeVisible({ timeout: 10000 });
 
-      // タブをアクティブにして既読にする
       await activateTab(serviceWorker, bgTabId);
-      // activateTabはアクティブタブを変更するだけなのでツリー構造は変わらない
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
@@ -144,12 +139,10 @@ extensionTest.describe('復元タブの未読状態', () => {
         { tabId: bgTabId, depth: 0 },
       ], 0);
 
-      // リロード後も既存タブに未読バッジが付かないことを確認
       const reloadedTabNode = sidePanelPage.locator(`[data-testid="tree-node-${bgTabId}"]`);
       const reloadedUnreadBadge = reloadedTabNode.locator('[data-testid="unread-badge"]');
       await expect(reloadedUnreadBadge).toHaveCount(0, { timeout: 5000 });
 
-      // クリーンアップ
       await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -189,9 +182,7 @@ extensionTest.describe('復元タブの未読状態', () => {
       });
       expect(unreadTabs).toContain(bgTabId);
 
-      // タブをアクティブにして既読にする
       await activateTab(serviceWorker, bgTabId);
-      // activateTabはアクティブタブを変更するだけなのでツリー構造は変わらない
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
         { tabId: bgTabId, depth: 0 },
@@ -206,7 +197,6 @@ extensionTest.describe('復元タブの未読状態', () => {
       });
       expect(unreadTabsAfter || []).not.toContain(bgTabId);
 
-      // クリーンアップ
       await closeTab(serviceWorker, bgTabId);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },

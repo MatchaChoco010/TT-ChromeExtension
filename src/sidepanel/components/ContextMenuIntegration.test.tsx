@@ -6,9 +6,6 @@ import { ContextMenu } from './ContextMenu';
 import { useMenuActions } from '../hooks/useMenuActions';
 import { chromeMock } from '@/test/chrome-mock';
 
-/**
- * MenuActions とメニュー項目の実装 - 統合テスト
- */
 describe('ContextMenu Integration with MenuActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();

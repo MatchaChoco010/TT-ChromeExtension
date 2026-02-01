@@ -95,7 +95,6 @@ export async function moveTabToWindow(
         return [tabId];
       }
 
-      // Find the node with the given tabId by traversing the tree
       const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
         for (const node of nodes) {
           if (node.tabId === targetTabId) {
@@ -109,7 +108,6 @@ export async function moveTabToWindow(
         return null;
       };
 
-      // Collect all descendant tabIds from a node (including the node itself)
       const collectDescendants = (node: TabNode): number[] => {
         const tabIds: number[] = [node.tabId];
         for (const child of node.children) {
@@ -118,7 +116,6 @@ export async function moveTabToWindow(
         return tabIds;
       };
 
-      // Search in all windows and views
       for (const windowState of treeState.windows) {
         for (const view of windowState.views) {
           const node = findNode(view.rootNodes, tabId);
@@ -203,7 +200,6 @@ export async function assertWindowTreeSync(
       windows: WindowState[];
     }
 
-    // Collect all tabIds from a tree
     const collectAllTabIds = (nodes: TabNode[]): Set<number> => {
       const tabIds = new Set<number>();
       for (const node of nodes) {
@@ -222,17 +218,14 @@ export async function assertWindowTreeSync(
         const treeState = result.tree_state as TreeState | undefined;
 
         if (treeState?.windows && tabs.length > 0) {
-          // Find the window state for this windowId
           const windowState = treeState.windows.find(w => w.windowId === windowId);
           if (windowState) {
-            // Collect all tabIds from all views in this window
             const allTreeTabIds = new Set<number>();
             for (const view of windowState.views) {
               for (const tabId of collectAllTabIds(view.rootNodes)) {
                 allTreeTabIds.add(tabId);
               }
             }
-            // Also include pinned tabs
             for (const pinnedTabId of windowState.pinnedTabIds) {
               allTreeTabIds.add(pinnedTabId);
             }

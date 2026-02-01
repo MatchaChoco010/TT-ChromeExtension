@@ -1,6 +1,3 @@
-/**
- * Tailwind CSS設定のテスト
- */
 import { describe, it, expect } from 'vitest';
 import type { Config } from 'tailwindcss';
 // @ts-expect-error - tailwind.config.js does not have type declarations

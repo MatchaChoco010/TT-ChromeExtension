@@ -41,7 +41,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
     await parentNode.hover();
     const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]');
     await expect(expandOverlay.first()).toBeVisible({ timeout: 3000 });
@@ -72,7 +71,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    // 子タブがない状態ではオーバーレイは表示されない
     await parentNode.hover();
     const expandOverlayBefore = parentNode.locator('[data-testid="expand-overlay"]');
     const hasExpandOverlayBefore = (await expandOverlayBefore.count()) > 0;
@@ -85,7 +83,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
       { tabId: childTab, depth: 1 },
     ], 0);
 
-    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
     await parentNode.hover();
     const expandOverlayAfter = parentNode.locator('[data-testid="expand-overlay"]');
 
@@ -131,7 +128,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     ], 0);
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
     await parentNode.hover();
     const expandOverlay = parentNode.locator('[data-testid="expand-overlay"]').first();
     await expect(expandOverlay).toBeVisible({ timeout: 5000 });
@@ -471,7 +467,6 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
     );
 
     const parentNode = sidePanelPage.locator(`[data-testid="tree-node-${parentTab}"]`).first();
-    // 展開中はホバーでオーバーレイが表示されるので、まずホバーする
     await parentNode.hover();
     const expandOverlayAfterNewTab = parentNode.locator('[data-testid="expand-overlay"]');
     const hasExpandOverlay = await expandOverlayAfterNewTab.count() > 0;

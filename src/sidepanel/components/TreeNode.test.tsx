@@ -104,7 +104,7 @@ describe('TreeNode', () => {
     });
 
     it('depthに基づいてインデントを適用できること', () => {
-      const node = createMockNode(1, 2); // depth: 2
+      const node = createMockNode(1, 2);
       const tab = createMockTab(1);
 
       render(
@@ -163,15 +163,12 @@ describe('TreeNode', () => {
         />
       );
 
-      // ホバーしていない状態ではオーバーレイは表示されない
       expect(screen.queryByTestId('expand-overlay')).not.toBeInTheDocument();
 
-      // ホバーするとオーバーレイが表示される
       const treeNodeElement = screen.getByTestId('tree-node-1');
       await user.hover(treeNodeElement);
       expect(screen.getByTestId('expand-overlay')).toBeInTheDocument();
 
-      // ホバーを外すとオーバーレイが消える
       await user.unhover(treeNodeElement);
       expect(screen.queryByTestId('expand-overlay')).not.toBeInTheDocument();
     });
@@ -238,14 +235,12 @@ describe('TreeNode', () => {
         />
       );
 
-      // 展開中はホバーしないとオーバーレイが表示されない
       const treeNodeElement = screen.getByTestId('tree-node-1');
       await user.hover(treeNodeElement);
 
       const toggleOverlay = screen.getByTestId('expand-overlay');
       expect(toggleOverlay).toHaveTextContent('▼');
 
-      // 折りたたみ状態に変更
       const collapsedNode = { ...expandedNode, isExpanded: false };
       rerender(
         <TreeNode
@@ -259,7 +254,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // 折りたたみ中は常にオーバーレイが表示される
       const collapsedOverlay = screen.getByTestId('expand-overlay');
       expect(collapsedOverlay).toHaveTextContent('▶');
     });
@@ -308,7 +302,6 @@ describe('TreeNode', () => {
       const treeNodeElement = screen.getByTestId('tree-node-1');
       expect(treeNodeElement).not.toHaveClass('bg-gray-200');
 
-      // アクティブ状態に変更
       rerender(
         <TreeNode
           node={node}
@@ -530,7 +523,7 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          closeWarningThreshold={2} // 閾値を2に設定（タブ数2なので表示される）
+          closeWarningThreshold={2}
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
@@ -588,7 +581,7 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          closeWarningThreshold={2} // 閾値を2に設定（タブ数2なので表示される）
+          closeWarningThreshold={2}
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
@@ -619,7 +612,7 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          closeWarningThreshold={2} // 閾値を2に設定（タブ数2なので表示される）
+          closeWarningThreshold={2}
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
@@ -720,7 +713,6 @@ describe('TreeNode', () => {
 
     it('タブタイトルの長さに関係なく閉じるボタンが常に右端にあること', async () => {
       const user = userEvent.setup();
-      // 短いタイトル
       const nodeShort = createMockNode(1);
       const tabShort = createMockTab(1, 'Short');
 
@@ -743,7 +735,6 @@ describe('TreeNode', () => {
       let contentContainer = closeButton.closest('[data-testid="tab-content"]');
       expect(contentContainer).toHaveClass('justify-between');
 
-      // 長いタイトルに変更
       const nodeLong = createMockNode(2);
       const tabLong = createMockTab(
         2,
@@ -820,7 +811,6 @@ describe('TreeNode', () => {
 
   describe('警告閾値によるダイアログ制御', () => {
     it('サブツリーのタブ数が閾値未満の場合は確認ダイアログを表示しないこと', () => {
-      // 閾値を5に設定、サブツリーは親+子1つ=2タブ
       const childNode = createMockNode(2);
       const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
@@ -849,7 +839,6 @@ describe('TreeNode', () => {
     });
 
     it('サブツリーのタブ数が閾値以上の場合は確認ダイアログを表示すること', () => {
-      // 閾値を3に設定、サブツリーは親+子2つ=3タブ
       const child1 = createMockNode(2);
       const child2 = createMockNode(3);
       const node = createMockNode(1, 0, [child1, child2]);
@@ -879,7 +868,6 @@ describe('TreeNode', () => {
     });
 
     it('サブツリーのタブ数が閾値ちょうどの場合は確認ダイアログを表示すること', () => {
-      // 閾値を2に設定、サブツリーは親+子1つ=2タブ
       const childNode = createMockNode(2);
       const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
@@ -908,7 +896,6 @@ describe('TreeNode', () => {
     });
 
     it('閾値が指定されていない場合は、デフォルト値(3)を使用すること', () => {
-      // 閾値を指定しない、サブツリーは親+子1つ=2タブ
       const childNode = createMockNode(2);
       const node = createMockNode(1, 0, [childNode]);
       const collapsedNode = { ...node, isExpanded: false };
@@ -992,7 +979,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Start Page', // URL形式ではないタイトル → そのまま表示
+        title: 'Start Page',
         url: 'chrome://vivaldi-webui/startpage',
         favIconUrl: undefined,
         status: 'complete',
@@ -1018,7 +1005,7 @@ describe('TreeNode', () => {
       const tab: TabInfo = {
         id: 1,
         title: 'chrome://vivaldi-webui/startpage',
-        url: '', // 拡張機能にはURLが公開されない
+        url: '',
         favIconUrl: undefined,
         status: 'complete',
       };
@@ -1042,7 +1029,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Speed Dial', // URL形式ではないタイトル → そのまま表示
+        title: 'Speed Dial',
         url: 'vivaldi://startpage/',
         favIconUrl: undefined,
         status: 'complete',
@@ -1067,7 +1054,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'New Tab', // URL形式ではないタイトル → そのまま表示
+        title: 'New Tab',
         url: 'chrome-extension://abcdefg/newtab.html',
         favIconUrl: undefined,
         status: 'complete',
@@ -1092,7 +1079,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'New Tab', // URL形式ではないタイトル → そのまま表示
+        title: 'New Tab',
         url: 'chrome://newtab/',
         favIconUrl: undefined,
         status: 'complete',
@@ -1117,7 +1104,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Speed Dial', // URL形式ではないタイトル → そのまま表示
+        title: 'Speed Dial',
         url: 'vivaldi://newtab/',
         favIconUrl: undefined,
         status: 'complete',
@@ -1346,7 +1333,7 @@ describe('TreeNode', () => {
     });
 
     it('未読インジケーターが絶対位置指定で左下に配置されること（depth=0）', () => {
-      const node = createMockNode(1, 0); // depth: 0
+      const node = createMockNode(1, 0);
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1370,7 +1357,7 @@ describe('TreeNode', () => {
     });
 
     it('未読インジケーターがdepthに応じた位置にインデント表示されること', () => {
-      const node = createMockNode(1, 2); // depth: 2
+      const node = createMockNode(1, 2);
       const tab = createMockTab(1, 'Test Tab');
 
       render(
@@ -1614,10 +1601,8 @@ describe('TreeNode', () => {
       expect(screen.getByText('ブックマーク')).toBeInTheDocument();
     });
 
-    // about:blankはURL形式でないためそのまま表示
     it('about:blankのタイトルはURL形式でないためそのまま表示されること', () => {
       const node = createMockNode(1);
-      // about:blankはabout:スキームなのでスキーム://ではないため、URL形式とは判定されない
       const tab: TabInfo = {
         id: 1,
         title: 'about:blank',
@@ -1638,7 +1623,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないため、chrome.tabs.Tab.titleがそのまま表示される
       expect(screen.getByText('about:blank')).toBeInTheDocument();
     });
 
@@ -1689,7 +1673,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないので、そのまま表示される
       expect(screen.getByText('My Document.pdf')).toBeInTheDocument();
     });
 
@@ -1697,7 +1680,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: '設定 - Chrome', // すでに適切なタイトルが設定されている
+        title: '設定 - Chrome',
         url: 'chrome://settings/',
         favIconUrl: undefined,
         status: 'complete',
@@ -1715,7 +1698,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないので、そのまま表示される
       expect(screen.getByText('設定 - Chrome')).toBeInTheDocument();
     });
 
@@ -1741,7 +1723,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがURL形式でないので、そのまま表示される
       expect(screen.getByText('重要な資料.pdf')).toBeInTheDocument();
     });
 
@@ -1767,7 +1748,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // マッピングがないのでそのまま表示
       expect(screen.getByText('https://unknown-system-page.com/')).toBeInTheDocument();
     });
   });
@@ -1777,7 +1757,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Settings', // HTMLの<title>タグで設定されたタイトル
+        title: 'Settings',
         url: 'chrome-extension://abcdefg/settings.html',
         favIconUrl: undefined,
         status: 'complete',
@@ -1795,9 +1775,7 @@ describe('TreeNode', () => {
         />
       );
 
-      // HTMLのtitleタグで設定された「Settings」がそのまま表示される
       expect(screen.getByText('Settings')).toBeInTheDocument();
-      // 「新しいタブ」に変換されないこと
       expect(screen.queryByText('新しいタブ')).not.toBeInTheDocument();
     });
 
@@ -1805,7 +1783,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Group', // HTMLの<title>タグで設定されたタイトル
+        title: 'Group',
         url: 'chrome-extension://abcdefg/group.html',
         favIconUrl: undefined,
         status: 'complete',
@@ -1823,9 +1801,7 @@ describe('TreeNode', () => {
         />
       );
 
-      // HTMLのtitleタグで設定された「Group」がそのまま表示される
       expect(screen.getByText('Group')).toBeInTheDocument();
-      // 「新しいタブ」に変換されないこと
       expect(screen.queryByText('新しいタブ')).not.toBeInTheDocument();
     });
 
@@ -1833,7 +1809,7 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab: TabInfo = {
         id: 1,
-        title: 'Custom Extension Page', // 拡張機能が設定したカスタムタイトル
+        title: 'Custom Extension Page',
         url: 'chrome-extension://abcdefg/custom.html',
         favIconUrl: undefined,
         status: 'complete',
@@ -1851,7 +1827,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // タイトルがそのまま表示される
       expect(screen.getByText('Custom Extension Page')).toBeInTheDocument();
     });
   });
@@ -1874,7 +1849,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // discarded-tab-titleテストIDを持つ要素が存在することを確認
       const discardedTitle = screen.getByTestId('discarded-tab-title');
       expect(discardedTitle).toBeInTheDocument();
       expect(discardedTitle).toHaveClass('text-gray-400');
@@ -1897,9 +1871,7 @@ describe('TreeNode', () => {
         />
       );
 
-      // discarded-tab-titleテストIDが存在しないことを確認
       expect(screen.queryByTestId('discarded-tab-title')).not.toBeInTheDocument();
-      // タイトルは表示されている
       expect(screen.getByText('Normal Tab')).toBeInTheDocument();
     });
 
@@ -1913,16 +1885,13 @@ describe('TreeNode', () => {
           tab={tab}
           isUnread={false}
           isActive={false}
-          // isDiscardedを指定しない（デフォルト値false）
           onActivate={mockOnActivate}
           onToggle={mockOnToggle}
           onClose={mockOnClose}
         />
       );
 
-      // discarded-tab-titleテストIDが存在しないことを確認
       expect(screen.queryByTestId('discarded-tab-title')).not.toBeInTheDocument();
-      // タイトルは表示されている
       expect(screen.getByText('Default Tab')).toBeInTheDocument();
     });
 
@@ -1930,7 +1899,6 @@ describe('TreeNode', () => {
       const node = createMockNode(1);
       const tab = createMockTab(1, 'Tab Title');
 
-      // 最初は休止タブ
       const { rerender } = render(
         <TreeNode
           node={node}
@@ -1944,10 +1912,8 @@ describe('TreeNode', () => {
         />
       );
 
-      // 休止タブなのでグレーアウトが適用されている
       expect(screen.getByTestId('discarded-tab-title')).toBeInTheDocument();
 
-      // 休止状態が解除された
       rerender(
         <TreeNode
           node={node}
@@ -1961,7 +1927,6 @@ describe('TreeNode', () => {
         />
       );
 
-      // グレーアウトが解除されている
       expect(screen.queryByTestId('discarded-tab-title')).not.toBeInTheDocument();
       expect(screen.getByText('Tab Title')).toBeInTheDocument();
     });

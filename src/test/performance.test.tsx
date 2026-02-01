@@ -1,7 +1,3 @@
-/**
- * パフォーマンステスト
- */
-
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import SidePanelRoot from '@/sidepanel/components/SidePanelRoot';

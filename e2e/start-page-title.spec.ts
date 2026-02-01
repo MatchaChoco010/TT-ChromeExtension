@@ -1,11 +1,3 @@
-/**
- * スタートページタイトルのE2Eテスト
- *
- * 注意: Chromiumでは chrome://vivaldi-webui/startpage はエラーページとして扱われるが、
- *       URLが正しく設定されていることを検証する
- *       Vivaldiではスタートページが開かれ「スタートページ」と表示される
- */
-
 import { test, expect } from './fixtures/extension';
 import { waitForTabInTreeState, waitForCondition } from './utils/polling-utils';
 import { assertTabStructure } from './utils/assertion-utils';
@@ -17,10 +9,6 @@ import {
 } from './utils/tab-utils';
 import { setupWindow } from './utils/setup-utils';
 
-/**
- * タブタイトル要素を取得するヘルパー関数
- * discarded-tab-title または tab-title の両方に対応
- */
 async function getTabTitleElement(sidePanelPage: import('@playwright/test').Page, tabId: number) {
   const tabTitle = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"] [data-testid="tab-title"]`);
   const discardedTabTitle = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"] [data-testid="discarded-tab-title"]`);

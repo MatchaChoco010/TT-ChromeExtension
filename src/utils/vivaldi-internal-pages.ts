@@ -29,17 +29,11 @@ export function getVivaldiInternalPageTitle(url: string): string | null {
   return null;
 }
 
-/**
- * 文字列の先頭を大文字にする
- */
 function capitalizeFirst(str: string): string {
   if (str.length === 0) return str;
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-/**
- * URLがVivaldiの内部ページかどうかを判定する
- */
 export function isVivaldiInternalPage(url: string): boolean {
   return (
     url.includes('mpognobbkildjkofajifpdfhcoklimli') ||

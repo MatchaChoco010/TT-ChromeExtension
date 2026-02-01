@@ -94,7 +94,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         tabId: 1,
         children: [node2, node3],
         depth: 0,
-        isExpanded: false, // 折りたたまれている
+        isExpanded: false,
       };
 
       const nodes = [node1];
@@ -138,7 +138,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         tabId: 1,
         children: [node2, node3],
         depth: 0,
-        isExpanded: true, // 展開されている
+        isExpanded: true,
       };
 
       const nodes = [node1];
@@ -177,7 +177,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         tabId: 2,
         children: [node4, node5],
         depth: 1,
-        isExpanded: false, // 折りたたまれている
+        isExpanded: false,
       };
       const node3: UITabNode = {
         tabId: 3,
@@ -202,7 +202,6 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
       expect(subtreeIds).toContain(4);
       expect(subtreeIds).toContain(5);
       expect(subtreeIds).toHaveLength(3);
-      // 親ノードや兄弟ノードは含まれない
       expect(subtreeIds).not.toContain(1);
       expect(subtreeIds).not.toContain(3);
     });
@@ -223,19 +222,19 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         tabId: 3,
         children: [node4],
         depth: 2,
-        isExpanded: false, // 折りたたまれている
+        isExpanded: false,
       };
       const node2: UITabNode = {
         tabId: 2,
         children: [node3],
         depth: 1,
-        isExpanded: false, // 折りたたまれている
+        isExpanded: false,
       };
       const node1: UITabNode = {
         tabId: 1,
         children: [node2],
         depth: 0,
-        isExpanded: false, // 折りたたまれている
+        isExpanded: false,
       };
 
       const nodes = [node1];
@@ -311,7 +310,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         tabId: 1,
         children: [node2],
         depth: 0,
-        isExpanded: false, // 折りたたまれている
+        isExpanded: false,
       };
 
       const nodes = [node1];
@@ -350,7 +349,7 @@ describe('折りたたみ/展開状態でのサブツリー移動', () => {
         tabId: 1,
         children: [node2],
         depth: 0,
-        isExpanded: true, // 展開されている
+        isExpanded: true,
       };
 
       const nodes = [node1];

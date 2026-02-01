@@ -30,7 +30,6 @@ test.describe('選択状態の自動解除', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // 複数選択を行う
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
 
@@ -54,7 +53,6 @@ test.describe('選択状態の自動解除', () => {
       await expect(tabNode1).not.toHaveClass(/bg-gray-500/);
       await expect(tabNode2).not.toHaveClass(/bg-gray-500/);
 
-      // Cleanup
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -109,7 +107,6 @@ test.describe('選択状態の自動解除', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // 複数選択を行う（tabId1とtabId2を選択）
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
 
@@ -132,7 +129,6 @@ test.describe('選択状態の自動解除', () => {
       await expect(tabNode1).not.toHaveClass(/bg-gray-500/);
       await expect(tabNode2).not.toHaveClass(/bg-gray-500/);
 
-      // Cleanup
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -170,7 +166,6 @@ test.describe('選択状態の自動解除', () => {
       await sidePanelPage.bringToFront();
       await sidePanelPage.evaluate(() => window.focus());
 
-      // 複数選択を行う
       const tabNode1 = sidePanelPage.locator(`[data-testid="tree-node-${tabId1}"]`);
       const tabNode2 = sidePanelPage.locator(`[data-testid="tree-node-${tabId2}"]`);
 
@@ -201,7 +196,6 @@ test.describe('選択状態の自動解除', () => {
       await expect(tabNode1).not.toHaveClass(/bg-gray-500/);
       await expect(tabNode2).not.toHaveClass(/bg-gray-500/);
 
-      // Cleanup
       await closeTab(serviceWorker, tabId1);
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },

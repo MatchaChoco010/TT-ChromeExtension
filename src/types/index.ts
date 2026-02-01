@@ -114,11 +114,10 @@ export interface TreeStructureEntry {
 }
 
 /**
- * ツリー状態（新アーキテクチャ）
+ * ツリー状態
  * Window → View → Tab の階層構造を直接反映
  */
 export interface TreeState {
-  /** ウィンドウの配列（順序を持つ） */
   windows: WindowState[];
 }
 

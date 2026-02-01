@@ -284,8 +284,6 @@ test.describe('ビューのタブカウント正確性', () => {
         }
       );
 
-      // viewTabCountsはtabInfoMapに存在するタブのみをカウントするため、
-      // ゴーストタブはカウントに含まれないはず
       const getTabCountBadge = async () => {
         const badge = sidePanelPage.locator('[data-testid="tab-count-badge-0"]');
         if (await badge.isVisible()) {
@@ -298,9 +296,6 @@ test.describe('ビューのタブカウント正確性', () => {
       await sidePanelPage.reload();
       await waitForViewSwitcher(sidePanelPage);
 
-      // (viewTabCountsはtabInfoMapに存在するタブのみをカウント)
-      // ゴーストタブはchrome.tabs APIに存在しないため、tabInfoMapに含まれず、
-      // したがってviewTabCountsにも含まれない
       await waitForCondition(
         async () => {
           const count = await getTabCountBadge();
@@ -657,10 +652,6 @@ test.describe('タブ数表示の視認性', () => {
         return tabs.map((t) => t.id);
       }, windowId);
 
-      // このテストは実装が正しいことを確認するのみ
-      // （実際にすべてのタブを閉じるとウィンドウも閉じてしまうため）
-      // ViewSwitcherのコード: {tabCount > 0 && (...)} を検証
-
       if (tabs.length > 0) {
         await waitForCondition(
           async () => {
@@ -700,7 +691,6 @@ test.describe('ピン留めタブのカウント', () => {
 
     const initialCount = await getTabCountBadge();
 
-    // 通常タブを2つ追加
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -728,7 +718,6 @@ test.describe('ピン留めタブのカウント', () => {
 
     const countBeforePin = await getTabCountBadge();
 
-    // 1つのタブをピン留め
     await pinTab(serviceWorker, tabId1);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }], 0);
     await assertTabStructure(sidePanelPage, windowId, [
@@ -736,8 +725,6 @@ test.describe('ピン留めタブのカウント', () => {
       { tabId: tabId2, depth: 0 },
     ], 0);
 
-    // ピン留め後もタブカウントは変わらないことを確認
-    // （ピン留めタブもカウントに含まれるため）
     await waitForCondition(
       async () => {
         const count = await getTabCountBadge();
@@ -750,14 +737,12 @@ test.describe('ピン留めタブのカウント', () => {
       }
     );
 
-    // もう1つのタブもピン留め
     await pinTab(serviceWorker, tabId2);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }, { tabId: tabId2 }], 0);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
     ], 0);
 
-    // まだタブカウントは変わらない
     await waitForCondition(
       async () => {
         const count = await getTabCountBadge();
@@ -770,7 +755,6 @@ test.describe('ピン留めタブのカウント', () => {
       }
     );
 
-    // ピン留め解除
     await unpinTab(serviceWorker, tabId1);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId2 }], 0);
     await assertTabStructure(sidePanelPage, windowId, [
@@ -778,7 +762,6 @@ test.describe('ピン留めタブのカウント', () => {
       { tabId: tabId1, depth: 0 },
     ], 0);
 
-    // タブカウントは変わらない
     await waitForCondition(
       async () => {
         const count = await getTabCountBadge();
@@ -791,7 +774,6 @@ test.describe('ピン留めタブのカウント', () => {
       }
     );
 
-    // クリーンアップ
     await closeTab(serviceWorker, tabId1);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId2 }], 0);
     await assertTabStructure(sidePanelPage, windowId, [
@@ -832,7 +814,6 @@ test.describe('ピン留めタブのカウント', () => {
 
     const initialCount = await getTabCountBadge();
 
-    // ピン留めするタブを作成
     const tabId1 = await createTab(serviceWorker, getTestServerUrl('/page'));
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
@@ -851,21 +832,18 @@ test.describe('ピン留めタブのカウント', () => {
       }
     );
 
-    // ピン留め
     await pinTab(serviceWorker, tabId1);
     await assertPinnedTabStructure(sidePanelPage, windowId, [{ tabId: tabId1 }], 0);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
     ], 0);
 
-    // ピン留めタブを閉じる
     await closeTab(serviceWorker, tabId1);
     await assertPinnedTabStructure(sidePanelPage, windowId, [], 0);
     await assertTabStructure(sidePanelPage, windowId, [
       { tabId: initialBrowserTabId, depth: 0 },
     ], 0);
 
-    // タブカウントが元に戻ることを確認
     await waitForCondition(
       async () => {
         const count = await getTabCountBadge();

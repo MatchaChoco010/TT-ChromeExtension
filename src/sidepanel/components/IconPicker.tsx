@@ -14,11 +14,9 @@ interface IconDefinition {
 }
 
 export interface IconPickerProps {
-  /** 現在選択中のアイコン（アイコン名またはURL） */
+  /** アイコン名またはURL */
   currentIcon: string | undefined;
-  /** アイコン選択時のコールバック */
   onSelect: (icon: string) => void;
-  /** キャンセル時のコールバック */
   onCancel: () => void;
 }
 
@@ -468,20 +466,10 @@ CATEGORIES.forEach((category) => {
   });
 });
 
-/**
- * アイコン名からSVGを取得するヘルパー関数
- * @param iconName アイコン名
- * @returns アイコン定義またはundefined
- */
 export const getIconByName = (iconName: string): IconDefinition | undefined => {
   return ALL_ICONS_MAP.get(iconName);
 };
 
-/**
- * アイコン名がカスタムアイコンかどうかを判定する
- * @param iconName アイコン名またはURL
- * @returns カスタムアイコンの場合true
- */
 export const isCustomIcon = (iconName: string | undefined): boolean => {
   if (!iconName) return false;
   if (iconName.startsWith('http://') || iconName.startsWith('https://')) return false;
