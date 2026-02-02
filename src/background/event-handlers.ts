@@ -1558,6 +1558,35 @@ async function handleCreateSnapshot(
   }
 }
 
+/**
+ * 複数のタブをバッチ処理で休止状態にする
+ * アクティブタブは自動的にスキップされる
+ */
+async function discardTabsInBatches(
+  tabIds: number[],
+  batchSize: number = 10,
+  delayMs: number = 50
+): Promise<void> {
+  for (let i = 0; i < tabIds.length; i += batchSize) {
+    const batch = tabIds.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (tabId) => {
+        try {
+          const tab = await chrome.tabs.get(tabId);
+          if (!tab.active && tab.status === 'complete') {
+            await chrome.tabs.discard(tabId);
+          }
+        } catch {
+          // タブが既に閉じられているか休止されている場合は無視
+        }
+      })
+    );
+    if (i + batchSize < tabIds.length) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 async function handleRestoreSnapshot(
   jsonData: string,
   closeCurrentTabs: boolean,
@@ -1685,6 +1714,12 @@ async function handleRestoreSnapshot(
     treeStateManager.notifyStateChanged();
 
     sendResponse({ success: true, data: null });
+
+    // 作成したタブを休止状態にする（メモリ節約）
+    const createdTabIds = Array.from(indexToNewTabId.values());
+    if (createdTabIds.length > 0) {
+      discardTabsInBatches(createdTabIds).catch(() => {});
+    }
   } catch (error) {
     isRestoringSnapshot = false;
     restoringTabIds.clear();

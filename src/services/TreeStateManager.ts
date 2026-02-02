@@ -1628,6 +1628,87 @@ export class TreeStateManager {
   // ========================================
 
   /**
+   * 配列からLongest Increasing Subsequence (LIS)を計算
+   * O(n log n)のpatience sortingアルゴリズムを使用
+   * @returns LISに含まれる要素のインデックス集合
+   */
+  private findLIS(arr: number[]): Set<number> {
+    if (arr.length === 0) return new Set();
+
+    const tails: number[] = [];
+    const prev: number[] = new Array(arr.length).fill(-1);
+    const tailIndices: number[] = [];
+
+    for (let i = 0; i < arr.length; i++) {
+      const val = arr[i];
+      let lo = 0;
+      let hi = tails.length;
+      while (lo < hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (arr[tailIndices[mid]] < val) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      if (lo > 0) {
+        prev[i] = tailIndices[lo - 1];
+      }
+      if (lo === tails.length) {
+        tails.push(val);
+        tailIndices.push(i);
+      } else {
+        tails[lo] = val;
+        tailIndices[lo] = i;
+      }
+    }
+
+    const lisIndices = new Set<number>();
+    let idx = tailIndices[tailIndices.length - 1];
+    while (idx !== -1) {
+      lisIndices.add(idx);
+      idx = prev[idx];
+    }
+    return lisIndices;
+  }
+
+  /**
+   * 現在の順序から目標順序への最小移動タブセットを計算
+   * LISを使用して移動不要なタブを特定
+   */
+  private calculateTabsToMove(
+    currentOrder: number[],
+    targetOrder: number[]
+  ): Set<number> {
+    if (targetOrder.length === 0) return new Set();
+
+    const currentPositionMap = new Map<number, number>();
+    for (let i = 0; i < currentOrder.length; i++) {
+      currentPositionMap.set(currentOrder[i], i);
+    }
+
+    const positionsInCurrent: number[] = [];
+    const validTargetOrder: number[] = [];
+    for (const tabId of targetOrder) {
+      const pos = currentPositionMap.get(tabId);
+      if (pos !== undefined) {
+        positionsInCurrent.push(pos);
+        validTargetOrder.push(tabId);
+      }
+    }
+
+    const lisIndices = this.findLIS(positionsInCurrent);
+
+    const tabsToMove = new Set<number>();
+    for (let i = 0; i < validTargetOrder.length; i++) {
+      if (!lisIndices.has(i)) {
+        tabsToMove.add(validTargetOrder[i]);
+      }
+    }
+    return tabsToMove;
+  }
+
+  /**
    * 拡張機能の新規インストール時にChromeタブからTreeStateを初期化
    * 設計原則として Chrome → TreeStateManager への同期は通常禁止だが、
    * 新規インストール時のみ許可される唯一の例外
@@ -1871,6 +1952,10 @@ export class TreeStateManager {
    * TreeStateの状態をChromeタブに同期
    */
   async syncTreeStateToChromeTabs(windowId?: number): Promise<void> {
+    // 既に同期中の場合は再入を防止
+    if (this.isSyncingToChrome) {
+      return;
+    }
     this.isSyncingToChrome = true;
     try {
       const queryOptions = windowId !== undefined ? { windowId } : {};
@@ -2020,6 +2105,15 @@ export class TreeStateManager {
       }
     }
 
+    // 現在のChrome順序を取得（非ピンタブのみ）
+    const nonPinnedTabs = currentTabs
+      .filter((t) => t.id !== undefined && !t.pinned)
+      .sort((a, b) => a.index - b.index);
+    const currentNonPinnedOrder = nonPinnedTabs.map((t) => t.id!);
+
+    // LISベースで移動が必要なタブを計算
+    const tabsToMove = this.calculateTabsToMove(currentNonPinnedOrder, orderedTabIds);
+
     const pinnedCount = currentTabs.filter((t) => t.pinned).length;
 
     const currentIndexMap = new Map<number, number>();
@@ -2029,10 +2123,17 @@ export class TreeStateManager {
       }
     }
 
+    // 移動が必要なタブがない場合でも、位置確認のループは実行する
     for (let i = 0; i < orderedTabIds.length; i++) {
       const tabId = orderedTabIds[i];
       const expectedIndex = pinnedCount + i;
       const currentIndex = currentIndexMap.get(tabId);
+
+      // LIS最適化: 移動不要なタブはスキップ
+      // ただし、tabsToMoveが空の場合は従来通り位置チェックを行う
+      if (tabsToMove.size > 0 && !tabsToMove.has(tabId)) {
+        continue;
+      }
 
       if (currentIndex !== undefined && currentIndex !== expectedIndex) {
         try {
@@ -2045,7 +2146,7 @@ export class TreeStateManager {
             }
           }
         } catch {
-          // タブが存在しない場合は無視（既に閉じられている場合など）
+          // タブが存在しない場合は無視
         }
       }
     }
@@ -2053,22 +2154,32 @@ export class TreeStateManager {
 
   /**
    * 空ウィンドウを閉じる
+   * 最初に1回だけwindows.getAll()を呼び出し、各ウィンドウのタブ数をチェック
    */
   private async closeEmptyWindows(): Promise<void> {
     try {
       const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
       if (allWindows.length <= 1) return;
 
+      // 空ウィンドウを特定
+      const emptyWindowIds: number[] = [];
       for (const window of allWindows) {
         if (window.id === undefined) continue;
         const tabs = await chrome.tabs.query({ windowId: window.id });
         if (tabs.length === 0) {
-          const currentWindows = await chrome.windows.getAll({
-            windowTypes: ['normal'],
-          });
-          if (currentWindows.length > 1) {
-            await chrome.windows.remove(window.id);
-          }
+          emptyWindowIds.push(window.id);
+        }
+      }
+
+      // ウィンドウが2つ以上残る限り空ウィンドウを削除
+      let remainingCount = allWindows.length;
+      for (const windowId of emptyWindowIds) {
+        if (remainingCount <= 1) break;
+        try {
+          await chrome.windows.remove(windowId);
+          remainingCount--;
+        } catch {
+          // ウィンドウが既に閉じられている場合は無視
         }
       }
     } catch {
