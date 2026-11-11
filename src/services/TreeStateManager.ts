@@ -32,16 +32,16 @@ export class TreeStateManager {
   private initialized: boolean = false;
   private initializationResolvers: (() => void)[] = [];
   private isSyncingToChrome: boolean = false;
-  private _isRestoringState: boolean = false;
+  private restoredFromPreviousBrowserSession: boolean = false;
 
   constructor(private storageService: IStorageService) {}
 
-  get isRestoringState(): boolean {
-    return this._isRestoringState;
-  }
-
-  setRestoringState(value: boolean): void {
-    this._isRestoringState = value;
+  /**
+   * 前回のブラウザセッションの状態からtabIdを付け直して初期化したかどうか
+   * trueの場合、初期化完了前に作成されたタブはセッション復元によるものである
+   */
+  wasRestoredFromPreviousBrowserSession(): boolean {
+    return this.restoredFromPreviousBrowserSession;
   }
 
   // ========================================
@@ -87,6 +87,7 @@ export class TreeStateManager {
 
   resetForTesting(): void {
     this.windows = [];
+    this.restoredFromPreviousBrowserSession = false;
     this.initializationInProgress = false;
     this.initialized = true;
     this.notifyInitializationComplete();
@@ -1749,7 +1750,28 @@ export class TreeStateManager {
   }
 
   /**
+   * 同一ブラウザセッション内でService Workerが再起動した後の状態復元
+   * tabIdとwindowIdはブラウザセッション中は変わらないため、保存された状態をそのまま使う
+   */
+  async resumeAfterServiceWorkerRestart(): Promise<void> {
+    if (this.initializationInProgress || this.initialized) {
+      return;
+    }
+    this.initializationInProgress = true;
+
+    try {
+      await this.loadState();
+    } finally {
+      this.initialized = true;
+      this.initializationInProgress = false;
+      this.notifyInitializationComplete();
+    }
+  }
+
+  /**
    * ブラウザ再起動後の状態復元
+   * ブラウザ再起動でtabIdとwindowIdが変わるため、並び順で対応付けて付け直す
+   * 同一ブラウザセッション内でこれを実行すると、Chromeのタブ順序とツリーがずれている場合にtabIdを取り違える
    */
   async restoreStateAfterRestart(_userSettings?: {
     newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end';
@@ -1758,6 +1780,7 @@ export class TreeStateManager {
       return;
     }
     this.initializationInProgress = true;
+    this.restoredFromPreviousBrowserSession = true;
 
     try {
       await this.loadState();

@@ -275,6 +275,60 @@ describe('TreeStateManager', () => {
     });
   });
 
+  describe('resumeAfterServiceWorkerRestart', () => {
+    it('Chromeのタブ順序がツリーとずれていても、保存済みのtabIdとwindowIdをそのまま使う', async () => {
+      mockStorageData['tree_state'] = {
+        windows: [{
+          windowId: 5,
+          views: [{
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: [
+              { tabId: 10, isExpanded: true, children: [] },
+              { tabId: 20, isExpanded: true, children: [{ tabId: 25, isExpanded: true, children: [] }] },
+              { tabId: 30, isExpanded: true, children: [] },
+            ],
+            pinnedTabIds: [7],
+          }],
+          activeViewIndex: 0,
+        }],
+      };
+
+      const chromeTabsInDifferentOrder = [
+        { id: 7, index: 0, windowId: 9, pinned: true },
+        { id: 30, index: 1, windowId: 9, pinned: false },
+        { id: 10, index: 2, windowId: 9, pinned: false },
+        { id: 40, index: 3, windowId: 9, pinned: false },
+      ] as chrome.tabs.Tab[];
+      const originalQuery = chrome.tabs.query;
+      const originalGetAll = chrome.windows.getAll;
+      const query = vi.fn().mockResolvedValue(chromeTabsInDifferentOrder);
+      chrome.tabs.query = query as typeof chrome.tabs.query;
+      chrome.windows.getAll = vi.fn().mockResolvedValue([{ id: 9 }]) as typeof chrome.windows.getAll;
+
+      try {
+        await manager.resumeAfterServiceWorkerRestart();
+
+        expect(manager.isInitialized()).toBe(true);
+        expect(manager.getViewTabIds(5)).toEqual([7, 10, 20, 25, 30]);
+        expect(manager.getParentTabId(25)).toBe(20);
+        expect(manager.getPinnedTabIds(5)).toEqual([7]);
+        expect(query).not.toHaveBeenCalled();
+      } finally {
+        chrome.tabs.query = originalQuery;
+        chrome.windows.getAll = originalGetAll;
+      }
+    });
+
+    it('初期化完了を待っている呼び出し元に完了を通知する', async () => {
+      const waiting = manager.waitForInitialization(1000);
+
+      await manager.resumeAfterServiceWorkerRestart();
+
+      await expect(waiting).resolves.toBe(true);
+    });
+  });
+
   describe('子タブ処理', () => {
     describe('childTabBehavior: promote', () => {
       it('親タブを閉じると、子タブが親のレベルに昇格する', async () => {

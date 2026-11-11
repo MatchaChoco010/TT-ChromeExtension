@@ -56,15 +56,26 @@ function startPeriodicPersist(): void {
   });
 }
 
+const BROWSER_SESSION_MARKER_KEY = 'tree_state_browser_session_active';
+
+/**
+ * 現在のブラウザセッションで既に初期化を完了しているかを返す
+ * chrome.storage.sessionはService Workerの再起動では保持され、ブラウザ再起動で消去される
+ */
+async function isInitializedInCurrentBrowserSession(): Promise<boolean> {
+  const result = await chrome.storage.session.get(BROWSER_SESSION_MARKER_KEY);
+  return result[BROWSER_SESSION_MARKER_KEY] === true;
+}
+
+async function markInitializedInCurrentBrowserSession(): Promise<void> {
+  await chrome.storage.session.set({ [BROWSER_SESSION_MARKER_KEY]: true });
+}
+
 // 全ての初期化処理はSW IIFEで行う（競合状態を防ぐため）
 chrome.runtime.onInstalled.addListener((_details) => {
 });
 
 (async () => {
-  // Chrome再起動時、セッション復元で作成されたタブのonCreatedイベントを抑制するため、
-  // awaitより前に復元中フラグを設定する
-  testTreeStateManager.setRestoringState(true);
-
   try {
     const hasExistingState = await testTreeStateManager.hasPersistedState();
 
@@ -72,8 +83,8 @@ chrome.runtime.onInstalled.addListener((_details) => {
       // 新規インストール時: ChromeタブからTreeStateを初期化
       // 設計原則として Chrome → TreeStateManager への同期は禁止だが、
       // 新規インストール時は既存タブを取り込むためこの方向の同期が必要
-      testTreeStateManager.setRestoringState(false);
       await testTreeStateManager.initializeFromChromeTabs();
+      await markInitializedInCurrentBrowserSession();
       testUnreadTracker.setInitialLoadComplete();
       testTreeStateManager.notifyStateChanged();
       await initializeAutoSnapshot();
@@ -82,18 +93,20 @@ chrome.runtime.onInstalled.addListener((_details) => {
       return;
     }
 
-    await testTreeStateManager.loadState();
+    if (await isInitializedInCurrentBrowserSession()) {
+      await testUnreadTracker.loadFromStorage();
+      await testTreeStateManager.resumeAfterServiceWorkerRestart();
+    } else {
+      await testUnreadTracker.clear();
 
-    await testUnreadTracker.clear();
+      const userSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
+      const syncSettings = {
+        newTabPositionManual: userSettings?.newTabPositionManual ?? 'end' as const,
+      };
 
-    const userSettings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
-    const syncSettings = {
-      newTabPositionManual: userSettings?.newTabPositionManual ?? 'end' as const,
-    };
-
-    await testTreeStateManager.restoreStateAfterRestart(syncSettings);
-
-    testTreeStateManager.setRestoringState(false);
+      await testTreeStateManager.restoreStateAfterRestart(syncSettings);
+      await markInitializedInCurrentBrowserSession();
+    }
 
     await initializeAutoSnapshot();
 
@@ -102,9 +115,8 @@ chrome.runtime.onInstalled.addListener((_details) => {
     testUnreadTracker.setInitialLoadComplete();
 
     chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
-  } catch {
-    testTreeStateManager.setRestoringState(false);
-    // 初期化エラーは致命的だが、ここで処理できることはない
+  } catch (error) {
+    console.error('[service-worker] Initialization failed:', error);
   }
 })();
 

@@ -82,6 +82,33 @@ export async function trackHandler<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
+ * TreeStateManagerの初期化完了を待つ
+ * Service Workerを起動したイベントは、保存済み状態の読み込み完了前に届く。
+ * 読み込み前の状態を変更・永続化すると保存済みのツリーを上書きするため、状態に触れるハンドラーは必ずこれを待つこと。
+ * @param eventName - タイムアウト時のエラーメッセージに含めるイベント名
+ * @throws 初期化が15秒以内に完了しない場合
+ */
+async function waitForTreeStateInitialization(eventName: string): Promise<void> {
+  if (treeStateManager.isInitialized()) {
+    return;
+  }
+  const completed = await treeStateManager.waitForInitialization(15000);
+  if (!completed) {
+    throw new Error(`Initialization did not complete within timeout for ${eventName}`);
+  }
+}
+
+/**
+ * TreeStateManagerの初期化完了後にハンドラーを実行し、完了を追跡する
+ */
+function trackHandlerAfterInitialization<T>(eventName: string, fn: () => Promise<T>): Promise<T> {
+  return trackHandler(async () => {
+    await waitForTreeStateInitialization(eventName);
+    return fn();
+  });
+}
+
+/**
  * 全ての実行中イベントハンドラーの完了を待機する（E2Eテスト専用）
  */
 async function waitForPendingHandlers(timeoutMs: number = 5000): Promise<void> {
@@ -179,34 +206,34 @@ export function registerTabEventListeners(): void {
     trackHandler(() => handleTabCreated(tab));
   });
   chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-    trackHandler(() => handleTabRemoved(tabId, removeInfo));
+    trackHandlerAfterInitialization('tabs.onRemoved', () => handleTabRemoved(tabId, removeInfo));
   });
   chrome.tabs.onMoved.addListener((tabId, moveInfo) => {
-    trackHandler(() => handleTabMoved(tabId, moveInfo));
+    trackHandlerAfterInitialization('tabs.onMoved', () => handleTabMoved(tabId, moveInfo));
   });
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    trackHandler(() => handleTabUpdated(tabId, changeInfo, tab));
+    trackHandlerAfterInitialization('tabs.onUpdated', () => handleTabUpdated(tabId, changeInfo, tab));
   });
   chrome.tabs.onActivated.addListener((activeInfo) => {
-    trackHandler(() => handleTabActivated(activeInfo));
+    trackHandlerAfterInitialization('tabs.onActivated', () => handleTabActivated(activeInfo));
   });
   chrome.tabs.onDetached.addListener((tabId, detachInfo) => {
-    trackHandler(() => handleTabDetached(tabId, detachInfo));
+    trackHandlerAfterInitialization('tabs.onDetached', () => handleTabDetached(tabId, detachInfo));
   });
   chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
-    trackHandler(() => handleTabAttached(tabId, attachInfo));
+    trackHandlerAfterInitialization('tabs.onAttached', () => handleTabAttached(tabId, attachInfo));
   });
   chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
-    trackHandler(() => handleTabReplaced(addedTabId, removedTabId));
+    trackHandlerAfterInitialization('tabs.onReplaced', () => handleTabReplaced(addedTabId, removedTabId));
   });
 }
 
 export function registerWindowEventListeners(): void {
   chrome.windows.onCreated.addListener((window) => {
-    trackHandler(() => handleWindowCreated(window));
+    trackHandlerAfterInitialization('windows.onCreated', () => handleWindowCreated(window));
   });
   chrome.windows.onRemoved.addListener((windowId) => {
-    trackHandler(() => handleWindowRemoved(windowId));
+    trackHandlerAfterInitialization('windows.onRemoved', () => handleWindowRemoved(windowId));
   });
 }
 
@@ -250,23 +277,17 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     return;
   }
 
-  // waitForInitialization()の前にフラグをキャプチャ（待機中にフラグがfalseに変わるため）
-  const wasTriggeredDuringRestore = treeStateManager.isRestoringState;
+  const arrivedBeforeInitialization = !treeStateManager.isInitialized();
 
   // onActivatedがmapを更新する前に値を取得
   const capturedLastActiveTabId = tab.windowId !== undefined
     ? lastActiveTabByWindow.get(tab.windowId)
     : undefined;
 
-  const initialized = treeStateManager.isInitialized();
-  if (!initialized) {
-    const completed = await treeStateManager.waitForInitialization(15000);
-    if (!completed) {
-      throw new Error(`Initialization did not complete within timeout for tab ${tab.id}`);
-    }
-  }
+  await waitForTreeStateInitialization(`tabs.onCreated(${tab.id})`);
 
-  if (wasTriggeredDuringRestore) {
+  // ブラウザ再起動時のセッション復元で作成されたタブは、restoreStateAfterRestartで既存ノードに対応付けている
+  if (arrivedBeforeInitialization && treeStateManager.wasRestoredFromPreviousBrowserSession()) {
     return;
   }
 
@@ -545,7 +566,11 @@ export async function handleTabRemoved(
   if (viewTabIds.length > 0) {
     try {
       const [activeTab] = await chrome.tabs.query({ active: true, windowId });
-      if (activeTab && activeTab.id !== undefined && !viewTabIds.includes(activeTab.id)) {
+      const isActiveTabInOtherView = activeTab?.id !== undefined &&
+        !viewTabIds.includes(activeTab.id) &&
+        (treeStateManager.getNodeByTabId(activeTab.id)?.windowId === windowId ||
+          treeStateManager.isPinnedTabInAnyView(activeTab.id, windowId));
+      if (isActiveTabInOtherView) {
         const lastTabId = viewTabIds[viewTabIds.length - 1];
         await chrome.tabs.update(lastTabId, { active: true });
       }
@@ -743,10 +768,28 @@ async function handleWindowRemoved(windowId: number): Promise<void> {
 
 function handleMessage(
   message: MessageType,
-
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response: MessageResponse<unknown>) => void,
 ): boolean {
+  if (treeStateManager.isInitialized()) {
+    dispatchMessage(message, sendResponse);
+  } else {
+    trackHandlerAfterInitialization(`runtime.onMessage(${message.type})`, async () => {
+      dispatchMessage(message, sendResponse);
+    }).catch((error: unknown) => {
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    });
+  }
+  return true;
+}
+
+function dispatchMessage(
+  message: MessageType,
+  sendResponse: (response: MessageResponse<unknown>) => void,
+): void {
   try {
     switch (message.type) {
       case 'GET_STATE':
@@ -1008,8 +1051,6 @@ function handleMessage(
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-
-  return true;
 }
 
 async function handleGetState(

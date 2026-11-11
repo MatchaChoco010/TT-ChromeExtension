@@ -3,7 +3,7 @@
  *
  * Service Workerとの通信、イベント監視、ライフサイクル検証の共通ヘルパー関数
  */
-import type { BrowserContext, Page, Worker } from '@playwright/test';
+import type { BrowserContext, CDPSession, Page, Worker } from '@playwright/test';
 
 export interface MessageOptions {
   /**
@@ -139,5 +139,124 @@ export async function assertServiceWorkerLifecycle(
 
   if (!isActive) {
     throw new Error('Service Worker is not active or chrome runtime is not available');
+  }
+}
+
+interface ServiceWorkerVersionsPayload {
+  versions: { versionId: string; scriptURL: string; runningStatus: string }[];
+}
+
+type ServiceWorkerRunningStatus = 'stopped' | 'starting' | 'running' | 'stopping';
+
+/**
+ * CDPのServiceWorkerドメインで、指定スクリプトのService Workerの実行状態を監視する
+ */
+class ServiceWorkerStatusWatcher {
+  private latest: { versionId: string; runningStatus: ServiceWorkerRunningStatus } | null = null;
+  private waiters: (() => void)[] = [];
+
+  private constructor(
+    private readonly cdpSession: CDPSession,
+    scriptURL: string
+  ) {
+    cdpSession.on('ServiceWorker.workerVersionUpdated', (event: ServiceWorkerVersionsPayload) => {
+      const version = event.versions.find((v) => v.scriptURL === scriptURL);
+      if (!version) return;
+      this.latest = {
+        versionId: version.versionId,
+        runningStatus: version.runningStatus as ServiceWorkerRunningStatus,
+      };
+      const waiters = this.waiters;
+      this.waiters = [];
+      waiters.forEach((notify) => notify());
+    });
+  }
+
+  static async start(
+    context: BrowserContext,
+    extensionPage: Page,
+    scriptURL: string
+  ): Promise<ServiceWorkerStatusWatcher> {
+    const cdpSession = await context.newCDPSession(extensionPage);
+    const watcher = new ServiceWorkerStatusWatcher(cdpSession, scriptURL);
+    await cdpSession.send('ServiceWorker.enable');
+    return watcher;
+  }
+
+  async waitForStatus(
+    runningStatus: ServiceWorkerRunningStatus
+  ): Promise<{ versionId: string; runningStatus: ServiceWorkerRunningStatus }> {
+    while (this.latest?.runningStatus !== runningStatus) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+    return this.latest;
+  }
+
+  async waitForAnyStatus(): Promise<{ versionId: string; runningStatus: ServiceWorkerRunningStatus }> {
+    while (this.latest === null) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+    return this.latest;
+  }
+
+  async stopWorker(versionId: string): Promise<void> {
+    await this.cdpSession.send('ServiceWorker.stopWorker', { versionId });
+  }
+
+  async dispose(): Promise<void> {
+    await this.cdpSession.detach();
+  }
+}
+
+/**
+ * 拡張機能のService Workerを停止し、停止の完了を待つ
+ * 停止したService Workerは、次に拡張機能へ届くイベント（タブ操作やメッセージ）で再起動する。
+ * 停止前に取得したWorkerオブジェクトは停止後に使えなくなり、Playwrightは再起動後のService Workerを公開しない。
+ * 再起動後の操作は拡張機能のページ経由で行うこと。
+ *
+ * @param context - 対象のブラウザコンテキスト
+ * @param extensionPage - 拡張機能のページ（Side Panelなど）。CDPセッションの接続先として使う
+ * @param serviceWorker - 停止するService Worker
+ */
+export async function stopServiceWorker(
+  context: BrowserContext,
+  extensionPage: Page,
+  serviceWorker: Worker
+): Promise<void> {
+  const watcher = await ServiceWorkerStatusWatcher.start(context, extensionPage, serviceWorker.url());
+  try {
+    const { versionId } = await watcher.waitForStatus('running');
+    await watcher.stopWorker(versionId);
+    await watcher.waitForStatus('stopped');
+  } finally {
+    await watcher.dispose();
+  }
+}
+
+/**
+ * 停止中のService Workerを起こす操作を実行し、Service Workerが起動するまで待つ
+ *
+ * @param context - 対象のブラウザコンテキスト
+ * @param extensionPage - 拡張機能のページ（Side Panelなど）。CDPセッションの接続先として使う
+ * @param serviceWorkerUrl - Service WorkerのスクリプトURL
+ * @param wakeUpAction - Service Workerを起こす操作（タブを閉じる、タブを開くなど）
+ * @throws wakeUpActionの実行前にService Workerが既に起動していた場合
+ */
+export async function restartServiceWorkerBy(
+  context: BrowserContext,
+  extensionPage: Page,
+  serviceWorkerUrl: string,
+  wakeUpAction: () => Promise<void>
+): Promise<void> {
+  const watcher = await ServiceWorkerStatusWatcher.start(context, extensionPage, serviceWorkerUrl);
+  try {
+    const { runningStatus } = await watcher.waitForAnyStatus();
+    if (runningStatus !== 'stopped') {
+      throw new Error(`Service Worker is already ${runningStatus} before the wake-up action`);
+    }
+    await wakeUpAction();
+    await watcher.waitForStatus('running');
+  } finally {
+    await watcher.dispose();
   }
 }

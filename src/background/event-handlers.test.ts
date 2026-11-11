@@ -888,3 +888,169 @@ describe('空ウィンドウの自動クローズ', () => {
     expect(windowsRemoveSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('Service Worker起動直後の初期化待ち', () => {
+  const createPersistedTree = (tabIds: number[]): TreeState => ({
+    windows: [
+      {
+        windowId: 1,
+        views: [
+          {
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: tabIds.map(createTestTabNode),
+            pinnedTabIds: [],
+          },
+        ],
+        activeViewIndex: 0,
+      },
+    ],
+  });
+
+  const getPersistedTabIds = async (): Promise<number[] | undefined> => {
+    const treeState = await testStorageService.get(STORAGE_KEYS.TREE_STATE);
+    return treeState?.windows.flatMap((w) =>
+      w.views.flatMap((v) => v.rootNodes.map((n) => n.tabId)),
+    );
+  };
+
+  beforeEach(async () => {
+    chromeMock.clearAllListeners();
+    vi.clearAllMocks();
+    testTreeStateManager.resetForTesting();
+    await testStorageService.set(STORAGE_KEYS.TREE_STATE, createPersistedTree([10, 20, 30]));
+    testTreeStateManager.prepareForInitializationReset();
+  });
+
+  afterEach(() => {
+    chromeMock.clearAllListeners();
+    testTreeStateManager.resetForTesting();
+  });
+
+  it('初期化完了前に届いたonRemovedは保存済みツリーを上書きせず、読み込み後のツリーに適用される', async () => {
+    registerTabEventListeners();
+
+    chromeMock.tabs.onRemoved.trigger(20, { windowId: 1, isWindowClosing: false });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(await getPersistedTabIds()).toEqual([10, 20, 30]);
+
+    await testTreeStateManager.resumeAfterServiceWorkerRestart();
+
+    await vi.waitFor(async () => {
+      expect(await getPersistedTabIds()).toEqual([10, 30]);
+    });
+    expect(testTreeStateManager.getTree(1).map((n) => n.tabId)).toEqual([10, 30]);
+  });
+
+  it('初期化完了前に届いたメッセージには読み込み後の状態で応答する', async () => {
+    registerMessageListener();
+
+    const sendResponse = vi.fn();
+    chromeMock.runtime.onMessage.trigger({ type: 'GET_STATE' }, {}, sendResponse);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(sendResponse).not.toHaveBeenCalled();
+
+    await testTreeStateManager.resumeAfterServiceWorkerRestart();
+
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalled();
+    });
+    const response = sendResponse.mock.calls[0][0];
+    expect(response.success).toBe(true);
+    expect(
+      (response.data as TreeState).windows[0].views[0].rootNodes.map((n) => n.tabId),
+    ).toEqual([10, 20, 30]);
+  });
+
+  it('Service Worker再起動の初期化完了前に作成されたタブはツリーに追加される', async () => {
+    registerTabEventListeners();
+
+    chromeMock.tabs.onCreated.trigger({
+      id: 40,
+      index: 3,
+      windowId: 1,
+      url: 'https://example.com/40',
+    } as chrome.tabs.Tab);
+
+    await testTreeStateManager.resumeAfterServiceWorkerRestart();
+
+    await vi.waitFor(() => {
+      expect(testTreeStateManager.getTree(1).map((n) => n.tabId)).toEqual([10, 20, 30, 40]);
+    });
+  });
+});
+
+describe('タブを閉じた後のアクティブタブ補正', () => {
+  const twoViewTree: TreeState = {
+    windows: [
+      {
+        windowId: 1,
+        views: [
+          {
+            name: 'Default',
+            color: '#3b82f6',
+            rootNodes: [createTestTabNode(10), createTestTabNode(20)],
+            pinnedTabIds: [],
+          },
+          {
+            name: 'Other',
+            color: '#ef4444',
+            rootNodes: [createTestTabNode(30)],
+            pinnedTabIds: [],
+          },
+        ],
+        activeViewIndex: 0,
+      },
+    ],
+  };
+
+  const mockActiveTab = (activeTabId: number): void => {
+    chromeMock.tabs.query.mockImplementation((queryInfo: chrome.tabs.QueryInfo) => {
+      if (queryInfo.active) {
+        return Promise.resolve([{ id: activeTabId, windowId: 1, index: 0 } as chrome.tabs.Tab]);
+      }
+      return Promise.resolve([]);
+    });
+  };
+
+  beforeEach(async () => {
+    chromeMock.clearAllListeners();
+    vi.clearAllMocks();
+    testTreeStateManager.resetForTesting();
+    await testStorageService.set(STORAGE_KEYS.TREE_STATE, twoViewTree);
+    await testTreeStateManager.loadState();
+  });
+
+  afterEach(() => {
+    chromeMock.clearAllListeners();
+    chromeMock.tabs.query.mockImplementation(() => Promise.resolve([]));
+    testTreeStateManager.resetForTesting();
+  });
+
+  it('閉じた後に別ビューのタブがアクティブになった場合、現在のビューの最後のタブをアクティブにする', async () => {
+    registerTabEventListeners();
+    mockActiveTab(30);
+
+    chromeMock.tabs.onRemoved.trigger(20, { windowId: 1, isWindowClosing: false });
+
+    await vi.waitFor(() => {
+      expect(chromeMock.tabs.update).toHaveBeenCalledWith(10, { active: true });
+    });
+  });
+
+  it('閉じた後にツリーに属さないタブがアクティブになった場合、アクティブタブを変更しない', async () => {
+    registerTabEventListeners();
+    mockActiveTab(99);
+    const sendMessageSpy = vi.fn(() => Promise.resolve());
+    chromeMock.runtime.sendMessage = sendMessageSpy;
+
+    chromeMock.tabs.onRemoved.trigger(20, { windowId: 1, isWindowClosing: false });
+
+    await vi.waitFor(() => {
+      expect(sendMessageSpy).toHaveBeenCalled();
+    });
+    expect(chromeMock.tabs.update).not.toHaveBeenCalledWith(10, { active: true });
+  });
+});
