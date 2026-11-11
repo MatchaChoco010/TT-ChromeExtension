@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { chromeMock, createMockTab } from '@/test/chrome-mock';
-import {
-  registerTabEventListeners,
-  registerWebNavigationListeners,
-  testStorageService,
-  testTreeStateManager,
-} from './event-handlers';
+import { storageService, treeStateManager } from './background-services';
+import { registerTabEventListeners, registerWebNavigationListeners } from './tab-event-handlers';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import type { TreeState, UserSettings } from '@/types';
 
@@ -31,10 +27,10 @@ describe('タブ開き方別の位置ルール', () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
 
-    await testStorageService.set(STORAGE_KEYS.TREE_STATE, createNewTreeState());
+    await storageService.set(STORAGE_KEYS.TREE_STATE, createNewTreeState());
 
-    testTreeStateManager.resetForTesting();
-    await testTreeStateManager.loadState();
+    treeStateManager.resetForTesting();
+    await treeStateManager.loadState();
 
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
   });
@@ -54,7 +50,7 @@ describe('タブ開き方別の位置ルール', () => {
         childTabBehavior: 'promote',
         snapshotSubfolder: 'TT-Snapshots',
       };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
+      await storageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
       registerWebNavigationListeners();
@@ -91,8 +87,8 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentResult = testTreeStateManager.getNodeByTabId(1);
-      const childResult = testTreeStateManager.getNodeByTabId(2);
+      const parentResult = treeStateManager.getNodeByTabId(1);
+      const childResult = treeStateManager.getNodeByTabId(2);
 
       expect(parentResult).toBeDefined();
       expect(childResult).toBeDefined();
@@ -113,7 +109,7 @@ describe('タブ開き方別の位置ルール', () => {
         childTabBehavior: 'promote',
         snapshotSubfolder: 'TT-Snapshots',
       };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
+      await storageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
       registerWebNavigationListeners();
@@ -150,8 +146,8 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentResult = testTreeStateManager.getNodeByTabId(1);
-      const childResult = testTreeStateManager.getNodeByTabId(2);
+      const parentResult = treeStateManager.getNodeByTabId(1);
+      const childResult = treeStateManager.getNodeByTabId(2);
       expect(childResult).toBeDefined();
       expect(parentResult?.node.children.some(c => c.tabId === 2)).toBe(false);
     });
@@ -172,7 +168,7 @@ describe('タブ開き方別の位置ルール', () => {
         childTabBehavior: 'promote',
         snapshotSubfolder: 'TT-Snapshots',
       };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
+      await storageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
 
@@ -185,9 +181,9 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(manualTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const result = testTreeStateManager.getNodeByTabId(1);
+      const result = treeStateManager.getNodeByTabId(1);
       expect(result).toBeDefined();
-      const tree = testTreeStateManager.getTree(1);
+      const tree = treeStateManager.getTree(1);
       expect(tree.some(n => n.tabId === 1)).toBe(true);
     });
   });
@@ -205,7 +201,7 @@ describe('タブ開き方別の位置ルール', () => {
         childTabBehavior: 'promote' as const,
         snapshotSubfolder: 'TT-Snapshots',
       };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
+      await storageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
       registerWebNavigationListeners();
@@ -242,7 +238,7 @@ describe('タブ開き方別の位置ルール', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const parentResult = treeStateManager.getNodeByTabId(1);
       expect(parentResult?.node.children.some(c => c.tabId === 2)).toBe(true);
     });
   });
@@ -253,10 +249,10 @@ describe('システムページ判定と新規タブ位置設定', () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
 
-    await testStorageService.set(STORAGE_KEYS.TREE_STATE, createNewTreeState());
+    await storageService.set(STORAGE_KEYS.TREE_STATE, createNewTreeState());
 
-    testTreeStateManager.resetForTesting();
-    await testTreeStateManager.loadState();
+    treeStateManager.resetForTesting();
+    await treeStateManager.loadState();
 
     chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
   });
@@ -276,7 +272,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
         childTabBehavior: 'promote',
         snapshotSubfolder: 'TT-Snapshots',
       };
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
+      await storageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
       registerTabEventListeners();
       registerWebNavigationListeners();
@@ -313,8 +309,8 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentResult = testTreeStateManager.getNodeByTabId(1);
-      const childResult = testTreeStateManager.getNodeByTabId(2);
+      const parentResult = treeStateManager.getNodeByTabId(1);
+      const childResult = treeStateManager.getNodeByTabId(2);
       expect(childResult).toBeDefined();
       expect(parentResult?.node.children.some(c => c.tabId === 2)).toBe(true);
     });
@@ -322,7 +318,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
 
   describe('デフォルト設定の確認', () => {
     it('設定が存在しない場合、リンククリックはデフォルトで子タブとして配置', async () => {
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, null as unknown as UserSettings);
+      await storageService.set(STORAGE_KEYS.USER_SETTINGS, null as unknown as UserSettings);
 
       registerTabEventListeners();
       registerWebNavigationListeners();
@@ -359,12 +355,12 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const parentResult = testTreeStateManager.getNodeByTabId(1);
+      const parentResult = treeStateManager.getNodeByTabId(1);
       expect(parentResult?.node.children.some(c => c.tabId === 2)).toBe(true);
     });
 
     it('設定が存在しない場合、手動タブはデフォルトでリストの最後に配置', async () => {
-      await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, null as unknown as UserSettings);
+      await storageService.set(STORAGE_KEYS.USER_SETTINGS, null as unknown as UserSettings);
 
       registerTabEventListeners();
 
@@ -377,9 +373,9 @@ describe('システムページ判定と新規タブ位置設定', () => {
       chromeMock.tabs.onCreated.trigger(manualTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const result = testTreeStateManager.getNodeByTabId(1);
+      const result = treeStateManager.getNodeByTabId(1);
       expect(result).toBeDefined();
-      const tree = testTreeStateManager.getTree(1);
+      const tree = treeStateManager.getTree(1);
       expect(tree.some(n => n.tabId === 1)).toBe(true);
     });
   });

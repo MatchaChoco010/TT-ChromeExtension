@@ -1,15 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { chromeMock, createMockTab } from '@/test/chrome-mock';
-import type { MessageType, TabNode, TreeState } from '@/types';
-import {
-  registerTabEventListeners,
-  registerWindowEventListeners,
-  registerMessageListener,
-  getDragState,
-  setDragState,
-  testTreeStateManager,
-  testStorageService,
-} from './event-handlers';
+import type { ServiceWorkerRequest, TabNode, TreeState } from '@/types';
+import { storageService, treeStateManager } from './background-services';
+import { registerTabEventListeners } from './tab-event-handlers';
+import { registerWindowEventListeners } from './window-event-handlers';
+import { registerRequestListener } from './requests/request-router';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
 const createTestTabNode = (tabId: number): TabNode => ({
@@ -40,10 +35,10 @@ describe('Service Worker - Tab Events', () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
 
-    await testStorageService.set(STORAGE_KEYS.TREE_STATE, createNewTreeState());
+    await storageService.set(STORAGE_KEYS.TREE_STATE, createNewTreeState());
 
-    testTreeStateManager.resetForTesting();
-    await testTreeStateManager.loadState();
+    treeStateManager.resetForTesting();
+    await treeStateManager.loadState();
   });
 
   afterEach(() => {
@@ -272,24 +267,22 @@ describe('Service Worker - Messaging', () => {
   beforeEach(() => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
-    setDragState(null);
   });
 
   afterEach(() => {
     chromeMock.clearAllListeners();
-    setDragState(null);
   });
 
   it('chrome.runtime.onMessage リスナーが登録されている', () => {
-    registerMessageListener();
+    registerRequestListener();
 
     expect(chromeMock.runtime.onMessage.hasListener).toBeDefined();
   });
 
   it('GET_STATE メッセージに応答する', async () => {
-    registerMessageListener();
+    registerRequestListener();
 
-    const message: MessageType = { type: 'GET_STATE' };
+    const message: ServiceWorkerRequest = { type: 'GET_STATE' };
     const sendResponse = vi.fn();
 
     chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
@@ -305,19 +298,9 @@ describe('Service Worker - Messaging', () => {
   });
 
   it('ACTIVATE_TAB メッセージでタブをアクティブ化する', async () => {
-    registerMessageListener();
+    registerRequestListener();
 
-    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockImplementation(
-      (
-        _tabId: number,
-        _updateProperties: chrome.tabs.UpdateProperties,
-        callback?: () => void,
-      ) => {
-        if (callback) callback();
-      },
-    );
-
-    const message: MessageType = {
+    const message: ServiceWorkerRequest = {
       type: 'ACTIVATE_TAB',
       payload: { tabId: 123 },
     };
@@ -325,23 +308,16 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
 
-    expect(chromeMock.tabs.update).toHaveBeenCalledWith(
-      123,
-      { active: true },
-      expect.any(Function),
-    );
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({ success: true, data: null });
+    });
+    expect(chromeMock.tabs.update).toHaveBeenCalledWith(123, { active: true });
   });
 
   it('CLOSE_TAB メッセージでタブを閉じる', async () => {
-    registerMessageListener();
+    registerRequestListener();
 
-    (chromeMock.tabs.remove as ReturnType<typeof vi.fn>).mockImplementation(
-      (_tabIds: number | number[], callback?: () => void) => {
-        if (callback) callback();
-      },
-    );
-
-    const message: MessageType = {
+    const message: ServiceWorkerRequest = {
       type: 'CLOSE_TAB',
       payload: { tabId: 456 },
     };
@@ -349,203 +325,12 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
 
-    expect(chromeMock.tabs.remove).toHaveBeenCalledWith(
-      456,
-      expect.any(Function),
-    );
-  });
-
-  it('MOVE_TAB_TO_WINDOW メッセージでタブを別ウィンドウに移動する', async () => {
-    registerMessageListener();
-
-    const tabId = 789;
-    const targetWindowId = 10;
-    const tab = createMockTab({ id: tabId, index: 0, windowId: 1, url: 'https://example.com' });
-    await testTreeStateManager.addTab(tab, null, 1);
-
-    (chromeMock.tabs.move as ReturnType<typeof vi.fn>).mockResolvedValue({});
-    (chromeMock.tabs.query as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-
-    const message: MessageType = {
-      type: 'MOVE_TAB_TO_WINDOW',
-      payload: { tabId, windowId: targetWindowId },
-    };
-    const sendResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
-
     await vi.waitFor(() => {
-      expect(sendResponse).toHaveBeenCalledWith(
-        expect.objectContaining({ success: true }),
-      );
+      expect(sendResponse).toHaveBeenCalledWith({ success: true, data: null });
     });
+    expect(chromeMock.tabs.remove).toHaveBeenCalledWith(456);
   });
 
-  it('CREATE_WINDOW_WITH_TAB メッセージで新しいウィンドウを作成する', async () => {
-    registerMessageListener();
-
-    const tabId = 999;
-    const tab = createMockTab({ id: tabId, index: 0, windowId: 1, url: 'https://example.com' });
-    await testTreeStateManager.addTab(tab, null, 1);
-
-    (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 100 });
-    (chromeMock.tabs.query as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-
-    const message: MessageType = {
-      type: 'CREATE_WINDOW_WITH_TAB',
-      payload: { tabId },
-    };
-    const sendResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
-
-    await vi.waitFor(() => {
-      expect(sendResponse).toHaveBeenCalledWith(
-        expect.objectContaining({ success: true }),
-      );
-    });
-  });
-
-  it('SET_DRAG_STATE メッセージでドラッグ状態を保存する', async () => {
-    registerMessageListener();
-
-    const treeData = [createTestTabNode(111)];
-    const message: MessageType = {
-      type: 'SET_DRAG_STATE',
-      payload: { tabId: 111, treeData, sourceWindowId: 5 },
-    };
-    const sendResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
-
-    expect(sendResponse).toHaveBeenCalledWith({ success: true, data: null });
-    expect(getDragState()).toEqual({
-      tabId: 111,
-      treeData,
-      sourceWindowId: 5,
-    });
-  });
-
-  it('GET_DRAG_STATE メッセージでドラッグ状態を取得する', async () => {
-    registerMessageListener();
-
-    const treeData = [createTestTabNode(222)];
-    setDragState({ tabId: 222, treeData, sourceWindowId: 6 });
-
-    const message: MessageType = { type: 'GET_DRAG_STATE' };
-    const sendResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(message, {}, sendResponse);
-
-    expect(sendResponse).toHaveBeenCalledWith({
-      success: true,
-      data: { tabId: 222, treeData, sourceWindowId: 6 },
-    });
-  });
-
-  it('CLEAR_DRAG_STATE メッセージでドラッグ状態をクリアする', async () => {
-    registerMessageListener();
-
-    setDragState({ tabId: 333, treeData: [createTestTabNode(333)], sourceWindowId: 7 });
-
-    const clearMessage: MessageType = { type: 'CLEAR_DRAG_STATE' };
-    const clearResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(clearMessage, {}, clearResponse);
-
-    expect(clearResponse).toHaveBeenCalledWith({ success: true, data: null });
-
-    const getMessage: MessageType = { type: 'GET_DRAG_STATE' };
-    const getResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(getMessage, {}, getResponse);
-
-    expect(getResponse).toHaveBeenCalledWith({
-      success: true,
-      data: null,
-    });
-  });
-
-  it('複数ウィンドウ間でドラッグ状態が共有される', async () => {
-    registerMessageListener();
-
-    const treeData = [createTestTabNode(444)];
-    const setMessage: MessageType = {
-      type: 'SET_DRAG_STATE',
-      payload: { tabId: 444, treeData, sourceWindowId: 1 },
-    };
-    const setResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(
-      setMessage,
-      { tab: createMockTab({ windowId: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 }) },
-      setResponse,
-    );
-
-    expect(setResponse).toHaveBeenCalledWith({ success: true, data: null });
-
-    const getMessage: MessageType = { type: 'GET_DRAG_STATE' };
-    const getResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(
-      getMessage,
-      { tab: createMockTab({ windowId: 2, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 }) },
-      getResponse,
-    );
-
-    expect(getResponse).toHaveBeenCalledWith({
-      success: true,
-      data: { tabId: 444, treeData, sourceWindowId: 1 },
-    });
-  });
-
-  it('ドラッグ状態のライフサイクル全体が正しく機能する', async () => {
-    registerMessageListener();
-
-    expect(getDragState()).toBeNull();
-
-    const treeData = [createTestTabNode(555)];
-    const setMessage: MessageType = {
-      type: 'SET_DRAG_STATE',
-      payload: {
-        tabId: 555,
-        treeData,
-        sourceWindowId: 10,
-      },
-    };
-    const setResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(setMessage, {}, setResponse);
-
-    expect(setResponse).toHaveBeenCalledWith({ success: true, data: null });
-    expect(getDragState()).toEqual({
-      tabId: 555,
-      treeData,
-      sourceWindowId: 10,
-    });
-
-    const getMessage: MessageType = { type: 'GET_DRAG_STATE' };
-    const getResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(getMessage, {}, getResponse);
-
-    expect(getResponse).toHaveBeenCalledWith({
-      success: true,
-      data: {
-        tabId: 555,
-        treeData,
-        sourceWindowId: 10,
-      },
-    });
-
-    const clearMessage: MessageType = { type: 'CLEAR_DRAG_STATE' };
-    const clearResponse = vi.fn();
-
-    chromeMock.runtime.onMessage.trigger(clearMessage, {}, clearResponse);
-
-    expect(clearResponse).toHaveBeenCalledWith({ success: true, data: null });
-    expect(getDragState()).toBeNull();
-  });
 });
 
 describe('複数タブのグループ化機能', () => {
@@ -556,7 +341,7 @@ describe('複数タブのグループ化機能', () => {
       tree_state: createNewTreeState(),
     });
 
-    await testTreeStateManager.loadState();
+    await treeStateManager.loadState();
   });
 
   afterEach(() => {
@@ -564,7 +349,7 @@ describe('複数タブのグループ化機能', () => {
   });
 
   it('CREATE_GROUP メッセージで新しいグループを作成し、選択されたタブをグループの子要素として設定する', async () => {
-    registerMessageListener();
+    registerRequestListener();
     registerTabEventListeners();
 
     const sendMessageSpy = vi.fn(() => Promise.resolve());
@@ -594,9 +379,9 @@ describe('複数タブのグループ化機能', () => {
     const tab2 = createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
     const tab3 = createMockTab({ id: 3, index: 2, windowId: 1, url: 'https://example3.com' });
 
-    await testTreeStateManager.addTab(tab1, null, 1);
-    await testTreeStateManager.addTab(tab2, null, 1);
-    await testTreeStateManager.addTab(tab3, null, 1);
+    await treeStateManager.addTab(tab1, null, 1);
+    await treeStateManager.addTab(tab2, null, 1);
+    await treeStateManager.addTab(tab3, null, 1);
 
     const message = {
       type: 'CREATE_GROUP',
@@ -642,7 +427,7 @@ describe('複数タブのグループ化機能', () => {
   });
 
   it('DISSOLVE_GROUP メッセージでグループを解除し、子タブをルートレベルに移動する', async () => {
-    registerMessageListener();
+    registerRequestListener();
     registerTabEventListeners();
 
     const sendMessageSpy = vi.fn(() => Promise.resolve());
@@ -670,8 +455,8 @@ describe('複数タブのグループ化機能', () => {
     const tab1 = createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example1.com' });
     const tab2 = createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
 
-    await testTreeStateManager.addTab(tab1, null, 1);
-    await testTreeStateManager.addTab(tab2, null, 1);
+    await treeStateManager.addTab(tab1, null, 1);
+    await treeStateManager.addTab(tab2, null, 1);
 
     const createMessage = {
       type: 'CREATE_GROUP',
@@ -731,7 +516,7 @@ describe('空ウィンドウの自動クローズ', () => {
   beforeEach(() => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
-    testTreeStateManager.resetForTesting();
+    treeStateManager.resetForTesting();
   });
 
   afterEach(() => {
@@ -739,7 +524,7 @@ describe('空ウィンドウの自動クローズ', () => {
   });
 
   it('ドラッグアウトにより全てのタブが移動されたとき、元のウィンドウを自動的に閉じる', async () => {
-    registerMessageListener();
+    registerRequestListener();
     registerTabEventListeners();
 
     const sourceWindowId = 100;
@@ -810,7 +595,7 @@ describe('空ウィンドウの自動クローズ', () => {
   });
 
   it('ウィンドウにタブが残っている場合、ウィンドウは開いたまま維持される', async () => {
-    registerMessageListener();
+    registerRequestListener();
     registerTabEventListeners();
 
     const sourceWindowId = 100;
@@ -909,7 +694,7 @@ describe('Service Worker起動直後の初期化待ち', () => {
   });
 
   const getPersistedTabIds = async (): Promise<number[] | undefined> => {
-    const treeState = await testStorageService.get(STORAGE_KEYS.TREE_STATE);
+    const treeState = await storageService.get(STORAGE_KEYS.TREE_STATE);
     return treeState?.windows.flatMap((w) =>
       w.views.flatMap((v) => v.rootNodes.map((n) => n.tabId)),
     );
@@ -918,14 +703,14 @@ describe('Service Worker起動直後の初期化待ち', () => {
   beforeEach(async () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
-    testTreeStateManager.resetForTesting();
-    await testStorageService.set(STORAGE_KEYS.TREE_STATE, createPersistedTree([10, 20, 30]));
-    testTreeStateManager.prepareForInitializationReset();
+    treeStateManager.resetForTesting();
+    await storageService.set(STORAGE_KEYS.TREE_STATE, createPersistedTree([10, 20, 30]));
+    treeStateManager.prepareForInitializationReset();
   });
 
   afterEach(() => {
     chromeMock.clearAllListeners();
-    testTreeStateManager.resetForTesting();
+    treeStateManager.resetForTesting();
   });
 
   it('初期化完了前に届いたonRemovedは保存済みツリーを上書きせず、読み込み後のツリーに適用される', async () => {
@@ -936,16 +721,16 @@ describe('Service Worker起動直後の初期化待ち', () => {
 
     expect(await getPersistedTabIds()).toEqual([10, 20, 30]);
 
-    await testTreeStateManager.resumeAfterServiceWorkerRestart();
+    await treeStateManager.resumeAfterServiceWorkerRestart();
 
     await vi.waitFor(async () => {
       expect(await getPersistedTabIds()).toEqual([10, 30]);
     });
-    expect(testTreeStateManager.getTree(1).map((n) => n.tabId)).toEqual([10, 30]);
+    expect(treeStateManager.getTree(1).map((n) => n.tabId)).toEqual([10, 30]);
   });
 
   it('初期化完了前に届いたメッセージには読み込み後の状態で応答する', async () => {
-    registerMessageListener();
+    registerRequestListener();
 
     const sendResponse = vi.fn();
     chromeMock.runtime.onMessage.trigger({ type: 'GET_STATE' }, {}, sendResponse);
@@ -953,7 +738,7 @@ describe('Service Worker起動直後の初期化待ち', () => {
 
     expect(sendResponse).not.toHaveBeenCalled();
 
-    await testTreeStateManager.resumeAfterServiceWorkerRestart();
+    await treeStateManager.resumeAfterServiceWorkerRestart();
 
     await vi.waitFor(() => {
       expect(sendResponse).toHaveBeenCalled();
@@ -975,10 +760,10 @@ describe('Service Worker起動直後の初期化待ち', () => {
       url: 'https://example.com/40',
     }));
 
-    await testTreeStateManager.resumeAfterServiceWorkerRestart();
+    await treeStateManager.resumeAfterServiceWorkerRestart();
 
     await vi.waitFor(() => {
-      expect(testTreeStateManager.getTree(1).map((n) => n.tabId)).toEqual([10, 20, 30, 40]);
+      expect(treeStateManager.getTree(1).map((n) => n.tabId)).toEqual([10, 20, 30, 40]);
     });
   });
 });
@@ -1019,15 +804,15 @@ describe('タブを閉じた後のアクティブタブ補正', () => {
   beforeEach(async () => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
-    testTreeStateManager.resetForTesting();
-    await testStorageService.set(STORAGE_KEYS.TREE_STATE, twoViewTree);
-    await testTreeStateManager.loadState();
+    treeStateManager.resetForTesting();
+    await storageService.set(STORAGE_KEYS.TREE_STATE, twoViewTree);
+    await treeStateManager.loadState();
   });
 
   afterEach(() => {
     chromeMock.clearAllListeners();
     chromeMock.tabs.query.mockImplementation(() => Promise.resolve([]));
-    testTreeStateManager.resetForTesting();
+    treeStateManager.resetForTesting();
   });
 
   it('閉じた後に別ビューのタブがアクティブになった場合、現在のビューの最後のタブをアクティブにする', async () => {

@@ -3,6 +3,7 @@ import type { UserSettings } from '@/types';
 import { SnapshotManager } from '@/services/SnapshotManager';
 import { downloadService } from '@/storage/DownloadService';
 import { storageService } from '@/storage/StorageService';
+import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 interface SettingsPanelProps {
   settings: UserSettings;
@@ -69,14 +70,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setIsProcessing(true);
       setShowRestoreOptions(false);
 
-      const response = await chrome.runtime.sendMessage({
-        type: 'RESTORE_SNAPSHOT',
-        payload: { jsonData: pendingJsonData, closeCurrentTabs },
-      });
-
-      if (response && !response.success) {
-        throw new Error(response.error || 'Unknown error');
-      }
+      await sendServiceWorkerRequest('RESTORE_SNAPSHOT', { jsonData: pendingJsonData, closeCurrentTabs });
 
       setPendingJsonData(null);
       setStatusMessage('スナップショットを復元しました');

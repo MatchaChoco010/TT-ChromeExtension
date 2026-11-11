@@ -189,23 +189,14 @@ export interface IUnreadTracker {
   isInitialLoadComplete(): boolean;
 }
 
-export interface TreeUpdatePayload {
-  nodeId: string;
-  newParentId: string | null;
-  index: number;
-}
-
-export type MessageType =
+/**
+ * サイドパネル等の拡張ページからService Workerへ送る要求
+ */
+export type ServiceWorkerRequest =
   | { type: 'GET_STATE' }
-  | { type: 'UPDATE_TREE'; payload: TreeUpdatePayload }
-  | { type: 'MOVE_TAB_TO_WINDOW'; payload: { tabId: number; windowId: number } }
-  | {
-      type: 'CREATE_WINDOW_WITH_TAB';
-      payload: { tabId: number };
-    }
   | {
       type: 'CREATE_WINDOW_WITH_SUBTREE';
-      payload: { tabId: number; sourceWindowId?: number };
+      payload: { tabId: number };
     }
   | {
       type: 'MOVE_SUBTREE_TO_WINDOW';
@@ -215,15 +206,6 @@ export type MessageType =
   | { type: 'CLOSE_SUBTREE'; payload: { tabId: number } }
   | { type: 'CLOSE_TABS_WITH_COLLAPSED_SUBTREES'; payload: { tabIds: number[] } }
   | { type: 'ACTIVATE_TAB'; payload: { tabId: number } }
-  | {
-      type: 'SET_DRAG_STATE';
-      payload: { tabId: number; treeData: TabNode[]; sourceWindowId: number };
-    }
-  | { type: 'GET_DRAG_STATE' }
-  | { type: 'CLEAR_DRAG_STATE' }
-  | { type: 'SYNC_TABS' }
-  | { type: 'REFRESH_TREE_STRUCTURE' }
-  | { type: 'STATE_UPDATED' }
   | { type: 'CREATE_GROUP'; payload: { tabIds: number[]; groupName?: string; contextMenuTabId?: number } }
   | { type: 'DISSOLVE_GROUP'; payload: { tabIds: number[] } }
   | { type: 'UPDATE_GROUP_NAME'; payload: { tabId: number; name: string } }
@@ -232,22 +214,8 @@ export type MessageType =
       type: 'RESTORE_SNAPSHOT';
       payload: { jsonData: string; closeCurrentTabs: boolean };
     }
-  | { type: 'REGISTER_DUPLICATE_SOURCE'; payload: { sourceTabId: number } }
   | { type: 'DUPLICATE_SUBTREE'; payload: { tabId: number } }
-  | {
-      type: 'START_DRAG_SESSION';
-      payload: { tabId: number; windowId: number; treeData: TabNode[] };
-    }
-  | { type: 'GET_DRAG_SESSION' }
-  | { type: 'END_DRAG_SESSION'; payload: { reason?: string } }
-  | {
-      type: 'BEGIN_CROSS_WINDOW_MOVE';
-      payload: { targetWindowId: number };
-    }
   | { type: 'GET_GROUP_INFO'; payload: { tabId: number } }
-  | { type: 'NOTIFY_TREE_VIEW_HOVER'; payload: { windowId: number } }
-  | { type: 'NOTIFY_DRAG_OUT' }
-  | { type: 'DRAG_SESSION_ENDED' }
   | { type: 'CLOSE_OTHER_TABS'; payload: { excludeTabIds: number[] } }
   | { type: 'DUPLICATE_TABS'; payload: { tabIds: number[] } }
   | { type: 'PIN_TABS'; payload: { tabIds: number[] } }
@@ -261,7 +229,6 @@ export type MessageType =
       payload: {
         tabId: number;
         targetParentTabId: number | null;
-        windowId: number;
         selectedTabIds: number[];
       };
     }
@@ -271,7 +238,6 @@ export type MessageType =
         tabId: number;
         aboveTabId?: number;
         belowTabId?: number;
-        windowId: number;
         selectedTabIds: number[];
         targetDepth?: number;
       };
@@ -281,8 +247,6 @@ export type MessageType =
       payload: {
         viewIndex: number;
         windowId: number;
-        previousViewIndex: number;
-        activeTabId: number | null;
       };
     }
   | { type: 'CREATE_VIEW'; payload: { windowId: number } }
@@ -293,7 +257,7 @@ export type MessageType =
     }
   | {
       type: 'TOGGLE_NODE_EXPAND';
-      payload: { tabId: number; windowId: number };
+      payload: { tabId: number };
     }
   | {
       type: 'MOVE_TABS_TO_VIEW';
@@ -301,15 +265,15 @@ export type MessageType =
     }
   | {
       type: 'DELETE_TREE_GROUP';
-      payload: { tabId: number; windowId: number };
+      payload: { tabId: number };
     }
   | {
       type: 'ADD_TAB_TO_TREE_GROUP';
-      payload: { tabId: number; targetGroupTabId: number; windowId: number };
+      payload: { tabId: number; targetGroupTabId: number };
     }
   | {
       type: 'REMOVE_TAB_FROM_TREE_GROUP';
-      payload: { tabId: number; windowId: number };
+      payload: { tabId: number };
     }
   | {
       type: 'SAVE_GROUPS';
@@ -325,6 +289,39 @@ export type MessageType =
       type: 'REORDER_VIEW';
       payload: { viewIndex: number; newIndex: number; windowId: number };
     };
+
+export type ServiceWorkerRequestType = ServiceWorkerRequest['type'];
+
+export type ServiceWorkerRequestPayload<K extends ServiceWorkerRequestType> =
+  Extract<ServiceWorkerRequest, { type: K }> extends { payload: infer P } ? P : undefined;
+
+export interface GroupDetails {
+  name: string;
+  children: Array<{ tabId: number; title: string; url: string }>;
+}
+
+/**
+ * データを返す要求の応答データの型。ここにない要求はデータを返さない
+ */
+interface ServiceWorkerResponseDataMap {
+  GET_STATE: TreeState;
+  GET_GROUP_INFO: GroupDetails;
+  CREATE_GROUP: { groupTabId: number };
+  CREATE_VIEW: { viewIndex: number };
+  CREATE_NEW_TAB: { tabId: number | undefined };
+  OPEN_SETTINGS_TAB: { tabId: number | undefined };
+}
+
+export type ServiceWorkerResponseData<K extends ServiceWorkerRequestType> =
+  K extends keyof ServiceWorkerResponseDataMap ? ServiceWorkerResponseDataMap[K] : void;
+
+/**
+ * Service Workerからサイドパネル等の拡張ページへ送る、ツリー状態の変更通知
+ */
+export interface StateUpdatedNotification {
+  type: 'STATE_UPDATED';
+  payload: TreeState;
+}
 
 export type MessageResponse<T> =
   | { success: true; data: T }

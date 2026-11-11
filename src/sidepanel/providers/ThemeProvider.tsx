@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from 'react';
 import type { UserSettings } from '@/types';
+import { dispatchServiceWorkerRequest, sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 interface ThemeContextType {
   settings: UserSettings | null;
@@ -48,10 +49,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           snapshotSubfolder: 'TT-Snapshots',
         };
         setSettings(defaultSettings);
-        await chrome.runtime.sendMessage({
-          type: 'SAVE_USER_SETTINGS',
-          payload: { settings: defaultSettings },
-        });
+        await sendServiceWorkerRequest('SAVE_USER_SETTINGS', { settings: defaultSettings });
       }
     };
 
@@ -74,10 +72,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   const updateSettings = useCallback((newSettings: UserSettings) => {
     setSettings(newSettings);
-    chrome.runtime.sendMessage({
-      type: 'SAVE_USER_SETTINGS',
-      payload: { settings: newSettings },
-    });
+    dispatchServiceWorkerRequest('SAVE_USER_SETTINGS', { settings: newSettings });
   }, []);
 
   useEffect(() => {

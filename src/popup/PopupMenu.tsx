@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
@@ -42,13 +43,10 @@ export const PopupMenu: React.FC = () => {
   const handleCreateSnapshot = async () => {
     setSnapshotStatus('loading');
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'CREATE_SNAPSHOT' });
-      if (response?.success) {
-        setSnapshotStatus('success');
-      } else {
-        setSnapshotStatus('error');
-      }
-    } catch {
+      await sendServiceWorkerRequest('CREATE_SNAPSHOT');
+      setSnapshotStatus('success');
+    } catch (error) {
+      console.error('Failed to create snapshot:', error);
       setSnapshotStatus('error');
     }
   };

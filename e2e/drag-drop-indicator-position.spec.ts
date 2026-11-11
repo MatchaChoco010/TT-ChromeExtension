@@ -23,7 +23,7 @@ async function getDropIndicatorBoundingBox(
   page: Page
 ): Promise<{ x: number; y: number; width: number; height: number } | null> {
   const indicator = page.locator('[data-testid="drop-indicator"]');
-  const isVisible = await indicator.isVisible().catch(() => false);
+  const isVisible = await indicator.isVisible();
   if (!isVisible) {
     return null;
   }
@@ -38,7 +38,7 @@ async function waitForDropIndicatorVisible(
   await waitForCondition(
     async () => {
       const indicator = page.locator('[data-testid="drop-indicator"]');
-      return await indicator.isVisible().catch(() => false);
+      return await indicator.isVisible();
     },
     { timeout, interval: 100, timeoutMessage: 'Drop indicator did not become visible' }
   );

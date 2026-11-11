@@ -1,35 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-
-interface ChildTabInfo {
-  tabId: number;
-  title: string;
-  url: string;
-}
-
-interface GroupInfo {
-  name: string;
-  children: ChildTabInfo[];
-}
+import { dispatchServiceWorkerRequest, sendServiceWorkerRequest } from '@/messaging/service-worker-client';
+import type { GroupDetails } from '@/types';
 
 type PageState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'loaded'; groupInfo: GroupInfo };
+  | { status: 'loaded'; groupInfo: GroupDetails };
 
 const POLLING_INTERVAL_MS = 2000;
-
-async function fetchGroupInfo(tabId: number): Promise<GroupInfo> {
-  const response = await chrome.runtime.sendMessage({
-    type: 'GET_GROUP_INFO',
-    payload: { tabId },
-  });
-
-  if (!response?.success) {
-    throw new Error(response?.error || 'Unknown error');
-  }
-
-  return response.data;
-}
 
 export const GroupPage: React.FC = () => {
   const [state, setState] = useState<PageState>({ status: 'loading' });
@@ -43,6 +21,8 @@ export const GroupPage: React.FC = () => {
       if (tab?.id) {
         setTabId(tab.id);
       }
+    }).catch((error: unknown) => {
+      console.error('Failed to get the group tab:', error);
     });
   }, []);
 
@@ -52,7 +32,7 @@ export const GroupPage: React.FC = () => {
     }
 
     try {
-      const groupInfo = await fetchGroupInfo(tabId);
+      const groupInfo = await sendServiceWorkerRequest('GET_GROUP_INFO', { tabId });
       setState({ status: 'loaded', groupInfo });
     } catch {
       setState({
@@ -85,16 +65,13 @@ export const GroupPage: React.FC = () => {
   }, [state]);
 
   const handleSaveTitle = useCallback(async () => {
-    if (state.status !== 'loaded' || !editedTitle.trim()) {
+    if (tabId === null || state.status !== 'loaded' || !editedTitle.trim()) {
       setIsEditing(false);
       return;
     }
 
     try {
-      await chrome.runtime.sendMessage({
-        type: 'UPDATE_GROUP_NAME',
-        payload: { tabId, name: editedTitle.trim() },
-      });
+      await sendServiceWorkerRequest('UPDATE_GROUP_NAME', { tabId, name: editedTitle.trim() });
       await loadGroupInfo();
     } catch (error) {
       console.error('Failed to save group name:', error);
@@ -193,10 +170,7 @@ export const GroupPage: React.FC = () => {
                 key={child.tabId}
                 className="p-3 bg-gray-800 rounded hover:bg-gray-700 cursor-pointer"
                 onClick={() => {
-                  chrome.runtime.sendMessage({
-                    type: 'ACTIVATE_TAB',
-                    payload: { tabId: child.tabId },
-                  });
+                  dispatchServiceWorkerRequest('ACTIVATE_TAB', { tabId: child.tabId });
                 }}
               >
                 <div className="font-medium">{child.title}</div>

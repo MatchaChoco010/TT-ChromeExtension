@@ -370,7 +370,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       await waitForCondition(
         async () => {
           const indicator = sidePanelPage.locator('[data-testid="drop-indicator"]');
-          return await indicator.isVisible().catch(() => false);
+          return await indicator.isVisible();
         },
         { timeout: 3000, interval: 50, timeoutMessage: 'Drop indicator not visible' }
       );
@@ -424,7 +424,7 @@ test.describe('Gapドロップ精度のE2Eテスト', () => {
       await waitForCondition(
         async () => {
           const indicator = sidePanelPage.locator('[data-testid="drop-indicator"]');
-          return await indicator.isVisible().catch(() => false);
+          return await indicator.isVisible();
         },
         { timeout: 5000, interval: 100, timeoutMessage: 'Drop indicator did not appear' }
       );

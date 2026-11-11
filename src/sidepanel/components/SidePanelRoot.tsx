@@ -13,6 +13,7 @@ import { downloadService } from '@/storage/DownloadService';
 import { storageService } from '@/storage/StorageService';
 import { SnapshotManager } from '@/services/SnapshotManager';
 import type { UITabNode, TabNode, MenuAction, WindowInfo } from '@/types';
+import { dispatchServiceWorkerRequest, sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 interface SidePanelRootProps {
   children?: React.ReactNode;
@@ -98,10 +99,7 @@ const TreeViewContent: React.FC = () => {
   const handleMoveToWindow = useCallback(async (targetWindowId: number, tabIds: number[]) => {
     try {
       for (const tabId of tabIds) {
-        await chrome.runtime.sendMessage({
-          type: 'MOVE_SUBTREE_TO_WINDOW',
-          payload: { tabId, windowId: targetWindowId },
-        });
+        await sendServiceWorkerRequest('MOVE_SUBTREE_TO_WINDOW', { tabId, windowId: targetWindowId });
       }
     } catch (error) {
       console.error('Failed to move tabs to window:', error);
@@ -120,15 +118,12 @@ const TreeViewContent: React.FC = () => {
   }, []);
 
   const handleNodeClick = (tabId: number) => {
-    chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId } });
+    dispatchServiceWorkerRequest('ACTIVATE_TAB', { tabId });
   };
 
   const handleToggleExpand = useCallback((tabId: number) => {
     if (currentWindowId === null) return;
-    chrome.runtime.sendMessage({
-      type: 'TOGGLE_NODE_EXPAND',
-      payload: { tabId, windowId: currentWindowId },
-    });
+    dispatchServiceWorkerRequest('TOGGLE_NODE_EXPAND', { tabId });
   }, [currentWindowId]);
 
   const currentWindowState = useMemo(() => {
@@ -209,7 +204,7 @@ const TreeViewContent: React.FC = () => {
 
   const handlePinnedTabClick = (tabId: number) => {
     clearSelection();
-    chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId } });
+    dispatchServiceWorkerRequest('ACTIVATE_TAB', { tabId });
   };
 
   const [pinnedContextMenu, setPinnedContextMenu] = useState<{
@@ -237,11 +232,8 @@ const TreeViewContent: React.FC = () => {
   }, [pinnedContextMenu, tabInfoMap, executeAction, handleSnapshot]);
 
   const handleExternalDrop = useCallback((tabId: number) => {
-    chrome.runtime.sendMessage({
-      type: 'CREATE_WINDOW_WITH_SUBTREE',
-      payload: { tabId, sourceWindowId: currentWindowId ?? undefined },
-    });
-  }, [currentWindowId]);
+    dispatchServiceWorkerRequest('CREATE_WINDOW_WITH_SUBTREE', { tabId });
+  }, []);
 
   const [groupNameModalOpen, setGroupNameModalOpen] = useState(false);
   const [pendingGroupTabIds, setPendingGroupTabIds] = useState<number[]>([]);
@@ -256,10 +248,7 @@ const TreeViewContent: React.FC = () => {
   const handleGroupNameSave = useCallback(async (groupName: string) => {
     setGroupNameModalOpen(false);
     try {
-      await chrome.runtime.sendMessage({
-        type: 'CREATE_GROUP',
-        payload: { tabIds: pendingGroupTabIds, groupName, contextMenuTabId: pendingContextMenuTabId },
-      });
+      await sendServiceWorkerRequest('CREATE_GROUP', { tabIds: pendingGroupTabIds, groupName, contextMenuTabId: pendingContextMenuTabId ?? undefined });
     } catch (error) {
       console.error('Failed to create group:', error);
     }

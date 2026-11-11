@@ -12,7 +12,8 @@ Vivaldi-TTは、Vivaldiブラウザ向けのツリー型タブマネージャー
 
 | ディレクトリ | 役割 | 主要ファイル |
 |-------------|------|-------------|
-| `/src/background/` | Service Worker（タブイベント処理、ツリー同期） | `service-worker.ts`, `event-handlers.ts` |
+| `/src/background/` | Service Worker（タブイベント処理、ツリー同期） | `service-worker.ts`, `tab-event-handlers.ts`, `requests/` |
+| `/src/messaging/` | 拡張ページからService Workerへの要求送信 | `service-worker-client.ts` |
 | `/src/sidepanel/` | React UI（サイドパネル） | `components/`, `providers/`, `hooks/` |
 | `/src/settings/` | 設定画面 | `SettingsPage.tsx` |
 | `/src/group/` | グループタブ専用ページ | `GroupPage.tsx` |
@@ -126,7 +127,7 @@ interface TabNode {
 ```
 UI操作/Chromeイベント
     ↓
-Service Worker (event-handlers.ts)
+Service Worker (tab-event-handlers.ts / requests/)
     ↓
 TreeStateManager
     ├→ メモリ上の状態変更
@@ -188,7 +189,7 @@ TreeStateManager
 
 **ストレージ**:
 - `chrome.storage.local`使用（`unlimitedStorage`権限）
-- 15秒ごとの定期永続化
+- TreeStateManagerは状態を変更するたびに永続化する
 - 想定最大タブ数: 2500
 
 **サイドパネルタブ除外**:

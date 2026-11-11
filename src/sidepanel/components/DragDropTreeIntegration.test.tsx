@@ -145,8 +145,6 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
         payload: {
           tabId: 2,
           targetParentTabId: 1,
-          viewIndex: 0,
-          windowId: 1,
           selectedTabIds: [],
         },
       });
@@ -204,8 +202,6 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
         payload: {
           tabId: 3,
           targetParentTabId: 2,
-          viewIndex: 0,
-          windowId: 1,
           selectedTabIds: [],
         },
       });
@@ -292,8 +288,6 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
         payload: {
           tabId: 1,
           targetParentTabId: 2,
-          viewIndex: 0,
-          windowId: 1,
           selectedTabIds: [],
         },
       });

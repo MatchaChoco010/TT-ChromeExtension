@@ -1226,8 +1226,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 2,
           aboveTabId: 1,
           belowTabId: 3,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1271,8 +1269,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 2,
           aboveTabId: undefined,
           belowTabId: 1,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1351,8 +1347,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 1,
           aboveTabId: 4,
           belowTabId: undefined,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1396,8 +1390,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 2,
           aboveTabId: 1,
           belowTabId: 3,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1441,8 +1433,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 2,
           aboveTabId: 1,
           belowTabId: 3,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1486,8 +1476,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 2,
           aboveTabId: 1,
           belowTabId: 3,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1531,8 +1519,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 2,
           aboveTabId: undefined,
           belowTabId: 1,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1576,8 +1562,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 2,
           aboveTabId: 1,
           belowTabId: 3,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });
@@ -1621,8 +1605,6 @@ describe('TreeStateProvider handleSiblingDrop', () => {
           tabId: 1,
           aboveTabId: 3,
           belowTabId: undefined,
-          windowId: 1,
-          viewIndex: 0,
           selectedTabIds: [],
         },
       });

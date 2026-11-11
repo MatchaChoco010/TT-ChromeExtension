@@ -3,6 +3,8 @@ import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, Sibl
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
 import { useLatestRequestGuard } from '../hooks/useLatestRequestGuard';
+import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
+import { isMissingTabOrWindowError } from '@/utils/chrome-errors';
 
 interface TreeStateContextType {
   treeState: TreeState | null;
@@ -184,23 +186,15 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   const saveGroups = React.useCallback(async (newGroups: Record<string, Group>) => {
     setGroups(newGroups);
-    await chrome.runtime.sendMessage({
-      type: 'SAVE_GROUPS',
-      payload: { groups: newGroups },
-    });
+    await sendServiceWorkerRequest('SAVE_GROUPS', { groups: newGroups });
   }, []);
 
   const loadTreeState = React.useCallback(async () => {
     const isLatestRequest = beginTreeStateRequest();
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
-      if (!isLatestRequest()) {
-        return;
-      }
-      if (response?.success && response.data) {
-        setTreeState(response.data as TreeState);
-      } else {
-        setError(new Error(response?.error ?? 'Failed to load tree state'));
+      const state = await sendServiceWorkerRequest('GET_STATE');
+      if (isLatestRequest()) {
+        setTreeState(state);
       }
     } catch (err) {
       setError(
@@ -309,23 +303,20 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       viewActiveTabIdsRef.current[currentViewIndex] = activeTabId;
     }
 
-    await chrome.runtime.sendMessage({
-      type: 'SWITCH_VIEW',
-      payload: {
-        viewIndex,
-        windowId: currentWindowId,
-        previousViewIndex: currentViewIndex,
-        activeTabId,
-      },
-    });
+    await sendServiceWorkerRequest('SWITCH_VIEW', { viewIndex, windowId: currentWindowId });
 
     if (tabIdToActivate !== undefined) {
       const tabInfo = tabInfoMap[tabIdToActivate];
       const isInCurrentWindow = tabInfo && tabInfo.windowId === currentWindowId;
       if (isInCurrentWindow) {
-        const response = await chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId: tabIdToActivate } });
-        if (response?.success) {
+        try {
+          await sendServiceWorkerRequest('ACTIVATE_TAB', { tabId: tabIdToActivate });
           return;
+        } catch (error) {
+          // 記憶していたタブが閉じられていた場合は、ビューの先頭のタブをアクティブにする
+          if (!isMissingTabOrWindowError(error)) {
+            throw error;
+          }
         }
       }
     }
@@ -350,33 +341,24 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     const viewTabs = collectTabIds(targetViewState.rootNodes);
 
     if (viewTabs.length > 0) {
-      await chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId: viewTabs[0] } });
+      await sendServiceWorkerRequest('ACTIVATE_TAB', { tabId: viewTabs[0] });
     }
   }, [treeState, activeTabId, currentViewIndex, currentWindowId, tabInfoMap]);
 
   const createView = useCallback(async () => {
     if (currentWindowId === null) return;
-    await chrome.runtime.sendMessage({
-      type: 'CREATE_VIEW',
-      payload: { windowId: currentWindowId },
-    });
+    await sendServiceWorkerRequest('CREATE_VIEW', { windowId: currentWindowId });
   }, [currentWindowId]);
 
   const deleteView = useCallback(async (viewIndex: number) => {
     if (viewIndex === 0 || currentWindowId === null) return;
 
-    await chrome.runtime.sendMessage({
-      type: 'DELETE_VIEW',
-      payload: { viewIndex, windowId: currentWindowId },
-    });
+    await sendServiceWorkerRequest('DELETE_VIEW', { viewIndex, windowId: currentWindowId });
   }, [currentWindowId]);
 
   const updateView = useCallback(async (viewIndex: number, updates: Partial<View>) => {
     if (currentWindowId === null) return;
-    await chrome.runtime.sendMessage({
-      type: 'UPDATE_VIEW',
-      payload: { viewIndex, updates, windowId: currentWindowId },
-    });
+    await sendServiceWorkerRequest('UPDATE_VIEW', { viewIndex, updates, windowId: currentWindowId });
   }, [currentWindowId]);
 
   const handleDragEnd = useCallback(
@@ -390,38 +372,28 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       const activeTabId = Number(active.id);
       const overTabId = Number(over.id);
 
-      await chrome.runtime.sendMessage({
-        type: 'MOVE_NODE',
-        payload: {
-          tabId: activeTabId,
-          targetParentTabId: overTabId,
-          windowId: currentWindowId,
-          viewIndex: currentViewIndex,
-          selectedTabIds: Array.from(selectedTabIds),
-        },
+      await sendServiceWorkerRequest('MOVE_NODE', {
+        tabId: activeTabId,
+        targetParentTabId: overTabId,
+        selectedTabIds: Array.from(selectedTabIds),
       });
     },
-    [selectedTabIds, currentViewIndex, currentWindowId]
+    [selectedTabIds]
   );
 
   const handleSiblingDrop = useCallback(
     async (info: SiblingDropInfo) => {
       const { activeTabId, aboveTabId, belowTabId, targetDepth } = info;
 
-      await chrome.runtime.sendMessage({
-        type: 'MOVE_NODE_AS_SIBLING',
-        payload: {
-          tabId: activeTabId,
-          aboveTabId: aboveTabId,
-          belowTabId: belowTabId,
-          windowId: currentWindowId,
-          viewIndex: currentViewIndex,
-          selectedTabIds: Array.from(selectedTabIds),
-          targetDepth,
-        },
+      await sendServiceWorkerRequest('MOVE_NODE_AS_SIBLING', {
+        tabId: activeTabId,
+        aboveTabId,
+        belowTabId,
+        selectedTabIds: Array.from(selectedTabIds),
+        targetDepth,
       });
     },
-    [selectedTabIds, currentViewIndex, currentWindowId]
+    [selectedTabIds]
   );
 
   const createGroup = useCallback((name: string, color: string): string => {
@@ -443,11 +415,8 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     delete newGroups[`group_${tabId}`];
     saveGroups(newGroups);
 
-    await chrome.runtime.sendMessage({
-      type: 'DELETE_TREE_GROUP',
-      payload: { tabId, windowId: currentWindowId, viewIndex: currentViewIndex },
-    });
-  }, [groups, saveGroups, currentViewIndex, currentWindowId]);
+    await sendServiceWorkerRequest('DELETE_TREE_GROUP', { tabId });
+  }, [groups, saveGroups]);
 
   const updateGroupFn = useCallback((tabId: number, updates: Partial<Group>) => {
     const groupKey = `group_${tabId}`;
@@ -470,18 +439,12 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, [groups, saveGroups]);
 
   const addTabToGroup = useCallback(async (tabId: number, targetGroupTabId: number) => {
-    await chrome.runtime.sendMessage({
-      type: 'ADD_TAB_TO_TREE_GROUP',
-      payload: { tabId, targetGroupTabId, windowId: currentWindowId, viewIndex: currentViewIndex },
-    });
-  }, [currentViewIndex, currentWindowId]);
+    await sendServiceWorkerRequest('ADD_TAB_TO_TREE_GROUP', { tabId, targetGroupTabId });
+  }, []);
 
   const removeTabFromGroup = useCallback(async (tabId: number) => {
-    await chrome.runtime.sendMessage({
-      type: 'REMOVE_TAB_FROM_TREE_GROUP',
-      payload: { tabId, windowId: currentWindowId, viewIndex: currentViewIndex },
-    });
-  }, [currentViewIndex, currentWindowId]);
+    await sendServiceWorkerRequest('REMOVE_TAB_FROM_TREE_GROUP', { tabId });
+  }, []);
 
   const getGroupTabCount = useCallback((tabId: number): number => {
     if (!currentViewState) return 0;
@@ -546,10 +509,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     if (currentWindowId === null) return;
 
     try {
-      await chrome.runtime.sendMessage({
-        type: 'REORDER_PINNED_TAB',
-        payload: { tabId, newIndex, windowId: currentWindowId },
-      });
+      await sendServiceWorkerRequest('REORDER_PINNED_TAB', { tabId, newIndex });
     } catch (error) {
       console.error('Failed to reorder pinned tab:', error);
     }
@@ -559,10 +519,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     if (currentWindowId === null) return;
 
     try {
-      await chrome.runtime.sendMessage({
-        type: 'REORDER_VIEW',
-        payload: { viewIndex, newIndex, windowId: currentWindowId },
-      });
+      await sendServiceWorkerRequest('REORDER_VIEW', { viewIndex, newIndex, windowId: currentWindowId });
     } catch (error) {
       console.error('Failed to reorder view:', error);
     }
@@ -692,10 +649,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
 
   const moveTabsToView = useCallback(async (viewIndex: number, tabIds: number[]) => {
     if (currentWindowId === null) return;
-    await chrome.runtime.sendMessage({
-      type: 'MOVE_TABS_TO_VIEW',
-      payload: { targetViewIndex: viewIndex, tabIds, windowId: currentWindowId },
-    });
+    await sendServiceWorkerRequest('MOVE_TABS_TO_VIEW', { targetViewIndex: viewIndex, tabIds, windowId: currentWindowId });
   }, [currentWindowId]);
 
   return (

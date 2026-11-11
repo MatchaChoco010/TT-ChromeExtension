@@ -16,6 +16,7 @@ import {
 } from './GapDropDetection';
 import { TREE_INDENT_WIDTH_PX, calculateDepthRange } from '../utils';
 import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
+import { dispatchServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 const countSubtreeNodes = (node: UITabNode): number => {
   let count = 1;
@@ -215,31 +216,19 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
         setShowConfirmDialog(true);
         return;
       }
-      chrome.runtime.sendMessage({
-        type: 'CLOSE_SUBTREE',
-        payload: { tabId: node.tabId },
-      });
+      dispatchServiceWorkerRequest('CLOSE_SUBTREE', { tabId: node.tabId });
     } else {
-      chrome.runtime.sendMessage({
-        type: 'CLOSE_TAB',
-        payload: { tabId: node.tabId },
-      });
+      dispatchServiceWorkerRequest('CLOSE_TAB', { tabId: node.tabId });
     }
   };
 
   const handleConfirmClose = () => {
     setShowConfirmDialog(false);
     if (pendingCloseAction?.type === 'subtree') {
-      chrome.runtime.sendMessage({
-        type: 'CLOSE_SUBTREE',
-        payload: { tabId: pendingCloseAction.tabIds[0] },
-      });
+      dispatchServiceWorkerRequest('CLOSE_SUBTREE', { tabId: pendingCloseAction.tabIds[0] });
     } else if (pendingCloseAction?.type === 'tabs') {
       for (const tabId of pendingCloseAction.tabIds) {
-        chrome.runtime.sendMessage({
-          type: 'CLOSE_TAB',
-          payload: { tabId },
-        });
+        dispatchServiceWorkerRequest('CLOSE_TAB', { tabId });
       }
     }
     setPendingCloseAction(null);
@@ -323,10 +312,7 @@ const DraggableTreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
   const handleGroupTitleSave = useCallback(() => {
     if (node.groupInfo !== undefined && editedGroupTitle.trim()) {
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_GROUP_NAME',
-        payload: { tabId: node.tabId, name: editedGroupTitle.trim() },
-      });
+      dispatchServiceWorkerRequest('UPDATE_GROUP_NAME', { tabId: node.tabId, name: editedGroupTitle.trim() });
     }
     setIsEditingGroupTitle(false);
   }, [node.tabId, node.groupInfo, editedGroupTitle]);
@@ -607,31 +593,19 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
         setShowConfirmDialog(true);
         return;
       }
-      chrome.runtime.sendMessage({
-        type: 'CLOSE_SUBTREE',
-        payload: { tabId: node.tabId },
-      });
+      dispatchServiceWorkerRequest('CLOSE_SUBTREE', { tabId: node.tabId });
     } else {
-      chrome.runtime.sendMessage({
-        type: 'CLOSE_TAB',
-        payload: { tabId: node.tabId },
-      });
+      dispatchServiceWorkerRequest('CLOSE_TAB', { tabId: node.tabId });
     }
   };
 
   const handleConfirmClose = () => {
     setShowConfirmDialog(false);
     if (pendingCloseAction?.type === 'subtree') {
-      chrome.runtime.sendMessage({
-        type: 'CLOSE_SUBTREE',
-        payload: { tabId: pendingCloseAction.tabIds[0] },
-      });
+      dispatchServiceWorkerRequest('CLOSE_SUBTREE', { tabId: pendingCloseAction.tabIds[0] });
     } else if (pendingCloseAction?.type === 'tabs') {
       for (const tabId of pendingCloseAction.tabIds) {
-        chrome.runtime.sendMessage({
-          type: 'CLOSE_TAB',
-          payload: { tabId },
-        });
+        dispatchServiceWorkerRequest('CLOSE_TAB', { tabId });
       }
     }
     setPendingCloseAction(null);
@@ -710,10 +684,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({
 
   const handleGroupTitleSave = useCallback(() => {
     if (node.groupInfo !== undefined && editedGroupTitle.trim()) {
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_GROUP_NAME',
-        payload: { tabId: node.tabId, name: editedGroupTitle.trim() },
-      });
+      dispatchServiceWorkerRequest('UPDATE_GROUP_NAME', { tabId: node.tabId, name: editedGroupTitle.trim() });
     }
     setIsEditingGroupTitle(false);
   }, [node.tabId, node.groupInfo, editedGroupTitle]);

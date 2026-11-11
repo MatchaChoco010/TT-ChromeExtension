@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { MenuAction } from '@/types';
+import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 export interface MenuActionOptions {
   url?: string;
@@ -14,98 +15,56 @@ export const useMenuActions = () => {
       switch (action) {
         case 'close':
           if (options?.isCollapsedParent && tabIds.length === 1) {
-            await chrome.runtime.sendMessage({
-              type: 'CLOSE_SUBTREE',
-              payload: { tabId: tabIds[0] },
-            });
+            await sendServiceWorkerRequest('CLOSE_SUBTREE', { tabId: tabIds[0] });
           } else if (tabIds.length > 1) {
-            await chrome.runtime.sendMessage({
-              type: 'CLOSE_TABS_WITH_COLLAPSED_SUBTREES',
-              payload: { tabIds },
-            });
+            await sendServiceWorkerRequest('CLOSE_TABS_WITH_COLLAPSED_SUBTREES', { tabIds });
           } else {
-            await chrome.runtime.sendMessage({
-              type: 'CLOSE_TAB',
-              payload: { tabId: tabIds[0] },
-            });
+            await sendServiceWorkerRequest('CLOSE_TAB', { tabId: tabIds[0] });
           }
           break;
 
         case 'closeSubtree':
-          await chrome.runtime.sendMessage({
-            type: 'CLOSE_SUBTREE',
-            payload: { tabId: tabIds[0] },
-          });
+          await sendServiceWorkerRequest('CLOSE_SUBTREE', { tabId: tabIds[0] });
           break;
 
         case 'closeOthers':
-          await chrome.runtime.sendMessage({
-            type: 'CLOSE_OTHER_TABS',
-            payload: { excludeTabIds: tabIds },
-          });
+          await sendServiceWorkerRequest('CLOSE_OTHER_TABS', { excludeTabIds: tabIds });
           break;
 
         case 'duplicate':
           if (options?.isCollapsedParent && tabIds.length === 1) {
-            await chrome.runtime.sendMessage({
-              type: 'DUPLICATE_SUBTREE',
-              payload: { tabId: tabIds[0] },
-            });
+            await sendServiceWorkerRequest('DUPLICATE_SUBTREE', { tabId: tabIds[0] });
           } else {
-            await chrome.runtime.sendMessage({
-              type: 'DUPLICATE_TABS',
-              payload: { tabIds },
-            });
+            await sendServiceWorkerRequest('DUPLICATE_TABS', { tabIds });
           }
           break;
 
         case 'pin':
-          await chrome.runtime.sendMessage({
-            type: 'PIN_TABS',
-            payload: { tabIds },
-          });
+          await sendServiceWorkerRequest('PIN_TABS', { tabIds });
           break;
 
         case 'unpin':
-          await chrome.runtime.sendMessage({
-            type: 'UNPIN_TABS',
-            payload: { tabIds },
-          });
+          await sendServiceWorkerRequest('UNPIN_TABS', { tabIds });
           break;
 
         case 'newWindow':
-          await chrome.runtime.sendMessage({
-            type: 'MOVE_TABS_TO_NEW_WINDOW',
-            payload: { tabIds },
-          });
+          await sendServiceWorkerRequest('MOVE_TABS_TO_NEW_WINDOW', { tabIds });
           break;
 
         case 'reload':
-          await chrome.runtime.sendMessage({
-            type: 'RELOAD_TABS',
-            payload: { tabIds },
-          });
+          await sendServiceWorkerRequest('RELOAD_TABS', { tabIds });
           break;
 
         case 'discard':
-          await chrome.runtime.sendMessage({
-            type: 'DISCARD_TABS',
-            payload: { tabIds },
-          });
+          await sendServiceWorkerRequest('DISCARD_TABS', { tabIds });
           break;
 
         case 'group':
-          await chrome.runtime.sendMessage({
-            type: 'CREATE_GROUP',
-            payload: { tabIds, groupName: options?.groupName },
-          });
+          await sendServiceWorkerRequest('CREATE_GROUP', { tabIds, groupName: options?.groupName });
           break;
 
         case 'ungroup':
-          await chrome.runtime.sendMessage({
-            type: 'DISSOLVE_GROUP',
-            payload: { tabIds },
-          });
+          await sendServiceWorkerRequest('DISSOLVE_GROUP', { tabIds });
           break;
 
         case 'copyUrl':

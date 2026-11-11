@@ -10,7 +10,7 @@ beforeEach(() => {
     },
   });
   mockSendMessage.mockClear();
-  mockSendMessage.mockResolvedValue(undefined);
+  mockSendMessage.mockResolvedValue({ success: true, data: { tabId: 1 } });
 });
 
 afterEach(() => {

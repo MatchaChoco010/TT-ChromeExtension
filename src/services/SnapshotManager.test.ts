@@ -79,6 +79,7 @@ describe('SnapshotManager', () => {
       alarms: {
         create: vi.fn(),
         clear: vi.fn(),
+        get: vi.fn(),
         onAlarm: {
           addListener: vi.fn(),
           removeListener: vi.fn(),
@@ -124,27 +125,50 @@ describe('SnapshotManager', () => {
     });
   });
 
-  describe('startAutoSnapshot', () => {
-    it('間隔が0の場合はアラームを設定しない', () => {
-      snapshotManager.startAutoSnapshot(0);
+  describe('scheduleAutoSnapshot', () => {
+    const mockExistingAlarm = (alarm: chrome.alarms.Alarm | undefined): void => {
+      vi.mocked(chrome.alarms.get as (name: string) => Promise<chrome.alarms.Alarm | undefined>).mockResolvedValue(alarm);
+    };
 
+    it('間隔が0の場合、既存のアラームを止める', async () => {
+      mockExistingAlarm({ name: 'auto-snapshot', scheduledTime: 0, periodInMinutes: 10, persistAcrossSessions: false });
+
+      await snapshotManager.scheduleAutoSnapshot(0);
+
+      expect(chrome.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
       expect(chrome.alarms.create).not.toHaveBeenCalled();
     });
 
-    it('間隔が指定されている場合はアラームを設定する', () => {
-      snapshotManager.startAutoSnapshot(10);
+    it('アラームがない場合は指定した間隔で作成する', async () => {
+      mockExistingAlarm(undefined);
 
-      expect(chrome.alarms.create).toHaveBeenCalledWith('auto-snapshot', {
-        periodInMinutes: 10,
-      });
+      await snapshotManager.scheduleAutoSnapshot(10);
+
+      expect(chrome.alarms.create).toHaveBeenCalledWith('auto-snapshot', { periodInMinutes: 10 });
+    });
+
+    it('同じ間隔のアラームが既にある場合は作り直さない', async () => {
+      mockExistingAlarm({ name: 'auto-snapshot', scheduledTime: 0, periodInMinutes: 10, persistAcrossSessions: false });
+
+      await snapshotManager.scheduleAutoSnapshot(10);
+
+      expect(chrome.alarms.create).not.toHaveBeenCalled();
+      expect(chrome.alarms.clear).not.toHaveBeenCalled();
+    });
+
+    it('間隔が変わった場合は作り直す', async () => {
+      mockExistingAlarm({ name: 'auto-snapshot', scheduledTime: 0, periodInMinutes: 10, persistAcrossSessions: false });
+
+      await snapshotManager.scheduleAutoSnapshot(30);
+
+      expect(chrome.alarms.create).toHaveBeenCalledWith('auto-snapshot', { periodInMinutes: 30 });
     });
   });
 
-  describe('stopAutoSnapshot', () => {
-    it('アラームをクリアする', async () => {
-      await snapshotManager.stopAutoSnapshot();
-
-      expect(chrome.alarms.clear).toHaveBeenCalledWith('auto-snapshot');
+  describe('isAutoSnapshotAlarm', () => {
+    it('自動スナップショットのアラームだけを判定する', () => {
+      expect(snapshotManager.isAutoSnapshotAlarm({ name: 'auto-snapshot', scheduledTime: 0, persistAcrossSessions: false })).toBe(true);
+      expect(snapshotManager.isAutoSnapshotAlarm({ name: 'other', scheduledTime: 0, persistAcrossSessions: false })).toBe(false);
     });
   });
 });

@@ -1,4 +1,5 @@
 import React from 'react';
+import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 interface NewTabButtonProps {
   /**
@@ -12,10 +13,8 @@ const NewTabButton: React.FC<NewTabButtonProps> = ({ onNewTab }) => {
     e.stopPropagation();
 
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'CREATE_NEW_TAB' });
-      if (response?.success && onNewTab) {
-        onNewTab();
-      }
+      await sendServiceWorkerRequest('CREATE_NEW_TAB');
+      onNewTab?.();
     } catch (error) {
       console.error('Failed to create new tab:', error);
     }

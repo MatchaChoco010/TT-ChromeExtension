@@ -100,7 +100,7 @@ export class ChromeMock {
         sendResponse: (response?: unknown) => void,
       ) => boolean | void
     >(),
-    sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(() => Promise.resolve()),
+    sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(() => Promise.resolve({ success: true, data: null })),
     getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
     id: 'test-extension-id',
     lastError: undefined as chrome.runtime.LastError | undefined,
@@ -181,7 +181,7 @@ export class ChromeMock {
     this.storageData = {};
 
     this.tabs.get.mockImplementation((tabId: number) => Promise.resolve(createMockTab({ id: tabId })));
-    this.runtime.sendMessage.mockImplementation(() => Promise.resolve());
+    this.runtime.sendMessage.mockImplementation(() => Promise.resolve({ success: true, data: null }));
     this.runtime.getURL.mockImplementation((path: string) => `chrome-extension://test-extension-id/${path}`);
     this.runtime.lastError = undefined;
 

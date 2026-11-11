@@ -20,7 +20,6 @@ export class SnapshotManager {
   private static readonly AUTO_SNAPSHOT_ALARM_NAME = 'auto-snapshot';
   private static readonly DEFAULT_SUBFOLDER = 'TT-Snapshots';
 
-  private alarmListener: ((alarm: chrome.alarms.Alarm) => void) | null = null;
 
   constructor(
     private downloadService: IDownloadService,
@@ -205,51 +204,34 @@ export class SnapshotManager {
   }
 
   /**
-   * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
+   * 自動スナップショットの間隔を設定する
+   * 間隔が変わらない場合は既存のアラームをそのまま残す。作り直すとアラームの周期がリセットされるため
+   * @param intervalMinutes - スナップショット間隔（分）。0以下の場合は自動スナップショットを止める
    */
-  startAutoSnapshot(intervalMinutes: number): void {
-    chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
-    if (this.alarmListener) {
-      chrome.alarms.onAlarm.removeListener(this.alarmListener);
-      this.alarmListener = null;
-    }
-
-    if (intervalMinutes === 0) {
+  async scheduleAutoSnapshot(intervalMinutes: number): Promise<void> {
+    const existingAlarm = await chrome.alarms.get(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
+    if (intervalMinutes <= 0) {
+      if (existingAlarm) {
+        await chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
+      }
       return;
     }
-
-    this.alarmListener = async (alarm: chrome.alarms.Alarm) => {
-      if (alarm.name === SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME) {
-        try {
-          const timestamp = new Date().toISOString().split('T')[0];
-          const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
-          await this.createSnapshot(name, true);
-        } catch (error) {
-          console.error('[SnapshotManager] Auto snapshot failed:', error);
-        }
-      }
-    };
-
-    chrome.alarms.onAlarm.addListener(this.alarmListener);
-
-    chrome.alarms.create(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME, {
+    if (existingAlarm?.periodInMinutes === intervalMinutes) {
+      return;
+    }
+    await chrome.alarms.create(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME, {
       periodInMinutes: intervalMinutes,
     });
   }
 
-  /**
-   * @param intervalMinutes - スナップショット間隔（分単位）。0の場合は無効化
-   */
-  updateAutoSnapshotSettings(intervalMinutes: number): void {
-    this.startAutoSnapshot(intervalMinutes);
+  isAutoSnapshotAlarm(alarm: chrome.alarms.Alarm): boolean {
+    return alarm.name === SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME;
   }
 
-  async stopAutoSnapshot(): Promise<void> {
-    await chrome.alarms.clear(SnapshotManager.AUTO_SNAPSHOT_ALARM_NAME);
-
-    if (this.alarmListener) {
-      chrome.alarms.onAlarm.removeListener(this.alarmListener);
-      this.alarmListener = null;
-    }
+  async createAutoSnapshot(): Promise<Snapshot> {
+    const timestamp = new Date().toISOString().split('T')[0];
+    const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
+    return this.createSnapshot(name, true);
   }
+
 }

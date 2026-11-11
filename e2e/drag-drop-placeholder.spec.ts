@@ -22,7 +22,7 @@ async function getDropIndicatorPosition(
   page: Page
 ): Promise<{ top: number; left: number } | null> {
   const indicator = page.locator('[data-testid="drop-indicator"]');
-  const isVisible = await indicator.isVisible().catch(() => false);
+  const isVisible = await indicator.isVisible();
   if (!isVisible) {
     return null;
   }
@@ -442,7 +442,7 @@ test.describe('ドラッグ&ドロップ - プレースホルダー表示', () =
       }
 
       // Assert
-      const isVisible = await dropIndicator.isVisible().catch(() => false);
+      const isVisible = await dropIndicator.isVisible();
 
       // コンテナ外ではプレースホルダーが非表示になるか、表示されていても問題ない
       // （実装によってはコンテナ境界チェックがない場合もあるため）

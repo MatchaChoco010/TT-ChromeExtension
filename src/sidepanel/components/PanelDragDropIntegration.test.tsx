@@ -205,8 +205,6 @@ describe('パネル内D&Dの統合テスト', () => {
           payload: {
             tabId: 2,
             targetParentTabId: 1,
-            windowId: 1,
-            viewIndex: 0,
             selectedTabIds: [],
           },
         });
@@ -242,8 +240,6 @@ describe('パネル内D&Dの統合テスト', () => {
           payload: {
             tabId: 3,
             targetParentTabId: 1,
-            windowId: 1,
-            viewIndex: 0,
             selectedTabIds: [],
           },
         });
@@ -297,8 +293,6 @@ describe('パネル内D&Dの統合テスト', () => {
           payload: {
             tabId: 2,
             targetParentTabId: 1,
-            windowId: 1,
-            viewIndex: 0,
             selectedTabIds: [],
           },
         });
@@ -352,8 +346,6 @@ describe('パネル内D&Dの統合テスト', () => {
           payload: {
             tabId: 2,
             targetParentTabId: 1,
-            windowId: 1,
-            viewIndex: 0,
             selectedTabIds: [],
           },
         });
@@ -465,8 +457,6 @@ describe('パネル内D&Dの統合テスト', () => {
           payload: {
             tabId: 1,
             targetParentTabId: 2,
-            windowId: 1,
-            viewIndex: 0,
             selectedTabIds: [],
           },
         });

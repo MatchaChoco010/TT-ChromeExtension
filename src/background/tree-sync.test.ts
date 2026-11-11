@@ -135,7 +135,7 @@ describe('ツリー同期とリアルタイム更新', () => {
     it('handleTabMoved: タブ移動時に STATE_UPDATED メッセージを送信する', async () => {
       mockChrome.runtime.sendMessage.mockResolvedValue(undefined);
 
-      const { handleTabMoved } = await import('@/background/event-handlers');
+      const { handleTabMoved } = await import('@/background/tab-event-handlers');
 
       const tabId = 1;
       const moveInfo: chrome.tabs.OnMovedInfo = {
@@ -159,7 +159,7 @@ describe('ツリー同期とリアルタイム更新', () => {
     it('handleTabUpdated: タイトルやURLが更新されたときに STATE_UPDATED メッセージを送信する', async () => {
       mockChrome.runtime.sendMessage.mockResolvedValue(undefined);
 
-      const { handleTabUpdated } = await import('@/background/event-handlers');
+      const { handleTabUpdated } = await import('@/background/tab-event-handlers');
 
       const tabId = 1;
       const changeInfo: chrome.tabs.OnUpdatedInfo = {

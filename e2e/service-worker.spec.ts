@@ -25,24 +25,6 @@ import { setupWindow } from './utils/setup-utils';
 import './types';
 import { openExtensionPageTab } from './utils/extension-page-utils';
 
-/**
- * Service Workerからのレスポンス型
- */
-interface ServiceWorkerResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-/**
- * ドラッグ状態の型
- */
-interface DragState {
-  tabId: number;
-  treeData: Record<string, unknown>;
-  sourceWindowId: number;
-}
-
 test.describe('Service Workerとの通信', () => {
   test.describe('Side PanelからService Workerへのメッセージ送信', () => {
     test('Side PanelからService Workerにchrome.runtime.sendMessage()でメッセージを送信できること', async ({
@@ -134,20 +116,6 @@ test.describe('Service Workerとの通信', () => {
       ], 0);
     });
 
-    test('SYNC_TABSメッセージでChrome タブと同期できること', async ({
-      extensionContext,
-      serviceWorker,
-    }) => {
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
-      const response = await sendMessageToServiceWorker(sidePanelPage, {
-        type: 'SYNC_TABS',
-      });
-
-      expect(response).toMatchObject({
-        success: true,
-      });
-    });
   });
 
   test.describe('Service WorkerからSide Panelへのメッセージ送信', () => {
@@ -498,39 +466,6 @@ test.describe('Service Workerとの通信', () => {
       });
     });
 
-    test('ドラッグ状態のSet/Get/Clearが正常に動作すること', async ({
-      extensionContext,
-      serviceWorker,
-    }) => {
-      const windowId = await getCurrentWindowId(serviceWorker);
-      const { sidePanelPage } = await setupWindow(extensionContext, serviceWorker, windowId);
-      const setResponse = await sendMessageToServiceWorker(sidePanelPage, {
-        type: 'SET_DRAG_STATE',
-        payload: { tabId: 123, treeData: {}, sourceWindowId: 1 },
-      });
-      expect((setResponse as { success: boolean }).success).toBe(true);
-
-      const getResponse = await sendMessageToServiceWorker(sidePanelPage, {
-        type: 'GET_DRAG_STATE',
-      });
-      const typedGetResponse = getResponse as ServiceWorkerResponse<DragState>;
-      expect(typedGetResponse.success).toBe(true);
-      expect(typedGetResponse.data).toMatchObject({
-        tabId: 123,
-        sourceWindowId: 1,
-      });
-
-      const clearResponse = await sendMessageToServiceWorker(sidePanelPage, {
-        type: 'CLEAR_DRAG_STATE',
-      });
-      expect((clearResponse as { success: boolean }).success).toBe(true);
-
-      const getAfterClear = await sendMessageToServiceWorker(sidePanelPage, {
-        type: 'GET_DRAG_STATE',
-      });
-      const typedGetAfterClear = getAfterClear as ServiceWorkerResponse<DragState | null>;
-      expect(typedGetAfterClear.data).toBeNull();
-    });
   });
 
   test.describe('統合テスト: Service Workerとの完全な通信フロー', () => {

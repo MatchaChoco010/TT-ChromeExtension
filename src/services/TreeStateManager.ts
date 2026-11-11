@@ -5,9 +5,11 @@ import type {
   ViewState,
   WindowState,
   GroupInfo,
+  GroupDetails,
+  StateUpdatedNotification,
 } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
-import { ignoreMissingTabOrWindow } from '@/utils/chrome-errors';
+import { ignoreMissingTabOrWindow, sendMessageToExtensionPages } from '@/utils/chrome-errors';
 
 /**
  * ノード検索結果
@@ -1338,15 +1340,12 @@ export class TreeStateManager {
   /**
    * グループ情報を取得
    */
-  async getGroupInfo(tabId: number): Promise<{
-    name: string;
-    children: Array<{ tabId: number; title: string; url: string }>;
-  }> {
+  async getGroupInfo(tabId: number): Promise<GroupDetails> {
     const result = this.findNodeByTabId(tabId);
     if (!result) throw new Error('Group not found');
     if (!result.node.groupInfo) throw new Error('Not a group tab');
 
-    const children: Array<{ tabId: number; title: string; url: string }> = [];
+    const children: GroupDetails['children'] = [];
     for (const child of result.node.children) {
       const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(child.tabId));
       if (tab) {
@@ -1797,9 +1796,7 @@ export class TreeStateManager {
    * ブラウザ再起動でtabIdとwindowIdが変わるため、並び順で対応付けて付け直す
    * 同一ブラウザセッション内でこれを実行すると、Chromeのタブ順序とツリーがずれている場合にtabIdを取り違える
    */
-  async restoreStateAfterRestart(_userSettings?: {
-    newTabPositionManual?: 'child' | 'nextSibling' | 'lastSibling' | 'end';
-  }): Promise<void> {
+  async restoreStateAfterRestart(): Promise<void> {
     if (this.initializationInProgress || this.initialized) {
       return;
     }
@@ -2403,15 +2400,10 @@ export class TreeStateManager {
    * 状態変更を通知
    */
   notifyStateChanged(): void {
-    const payload = this.toJSON();
-    chrome.runtime
-      .sendMessage({
-        type: 'STATE_UPDATED',
-        payload,
-      })
-      .catch(() => {
-        // Side Panelが開かれていない場合は無視
-      });
+    const notification: StateUpdatedNotification = { type: 'STATE_UPDATED', payload: this.toJSON() };
+    sendMessageToExtensionPages(notification).catch((error: unknown) => {
+      console.error('[TreeStateManager] Failed to notify state change:', error);
+    });
   }
 
   /**

@@ -1,7 +1,8 @@
 import React, { useCallback } from 'react';
+import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 export async function openSettingsInNewTab(): Promise<void> {
-  await chrome.runtime.sendMessage({ type: 'OPEN_SETTINGS_TAB' });
+  await sendServiceWorkerRequest('OPEN_SETTINGS_TAB');
 }
 
 export const OpenSettingsButton: React.FC = () => {

@@ -13,10 +13,10 @@ async function getTabTitleElement(sidePanelPage: import('@playwright/test').Page
   const tabTitle = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"] [data-testid="tab-title"]`);
   const discardedTabTitle = sidePanelPage.locator(`[data-testid="tree-node-${tabId}"] [data-testid="discarded-tab-title"]`);
 
-  if (await tabTitle.isVisible().catch(() => false)) {
+  if (await tabTitle.isVisible()) {
     return tabTitle;
   }
-  if (await discardedTabTitle.isVisible().catch(() => false)) {
+  if (await discardedTabTitle.isVisible()) {
     return discardedTabTitle;
   }
 

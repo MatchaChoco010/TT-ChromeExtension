@@ -38,10 +38,7 @@ async function getBoundingBox(
 async function waitForDragState(page: Page, maxWait: number = 2000): Promise<void> {
   const startTime = Date.now();
   while (Date.now() - startTime < maxWait) {
-    const dragContainer = page.locator('[data-drag-container]');
-    const hasDragClass = await dragContainer.evaluate((el) =>
-      el.classList.contains('is-dragging')
-    ).catch(() => false);
+    const hasDragClass = await isDragging(page);
     if (hasDragClass) {
       return;
     }
@@ -292,10 +289,9 @@ export async function dragOutside(
  * @returns ドラッグ中の場合true
  */
 export async function isDragging(page: Page): Promise<boolean> {
-  const dragContainer = page.locator('[data-drag-container]');
-  return await dragContainer.evaluate((el) =>
-    el.classList.contains('is-dragging')
-  ).catch(() => false);
+  return page.evaluate(() =>
+    document.querySelector('[data-drag-container]')?.classList.contains('is-dragging') ?? false
+  );
 }
 
 /**
@@ -331,52 +327,13 @@ async function waitForDropIndicator(page: Page, maxWait: number = 2000): Promise
   const startTime = Date.now();
   while (Date.now() - startTime < maxWait) {
     const indicator = page.locator('[data-testid="drop-indicator"]');
-    const isVisible = await indicator.isVisible().catch(() => false);
+    const isVisible = await indicator.isVisible();
     if (isVisible) {
       return;
     }
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
   }
   throw new Error(`waitForDropIndicator: drop-indicator not visible within ${maxWait}ms`);
-}
-
-
-/**
- * ターゲットタブがハイライトされ、かつdropTargetの状態がTabになるまでポーリングで待機
- * タブ中央へのドロップ（子タブ化）時に使用
- * ハイライト時はring-2クラスが付与され、data-drop-target-type="tab"が設定される
- * 追加でdata-drop-target-nodeがターゲットタブのノードIDと一致することを確認
- * タイムアウト時は例外を投げる
- *
- * @param page - Side PanelのPage
- * @param targetTabId - ターゲットタブのID
- * @param maxWait - 最大待機時間（ミリ秒）
- * @throws タイムアウト時にError
- */
-async function _waitForTargetHighlight(page: Page, targetTabId: number, maxWait: number = 2000): Promise<void> {
-  const startTime = Date.now();
-  while (Date.now() - startTime < maxWait) {
-    const result = await page.evaluate((tabId: number) => {
-      const targetNode = document.querySelector(`[data-testid="tree-node-${tabId}"]`);
-      const dragContainer = document.querySelector('[data-drag-container]');
-
-      const hasHighlight = targetNode?.classList.contains('ring-2') &&
-                           targetNode?.classList.contains('ring-gray-400');
-      const dropTargetType = dragContainer?.getAttribute('data-drop-target-type');
-
-      return {
-        hasHighlight,
-        dropTargetType,
-        isReady: hasHighlight && dropTargetType === 'tab',
-      };
-    }, targetTabId).catch(() => ({ hasHighlight: false, dropTargetType: null, isReady: false }));
-
-    if (result.isReady) {
-      return;
-    }
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 10)));
-  }
-  throw new Error(`waitForTargetHighlight: target tab ${targetTabId} not highlighted within ${maxWait}ms`);
 }
 
 

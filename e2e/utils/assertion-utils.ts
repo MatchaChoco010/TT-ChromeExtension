@@ -170,7 +170,7 @@ export async function assertTabStructure(
 
     for (const expected of expectedStructure) {
       const element = page.locator(`[data-testid="tree-node-${expected.tabId}"]`).first();
-      const isVisible = await element.isVisible().catch(() => false);
+      const isVisible = await element.isVisible();
       if (!isVisible) {
         allTabsFound = false;
         break;
@@ -264,7 +264,7 @@ export async function assertTabStructure(
   const actualStructure: { tabId: number; depth: number; y: number; expanded: string | null }[] = [];
   for (const expected of expectedStructure) {
     const element = page.locator(`[data-testid="tree-node-${expected.tabId}"]`).first();
-    const isVisible = await element.isVisible().catch(() => false);
+    const isVisible = await element.isVisible();
     if (!isVisible) {
       errorMessage += `  Tab ${expected.tabId} is not visible\n`;
       continue;
@@ -431,7 +431,7 @@ export async function assertPinnedTabStructure(
       }
 
       const pinnedSection = page.locator('[data-testid="pinned-tabs-section"]');
-      const sectionExists = await pinnedSection.isVisible().catch(() => false);
+      const sectionExists = await pinnedSection.isVisible();
 
       if (expectedStructure.length === 0) {
         if (!sectionExists) {
@@ -472,7 +472,7 @@ export async function assertPinnedTabStructure(
 
       for (const expected of expectedStructure) {
         const element = page.locator(`[data-testid="pinned-tab-${expected.tabId}"]`).first();
-        const isVisible = await element.isVisible().catch(() => false);
+        const isVisible = await element.isVisible();
 
         if (!isVisible) {
           throw new Error(`Pinned tab ${expected.tabId} is not visible (windowId: ${windowId})`);
@@ -549,7 +549,7 @@ export async function assertViewStructure(
   while (Date.now() - startTime < timeout) {
     try {
       const viewSwitcher = page.locator('[data-testid="view-switcher-container"]');
-      const containerExists = await viewSwitcher.isVisible().catch(() => false);
+      const containerExists = await viewSwitcher.isVisible();
 
       if (!containerExists) {
         throw new Error(`View switcher container is not visible (windowId: ${windowId})`);

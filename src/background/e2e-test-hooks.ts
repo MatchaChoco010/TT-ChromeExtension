@@ -1,0 +1,35 @@
+/**
+ * E2EテストがService Workerの状態を検査・リセットするためにグローバルへ公開する関数と状態
+ */
+import { treeStateManager } from './background-services';
+import { waitForPendingHandlers } from './handler-tracking';
+import {
+  pendingTabParents,
+  pendingDuplicateSources,
+  pendingLinkClicks,
+  restoringTabIds,
+  lastActiveTabByWindow,
+  detachedPinnedTabsByWindow,
+  snapshotRestoreState,
+} from './pending-state';
+
+/**
+ * テスト間のリセット前に、実行中のハンドラーの完了を待ち、ハンドラー間の一時状態を破棄する
+ * E2Eテストのリセット処理専用。タブ操作後の状態確認には使わず、assertTabStructure等のUI検証を使うこと
+ */
+async function prepareForReset(): Promise<void> {
+  await waitForPendingHandlers();
+  snapshotRestoreState.inProgress = false;
+  restoringTabIds.clear();
+  lastActiveTabByWindow.clear();
+  detachedPinnedTabsByWindow.clear();
+}
+
+export function exposeE2ETestHooks(): void {
+  globalThis.treeStateManager = treeStateManager;
+  globalThis.pendingTabParents = pendingTabParents;
+  globalThis.pendingDuplicateSources = pendingDuplicateSources;
+  globalThis.pendingLinkClicks = pendingLinkClicks;
+  globalThis.prepareForReset = prepareForReset;
+  globalThis.waitForHandlers = waitForPendingHandlers;
+}
