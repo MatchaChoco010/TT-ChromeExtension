@@ -2,6 +2,7 @@ import { test, chromium } from '@playwright/test';
 import { expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { E2E_EXTENSION_DIR } from './utils/extension-build';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,7 +42,7 @@ test.describe('headlessモードの設定検証', () => {
       'このテストはHEADED=trueでのみ実行可能です'
     );
 
-    const pathToExtension = path.join(__dirname, '../dist');
+    const pathToExtension = E2E_EXTENSION_DIR;
     const headless = process.env.HEADED !== 'true';
 
     if (process.env.HEADED === 'true') {

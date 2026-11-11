@@ -29,6 +29,6 @@
     "types": ["chrome", "node", "vite/client"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "playwright-report", "test-results", "e2e"],
+  "exclude": ["node_modules", "dist", "dist-e2e", "playwright-report", "test-results", "e2e"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

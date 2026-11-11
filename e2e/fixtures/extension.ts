@@ -8,6 +8,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { resetExtensionState } from '../utils/reset-utils';
+import { E2E_EXTENSION_DIR } from '../utils/extension-build';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,9 +23,7 @@ export interface ExtensionFixtures {
   downloadDir: string;
 }
 
-const getExtensionPath = () => {
-  return path.join(__dirname, '../../dist');
-};
+const getExtensionPath = () => E2E_EXTENSION_DIR;
 
 const validateExtensionBuild = (extensionPath: string): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];

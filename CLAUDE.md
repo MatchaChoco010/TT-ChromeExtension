@@ -197,6 +197,11 @@ TreeStateManager
 - `src/utils/extension-urls.ts`の`isSidePanelUrl()`で判定
 - TreeStateに追加しない（E2Eテストでの擬似サイドパネル対応のため）
 
+## E2Eテストのビルド出力先
+
+- E2Eテストは`dist-e2e/`にビルドし、そこから拡張機能を読み込む（`e2e/utils/extension-build.ts`）
+- `dist/`はローカルのブラウザが読み込む本番用のビルドで、`npm run build`だけが更新する
+
 ## E2Eテスト実行時の結果確認（必須）
 
 テスト結果は**リポジトリ内のログファイルに保存**してから確認する。出力を切り捨てると失敗テストの情報が失われ、再実行が必要になる。

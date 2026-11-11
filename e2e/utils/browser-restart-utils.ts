@@ -8,6 +8,7 @@
 import { chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
 import { openExtensionPageTab } from './extension-page-utils';
 import { waitForInitialized } from './polling-utils';
+import { E2E_EXTENSION_DIR } from './extension-build';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -15,9 +16,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const getExtensionPath = () => {
-  return path.join(__dirname, '../../dist');
-};
+const getExtensionPath = () => E2E_EXTENSION_DIR;
 
 const waitForServiceWorker = async (
   context: BrowserContext,

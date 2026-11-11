@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { E2E_EXTENSION_DIR } from './utils/extension-build';
 
 test.describe('ビルドプロセス統合', () => {
-  test('dist/ディレクトリが存在し、ビルド成果物が含まれていること', () => {
-    const distPath = path.join(process.cwd(), 'dist');
+  test('E2E用のビルド出力先にビルド成果物が含まれていること', () => {
+    const distPath = E2E_EXTENSION_DIR;
 
     expect(fs.existsSync(distPath)).toBe(true);
 

@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { E2E_EXTENSION_DIR } from '../utils/extension-build';
 
 async function globalSetup() {
   const playwrightTmpDir = path.join(process.cwd(), '.playwright-tmp');
@@ -12,24 +13,24 @@ async function globalSetup() {
   console.log('🔨 E2Eテスト実行前にビルドを開始します...');
 
   try {
-    execSync('npx vite build', {
+    execSync(`npx vite build --outDir "${E2E_EXTENSION_DIR}" --emptyOutDir`, {
       stdio: 'inherit',
       cwd: process.cwd(),
     });
 
     console.log('✅ ビルドが正常に完了しました');
 
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = E2E_EXTENSION_DIR;
     if (!fs.existsSync(distPath)) {
       throw new Error(
-        '❌ ビルドエラー: dist/ディレクトリが見つかりません。ビルドプロセスを確認してください。'
+        `❌ ビルドエラー: ${distPath} が見つかりません。ビルドプロセスを確認してください。`
       );
     }
 
     const manifestPath = path.join(distPath, 'manifest.json');
     if (!fs.existsSync(manifestPath)) {
       throw new Error(
-        '❌ ビルドエラー: dist/manifest.jsonが見つかりません。拡張機能のビルドが不完全です。'
+        `❌ ビルドエラー: ${manifestPath} が見つかりません。拡張機能のビルドが不完全です。`
       );
     }
 

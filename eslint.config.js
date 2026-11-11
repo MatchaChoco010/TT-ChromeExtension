@@ -7,7 +7,7 @@ import prettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['dist', 'node_modules', '.playwright-tmp'],
+    ignores: ['dist', 'dist-e2e', 'node_modules', '.playwright-tmp'],
   },
   js.configs.recommended,
   {
