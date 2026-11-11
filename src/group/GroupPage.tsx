@@ -96,8 +96,8 @@ export const GroupPage: React.FC = () => {
         payload: { tabId, name: editedTitle.trim() },
       });
       await loadGroupInfo();
-    } catch {
-      // グループ名保存失敗は無視（次回ポーリングで正しい状態に復元される）
+    } catch (error) {
+      console.error('Failed to save group name:', error);
     }
     setIsEditing(false);
   }, [state, editedTitle, loadGroupInfo, tabId]);

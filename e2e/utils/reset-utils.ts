@@ -45,8 +45,7 @@ export async function resetExtensionState(
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const g = globalThis as unknown as { prepareForReset: () => Promise<void> };
-      await g.prepareForReset();
+      await globalThis.prepareForReset();
     },
     10000,
     'prepareForReset'
@@ -72,18 +71,11 @@ export async function resetExtensionState(
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: {
-        resetForTesting: () => void;
-      } }).treeStateManager;
-      if (treeStateManager) {
-        treeStateManager.resetForTesting();
-      }
+      globalThis.treeStateManager.resetForTesting();
 
-      const g = globalThis as unknown as { pendingTabParents?: Map<unknown, unknown>; pendingDuplicateSources?: Map<unknown, unknown>; pendingGroupTabIds?: Map<unknown, unknown>; pendingLinkClicks?: Map<unknown, unknown> };
-      g.pendingTabParents?.clear();
-      g.pendingDuplicateSources?.clear();
-      g.pendingGroupTabIds?.clear();
-      g.pendingLinkClicks?.clear();
+      globalThis.pendingTabParents.clear();
+      globalThis.pendingDuplicateSources.clear();
+      globalThis.pendingLinkClicks.clear();
     },
     10000,
     'clearMemoryState'
@@ -96,7 +88,10 @@ export async function resetExtensionState(
     serviceWorker,
     async () => {
       const newWindow = await chrome.windows.create({ focused: true });
-      return newWindow.id!;
+      if (newWindow?.id === undefined) {
+        throw new Error('Failed to create window');
+      }
+      return newWindow.id;
     },
     10000,
     'createCleanWindow'
@@ -111,11 +106,12 @@ export async function resetExtensionState(
       for (const window of windows) {
         if (window.id !== keepWindowId) {
           closeIds.push(window.id!);
-          try {
-            await chrome.windows.remove(window.id!);
-          } catch {
-            // ウィンドウが既に閉じられている場合は正常動作
-          }
+          await chrome.windows.remove(window.id!).catch((error: unknown) => {
+            // 他のウィンドウを閉じた影響で既に閉じられている場合がある
+            if (!(error instanceof Error && error.message.startsWith('No window with id'))) {
+              throw error;
+            }
+          });
         }
       }
       return closeIds;
@@ -133,8 +129,7 @@ export async function resetExtensionState(
   await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const g = globalThis as unknown as { prepareForReset: () => Promise<void> };
-      await g.prepareForReset();
+      await globalThis.prepareForReset();
     },
     10000,
     'prepareForReset2'
@@ -168,7 +163,7 @@ export async function resetExtensionState(
   const initStatus = await evaluateWithTimeout(
     serviceWorker,
     async () => {
-      const treeStateManager = (globalThis as unknown as { treeStateManager?: { isInitialized: () => boolean; isInitializationInProgress: () => boolean } }).treeStateManager;
+      const treeStateManager = globalThis.treeStateManager;
       return {
         initialized: treeStateManager?.isInitialized() ?? false,
         initializationInProgress: treeStateManager?.isInitializationInProgress() ?? false,

@@ -664,21 +664,18 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
           return { valid: false, reason: 'No tree state' };
         }
 
-        let child1Info: { parentTabId: number | null } | null = null;
-        let child2Info: { parentTabId: number | null } | null = null;
-
-        for (const window of treeState.windows) {
-          for (const view of window.views) {
-            const child1Result = findNodeWithParent(child1Id, view.rootNodes, null);
-            if (child1Result) {
-              child1Info = { parentTabId: child1Result.parentTabId };
-            }
-            const child2Result = findNodeWithParent(child2Id, view.rootNodes, null);
-            if (child2Result) {
-              child2Info = { parentTabId: child2Result.parentTabId };
+        const findInTree = (tabId: number): { found: boolean; parentTabId: number | null } | null => {
+          for (const window of treeState.windows) {
+            for (const view of window.views) {
+              const found = findNodeWithParent(tabId, view.rootNodes, null);
+              if (found) return found;
             }
           }
-        }
+          return null;
+        };
+
+        const child1Info = findInTree(child1Id);
+        const child2Info = findInTree(child2Id);
 
         if (!child1Info || child1Info.parentTabId !== parent1Id) {
           return {
@@ -932,7 +929,10 @@ test.describe('ドラッグ&ドロップによる階層変更（親子関係の�
 
     const newWindowId = await serviceWorker.evaluate(async () => {
       const newWindow = await chrome.windows.create({ type: 'normal' });
-      return newWindow.id as number;
+      if (newWindow?.id === undefined) {
+        throw new Error('Failed to create window');
+      }
+      return newWindow.id;
     });
 
     const storageAfterWindow = await serviceWorker.evaluate(

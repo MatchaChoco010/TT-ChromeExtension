@@ -244,11 +244,8 @@ test.describe('Tree Structure Persistence', () => {
       ], 0);
 
       await serviceWorker.evaluate(async (wid) => {
-        // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing treeStateManager
           await globalThis.treeStateManager.createViewWithAutoColor(wid);
-          // @ts-expect-error accessing treeStateManager
           globalThis.treeStateManager.notifyStateChanged();
         }
       }, windowId);
@@ -260,7 +257,7 @@ test.describe('Tree Structure Persistence', () => {
         });
         if (!treeState?.windows) return false;
         const windowState = treeState.windows.find(w => w.windowId === windowId);
-        return windowState && windowState.views.length >= 2;
+        return windowState !== undefined && windowState.views.length >= 2;
       }, { timeout: 5000, timeoutMessage: 'new view was not created' });
 
       const newViewIndex = await serviceWorker.evaluate(async (wid) => {
@@ -271,11 +268,8 @@ test.describe('Tree Structure Persistence', () => {
       }, windowId);
 
       await serviceWorker.evaluate(async ({ tabId, viewIndex, wid }) => {
-        // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing treeStateManager
           await globalThis.treeStateManager.moveTabsToViewInternal([tabId], wid, viewIndex);
-          // @ts-expect-error accessing treeStateManager
           globalThis.treeStateManager.notifyStateChanged();
         }
       }, { tabId, viewIndex: newViewIndex, wid: windowId });
@@ -403,13 +397,8 @@ test.describe('Tree Structure Persistence', () => {
       );
 
       await serviceWorker.evaluate(async () => {
-        // @ts-expect-error accessing global treeStateManager
-        if (globalThis.treeStateManager) {
-          // @ts-expect-error accessing global treeStateManager
-          globalThis.treeStateManager.initialized = false;
-          // @ts-expect-error accessing global treeStateManager
-          await globalThis.treeStateManager.restoreStateAfterRestart();
-        }
+        globalThis.treeStateManager.prepareForInitializationReset();
+        await globalThis.treeStateManager.restoreStateAfterRestart();
       });
 
       await waitForCondition(

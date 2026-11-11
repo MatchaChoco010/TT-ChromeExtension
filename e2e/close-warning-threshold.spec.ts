@@ -10,15 +10,13 @@ import { setupWindow } from './utils/setup-utils';
 
 async function setCloseWarningThreshold(serviceWorker: import('@playwright/test').Worker, threshold: number): Promise<void> {
   await serviceWorker.evaluate(async (threshold) => {
-    const result = await chrome.storage.local.get('user_settings');
-    const settings = result.user_settings || {};
-    settings.closeWarningThreshold = threshold;
-    await chrome.storage.local.set({ user_settings: settings });
+    const result = await chrome.storage.local.get<{ user_settings?: Record<string, unknown> }>('user_settings');
+    await chrome.storage.local.set({ user_settings: { ...result.user_settings, closeWarningThreshold: threshold } });
   }, threshold);
 
   await serviceWorker.evaluate(async (threshold) => {
     for (let i = 0; i < 50; i++) {
-      const result = await chrome.storage.local.get('user_settings');
+      const result = await chrome.storage.local.get<{ user_settings?: { closeWarningThreshold?: number } }>('user_settings');
       if (result.user_settings?.closeWarningThreshold === threshold) {
         return;
       }

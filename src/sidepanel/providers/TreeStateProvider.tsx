@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { TreeState, TabNode, View, Group, ExtendedTabInfo, TabInfoMap, SiblingDropInfo, DragEndEvent, ViewState, WindowState } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
+import { useLatestRequestGuard } from '../hooks/useLatestRequestGuard';
 
 interface TreeStateContextType {
   treeState: TreeState | null;
@@ -75,39 +76,47 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   const [lastSelectedTabId, setLastSelectedTabId] = useState<number | null>(null);
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
   const viewActiveTabIdsRef = useRef<Record<number, number>>({});
+  const beginTreeStateRequest = useLatestRequestGuard();
+  const beginGroupsRequest = useLatestRequestGuard();
+  const beginUnreadTabsRequest = useLatestRequestGuard();
+  const beginActiveTabRequest = useLatestRequestGuard();
+  const beginTabInfoRequest = useLatestRequestGuard();
 
   const loadGroups = React.useCallback(async () => {
+    const isLatestRequest = beginGroupsRequest();
     try {
       const result = await chrome.storage.local.get('groups');
-      if (result.groups) {
+      if (result.groups && isLatestRequest()) {
         setGroups(result.groups as Record<string, Group>);
       }
-    } catch {
-      // グループ読み込みエラーは無視（初期状態として空を使用）
+    } catch (error) {
+      console.error('[TreeStateProvider] Failed to load groups:', error);
     }
-  }, []);
+  }, [beginGroupsRequest]);
 
   const loadUnreadTabs = React.useCallback(async () => {
+    const isLatestRequest = beginUnreadTabsRequest();
     try {
       const result = await chrome.storage.local.get(STORAGE_KEYS.UNREAD_TABS);
-      if (result[STORAGE_KEYS.UNREAD_TABS]) {
+      if (result[STORAGE_KEYS.UNREAD_TABS] && isLatestRequest()) {
         setUnreadTabIds(new Set(result[STORAGE_KEYS.UNREAD_TABS] as number[]));
       }
-    } catch {
-      // 未読タブ読み込みエラーは無視（初期状態として空を使用）
+    } catch (error) {
+      console.error('[TreeStateProvider] Failed to load unread tabs:', error);
     }
-  }, []);
+  }, [beginUnreadTabsRequest]);
 
   const loadActiveTab = React.useCallback(async () => {
+    const isLatestRequest = beginActiveTabRequest();
     try {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (activeTab?.id) {
+      if (activeTab?.id && isLatestRequest()) {
         setActiveTabId(activeTab.id);
       }
-    } catch {
-      // アクティブタブ取得エラーは無視
+    } catch (error) {
+      console.error('[TreeStateProvider] Failed to load active tab:', error);
     }
-  }, []);
+  }, [beginActiveTabRequest]);
 
   const loadCurrentWindowId = React.useCallback(async () => {
     try {
@@ -121,12 +130,13 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       if (currentWindow?.id !== undefined) {
         setCurrentWindowId(currentWindow.id);
       }
-    } catch {
-      // ウィンドウID取得エラーは無視（APIが利用できない場合はnullのまま）
+    } catch (error) {
+      console.error('[TreeStateProvider] Failed to resolve current window:', error);
     }
   }, []);
 
   const loadTabInfoMap = React.useCallback(async () => {
+    const isLatestRequest = beginTabInfoRequest();
     try {
       const storedTitlesResult = await chrome.storage.local.get(STORAGE_KEYS.TAB_TITLES);
       const persistedTitles: Record<number, string> = (storedTitlesResult[STORAGE_KEYS.TAB_TITLES] as Record<number, string> | undefined) || {};
@@ -160,11 +170,13 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
         }
       }
 
-      setTabInfoMap(newTabInfoMap);
-    } catch {
-      // タブ情報読み込みエラーは無視
+      if (isLatestRequest()) {
+        setTabInfoMap(newTabInfoMap);
+      }
+    } catch (error) {
+      console.error('[TreeStateProvider] Failed to load tab info:', error);
     }
-  }, []);
+  }, [beginTabInfoRequest]);
 
   const getTabInfo = useCallback((tabId: number): ExtendedTabInfo | undefined => {
     return tabInfoMap[tabId];
@@ -179,22 +191,23 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   }, []);
 
   const loadTreeState = React.useCallback(async () => {
+    const isLatestRequest = beginTreeStateRequest();
     try {
       const response = await chrome.runtime.sendMessage({ type: 'GET_STATE' });
+      if (!isLatestRequest()) {
+        return;
+      }
       if (response?.success && response.data) {
         setTreeState(response.data as TreeState);
       } else {
-        const initialState: TreeState = {
-          windows: [],
-        };
-        setTreeState(initialState);
+        setError(new Error(response?.error ?? 'Failed to load tree state'));
       }
     } catch (err) {
       setError(
         err instanceof Error ? err : new Error('Failed to load tree state')
       );
     }
-  }, []);
+  }, [beginTreeStateRequest]);
 
   useEffect(() => {
     const initializeTreeState = async () => {
@@ -209,6 +222,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
   useEffect(() => {
     const messageListener = (message: { type: string; payload?: TreeState }) => {
       if (message.type === 'STATE_UPDATED' && message.payload) {
+        beginTreeStateRequest();
         setTreeState(message.payload);
         loadTabInfoMap();
         loadUnreadTabs();
@@ -221,10 +235,11 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
     };
-  }, [loadTabInfoMap, loadUnreadTabs, loadGroups]);
+  }, [beginTreeStateRequest, loadTabInfoMap, loadUnreadTabs, loadGroups]);
 
   useEffect(() => {
     const handleTabActivated = (activeInfo: chrome.tabs.OnActivatedInfo) => {
+      beginActiveTabRequest();
       setActiveTabId(activeInfo.tabId);
     };
 
@@ -233,7 +248,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     return () => {
       chrome.tabs.onActivated.removeListener(handleTabActivated);
     };
-  }, []);
+  }, [beginActiveTabRequest]);
 
   useEffect(() => {
     const handleTabCreated = () => {
@@ -308,11 +323,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
       const tabInfo = tabInfoMap[tabIdToActivate];
       const isInCurrentWindow = tabInfo && tabInfo.windowId === currentWindowId;
       if (isInCurrentWindow) {
-        try {
-          await chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId: tabIdToActivate } });
+        const response = await chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId: tabIdToActivate } });
+        if (response?.success) {
           return;
-        } catch {
-          // タブが存在しない場合は無視してフォールバック
         }
       }
     }
@@ -337,11 +350,7 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     const viewTabs = collectTabIds(targetViewState.rootNodes);
 
     if (viewTabs.length > 0) {
-      try {
-        await chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId: viewTabs[0] } });
-      } catch {
-        // タブが存在しない場合は無視
-      }
+      await chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', payload: { tabId: viewTabs[0] } });
     }
   }, [treeState, activeTabId, currentViewIndex, currentWindowId, tabInfoMap]);
 

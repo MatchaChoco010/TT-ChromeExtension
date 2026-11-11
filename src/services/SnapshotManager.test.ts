@@ -124,42 +124,6 @@ describe('SnapshotManager', () => {
     });
   });
 
-  describe('restoreFromJson', () => {
-    it('JSON文字列からタブを復元する', async () => {
-      const snapshotJson = JSON.stringify({
-        id: 'snapshot-123',
-        createdAt: new Date().toISOString(),
-        name: 'Test Snapshot',
-        isAutoSave: false,
-        data: {
-          views: [{ id: 'default', name: 'Default', color: '#3B82F6' }],
-          tabs: [
-            {
-              index: 0,
-              url: 'https://example.com',
-              title: 'Example',
-              parentIndex: null,
-              viewId: 'Default',
-              isExpanded: true,
-              pinned: false,
-              windowIndex: 0,
-            },
-          ],
-        },
-      });
-
-      await snapshotManager.restoreFromJson(snapshotJson);
-
-      expect(chrome.windows.create).toHaveBeenCalled();
-      expect(chrome.tabs.create).toHaveBeenCalledWith({
-        url: 'https://example.com',
-        active: false,
-        pinned: false,
-        windowId: 2,
-      });
-    });
-  });
-
   describe('startAutoSnapshot', () => {
     it('間隔が0の場合はアラームを設定しない', () => {
       snapshotManager.startAutoSnapshot(0);

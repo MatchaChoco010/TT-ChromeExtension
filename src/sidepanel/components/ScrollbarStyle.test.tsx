@@ -7,15 +7,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   chromeMock.clearAllListeners();
 
-  chromeMock.runtime.sendMessage.mockImplementation(() => {
-    return Promise.resolve({
-      state: {
-        nodes: {},
-        views: [{ id: 'default', name: 'Default View', iconUrl: null }],
-        currentViewId: 'default',
-        windowId: 1,
-      },
-    });
+  chromeMock.runtime.sendMessage.mockImplementation((message: unknown) => {
+    const isGetState = (message as { type?: string }).type === 'GET_STATE';
+    return Promise.resolve({ success: true, data: isGetState ? { windows: [] } : null });
   });
 });
 

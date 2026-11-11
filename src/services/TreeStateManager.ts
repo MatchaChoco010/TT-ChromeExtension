@@ -7,6 +7,7 @@ import type {
   GroupInfo,
 } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
+import { ignoreMissingTabOrWindow } from '@/utils/chrome-errors';
 
 /**
  * ノード検索結果
@@ -33,6 +34,7 @@ export class TreeStateManager {
   private initializationResolvers: (() => void)[] = [];
   private isSyncingToChrome: boolean = false;
   private restoredFromPreviousBrowserSession: boolean = false;
+  private tabRegistrationWaiters = new Map<number, (() => void)[]>();
 
   constructor(private storageService: IStorageService) {}
 
@@ -344,7 +346,47 @@ export class TreeStateManager {
       }
     }
 
+    this.notifyTabRegistered(tab.id);
     await this.persistState();
+  }
+
+  /**
+   * 指定したタブがツリーに登録されるまで待つ
+   * Service Workerが作成したタブは、onCreatedイベントの処理でツリーに登録される。その完了を待つために使う
+   * @param tabId - 待つタブのID
+   * @param timeoutMs - 待機の上限時間
+   * @returns 時間内に登録された（または既に登録済みの）場合true
+   */
+  waitForTabRegistration(tabId: number, timeoutMs: number = 5000): Promise<boolean> {
+    if (this.findNodeByTabId(tabId)) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const waiters = this.tabRegistrationWaiters.get(tabId) ?? [];
+      const timeoutId = setTimeout(() => {
+        const remaining = (this.tabRegistrationWaiters.get(tabId) ?? []).filter((w) => w !== waiter);
+        if (remaining.length > 0) {
+          this.tabRegistrationWaiters.set(tabId, remaining);
+        } else {
+          this.tabRegistrationWaiters.delete(tabId);
+        }
+        resolve(false);
+      }, timeoutMs);
+      const waiter = (): void => {
+        clearTimeout(timeoutId);
+        resolve(true);
+      };
+      waiters.push(waiter);
+      this.tabRegistrationWaiters.set(tabId, waiters);
+    });
+  }
+
+  private notifyTabRegistered(tabId: number): void {
+    const waiters = this.tabRegistrationWaiters.get(tabId);
+    if (!waiters) return;
+    this.tabRegistrationWaiters.delete(tabId);
+    waiters.forEach((notify) => notify());
   }
 
   /**
@@ -844,11 +886,7 @@ export class TreeStateManager {
     if (!newWindow || newWindow.id === undefined) return undefined;
 
     for (const node of subtree.slice(1)) {
-      try {
-        await chrome.tabs.move(node.tabId, { windowId: newWindow.id, index: -1 });
-      } catch {
-        // タブ移動失敗は無視（タブが既に閉じられている場合など）
-      }
+      await ignoreMissingTabOrWindow(chrome.tabs.move(node.tabId, { windowId: newWindow.id, index: -1 }));
     }
 
     const newWindowState: WindowState = {
@@ -889,11 +927,7 @@ export class TreeStateManager {
     }
 
     for (const node of subtree) {
-      try {
-        await chrome.tabs.move(node.tabId, { windowId: targetWindowId, index: -1 });
-      } catch {
-        // タブ移動失敗は無視（タブが既に閉じられている場合など）
-      }
+      await ignoreMissingTabOrWindow(chrome.tabs.move(node.tabId, { windowId: targetWindowId, index: -1 }));
     }
 
     const targetWindowState = this.getOrCreateWindowState(targetWindowId);
@@ -944,11 +978,7 @@ export class TreeStateManager {
           ? nodesToMove[0].children.flatMap(collectTabIds)
           : collectTabIds(nodesToMove[i]);
       for (const tid of tabIdsToMove) {
-        try {
-          await chrome.tabs.move(tid, { windowId: newWindow.id, index: -1 });
-        } catch {
-          // タブ移動失敗は無視（タブが既に閉じられている場合など）
-        }
+        await ignoreMissingTabOrWindow(chrome.tabs.move(tid, { windowId: newWindow.id, index: -1 }));
       }
     }
 
@@ -990,11 +1020,7 @@ export class TreeStateManager {
     const targetViewState = targetWindowState.views[targetWindowState.activeViewIndex];
     targetViewState.rootNodes.push(result.node);
 
-    try {
-      await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
-    } catch {
-      // タブが存在しない場合は無視（既に閉じられている場合など）
-    }
+    await ignoreMissingTabOrWindow(chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 }));
 
     await this.persistState();
     await this.syncTreeStateToChromeTabs(targetWindowId);
@@ -1322,15 +1348,13 @@ export class TreeStateManager {
 
     const children: Array<{ tabId: number; title: string; url: string }> = [];
     for (const child of result.node.children) {
-      try {
-        const tab = await chrome.tabs.get(child.tabId);
+      const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(child.tabId));
+      if (tab) {
         children.push({
           tabId: child.tabId,
           title: tab.title || '',
           url: tab.url || '',
         });
-      } catch {
-        // タブが存在しない場合はスキップ（TreeStateに残っているが実際のタブは閉じられている）
       }
     }
 
@@ -1817,7 +1841,8 @@ export class TreeStateManager {
 
       this.initialized = true;
       this.notifyInitializationComplete();
-    } catch {
+    } catch (error) {
+      console.error('[TreeStateManager] Failed to restore state after browser restart:', error);
       this.initialized = true;
       this.notifyInitializationComplete();
     } finally {
@@ -1861,23 +1886,22 @@ export class TreeStateManager {
           if (chromeTab && chromeTab.url?.startsWith(groupTabUrl)) {
             chromeIndex++;
           } else {
-            try {
-              const insertIndex = chromeTab?.index ?? windowTabs.length;
-              await chrome.tabs.create({
-                url: groupTabUrl,
-                windowId: windowState.windowId,
-                index: insertIndex,
-                active: false,
-              });
-
-              windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
-              windowTabs = windowTabs
-                .filter((t) => t.id !== undefined && !t.pinned)
-                .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-              chromeIndex++;
-            } catch {
-              // ウィンドウが閉じられている場合はグループタブの作成をスキップ
+            const insertIndex = chromeTab?.index ?? windowTabs.length;
+            const createdGroupTab = await ignoreMissingTabOrWindow(chrome.tabs.create({
+              url: groupTabUrl,
+              windowId: windowState.windowId,
+              index: insertIndex,
+              active: false,
+            }));
+            if (!createdGroupTab) {
+              break;
             }
+
+            windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
+            windowTabs = windowTabs
+              .filter((t) => t.id !== undefined && !t.pinned)
+              .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+            chromeIndex++;
           }
         } else {
           chromeIndex++;
@@ -2049,21 +2073,13 @@ export class TreeStateManager {
 
     for (const tabId of expectedPinnedIds) {
       if (!actuallyPinnedIds.has(tabId)) {
-        try {
-          await chrome.tabs.update(tabId, { pinned: true });
-        } catch {
-          // タブが存在しない場合は無視（既に閉じられている場合など）
-        }
+        await ignoreMissingTabOrWindow(chrome.tabs.update(tabId, { pinned: true }));
       }
     }
 
     for (const tabId of actuallyPinnedIds) {
       if (!expectedPinnedIds.has(tabId)) {
-        try {
-          await chrome.tabs.update(tabId, { pinned: false });
-        } catch {
-          // タブが存在しない場合は無視（既に閉じられている場合など）
-        }
+        await ignoreMissingTabOrWindow(chrome.tabs.update(tabId, { pinned: false }));
       }
     }
 
@@ -2078,17 +2094,13 @@ export class TreeStateManager {
       const tabId = orderedPinnedIds[i];
       const currentIndex = currentIndexMap.get(tabId);
       if (currentIndex !== undefined && currentIndex !== i) {
-        try {
-          await chrome.tabs.move(tabId, { index: i });
-          const updatedTabs = await chrome.tabs.query({ windowId });
-          currentIndexMap.clear();
-          for (const tab of updatedTabs) {
-            if (tab.id !== undefined) {
-              currentIndexMap.set(tab.id, tab.index);
-            }
+        await ignoreMissingTabOrWindow(chrome.tabs.move(tabId, { index: i }));
+        const updatedTabs = await chrome.tabs.query({ windowId });
+        currentIndexMap.clear();
+        for (const tab of updatedTabs) {
+          if (tab.id !== undefined) {
+            currentIndexMap.set(tab.id, tab.index);
           }
-        } catch {
-          // タブが存在しない場合は無視（既に閉じられている場合など）
         }
       }
     }
@@ -2159,17 +2171,13 @@ export class TreeStateManager {
       }
 
       if (currentIndex !== undefined && currentIndex !== expectedIndex) {
-        try {
-          await chrome.tabs.move(tabId, { index: expectedIndex });
-          const updatedTabs = await chrome.tabs.query({ windowId });
-          currentIndexMap.clear();
-          for (const tab of updatedTabs) {
-            if (tab.id !== undefined) {
-              currentIndexMap.set(tab.id, tab.index);
-            }
+        await ignoreMissingTabOrWindow(chrome.tabs.move(tabId, { index: expectedIndex }));
+        const updatedTabs = await chrome.tabs.query({ windowId });
+        currentIndexMap.clear();
+        for (const tab of updatedTabs) {
+          if (tab.id !== undefined) {
+            currentIndexMap.set(tab.id, tab.index);
           }
-        } catch {
-          // タブが存在しない場合は無視
         }
       }
     }
@@ -2180,42 +2188,30 @@ export class TreeStateManager {
    * 最初に1回だけwindows.getAll()を呼び出し、各ウィンドウのタブ数をチェック
    */
   private async closeEmptyWindows(): Promise<void> {
-    try {
-      const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-      if (allWindows.length <= 1) return;
+    const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    if (allWindows.length <= 1) return;
 
-      // 空ウィンドウを特定
-      const emptyWindowIds: number[] = [];
-      for (const window of allWindows) {
-        if (window.id === undefined) continue;
-        const tabs = await chrome.tabs.query({ windowId: window.id });
-        if (tabs.length === 0) {
-          emptyWindowIds.push(window.id);
-        }
+    const emptyWindowIds: number[] = [];
+    for (const window of allWindows) {
+      if (window.id === undefined) continue;
+      const tabs = await chrome.tabs.query({ windowId: window.id });
+      if (tabs.length === 0) {
+        emptyWindowIds.push(window.id);
       }
+    }
 
-      // ウィンドウが2つ以上残る限り空ウィンドウを削除
-      let remainingCount = allWindows.length;
-      for (const windowId of emptyWindowIds) {
-        if (remainingCount <= 1) break;
-        try {
-          await chrome.windows.remove(windowId);
-          remainingCount--;
-        } catch {
-          // ウィンドウが既に閉じられている場合は無視
-        }
-      }
-    } catch {
-      // ウィンドウクローズ失敗は無視（既に閉じられている場合など）
+    // 最後の1ウィンドウは空でも閉じない（閉じるとブラウザが終了する）
+    let remainingCount = allWindows.length;
+    for (const windowId of emptyWindowIds) {
+      if (remainingCount <= 1) break;
+      await ignoreMissingTabOrWindow(chrome.windows.remove(windowId));
+      remainingCount--;
     }
   }
 
+
   async refreshTreeStructure(): Promise<void> {
-    try {
-      await this.persistState();
-    } catch {
-      // 永続化失敗は無視（次回の自動保存で再試行される）
-    }
+    await this.persistState();
   }
 
   /**
@@ -2355,11 +2351,7 @@ export class TreeStateManager {
     const result = this.findNodeByTabId(tabId);
     if (!result || !result.node.groupInfo) return;
 
-    try {
-      await chrome.tabs.remove(tabId);
-    } catch {
-      // タブが存在しない場合は無視（既に閉じられている場合など）
-    }
+    await ignoreMissingTabOrWindow(chrome.tabs.remove(tabId));
 
     const siblings = result.parent
       ? result.parent.children
@@ -2434,40 +2426,32 @@ export class TreeStateManager {
    * ストレージに保存されたstateが存在するかチェック
    */
   async hasPersistedState(): Promise<boolean> {
-    try {
-      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-      return !!(state && state.windows && state.windows.length > 0);
-    } catch {
-      return false;
-    }
+    const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+    return !!(state && state.windows && state.windows.length > 0);
   }
 
   /**
    * ストレージから復元
    */
   async loadState(): Promise<void> {
-    try {
-      const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-      if (!state || !state.windows) {
-        return;
-      }
-
-
-      this.windows = state.windows.map((w) => ({
-        windowId: w.windowId,
-        views: w.views.map((v) => ({
-          name: v.name,
-          color: v.color,
-          icon: v.icon,
-          rootNodes: this.deserializeNodes(v.rootNodes),
-          pinnedTabIds: [...(v.pinnedTabIds || [])],
-        })),
-        activeViewIndex: w.activeViewIndex,
-      }));
-    } catch {
-      // ストレージが破損している場合は初期状態で継続
+    const state = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
+    if (!state || !state.windows) {
+      return;
     }
+
+    this.windows = state.windows.map((w) => ({
+      windowId: w.windowId,
+      views: w.views.map((v) => ({
+        name: v.name,
+        color: v.color,
+        icon: v.icon,
+        rootNodes: this.deserializeNodes(v.rootNodes),
+        pinnedTabIds: [...(v.pinnedTabIds || [])],
+      })),
+      activeViewIndex: w.activeViewIndex,
+    }));
   }
+
 
   private deserializeNodes(nodes: TabNode[]): TabNode[] {
     if (!nodes || !Array.isArray(nodes)) return [];

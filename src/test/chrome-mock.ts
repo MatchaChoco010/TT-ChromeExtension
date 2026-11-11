@@ -71,7 +71,7 @@ export class ChromeMock {
     onReplaced: new MockEvent<
       (addedTabId: number, removedTabId: number) => void
     >(),
-    get: vi.fn<(tabId: number) => Promise<chrome.tabs.Tab | null>>(() => Promise.resolve(null)),
+    get: vi.fn<(tabId: number) => Promise<chrome.tabs.Tab>>((tabId) => Promise.resolve(createMockTab({ id: tabId }))),
     move: vi.fn<(tabIds: number | number[], moveProperties: chrome.tabs.MoveProperties) => Promise<chrome.tabs.Tab | chrome.tabs.Tab[]>>(() => Promise.resolve([] as chrome.tabs.Tab[])),
     update: vi.fn<(tabId: number, updateProperties: chrome.tabs.UpdateProperties) => Promise<chrome.tabs.Tab | null>>(() => Promise.resolve(null)),
     remove: vi.fn<(tabIds: number | number[]) => Promise<void>>(() => Promise.resolve()),
@@ -180,6 +180,7 @@ export class ChromeMock {
 
     this.storageData = {};
 
+    this.tabs.get.mockImplementation((tabId: number) => Promise.resolve(createMockTab({ id: tabId })));
     this.runtime.sendMessage.mockImplementation(() => Promise.resolve());
     this.runtime.getURL.mockImplementation((path: string) => `chrome-extension://test-extension-id/${path}`);
     this.runtime.lastError = undefined;

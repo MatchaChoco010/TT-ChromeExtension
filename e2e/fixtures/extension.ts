@@ -113,8 +113,8 @@ const createUniqueUserDataDir = (): string => {
 const removeUserDataDir = (userDataDir: string): void => {
   try {
     fs.rmSync(userDataDir, { recursive: true, force: true });
-  } catch {
-    // 削除失敗は警告のみ（テスト自体は成功）
+  } catch (error) {
+    console.warn(`Failed to remove user data dir ${userDataDir}:`, error);
   }
 };
 

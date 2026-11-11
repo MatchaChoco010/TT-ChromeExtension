@@ -2,10 +2,7 @@
  * タブ操作（作成、削除、アクティブ化、検証）の共通ヘルパー関数
  */
 import type { Page, Worker } from '@playwright/test';
-import type { TestGlobals } from '../types';
 import { waitForTabStatusComplete, waitForTabInTreeState } from './polling-utils';
-
-declare let globalThis: TestGlobals;
 
 /**
  * タブ作成オプション
@@ -83,9 +80,6 @@ export async function createTab(
       });
 
       if (parentTabId !== undefined && createdTab.id) {
-        if (!globalThis.pendingTabParents) {
-          globalThis.pendingTabParents = new Map();
-        }
         globalThis.pendingTabParents.set(createdTab.id, parentTabId);
       }
 

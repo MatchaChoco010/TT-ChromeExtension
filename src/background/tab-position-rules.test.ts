@@ -67,7 +67,7 @@ describe('タブ開き方別の位置ルール', () => {
       });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
-        return Promise.resolve(null);
+        return Promise.resolve(createMockTab({ id: tabId }));
       });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -126,7 +126,7 @@ describe('タブ開き方別の位置ルール', () => {
       });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
-        return Promise.resolve(null);
+        return Promise.resolve(createMockTab({ id: tabId }));
       });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -218,7 +218,7 @@ describe('タブ開き方別の位置ルール', () => {
       });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
-        return Promise.resolve(null);
+        return Promise.resolve(createMockTab({ id: tabId }));
       });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -289,7 +289,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
       });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
-        return Promise.resolve(null);
+        return Promise.resolve(createMockTab({ id: tabId }));
       });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -335,7 +335,7 @@ describe('システムページ判定と新規タブ位置設定', () => {
       });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
-        return Promise.resolve(null);
+        return Promise.resolve(createMockTab({ id: tabId }));
       });
       chromeMock.tabs.onCreated.trigger(parentTab);
       await new Promise((resolve) => setTimeout(resolve, 10));

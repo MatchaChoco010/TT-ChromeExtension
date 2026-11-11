@@ -12,10 +12,8 @@ export async function setUserSettings(
   }
 
   await serviceWorker.evaluate(async (partialSettings: Partial<UserSettings>) => {
-    const result = await chrome.storage.local.get('user_settings');
-    const currentSettings = result.user_settings || {};
-    const newSettings = { ...currentSettings, ...partialSettings };
-    await chrome.storage.local.set({ user_settings: newSettings });
+    const result = await chrome.storage.local.get<{ user_settings?: Partial<UserSettings> }>('user_settings');
+    await chrome.storage.local.set({ user_settings: { ...result.user_settings, ...partialSettings } });
   }, settings);
 }
 
@@ -23,7 +21,7 @@ export async function getUserSettings(
   serviceWorker: Worker
 ): Promise<UserSettings | null> {
   return serviceWorker.evaluate(async () => {
-    const result = await chrome.storage.local.get('user_settings');
-    return result.user_settings || null;
+    const result = await chrome.storage.local.get<{ user_settings?: UserSettings }>('user_settings');
+    return result.user_settings ?? null;
   });
 }

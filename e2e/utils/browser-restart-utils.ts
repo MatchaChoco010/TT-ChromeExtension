@@ -6,6 +6,8 @@
  * chrome.storage.localのデータを保持したままブラウザを再起動できる。
  */
 import { chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { openExtensionPageTab } from './extension-page-utils';
+import { waitForInitialized } from './polling-utils';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -104,13 +106,13 @@ export async function restartBrowser(
 
   const extensionId = serviceWorker.url().split('/')[2];
 
-  // Service Workerが完全に初期化されるのを待つ
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await waitForInitialized(serviceWorker);
 
-  const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel.html`;
-  const sidePanelPage = await newContext.newPage();
-  await sidePanelPage.goto(sidePanelUrl);
-  await sidePanelPage.waitForLoadState('domcontentloaded');
+  const sidePanelPage = await openExtensionPageTab(
+    newContext,
+    serviceWorker,
+    `chrome-extension://${extensionId}/sidepanel.html?session=${Date.now()}`,
+  );
 
   return {
     context: newContext,
@@ -144,8 +146,8 @@ export function createTestUserDataDir(): string {
 export function removeTestUserDataDir(userDataDir: string): void {
   try {
     fs.rmSync(userDataDir, { recursive: true, force: true });
-  } catch {
-    // 削除失敗は警告のみ
+  } catch (error) {
+    console.warn(`Failed to remove test user data dir ${userDataDir}:`, error);
   }
 }
 
@@ -186,13 +188,13 @@ export async function createInitialContext(
   const serviceWorker = await waitForServiceWorker(context, 30000);
   const extensionId = serviceWorker.url().split('/')[2];
 
-  // Service Workerが完全に初期化されるのを待つ
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await waitForInitialized(serviceWorker);
 
-  const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel.html`;
-  const sidePanelPage = await context.newPage();
-  await sidePanelPage.goto(sidePanelUrl);
-  await sidePanelPage.waitForLoadState('domcontentloaded');
+  const sidePanelPage = await openExtensionPageTab(
+    context,
+    serviceWorker,
+    `chrome-extension://${extensionId}/sidepanel.html?session=${Date.now()}`,
+  );
 
   return {
     context,

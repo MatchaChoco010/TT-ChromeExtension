@@ -617,7 +617,6 @@ export async function waitForInitialized(
   const result = await serviceWorker.evaluate(
     async ({ iterations, interval }) => {
       for (let i = 0; i < iterations; i++) {
-        // @ts-expect-error accessing global treeStateManager
         if (globalThis.treeStateManager?.isInitialized?.()) {
           return { success: true };
         }
@@ -737,15 +736,7 @@ export async function waitForSidePanelReady(
   } = options;
 
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout });
-
-  try {
-    await page.waitForSelector('text=Loading', {
-      state: 'hidden',
-      timeout: 5000,
-    });
-  } catch {
-    // ローディング表示がない場合は無視
-  }
+  await page.waitForSelector('[data-testid="side-panel-loading"]', { state: 'hidden', timeout });
 
   const iterations = Math.ceil(timeout / interval);
   const result = await serviceWorker.evaluate(
@@ -872,15 +863,7 @@ export async function waitForViewSwitcher(
   const { timeout = 10000 } = options;
 
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout });
-
-  try {
-    await page.waitForSelector('text=Loading', {
-      state: 'hidden',
-      timeout: 5000,
-    });
-  } catch {
-    // ローディング表示がない場合は無視
-  }
+  await page.waitForSelector('[data-testid="side-panel-loading"]', { state: 'hidden', timeout });
 
   await page.waitForSelector('[data-testid="view-switcher-container"]', {
     timeout,

@@ -5,6 +5,7 @@ import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 import { COMMON_TIMEOUTS } from './test-data/common-constants';
 import type { Page, Worker as PlaywrightWorker } from '@playwright/test';
+import type { UserSettings } from '../src/types';
 
 async function openSettingsPage(
   extensionContext: import('@playwright/test').BrowserContext,
@@ -36,7 +37,7 @@ async function waitForSettingsSaved(
   await waitForCondition(
     async () => {
       const settings = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('user_settings');
+        const result = await chrome.storage.local.get<{ user_settings?: Partial<UserSettings> }>('user_settings');
         return result.user_settings;
       });
       return settings?.[settingKey] === expectedValue;

@@ -1,6 +1,7 @@
 import type { BrowserContext, Page, Worker } from '@playwright/test';
 export type { Page } from '@playwright/test';
-import { expect } from '@playwright/test';
+import { openExtensionPageTab } from './extension-page-utils';
+import type { TabNode, TreeState } from '../../src/types';
 
 /**
  * Service Workerを取得
@@ -32,18 +33,17 @@ export async function createWindow(context: BrowserContext): Promise<number> {
     });
   });
 
-  const windowId = window.id as number;
+  if (window?.id === undefined) {
+    throw new Error('Failed to create window');
+  }
+  const windowId = window.id;
 
   await serviceWorker.evaluate(async (windowId: number) => {
     for (let i = 0; i < 50; i++) {
-      try {
-        const windows = await chrome.windows.getAll();
-        const found = windows.find(w => w.id === windowId);
-        if (found) {
-          return;
-        }
-      } catch {
-        // エラーは無視して続行
+      const windows = await chrome.windows.getAll();
+      const found = windows.find(w => w.id === windowId);
+      if (found) {
+        return;
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -68,32 +68,7 @@ export async function moveTabToWindow(
 
   const tabIdsToMove = await serviceWorker.evaluate(
     async ({ tabId }) => {
-      interface TabNode {
-        tabId: number;
-        isExpanded: boolean;
-        children: TabNode[];
-      }
-      interface ViewState {
-        name: string;
-        color: string;
-        rootNodes: TabNode[];
-      }
-      interface WindowState {
-        windowId: number;
-        views: ViewState[];
-        activeViewIndex: number;
-        pinnedTabIds: number[];
-      }
-      interface TreeState {
-        windows: WindowState[];
-      }
-
-      const result = await chrome.storage.local.get('tree_state');
-      const treeState = result.tree_state as TreeState | undefined;
-
-      if (!treeState?.windows) {
-        return [tabId];
-      }
+      const treeState: TreeState = globalThis.treeStateManager.toJSON();
 
       const findNode = (nodes: TabNode[], targetTabId: number): TabNode | null => {
         for (const node of nodes) {
@@ -145,20 +120,16 @@ export async function moveTabToWindow(
   await serviceWorker.evaluate(
     async ({ tabIds, windowId }) => {
       for (let i = 0; i < 50; i++) {
-        try {
-          let allMoved = true;
-          for (const tabId of tabIds) {
-            const tab = await chrome.tabs.get(tabId);
-            if (tab.windowId !== windowId) {
-              allMoved = false;
-              break;
-            }
+        let allMoved = true;
+        for (const tabId of tabIds) {
+          const tab = await chrome.tabs.get(tabId);
+          if (tab.windowId !== windowId) {
+            allMoved = false;
+            break;
           }
-          if (allMoved) {
-            return;
-          }
-        } catch {
-          // エラーは無視して続行
+        }
+        if (allMoved) {
+          return;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -179,78 +150,42 @@ export async function assertWindowTreeSync(
 ): Promise<void> {
   const serviceWorker = await getServiceWorker(context);
 
-  await serviceWorker.evaluate(async (windowId: number) => {
-    interface TabNode {
-      tabId: number;
-      isExpanded: boolean;
-      children: TabNode[];
-    }
-    interface ViewState {
-      name: string;
-      color: string;
-      rootNodes: TabNode[];
-    }
-    interface WindowState {
-      windowId: number;
-      views: ViewState[];
-      activeViewIndex: number;
-      pinnedTabIds: number[];
-    }
-    interface TreeState {
-      windows: WindowState[];
-    }
+  const result = await serviceWorker.evaluate(async (windowId: number) => {
+    const sidePanelUrlPrefix = `chrome-extension://${chrome.runtime.id}/sidepanel.html`;
+    const collectTabIds = (nodes: TabNode[]): number[] =>
+      nodes.flatMap((node) => [node.tabId, ...collectTabIds(node.children)]);
 
-    const collectAllTabIds = (nodes: TabNode[]): Set<number> => {
-      const tabIds = new Set<number>();
-      for (const node of nodes) {
-        tabIds.add(node.tabId);
-        for (const childTabId of collectAllTabIds(node.children)) {
-          tabIds.add(childTabId);
-        }
-      }
-      return tabIds;
-    };
-
+    let chromeTabIds: number[] = [];
+    let treeTabIds: number[] = [];
     for (let i = 0; i < 50; i++) {
-      try {
-        const tabs = await chrome.tabs.query({ windowId });
-        const result = await chrome.storage.local.get('tree_state');
-        const treeState = result.tree_state as TreeState | undefined;
+      const tabs = await chrome.tabs.query({ windowId });
+      chromeTabIds = tabs
+        .filter((tab) => !(tab.url || tab.pendingUrl || '').startsWith(sidePanelUrlPrefix))
+        .map((tab) => tab.id)
+        .filter((id): id is number => id !== undefined);
 
-        if (treeState?.windows && tabs.length > 0) {
-          const windowState = treeState.windows.find(w => w.windowId === windowId);
-          if (windowState) {
-            const allTreeTabIds = new Set<number>();
-            for (const view of windowState.views) {
-              for (const tabId of collectAllTabIds(view.rootNodes)) {
-                allTreeTabIds.add(tabId);
-              }
-            }
-            for (const pinnedTabId of windowState.pinnedTabIds) {
-              allTreeTabIds.add(pinnedTabId);
-            }
+      const treeState: TreeState = globalThis.treeStateManager.toJSON();
+      const windowState = treeState.windows.find((w) => w.windowId === windowId);
+      treeTabIds = windowState
+        ? windowState.views.flatMap((view) => [...view.pinnedTabIds, ...collectTabIds(view.rootNodes)])
+        : [];
 
-            const allTabsSynced = tabs.every(
-              (tab: chrome.tabs.Tab) => tab.id && allTreeTabIds.has(tab.id)
-            );
-            if (allTabsSynced) {
-              return;
-            }
-          }
-        }
-      } catch {
-        // エラーは無視して続行
+      const treeTabIdSet = new Set(treeTabIds);
+      if (chromeTabIds.length > 0 && chromeTabIds.every((id) => treeTabIdSet.has(id))) {
+        return { synced: true, chromeTabIds, treeTabIds };
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    return { synced: false, chromeTabIds, treeTabIds };
   }, windowId);
 
-  const tabs = await serviceWorker.evaluate((windowId) => {
-    return chrome.tabs.query({ windowId });
-  }, windowId);
-
-  expect(tabs).toBeDefined();
-  expect(Array.isArray(tabs)).toBe(true);
+  if (!result.synced) {
+    throw new Error(
+      `Window ${windowId} tree is not synced with Chrome tabs.\n` +
+      `  Chrome tabs: [${result.chromeTabIds.join(', ')}]\n` +
+      `  Tree tabs:   [${result.treeTabIds.join(', ')}]`
+    );
+  }
 }
 
 /**
@@ -269,48 +204,16 @@ export async function openSidePanelForWindow(
   windowId: number
 ): Promise<Page> {
   const serviceWorker = await getServiceWorker(context);
-
   const extensionId = serviceWorker.url().split('/')[2];
+  const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`;
 
   await serviceWorker.evaluate(
-    ({ windowId }) => {
-      return chrome.windows.update(windowId, { focused: true });
-    },
-    { windowId }
+    (windowId) => chrome.windows.update(windowId, { focused: true }),
+    windowId
   );
 
-  await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 200)));
-
-  const page = await context.newPage();
-  const sidePanelUrl = `chrome-extension://${extensionId}/sidepanel.html?windowId=${windowId}`;
-  await page.goto(sidePanelUrl);
-
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForSelector('#root', { timeout: 5000 });
+  const page = await openExtensionPageTab(context, serviceWorker, sidePanelUrl, windowId);
   await page.waitForSelector('[data-testid="side-panel-root"]', { timeout: 5000 });
-
-  // sidePanelPageのタブが正しいウィンドウにあることを確認し、必要に応じて移動
-  const sidePanelTabId = await serviceWorker.evaluate(async (url) => {
-    const tabs = await chrome.tabs.query({});
-    const tab = tabs.find(t => (t.url || t.pendingUrl) === url);
-    return tab?.id;
-  }, sidePanelUrl);
-
-  if (sidePanelTabId !== undefined) {
-    const currentWindowId = await serviceWorker.evaluate(async (tabId) => {
-      const tab = await chrome.tabs.get(tabId);
-      return tab.windowId;
-    }, sidePanelTabId);
-
-    if (currentWindowId !== windowId) {
-      await serviceWorker.evaluate(async ({ tabId, targetWindowId }) => {
-        await chrome.tabs.move(tabId, { windowId: targetWindowId, index: -1 });
-      }, { tabId: sidePanelTabId, targetWindowId: windowId });
-
-      await serviceWorker.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
-    }
-  }
-
   return page;
 }
 

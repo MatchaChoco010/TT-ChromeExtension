@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@/test/test-utils';
 import SidePanelRoot from './SidePanelRoot';
+import type { TreeState } from '@/types';
 
 const mockStorageGet = vi.fn();
 const mockStorageSet = vi.fn();
@@ -47,6 +48,24 @@ const mockRuntimeOnMessage = {
 };
 
 const mockTabsCreate = vi.fn();
+
+/**
+ * ウィンドウ1に、指定したタブIDを持つビューを並べたツリー状態を作る
+ */
+const createTreeState = (viewTabIds: number[][]): TreeState => ({
+  windows: [
+    {
+      windowId: 1,
+      views: viewTabIds.map((tabIds, index) => ({
+        name: `View ${index + 1}`,
+        color: '#3b82f6',
+        rootNodes: tabIds.map((tabId) => ({ tabId, isExpanded: true, children: [] })),
+        pinnedTabIds: [],
+      })),
+      activeViewIndex: 0,
+    },
+  ],
+});
 
 beforeEach(() => {
   vi.stubGlobal('chrome', {
@@ -96,7 +115,13 @@ beforeEach(() => {
   mockTabsQuery.mockResolvedValue([]);
   mockTabsUpdate.mockResolvedValue({});
   mockTabsCreate.mockResolvedValue({ id: 999, windowId: 1 });
-  mockRuntimeSendMessage.mockResolvedValue({ success: true });
+  mockRuntimeSendMessage.mockImplementation((message: { type: string }) =>
+    Promise.resolve(
+      message.type === 'GET_STATE'
+        ? { success: true, data: createTreeState([[]]) }
+        : { success: true, data: null },
+    ),
+  );
 });
 
 afterEach(() => {
@@ -190,47 +215,21 @@ describe('SidePanelRoot', () => {
   });
 
   describe('ビュー情報のTabTreeViewへの受け渡し', () => {
-    it('treeStateにビューがある場合、TabTreeViewにviewsとonMoveToViewが渡されること', async () => {
-      const mockTreeState = {
-        views: {
-          'default': {
-            info: { id: 'default', name: 'Default', color: '#3b82f6' },
-            rootNodeIds: ['node-1'],
-            nodes: {
-              'node-1': {
-                id: 'node-1',
-                tabId: 1,
-                parentId: null,
-                children: [],
-                isExpanded: true,
-                depth: 0,
-              },
-            },
-          },
-          'view-2': {
-            info: { id: 'view-2', name: 'View 2', color: '#10b981' },
-            rootNodeIds: [],
-            nodes: {},
-          },
-        },
-        viewOrder: ['default', 'view-2'],
-        currentViewId: 'default',
-        tabToNode: { 1: { viewId: 'default', nodeId: 'node-1' } },
-      };
-
-      mockStorageGet.mockImplementation((keys: string | string[]) => {
-        if (keys === 'tree_state' || (Array.isArray(keys) && keys.includes('tree_state'))) {
-          return Promise.resolve({ tree_state: mockTreeState });
-        }
-        return Promise.resolve({});
-      });
+    it('treeStateに複数のビューがある場合、すべてのビューが切り替えボタンとして表示されること', async () => {
+      mockRuntimeSendMessage.mockImplementation((message: { type: string }) =>
+        Promise.resolve(
+          message.type === 'GET_STATE'
+            ? { success: true, data: createTreeState([[1], []]) }
+            : { success: true, data: null },
+        ),
+      );
 
       await act(async () => {
         render(<SidePanelRoot />);
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId('tab-tree-view')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: /^Switch to / })).toHaveLength(2);
       });
     });
   });

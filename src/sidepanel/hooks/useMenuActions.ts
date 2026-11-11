@@ -95,14 +95,10 @@ export const useMenuActions = () => {
           break;
 
         case 'group':
-          try {
-            await chrome.runtime.sendMessage({
-              type: 'CREATE_GROUP',
-              payload: { tabIds, groupName: options?.groupName },
-            });
-          } catch {
-            // グループ化APIのエラーは無視（タブが存在しない場合など）
-          }
+          await chrome.runtime.sendMessage({
+            type: 'CREATE_GROUP',
+            payload: { tabIds, groupName: options?.groupName },
+          });
           break;
 
         case 'ungroup':

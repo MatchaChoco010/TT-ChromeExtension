@@ -54,9 +54,12 @@ test.describe('タブ複製時の配置', () => {
           return sortedTabs[0]?.id;
         }, [initialBrowserTabId, tabId]);
         expect(newTabId).toBeDefined();
-      }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 10000 });
+    if (newTabId === undefined) {
+      throw new Error('newTabId was not found');
+    }
 
-      await waitForTabInTreeState(serviceWorker, newTabId!);
+    await waitForTabInTreeState(serviceWorker, newTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -140,9 +143,12 @@ test.describe('タブ複製時の配置', () => {
           return sortedTabs[0]?.id;
         }, [initialBrowserTabId, tabId1, tabId2, tabId3]);
         expect(duplicatedTabId).toBeDefined();
-      }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 10000 });
+    if (duplicatedTabId === undefined) {
+      throw new Error('duplicatedTabId was not found');
+    }
 
-      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
+    await waitForTabInTreeState(serviceWorker, duplicatedTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -226,9 +232,12 @@ test.describe('タブ複製時の配置', () => {
           return sortedTabs[0]?.id;
         }, [initialBrowserTabId, tabId1]);
         expect(duplicatedTabId).toBeDefined();
-      }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 10000 });
+    if (duplicatedTabId === undefined) {
+      throw new Error('duplicatedTabId was not found');
+    }
 
-      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
+    await waitForTabInTreeState(serviceWorker, duplicatedTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -304,9 +313,12 @@ test.describe('タブ複製時の配置', () => {
           return sortedTabs[0]?.id;
         }, [initialBrowserTabId, parentTabId, childTabId]);
         expect(duplicatedTabId).toBeDefined();
-      }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 10000 });
+    if (duplicatedTabId === undefined) {
+      throw new Error('duplicatedTabId was not found');
+    }
 
-      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
+    await waitForTabInTreeState(serviceWorker, duplicatedTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -391,9 +403,12 @@ test.describe('タブ複製時の配置', () => {
           return sortedTabs[0]?.id;
         }, [initialBrowserTabId, tabId1, tabId2]);
         expect(duplicatedTabId).toBeDefined();
-      }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 10000 });
+    if (duplicatedTabId === undefined) {
+      throw new Error('duplicatedTabId was not found');
+    }
 
-      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
+    await waitForTabInTreeState(serviceWorker, duplicatedTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -421,11 +436,11 @@ test.describe('タブ複製時の配置', () => {
       ], 0);
     });
 
-    test('設定が"sibling"の場合、複製されたタブは元のタブの直後に配置される', async ({
+    test('設定が"nextSibling"の場合、複製されたタブは元のタブの直後に配置される', async ({
       extensionContext,
       serviceWorker,
     }) => {
-      await setUserSettings(extensionContext, { duplicateTabPosition: 'sibling' });
+      await setUserSettings(extensionContext, { duplicateTabPosition: 'nextSibling' });
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
@@ -476,9 +491,12 @@ test.describe('タブ複製時の配置', () => {
           return sortedTabs[0]?.id;
         }, [initialBrowserTabId, tabId1, tabId2]);
         expect(duplicatedTabId).toBeDefined();
-      }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 10000 });
+    if (duplicatedTabId === undefined) {
+      throw new Error('duplicatedTabId was not found');
+    }
 
-      await waitForTabInTreeState(serviceWorker, duplicatedTabId!);
+    await waitForTabInTreeState(serviceWorker, duplicatedTabId);
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: initialBrowserTabId, depth: 0 },
@@ -512,7 +530,7 @@ test.describe('タブ複製時の配置', () => {
       extensionContext,
       serviceWorker,
     }) => {
-      await setUserSettings(extensionContext, { duplicateTabPosition: 'sibling', childTabBehavior: 'close_all' });
+      await setUserSettings(extensionContext, { duplicateTabPosition: 'nextSibling', childTabBehavior: 'close_all' });
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
@@ -890,11 +908,11 @@ test.describe('タブ複製時の配置', () => {
       ], 0);
     });
 
-    test('sibling設定で複数タブを複製すると、各複製タブが元のタブの直後に配置される', async ({
+    test('nextSibling設定で複数タブを複製すると、各複製タブが元のタブの直後に配置される', async ({
       extensionContext,
       serviceWorker,
     }) => {
-      await setUserSettings(extensionContext, { duplicateTabPosition: 'sibling' });
+      await setUserSettings(extensionContext, { duplicateTabPosition: 'nextSibling' });
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
@@ -1010,11 +1028,11 @@ test.describe('タブ複製時の配置', () => {
       ], 0);
     });
 
-    test('sibling設定で3タブを複製すると、各複製タブが元のタブの直後に配置される', async ({
+    test('nextSibling設定で3タブを複製すると、各複製タブが元のタブの直後に配置される', async ({
       extensionContext,
       serviceWorker,
     }) => {
-      await setUserSettings(extensionContext, { duplicateTabPosition: 'sibling' });
+      await setUserSettings(extensionContext, { duplicateTabPosition: 'nextSibling' });
       const windowId = await getCurrentWindowId(serviceWorker);
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);

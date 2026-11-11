@@ -84,15 +84,18 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
           return null;
         };
 
-        let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
-        let childResult: { node: TabNode; parent: TabNode | null } | null = null;
-
-        for (const windowState of treeState.windows) {
-          for (const viewState of windowState.views) {
-            if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
-            if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
+        const findInTree = (targetTabId: number): { node: TabNode; parent: TabNode | null } | null => {
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              const found = findNodeWithParent(viewState.rootNodes, targetTabId, null);
+              if (found) return found;
+            }
           }
-        }
+          return null;
+        };
+
+        const parentResult = findInTree(parentTabId);
+        const childResult = findInTree(childTabId);
 
         if (!parentResult) {
           return { valid: false, reason: 'Parent not found', parentFound: false };
@@ -338,13 +341,8 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     }, { timeout: 5000, timeoutMessage: 'Tree state was not saved to storage' });
 
     await serviceWorker.evaluate(async () => {
-      // @ts-expect-error accessing global treeStateManager
-      if (globalThis.treeStateManager) {
-        // @ts-expect-error accessing internal windows array
-        globalThis.treeStateManager.windows = [];
-        // @ts-expect-error accessing global treeStateManager
-        await globalThis.treeStateManager.loadState();
-      }
+      globalThis.treeStateManager.clearAllWindows();
+      await globalThis.treeStateManager.loadState();
     });
 
     interface RelationsResult {
@@ -399,17 +397,19 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
             return null;
           };
 
-          let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
-          let childResult: { node: TabNode; parent: TabNode | null } | null = null;
-          let grandchildResult: { node: TabNode; parent: TabNode | null } | null = null;
-
-          for (const windowState of treeState.windows) {
-            for (const viewState of windowState.views) {
-              if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
-              if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
-              if (!grandchildResult) grandchildResult = findNodeWithParent(viewState.rootNodes, grandchildTabId, null);
+          const findInTree = (targetTabId: number): { node: TabNode; parent: TabNode | null } | null => {
+            for (const windowState of treeState.windows) {
+              for (const viewState of windowState.views) {
+                const found = findNodeWithParent(viewState.rootNodes, targetTabId, null);
+                if (found) return found;
+              }
             }
-          }
+            return null;
+          };
+
+          const parentResult = findInTree(parentTabId);
+          const childResult = findInTree(childTabId);
+          const grandchildResult = findInTree(grandchildTabId);
 
           if (!parentResult || !childResult || !grandchildResult) {
             return {
@@ -537,15 +537,18 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
           return null;
         };
 
-        let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
-        let childResult: { node: TabNode; parent: TabNode | null } | null = null;
-
-        for (const windowState of treeState.windows) {
-          for (const viewState of windowState.views) {
-            if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
-            if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
+        const findInTree = (targetTabId: number): { node: TabNode; parent: TabNode | null } | null => {
+          for (const windowState of treeState.windows) {
+            for (const viewState of windowState.views) {
+              const found = findNodeWithParent(viewState.rootNodes, targetTabId, null);
+              if (found) return found;
+            }
           }
-        }
+          return null;
+        };
+
+        const parentResult = findInTree(parentTabId);
+        const childResult = findInTree(childTabId);
 
         if (!parentResult) {
           return { valid: false, reason: 'Parent not found', parentFound: false };
@@ -572,13 +575,8 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     }, { timeout: 5000, timeoutMessage: 'D&D parent-child relation was not saved correctly' });
 
     await serviceWorker.evaluate(async () => {
-      // @ts-expect-error accessing global treeStateManager
-      if (globalThis.treeStateManager) {
-        // @ts-expect-error accessing internal windows array
-        globalThis.treeStateManager.windows = [];
-        // @ts-expect-error accessing global treeStateManager
-        await globalThis.treeStateManager.loadState();
-      }
+      globalThis.treeStateManager.clearAllWindows();
+      await globalThis.treeStateManager.loadState();
     });
 
     interface DndRelationsResult {
@@ -631,15 +629,18 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
             return null;
           };
 
-          let parentResult: { node: TabNode; parent: TabNode | null } | null = null;
-          let childResult: { node: TabNode; parent: TabNode | null } | null = null;
-
-          for (const windowState of treeState.windows) {
-            for (const viewState of windowState.views) {
-              if (!parentResult) parentResult = findNodeWithParent(viewState.rootNodes, parentTabId, null);
-              if (!childResult) childResult = findNodeWithParent(viewState.rootNodes, childTabId, null);
+          const findInTree = (targetTabId: number): { node: TabNode; parent: TabNode | null } | null => {
+            for (const windowState of treeState.windows) {
+              for (const viewState of windowState.views) {
+                const found = findNodeWithParent(viewState.rootNodes, targetTabId, null);
+                if (found) return found;
+              }
             }
-          }
+            return null;
+          };
+
+          const parentResult = findInTree(parentTabId);
+          const childResult = findInTree(childTabId);
 
           if (!parentResult || !childResult) {
             return {
@@ -789,13 +790,8 @@ test.describe('ブラウザ再起動時のツリー構造復元', () => {
     }, { tabAId });
 
     await serviceWorker.evaluate(async () => {
-      // @ts-expect-error accessing global treeStateManager
-      if (globalThis.treeStateManager) {
-        // @ts-expect-error accessing internal windows array
-        globalThis.treeStateManager.windows = [];
-        // @ts-expect-error accessing global treeStateManager
-        await globalThis.treeStateManager.loadState();
-      }
+      globalThis.treeStateManager.clearAllWindows();
+      await globalThis.treeStateManager.loadState();
     });
 
     interface ViewIndexResult {

@@ -1,20 +1,25 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, Worker } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { openExtensionPageTab } from './extension-page-utils';
 
 /**
  * Side Panelを開く
  *
  * @param context - ブラウザコンテキスト
+ * @param serviceWorker - タブ作成に使うService Worker
  * @param extensionId - 拡張機能のID
  * @returns Side PanelのPage
  */
 export async function openSidePanel(
   context: BrowserContext,
+  serviceWorker: Worker,
   extensionId: string
 ): Promise<Page> {
-  const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-  await page.waitForLoadState('domcontentloaded');
+  const page = await openExtensionPageTab(
+    context,
+    serviceWorker,
+    `chrome-extension://${extensionId}/sidepanel.html`,
+  );
   await page.waitForSelector('#root', { timeout: 5000 });
   return page;
 }
@@ -28,12 +33,7 @@ export async function assertTreeVisible(page: Page): Promise<void> {
   const sidePanelRoot = page.locator('[data-testid="side-panel-root"]');
   await expect(sidePanelRoot).toBeVisible({ timeout: 5000 });
 
-  const loadingIndicator = page.locator('text=Loading');
-  try {
-    await expect(loadingIndicator).not.toBeVisible({ timeout: 3000 });
-  } catch {
-    // ローディングが存在しなかった場合は無視
-  }
+  await expect(page.locator('[data-testid="side-panel-loading"]')).toBeHidden({ timeout: 5000 });
 }
 
 /**

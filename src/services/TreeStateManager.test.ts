@@ -276,6 +276,34 @@ describe('TreeStateManager', () => {
     });
   });
 
+  describe('waitForTabRegistration', () => {
+    it('既にツリーにあるタブはすぐにtrueを返す', async () => {
+      await manager.addTab(createMockTab({ id: 1, windowId: defaultWindowId }), null, defaultWindowId);
+
+      await expect(manager.waitForTabRegistration(1, 1000)).resolves.toBe(true);
+    });
+
+    it('待機中にタブが追加されるとtrueを返す', async () => {
+      const waiting = manager.waitForTabRegistration(2, 1000);
+
+      await manager.addTab(createMockTab({ id: 2, windowId: defaultWindowId }), null, defaultWindowId);
+
+      await expect(waiting).resolves.toBe(true);
+    });
+
+    it('時間内に追加されない場合はfalseを返す', async () => {
+      vi.useFakeTimers();
+      try {
+        const waiting = manager.waitForTabRegistration(3, 1000);
+        vi.advanceTimersByTime(1000);
+
+        await expect(waiting).resolves.toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('resumeAfterServiceWorkerRestart', () => {
     it('Chromeのタブ順序がツリーとずれていても、保存済みのtabIdとwindowIdをそのまま使う', async () => {
       mockStorageData['tree_state'] = {

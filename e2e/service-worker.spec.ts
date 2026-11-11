@@ -23,6 +23,7 @@ import {
 import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 import './types';
+import { openExtensionPageTab } from './utils/extension-page-utils';
 
 /**
  * Service Workerからのレスポンス型
@@ -620,8 +621,11 @@ test.describe('Service Workerとの通信', () => {
       const { initialBrowserTabId, sidePanelPage } =
         await setupWindow(extensionContext, serviceWorker, windowId);
 
-      const sidePanelPage2 = await extensionContext.newPage();
-      await sidePanelPage2.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+      const sidePanelPage2 = await openExtensionPageTab(
+        extensionContext,
+        serviceWorker,
+        `chrome-extension://${extensionId}/sidepanel.html`,
+      );
       await sidePanelPage2.waitForSelector('#root', { timeout: 5000 });
 
       // サイドパネルタブはTreeStateに含まれない

@@ -597,13 +597,13 @@ test.describe('chrome.tabs API統合', () => {
 
       await waitForCondition(async () => {
         const result = await serviceWorker.evaluate(async () => {
-          return await chrome.storage.local.get('unread_tabs');
+          return await chrome.storage.local.get<{ unread_tabs?: number[] }>('unread_tabs');
         });
         return Array.isArray(result.unread_tabs) && result.unread_tabs.includes(tabId);
       }, { timeout: 3000 });
 
       let unreadState = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('unread_tabs');
+        const result = await chrome.storage.local.get<{ unread_tabs?: number[] }>('unread_tabs');
         return result.unread_tabs;
       });
       expect(Array.isArray(unreadState) && unreadState.includes(tabId)).toBe(true);
@@ -616,13 +616,13 @@ test.describe('chrome.tabs API統合', () => {
 
       await waitForCondition(async () => {
         const result = await serviceWorker.evaluate(async () => {
-          return await chrome.storage.local.get('unread_tabs');
+          return await chrome.storage.local.get<{ unread_tabs?: number[] }>('unread_tabs');
         });
         return !result.unread_tabs || !result.unread_tabs.includes(tabId);
       }, { timeout: 3000 });
 
       unreadState = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('unread_tabs');
+        const result = await chrome.storage.local.get<{ unread_tabs?: number[] }>('unread_tabs');
         return result.unread_tabs;
       });
       expect(!unreadState || !unreadState.includes(tabId)).toBe(true);

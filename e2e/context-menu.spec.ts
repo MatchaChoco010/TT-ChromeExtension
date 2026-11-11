@@ -488,18 +488,17 @@ test.describe('コンテキストメニュー操作', () => {
       const sourceTab = await chrome.tabs.get(tabId);
       const sourceWindowId = sourceTab.windowId;
 
-      const newWindow = await chrome.windows.create({ tabId });
+      await chrome.windows.create({ tabId });
 
       const remainingTabs = await chrome.tabs.query({ windowId: sourceWindowId });
       if (remainingTabs.length === 0) {
-        try {
-          await chrome.windows.remove(sourceWindowId);
-        } catch {
-          // ウィンドウが既に閉じられている場合のエラーは無視
-        }
+        await chrome.windows.remove(sourceWindowId).catch((error: unknown) => {
+          // 最後のタブを移動したウィンドウはChromeが自動で閉じる場合がある
+          if (!(error instanceof Error && error.message.startsWith('No window with id'))) {
+            throw error;
+          }
+        });
       }
-
-      return newWindow.id;
     }, window2DefaultTabId!);
 
     await assertWindowClosed(extensionContext, window2Id);

@@ -6,15 +6,13 @@ import type {
   View,
   TabNode,
   TreeState,
-  ViewState,
-  WindowState,
 } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 
 /**
  * SnapshotManager
  *
- * セッションスナップショットの保存・復元を担当するサービス
+ * セッションスナップショットの保存を担当するサービス
  * スナップショットはchrome.downloads APIでJSONファイルとしてダウンロードフォルダに保存
  */
 export class SnapshotManager {
@@ -87,17 +85,6 @@ export class SnapshotManager {
     await this.downloadService.downloadSnapshot(jsonContent, filename, subfolder);
 
     return snapshot;
-  }
-
-  async restoreFromJson(jsonData: string): Promise<void> {
-    const parsed = JSON.parse(jsonData);
-
-    const snapshot: Snapshot = {
-      ...parsed,
-      createdAt: new Date(parsed.createdAt),
-    };
-
-    await this.restoreTabsFromSnapshot(snapshot.data.tabs, snapshot.data.views);
   }
 
   private async createTabSnapshots(
@@ -200,184 +187,6 @@ export class SnapshotManager {
     return tabSnapshots;
   }
 
-  private async restoreTabsFromSnapshot(
-    tabs: TabSnapshot[],
-    views: View[],
-  ): Promise<void> {
-    if (tabs.length === 0) return;
-
-    const sortedTabs = [...tabs].sort((a, b) => {
-      if (a.parentIndex === null && b.parentIndex !== null) return -1;
-      if (a.parentIndex !== null && b.parentIndex === null) return 1;
-      return a.index - b.index;
-    });
-
-    const indexToNewTabId = new Map<number, number>();
-    const indexToSnapshot = new Map<number, TabSnapshot>();
-
-    for (const tabSnapshot of sortedTabs) {
-      indexToSnapshot.set(tabSnapshot.index, tabSnapshot);
-    }
-
-    const windowIndexSet = new Set<number>();
-    for (const tabSnapshot of sortedTabs) {
-      windowIndexSet.add(tabSnapshot.windowIndex ?? 0);
-    }
-    const windowIndices = Array.from(windowIndexSet).sort((a, b) => a - b);
-
-    const windowIndexToNewWindowId = new Map<number, number>();
-    for (const windowIndex of windowIndices) {
-      try {
-        const newWindow = await chrome.windows.create({});
-        if (newWindow && newWindow.id !== undefined) {
-          windowIndexToNewWindowId.set(windowIndex, newWindow.id);
-          if (newWindow.tabs && newWindow.tabs.length > 0) {
-            const blankTabId = newWindow.tabs[0].id;
-            if (blankTabId !== undefined) {
-              setTimeout(() => {
-                // 空白タブの削除失敗は無視（既に閉じられている場合がある）
-                chrome.tabs.remove(blankTabId).catch(() => {});
-              }, 1000);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to create window for windowIndex:', windowIndex, error);
-      }
-    }
-
-    for (const tabSnapshot of sortedTabs) {
-      try {
-        const windowIndex = tabSnapshot.windowIndex ?? 0;
-        const targetWindowId = windowIndexToNewWindowId.get(windowIndex);
-
-        const newTab = await chrome.tabs.create({
-          url: tabSnapshot.url,
-          active: false,
-          pinned: tabSnapshot.pinned,
-          windowId: targetWindowId,
-        });
-
-        if (newTab.id !== undefined) {
-          indexToNewTabId.set(tabSnapshot.index, newTab.id);
-        }
-      } catch (error) {
-        console.error('Failed to create tab:', tabSnapshot.url, error);
-      }
-    }
-
-    const treeState = await this.storageService.get(STORAGE_KEYS.TREE_STATE);
-    if (!treeState) return;
-
-    const newWindows: WindowState[] = [];
-
-    for (const windowIndex of windowIndices) {
-      const newWindowId = windowIndexToNewWindowId.get(windowIndex);
-      if (newWindowId === undefined) continue;
-
-      const windowTabs = sortedTabs.filter(t => (t.windowIndex ?? 0) === windowIndex);
-
-      const viewNamesInThisWindow = new Set<string>();
-      for (const tab of windowTabs) {
-        viewNamesInThisWindow.add(tab.viewId);
-      }
-
-      // views配列の順序でビューを構築（スナップショットのビュー順序を維持）
-      const orderedViewNames: string[] = [];
-      for (const view of views) {
-        if (viewNamesInThisWindow.has(view.name)) {
-          orderedViewNames.push(view.name);
-        }
-      }
-
-      const viewStates: ViewState[] = [];
-      for (const viewName of orderedViewNames) {
-        const viewInfo = views.find(v => v.name === viewName);
-        const viewTabs = windowTabs.filter(t => t.viewId === viewName);
-
-        const tabIdToNode = new Map<number, TabNode>();
-        const rootNodes: TabNode[] = [];
-
-        for (const tabSnapshot of viewTabs) {
-          const newTabId = indexToNewTabId.get(tabSnapshot.index);
-          if (newTabId === undefined) continue;
-
-          const node: TabNode = {
-            tabId: newTabId,
-            isExpanded: tabSnapshot.isExpanded,
-            children: [],
-          };
-          if (tabSnapshot.groupInfo) {
-            node.groupInfo = tabSnapshot.groupInfo;
-          }
-          tabIdToNode.set(newTabId, node);
-        }
-
-        for (const tabSnapshot of viewTabs) {
-          const newTabId = indexToNewTabId.get(tabSnapshot.index);
-          if (newTabId === undefined) continue;
-          const node = tabIdToNode.get(newTabId);
-          if (!node) continue;
-
-          if (tabSnapshot.parentIndex !== null) {
-            const parentTabId = indexToNewTabId.get(tabSnapshot.parentIndex);
-            if (parentTabId !== undefined) {
-              const parent = tabIdToNode.get(parentTabId);
-              if (parent) {
-                parent.children.push(node);
-              } else {
-                rootNodes.push(node);
-              }
-            } else {
-              rootNodes.push(node);
-            }
-          } else {
-            rootNodes.push(node);
-          }
-        }
-
-        const viewPinnedTabIds: number[] = [];
-        for (const tabSnapshot of viewTabs) {
-          if (tabSnapshot.pinned) {
-            const newTabId = indexToNewTabId.get(tabSnapshot.index);
-            if (newTabId !== undefined) {
-              viewPinnedTabIds.push(newTabId);
-            }
-          }
-        }
-
-        viewStates.push({
-          name: viewInfo?.name ?? viewName,
-          color: viewInfo?.color ?? '#3B82F6',
-          icon: viewInfo?.icon,
-          rootNodes,
-          pinnedTabIds: viewPinnedTabIds,
-        });
-      }
-
-      if (viewStates.length === 0) {
-        viewStates.push({
-          name: 'Default',
-          color: '#3B82F6',
-          rootNodes: [],
-          pinnedTabIds: [],
-        });
-      }
-
-      newWindows.push({
-        windowId: newWindowId,
-        views: viewStates,
-        activeViewIndex: 0,
-      });
-    }
-
-    const updatedTreeState: TreeState = {
-      windows: [...treeState.windows, ...newWindows],
-    };
-
-    await this.storageService.set(STORAGE_KEYS.TREE_STATE, updatedTreeState);
-  }
-
   private generateSnapshotId(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 9);
@@ -415,8 +224,8 @@ export class SnapshotManager {
           const timestamp = new Date().toISOString().split('T')[0];
           const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
           await this.createSnapshot(name, true);
-        } catch {
-          // 自動スナップショット失敗は無視
+        } catch (error) {
+          console.error('[SnapshotManager] Auto snapshot failed:', error);
         }
       }
     };

@@ -5,6 +5,7 @@ import { TitlePersistenceService } from '@/services/TitlePersistenceService';
 import { SnapshotManager } from '@/services/SnapshotManager';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
 import { downloadService } from '@/storage/DownloadService';
+import { ignoreMissingTabOrWindow } from '@/utils/chrome-errors';
 
 const TAB_POSITION_DEFAULTS = {
   newTabPositionFromLink: 'child' as const,
@@ -37,15 +38,6 @@ const unreadTracker = new UnreadTracker(storageService);
 const titlePersistence = new TitlePersistenceService(storageService);
 const snapshotManager = new SnapshotManager(downloadService, storageService);
 
-unreadTracker.loadFromStorage().catch(() => {});
-
-titlePersistence.loadFromStorage().catch(() => {});
-
-declare global {
-  var treeStateManager: TreeStateManager;
-}
-
-globalThis.treeStateManager = treeStateManager;
 
 export { storageService as testStorageService, treeStateManager as testTreeStateManager, unreadTracker as testUnreadTracker, titlePersistence as testTitlePersistence, snapshotManager as testSnapshotManager };
 
@@ -109,6 +101,16 @@ function trackHandlerAfterInitialization<T>(eventName: string, fn: () => Promise
 }
 
 /**
+ * Chromeイベントのハンドラーを初期化完了後に実行する
+ * Chromeはリスナーの戻り値を扱わないため、失敗はここでイベント名とともに記録する
+ */
+function runEventHandler(eventName: string, fn: () => Promise<void>): void {
+  trackHandlerAfterInitialization(eventName, fn).catch((error: unknown) => {
+    console.error(`[${eventName}] Handler failed:`, error);
+  });
+}
+
+/**
  * 全ての実行中イベントハンドラーの完了を待機する（E2Eテスト専用）
  */
 async function waitForPendingHandlers(timeoutMs: number = 5000): Promise<void> {
@@ -151,7 +153,6 @@ async function waitForPendingHandlers(timeoutMs: number = 5000): Promise<void> {
  */
 async function prepareForReset(): Promise<void> {
   await waitForPendingHandlers();
-  isCreatingGroupTab = false;
   isRestoringSnapshot = false;
   restoringTabIds.clear();
   lastActiveTabByWindow.clear();
@@ -166,9 +167,6 @@ const pendingTabParents = new Map<number, number>();
 
 const pendingDuplicateSources = new Map<number, { url: string; windowId: number; isSubtreeDuplicate: boolean }>();
 
-const pendingGroupTabIds = new Set<number>();
-
-let isCreatingGroupTab = false;
 
 const lastActiveTabByWindow = new Map<number, number>();
 
@@ -178,24 +176,8 @@ const restoringTabIds = new Set<number>();
 
 let isRestoringSnapshot = false;
 
-declare global {
-
-  var pendingTabParents: Map<number, number>;
-
-  var pendingDuplicateSources: Map<number, { url: string; windowId: number; isSubtreeDuplicate: boolean }>;
-
-  var pendingGroupTabIds: Set<number>;
-
-  var pendingLinkClicks: Map<number, number>;
-
-  var treeStateManager: TreeStateManager;
-
-  function prepareForReset(): Promise<void>;
-  function waitForHandlers(): Promise<void>;
-}
 globalThis.pendingTabParents = pendingTabParents;
 globalThis.pendingDuplicateSources = pendingDuplicateSources;
-globalThis.pendingGroupTabIds = pendingGroupTabIds;
 globalThis.pendingLinkClicks = pendingLinkClicks;
 globalThis.treeStateManager = treeStateManager;
 globalThis.prepareForReset = prepareForReset;
@@ -203,37 +185,39 @@ globalThis.waitForHandlers = waitForPendingHandlers;
 
 export function registerTabEventListeners(): void {
   chrome.tabs.onCreated.addListener((tab) => {
-    trackHandler(() => handleTabCreated(tab));
+    trackHandler(() => handleTabCreated(tab)).catch((error: unknown) => {
+      console.error('[tabs.onCreated] Handler failed:', error);
+    });
   });
   chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-    trackHandlerAfterInitialization('tabs.onRemoved', () => handleTabRemoved(tabId, removeInfo));
+    runEventHandler('tabs.onRemoved', () => handleTabRemoved(tabId, removeInfo));
   });
   chrome.tabs.onMoved.addListener((tabId, moveInfo) => {
-    trackHandlerAfterInitialization('tabs.onMoved', () => handleTabMoved(tabId, moveInfo));
+    runEventHandler('tabs.onMoved', () => handleTabMoved(tabId, moveInfo));
   });
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    trackHandlerAfterInitialization('tabs.onUpdated', () => handleTabUpdated(tabId, changeInfo, tab));
+    runEventHandler('tabs.onUpdated', () => handleTabUpdated(tabId, changeInfo, tab));
   });
   chrome.tabs.onActivated.addListener((activeInfo) => {
-    trackHandlerAfterInitialization('tabs.onActivated', () => handleTabActivated(activeInfo));
+    runEventHandler('tabs.onActivated', () => handleTabActivated(activeInfo));
   });
   chrome.tabs.onDetached.addListener((tabId, detachInfo) => {
-    trackHandlerAfterInitialization('tabs.onDetached', () => handleTabDetached(tabId, detachInfo));
+    runEventHandler('tabs.onDetached', () => handleTabDetached(tabId, detachInfo));
   });
   chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
-    trackHandlerAfterInitialization('tabs.onAttached', () => handleTabAttached(tabId, attachInfo));
+    runEventHandler('tabs.onAttached', () => handleTabAttached(tabId, attachInfo));
   });
   chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
-    trackHandlerAfterInitialization('tabs.onReplaced', () => handleTabReplaced(addedTabId, removedTabId));
+    runEventHandler('tabs.onReplaced', () => handleTabReplaced(addedTabId, removedTabId));
   });
 }
 
 export function registerWindowEventListeners(): void {
   chrome.windows.onCreated.addListener((window) => {
-    trackHandlerAfterInitialization('windows.onCreated', () => handleWindowCreated(window));
+    runEventHandler('windows.onCreated', () => handleWindowCreated(window));
   });
   chrome.windows.onRemoved.addListener((windowId) => {
-    trackHandlerAfterInitialization('windows.onRemoved', () => handleWindowRemoved(windowId));
+    runEventHandler('windows.onRemoved', () => handleWindowRemoved(windowId));
   });
 }
 
@@ -296,54 +280,13 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     return;
   }
 
-  if (isCreatingGroupTab) {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    if (pendingGroupTabIds.has(tab.id)) {
-      pendingGroupTabIds.delete(tab.id);
-      return;
-    }
-    const refreshedTab = await chrome.tabs.get(tab.id);
-    if (isGroupTabUrl(refreshedTab.url) || isGroupTabUrl(refreshedTab.pendingUrl)) {
-      return;
-    }
-  }
-
-  if (pendingGroupTabIds.has(tab.id)) {
-    pendingGroupTabIds.delete(tab.id);
-    return;
-  }
+  // グループタブはcreateGroupWithRealTab・restoreGroupTabsがツリーに登録する
   if (isGroupTabUrl(tab.url) || isGroupTabUrl(tab.pendingUrl)) {
     return;
   }
 
   if (isSidePanelUrl(tab.url) || isSidePanelUrl(tab.pendingUrl)) {
     return;
-  }
-
-  const isUrlIndeterminate = (!tab.url && !tab.pendingUrl) ||
-    ((!tab.url || tab.url === 'about:blank') && (!tab.pendingUrl || tab.pendingUrl === 'about:blank'));
-  if (isUrlIndeterminate) {
-    for (let i = 0; i < 10; i++) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      try {
-        const refreshedTab = await chrome.tabs.get(tab.id);
-        if (!refreshedTab) {
-          break;
-        }
-        const actualUrl = refreshedTab.url || refreshedTab.pendingUrl || '';
-        if (actualUrl && actualUrl !== 'about:blank') {
-          if (isSidePanelUrl(refreshedTab.url) || isSidePanelUrl(refreshedTab.pendingUrl)) {
-            return;
-          }
-          if (isGroupTabUrl(refreshedTab.url) || isGroupTabUrl(refreshedTab.pendingUrl)) {
-            return;
-          }
-          break;
-        }
-      } catch {
-        return;
-      }
-    }
   }
 
   if (isRestoringSnapshot || restoringTabIds.has(tab.id)) {
@@ -359,18 +302,15 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     return;
   }
 
-  try {
-    const currentTab = await chrome.tabs.get(tab.id);
-    if (currentTab.pinned) {
-      if (currentTab.windowId !== undefined) {
-        if (!treeStateManager.isPinnedTabInAnyView(tab.id, currentTab.windowId)) {
-          treeStateManager.updatePinnedStateFromChromeEvent(tab.id, currentTab.windowId, true);
-        }
-      }
-      return;
+  const currentTab = await ignoreMissingTabOrWindow(chrome.tabs.get(tab.id));
+  if (!currentTab) {
+    return;
+  }
+  if (currentTab.pinned) {
+    if (!treeStateManager.isPinnedTabInAnyView(tab.id, currentTab.windowId)) {
+      treeStateManager.updatePinnedStateFromChromeEvent(tab.id, currentTab.windowId, true);
     }
-  } catch {
-    // タブが既に閉じられている場合
+    return;
   }
 
   // ウィンドウが閉じられる時にChromeがアンピンして移動したタブを検出
@@ -381,15 +321,10 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
       const activeViewState = windowState.views[windowState.activeViewIndex];
       if (!activeViewState || activeViewState.pinnedTabIds.length === 0) continue;
 
-      try {
-        await chrome.windows.get(windowState.windowId);
-      } catch {
+      const pinnedTabsWindow = await ignoreMissingTabOrWindow(chrome.windows.get(windowState.windowId));
+      if (!pinnedTabsWindow) {
         // ウィンドウが閉じられている途中なので、移動されたタブを閉じる
-        try {
-          await chrome.tabs.remove(tab.id);
-        } catch {
-          // タブが既に閉じられている
-        }
+        await ignoreMissingTabOrWindow(chrome.tabs.remove(tab.id));
         return;
       }
     }
@@ -401,12 +336,8 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
     let openerTabIdFromChrome: number | undefined = tab.openerTabId;
     if (openerTabIdFromChrome === undefined) {
-      try {
-        const freshTab = await chrome.tabs.get(tab.id);
-        openerTabIdFromChrome = freshTab?.openerTabId;
-      } catch {
-        // タブが既に閉じられている
-      }
+      const freshTab = await ignoreMissingTabOrWindow(chrome.tabs.get(tab.id));
+      openerTabIdFromChrome = freshTab?.openerTabId;
     }
 
     const pendingOpenerTabId = pendingTabParents.get(tab.id);
@@ -564,18 +495,14 @@ export async function handleTabRemoved(
   const { windowId } = removeInfo;
   const viewTabIds = treeStateManager.getViewTabIds(windowId);
   if (viewTabIds.length > 0) {
-    try {
-      const [activeTab] = await chrome.tabs.query({ active: true, windowId });
-      const isActiveTabInOtherView = activeTab?.id !== undefined &&
-        !viewTabIds.includes(activeTab.id) &&
-        (treeStateManager.getNodeByTabId(activeTab.id)?.windowId === windowId ||
-          treeStateManager.isPinnedTabInAnyView(activeTab.id, windowId));
-      if (isActiveTabInOtherView) {
-        const lastTabId = viewTabIds[viewTabIds.length - 1];
-        await chrome.tabs.update(lastTabId, { active: true });
-      }
-    } catch {
-      // タブが存在しない
+    const [activeTab] = await chrome.tabs.query({ active: true, windowId });
+    const isActiveTabInOtherView = activeTab?.id !== undefined &&
+      !viewTabIds.includes(activeTab.id) &&
+      (treeStateManager.getNodeByTabId(activeTab.id)?.windowId === windowId ||
+        treeStateManager.isPinnedTabInAnyView(activeTab.id, windowId));
+    if (isActiveTabInOtherView) {
+      const lastTabId = viewTabIds[viewTabIds.length - 1];
+      await ignoreMissingTabOrWindow(chrome.tabs.update(lastTabId, { active: true }));
     }
   }
 
@@ -587,24 +514,13 @@ export async function handleTabMoved(
   moveInfo: chrome.tabs.OnMovedInfo,
 ): Promise<void> {
   // ピン留め操作時はonMoved→onUpdatedの順でイベントが発火し、TreeStateに未反映のため判定
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.pinned && tab.windowId !== undefined) {
-      const isPinnedInTreeState = treeStateManager.isPinnedTabInAnyView(tabId, tab.windowId);
-      if (!isPinnedInTreeState) {
-        treeStateManager.notifyStateChanged();
-        return;
-      }
-    }
-  } catch {
-    // タブが存在しない
+  const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(tabId));
+  if (tab?.pinned && !treeStateManager.isPinnedTabInAnyView(tabId, tab.windowId)) {
+    treeStateManager.notifyStateChanged();
+    return;
   }
 
-  try {
-    await treeStateManager.syncTreeStateToChromeTabs(moveInfo.windowId);
-  } catch {
-    // 同期失敗
-  }
+  await treeStateManager.syncTreeStateToChromeTabs(moveInfo.windowId);
   treeStateManager.notifyStateChanged();
 }
 
@@ -613,52 +529,40 @@ export async function handleTabUpdated(
   changeInfo: chrome.tabs.OnUpdatedInfo,
   tab: chrome.tabs.Tab,
 ): Promise<void> {
-  try {
-    if (changeInfo.title !== undefined && tab.title) {
-      titlePersistence.saveTitle(tabId, tab.title);
-    }
+  if (changeInfo.title !== undefined && tab.title) {
+    titlePersistence.saveTitle(tabId, tab.title);
+  }
 
-    if (changeInfo.favIconUrl !== undefined && changeInfo.favIconUrl !== null && changeInfo.favIconUrl !== '' && tab.url) {
-      try {
-        const storedFaviconsResult = await storageService.get(STORAGE_KEYS.TAB_FAVICONS);
-        const favicons = storedFaviconsResult ? { ...storedFaviconsResult } : {};
-        favicons[tab.url] = changeInfo.favIconUrl;
-        await storageService.set(STORAGE_KEYS.TAB_FAVICONS, favicons);
-      } catch {
-        // ファビコン保存失敗
-      }
-    }
+  if (changeInfo.favIconUrl && tab.url) {
+    const storedFavicons = await storageService.get(STORAGE_KEYS.TAB_FAVICONS);
+    await storageService.set(STORAGE_KEYS.TAB_FAVICONS, {
+      ...storedFavicons,
+      [tab.url]: changeInfo.favIconUrl,
+    });
+  }
 
-    if (changeInfo.pinned !== undefined && tab.windowId !== undefined) {
-      treeStateManager.updatePinnedStateFromChromeEvent(tabId, tab.windowId, changeInfo.pinned);
-    }
+  if (changeInfo.pinned !== undefined) {
+    treeStateManager.updatePinnedStateFromChromeEvent(tabId, tab.windowId, changeInfo.pinned);
+  }
 
-    if (
-      changeInfo.title !== undefined ||
-      changeInfo.url !== undefined ||
-      changeInfo.status !== undefined ||
-      changeInfo.favIconUrl !== undefined ||
-      changeInfo.discarded !== undefined ||
-      changeInfo.pinned !== undefined
-    ) {
-      treeStateManager.notifyStateChanged();
-    }
-  } catch {
-    // タブ更新処理失敗
+  if (
+    changeInfo.title !== undefined ||
+    changeInfo.url !== undefined ||
+    changeInfo.status !== undefined ||
+    changeInfo.favIconUrl !== undefined ||
+    changeInfo.discarded !== undefined ||
+    changeInfo.pinned !== undefined
+  ) {
+    treeStateManager.notifyStateChanged();
   }
 }
 
 async function handleTabActivated(activeInfo: chrome.tabs.OnActivatedInfo): Promise<void> {
-  try {
-    lastActiveTabByWindow.set(activeInfo.windowId, activeInfo.tabId);
+  lastActiveTabByWindow.set(activeInfo.windowId, activeInfo.tabId);
 
-    if (unreadTracker.isUnread(activeInfo.tabId)) {
-      await unreadTracker.markAsRead(activeInfo.tabId);
-
-      treeStateManager.notifyStateChanged();
-    }
-  } catch {
-    // タブアクティブ化処理失敗
+  if (unreadTracker.isUnread(activeInfo.tabId)) {
+    await unreadTracker.markAsRead(activeInfo.tabId);
+    treeStateManager.notifyStateChanged();
   }
 }
 
@@ -668,20 +572,18 @@ async function handleTabDetached(
   tabId: number,
   detachInfo: chrome.tabs.OnDetachedInfo,
 ): Promise<void> {
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.pinned) {
-      const oldWindowId = detachInfo.oldWindowId;
-      if (!detachedPinnedTabsByWindow.has(oldWindowId)) {
-        detachedPinnedTabsByWindow.set(oldWindowId, new Set());
-      }
-      detachedPinnedTabsByWindow.get(oldWindowId)!.add(tabId);
-    }
-
-    treeStateManager.notifyStateChanged();
-  } catch {
-    // タブが存在しない
+  const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(tabId));
+  if (!tab) {
+    return;
   }
+  if (tab.pinned) {
+    const oldWindowId = detachInfo.oldWindowId;
+    const detachedTabIds = detachedPinnedTabsByWindow.get(oldWindowId) ?? new Set<number>();
+    detachedTabIds.add(tabId);
+    detachedPinnedTabsByWindow.set(oldWindowId, detachedTabIds);
+  }
+
+  treeStateManager.notifyStateChanged();
 }
 
 async function handleTabAttached(
@@ -697,12 +599,8 @@ async function handleTabAttached(
     let parentInSameWindow = false;
 
     if (parentTabId !== null) {
-      try {
-        const parentTab = await chrome.tabs.get(parentTabId);
-        parentInSameWindow = parentTab.windowId === attachInfo.newWindowId;
-      } catch {
-        // 親タブが存在しない
-      }
+      const parentTab = await ignoreMissingTabOrWindow(chrome.tabs.get(parentTabId));
+      parentInSameWindow = parentTab?.windowId === attachInfo.newWindowId;
     }
 
     if (!parentInSameWindow) {
@@ -714,14 +612,12 @@ async function handleTabAttached(
 
   for (const [windowId, tabIds] of detachedPinnedTabsByWindow.entries()) {
     if (tabIds.has(tabId)) {
-      try {
-        await chrome.windows.get(windowId);
+      const sourceWindow = await ignoreMissingTabOrWindow(chrome.windows.get(windowId));
+      if (sourceWindow) {
         tabIds.delete(tabId);
         if (tabIds.size === 0) {
           detachedPinnedTabsByWindow.delete(windowId);
         }
-      } catch {
-        // ウィンドウが存在しない
       }
       break;
     }
@@ -742,28 +638,17 @@ async function handleWindowCreated(_window: chrome.windows.Window): Promise<void
 }
 
 async function handleWindowRemoved(windowId: number): Promise<void> {
-  try {
-    const pinnedTabsToClose = detachedPinnedTabsByWindow.get(windowId);
-    if (pinnedTabsToClose && pinnedTabsToClose.size > 0) {
-      const tabIds = Array.from(pinnedTabsToClose);
-      for (const tabId of tabIds) {
-        try {
-          await chrome.tabs.remove(tabId);
-        } catch {
-          // タブが既に閉じられている
-        }
-      }
-      detachedPinnedTabsByWindow.delete(windowId);
+  const pinnedTabsToClose = detachedPinnedTabsByWindow.get(windowId);
+  if (pinnedTabsToClose) {
+    for (const tabId of pinnedTabsToClose) {
+      await ignoreMissingTabOrWindow(chrome.tabs.remove(tabId));
     }
-
-    await treeStateManager.removeWindow(windowId);
-
-    await treeStateManager.syncTreeStateToChromeTabs();
-
-    treeStateManager.notifyStateChanged();
-  } catch {
-    // メッセージ送信失敗
+    detachedPinnedTabsByWindow.delete(windowId);
   }
+
+  await treeStateManager.removeWindow(windowId);
+  await treeStateManager.syncTreeStateToChromeTabs();
+  treeStateManager.notifyStateChanged();
 }
 
 function handleMessage(
@@ -1359,15 +1244,9 @@ async function handleCreateGroup(
     }
 
     const targetTabId = contextMenuTabId ?? tabIds[0];
-    let windowId: number | undefined;
-    let targetTabIndex: number | undefined;
-    try {
-      const targetTab = await chrome.tabs.get(targetTabId);
-      windowId = targetTab.windowId;
-      targetTabIndex = targetTab.index;
-    } catch {
-      // タブ情報取得失敗
-    }
+    const targetTab = await ignoreMissingTabOrWindow(chrome.tabs.get(targetTabId));
+    const windowId = targetTab?.windowId;
+    const targetTabIndex = targetTab?.index;
 
     const createOptions: chrome.tabs.CreateProperties = {
       url: `chrome-extension://${chrome.runtime.id}/group.html`,
@@ -1380,23 +1259,15 @@ async function handleCreateGroup(
       createOptions.index = targetTabIndex;
     }
 
-    isCreatingGroupTab = true;
     const groupTab = await chrome.tabs.create(createOptions);
 
     if (!groupTab.id) {
-      isCreatingGroupTab = false;
       sendResponse({
         success: false,
         error: 'Failed to create group tab',
       });
       return;
     }
-
-    pendingGroupTabIds.add(groupTab.id);
-    isCreatingGroupTab = false;
-
-    const groupPageUrl = `chrome-extension://${chrome.runtime.id}/group.html`;
-    await chrome.tabs.update(groupTab.id, { url: groupPageUrl });
 
     await treeStateManager.createGroupWithRealTab(groupTab.id, tabIds, groupName ?? 'グループ', windowId!, targetTabId);
 
@@ -1517,15 +1388,11 @@ async function handleDuplicateSubtree(
       }
     }
 
-    const newTabIds = Array.from(oldTabIdToNewTabId.values());
-    const maxIterations = 100;
-    for (let i = 0; i < maxIterations; i++) {
-      const allTabsInTree = newTabIds.every(tid =>
-        treeStateManager.getNodeByTabId(tid) !== null
-      );
-      if (allTabsInTree) break;
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+    await Promise.all(
+      Array.from(oldTabIdToNewTabId.values()).map((newTabId) =>
+        treeStateManager.waitForTabRegistration(newTabId),
+      ),
+    );
 
     const rootNode = subtree[0];
     const rootNewTabId = oldTabIdToNewTabId.get(rootNode.tabId);
@@ -1612,13 +1479,9 @@ async function discardTabsInBatches(
     const batch = tabIds.slice(i, i + batchSize);
     await Promise.all(
       batch.map(async (tabId) => {
-        try {
-          const tab = await chrome.tabs.get(tabId);
-          if (!tab.active && tab.status === 'complete') {
-            await chrome.tabs.discard(tabId);
-          }
-        } catch {
-          // タブが既に閉じられているか休止されている場合は無視
+        const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(tabId));
+        if (tab && !tab.active && tab.status === 'complete') {
+          await ignoreMissingTabOrWindow(chrome.tabs.discard(tabId));
         }
       })
     );
@@ -1726,11 +1589,7 @@ async function handleRestoreSnapshot(
     }
 
     for (const blankTabId of blankTabsToRemove) {
-      try {
-        await chrome.tabs.remove(blankTabId);
-      } catch {
-        // 既に閉じられている
-      }
+      await ignoreMissingTabOrWindow(chrome.tabs.remove(blankTabId));
     }
 
     await treeStateManager.restoreTreeStateFromSnapshot(
@@ -1741,11 +1600,9 @@ async function handleRestoreSnapshot(
       windowIndexToNewWindowId
     );
 
-    if (closeCurrentTabs && existingTabIds.length > 0) {
-      try {
-        await chrome.tabs.remove(existingTabIds);
-      } catch {
-        // タブ削除失敗
+    if (closeCurrentTabs) {
+      for (const existingTabId of existingTabIds) {
+        await ignoreMissingTabOrWindow(chrome.tabs.remove(existingTabId));
       }
     }
 
@@ -1756,11 +1613,10 @@ async function handleRestoreSnapshot(
 
     sendResponse({ success: true, data: null });
 
-    // 作成したタブを休止状態にする（メモリ節約）
-    const createdTabIds = Array.from(indexToNewTabId.values());
-    if (createdTabIds.length > 0) {
-      discardTabsInBatches(createdTabIds).catch(() => {});
-    }
+    // 作成したタブを休止状態にする（メモリ節約）。応答後に行うため、失敗は記録のみ
+    await discardTabsInBatches(Array.from(indexToNewTabId.values())).catch((error: unknown) => {
+      console.error('[handleRestoreSnapshot] Failed to discard restored tabs:', error);
+    });
   } catch (error) {
     isRestoringSnapshot = false;
     restoringTabIds.clear();
@@ -1825,15 +1681,11 @@ async function handlePinTabs(
   try {
     const tabsByWindow = new Map<number, number[]>();
     for (const tabId of tabIds) {
-      try {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab.windowId !== undefined) {
-          const windowTabs = tabsByWindow.get(tab.windowId) ?? [];
-          windowTabs.push(tabId);
-          tabsByWindow.set(tab.windowId, windowTabs);
-        }
-      } catch {
-        // タブが存在しない
+      const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(tabId));
+      if (tab) {
+        const windowTabs = tabsByWindow.get(tab.windowId) ?? [];
+        windowTabs.push(tabId);
+        tabsByWindow.set(tab.windowId, windowTabs);
       }
     }
 
@@ -1860,15 +1712,11 @@ async function handleUnpinTabs(
   try {
     const tabsByWindow = new Map<number, number[]>();
     for (const tabId of tabIds) {
-      try {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab.windowId !== undefined) {
-          const windowTabs = tabsByWindow.get(tab.windowId) ?? [];
-          windowTabs.push(tabId);
-          tabsByWindow.set(tab.windowId, windowTabs);
-        }
-      } catch {
-        // タブが存在しない
+      const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(tabId));
+      if (tab) {
+        const windowTabs = tabsByWindow.get(tab.windowId) ?? [];
+        windowTabs.push(tabId);
+        tabsByWindow.set(tab.windowId, windowTabs);
       }
     }
 
@@ -1963,13 +1811,9 @@ async function handleDiscardTabs(
     }
 
     for (const tabId of tabIds) {
-      try {
-        const tab = await chrome.tabs.get(tabId);
-        if (!tab.active) {
-          await chrome.tabs.discard(tabId);
-        }
-      } catch {
-        // タブが既に休止されている
+      const tab = await ignoreMissingTabOrWindow(chrome.tabs.get(tabId));
+      if (tab && !tab.active && !tab.discarded) {
+        await ignoreMissingTabOrWindow(chrome.tabs.discard(tabId));
       }
     }
 

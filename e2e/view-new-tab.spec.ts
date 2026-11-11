@@ -398,7 +398,7 @@ test.describe('ビューへの新規タブ追加', () => {
       await waitForCondition(
         async () => {
           const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; viewIndex: number }) => {
-            const treeState = (globalThis as unknown as { treeStateManager?: { toJSON: () => { windows: { windowId: number; views: { rootNodes: { tabId: number }[] }[] }[] } } }).treeStateManager?.toJSON();
+            const treeState = globalThis.treeStateManager?.toJSON();
             if (!treeState) return [];
             const windowState = treeState.windows.find(w => w.windowId === args.windowId);
             if (!windowState) return [];
@@ -414,6 +414,9 @@ test.describe('ビューへの新規タブ追加', () => {
         },
         { timeout: 5000, interval: 100, timeoutMessage: 'New tab was not added to TreeState view' }
       );
+      if (newTabId === undefined) {
+        throw new Error('New tab was not found in TreeState view');
+      }
 
       await assertTabStructure(sidePanelPage, windowId, [
         { tabId: newTabId, depth: 0 },

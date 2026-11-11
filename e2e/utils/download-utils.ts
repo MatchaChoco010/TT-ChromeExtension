@@ -127,8 +127,11 @@ export function findSnapshotFileByContent(downloadDir: string): string | null {
         ) {
           return filePath;
         }
-      } catch {
-        // JSONパースに失敗した場合は無視
+      } catch (error) {
+        // ダウンロード途中などでJSONとして読めないファイルはスナップショット候補から外す
+        if (!(error instanceof SyntaxError)) {
+          throw error;
+        }
       }
     }
   }

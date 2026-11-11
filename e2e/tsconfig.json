@@ -4,6 +4,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["./**/*"],
+  "include": ["./**/*", "../src/types/e2e-globals.d.ts"],
   "exclude": ["node_modules"]
 }

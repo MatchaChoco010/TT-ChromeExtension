@@ -8,31 +8,31 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    const initialTreeState: TreeState = {
+      windows: [
+        {
+          windowId: 1,
+          views: [
+            {
+              name: 'Default',
+              color: '#3b82f6',
+              rootNodes: [
+                { tabId: 1, isExpanded: true, children: [] },
+                { tabId: 2, isExpanded: true, children: [] },
+                { tabId: 3, isExpanded: true, children: [] },
+              ],
+              pinnedTabIds: [],
+            },
+          ],
+          activeViewIndex: 0,
+        },
+      ],
+    };
+
     global.chrome = {
       storage: {
         local: {
-          get: vi.fn().mockResolvedValue({
-            tree_state: {
-              windows: [
-                {
-                  windowId: 1,
-                  views: [
-                    {
-                      name: 'Default',
-                      color: '#3b82f6',
-                      rootNodes: [
-                        { tabId: 1, isExpanded: true, children: [] },
-                        { tabId: 2, isExpanded: true, children: [] },
-                        { tabId: 3, isExpanded: true, children: [] },
-                      ],
-                    },
-                  ],
-                  activeViewIndex: 0,
-                  pinnedTabIds: [],
-                },
-              ],
-            },
-          }),
+          get: vi.fn().mockResolvedValue({}),
           set: vi.fn().mockResolvedValue(undefined),
         },
         onChanged: {
@@ -41,7 +41,13 @@ describe('ドラッグ&ドロップによるツリー再構成', () => {
         },
       },
       runtime: {
-        sendMessage: vi.fn().mockResolvedValue(undefined),
+        sendMessage: vi.fn((message: { type: string }) =>
+          Promise.resolve(
+            message.type === 'GET_STATE'
+              ? { success: true, data: initialTreeState }
+              : { success: true, data: null },
+          ),
+        ),
         onMessage: {
           addListener: vi.fn(),
           removeListener: vi.fn(),

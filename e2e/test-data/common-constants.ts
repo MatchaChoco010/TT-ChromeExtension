@@ -45,7 +45,6 @@ export const COMMON_SELECTORS = {
   /** コンテキストメニュー（roleベース） */
   contextMenu: '[role="menu"]',
 
-  loadingText: 'text=Loading',
   reactRoot: '#root',
 } as const;
 

@@ -155,7 +155,7 @@ test.describe('新規タブ追加ボタン', () => {
       await waitForCondition(
         async () => {
           const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; excludeTabIds: number[] }) => {
-            const treeState = (globalThis as unknown as { treeStateManager?: { toJSON: () => { windows: { windowId: number; views: { rootNodes: { tabId: number }[] }[] }[] } } }).treeStateManager?.toJSON();
+            const treeState = globalThis.treeStateManager?.toJSON();
             if (!treeState) return [];
             const windowState = treeState.windows.find(w => w.windowId === args.windowId);
             if (!windowState) return [];
@@ -236,7 +236,7 @@ test.describe('新規タブ追加ボタン', () => {
       await waitForCondition(
         async () => {
           const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; excludeTabIds: number[] }) => {
-            const treeState = (globalThis as unknown as { treeStateManager?: { toJSON: () => { windows: { windowId: number; views: { rootNodes: { tabId: number }[] }[] }[] } } }).treeStateManager?.toJSON();
+            const treeState = globalThis.treeStateManager?.toJSON();
             if (!treeState) return [];
             const windowState = treeState.windows.find(w => w.windowId === args.windowId);
             if (!windowState) return [];

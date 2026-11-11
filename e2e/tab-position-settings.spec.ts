@@ -5,6 +5,7 @@ import { assertTabStructure } from './utils/assertion-utils';
 import { setupWindow } from './utils/setup-utils';
 import { COMMON_TIMEOUTS } from './test-data/common-constants';
 import type { Page, Worker as PlaywrightWorker } from '@playwright/test';
+import type { UserSettings } from '../src/types';
 
 async function openSettingsPage(
   extensionContext: import('@playwright/test').BrowserContext,
@@ -36,7 +37,7 @@ async function waitForSettingsSaved(
   await waitForCondition(
     async () => {
       const settings = await serviceWorker.evaluate(async () => {
-        const result = await chrome.storage.local.get('user_settings');
+        const result = await chrome.storage.local.get<{ user_settings?: Partial<UserSettings> }>('user_settings');
         return result.user_settings;
       });
       return settings?.[settingKey] === expectedValue;
@@ -464,7 +465,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await waitForCondition(
         async () => {
           const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; excludeTabId: number }) => {
-            const treeState = (globalThis as unknown as { treeStateManager?: { toJSON: () => { windows: { windowId: number; views: { rootNodes: { tabId: number }[] }[] }[] } } }).treeStateManager?.toJSON();
+            const treeState = globalThis.treeStateManager?.toJSON();
             if (!treeState) return [];
             const windowState = treeState.windows.find(w => w.windowId === args.windowId);
             if (!windowState) return [];
@@ -532,7 +533,7 @@ test.describe('タブ位置とタイトル表示のE2Eテスト', () => {
       await waitForCondition(
         async () => {
           const tabIds = await serviceWorker.evaluate(async (args: { windowId: number; excludeTabId: number }) => {
-            const treeState = (globalThis as unknown as { treeStateManager?: { toJSON: () => { windows: { windowId: number; views: { rootNodes: { tabId: number }[] }[] }[] } } }).treeStateManager?.toJSON();
+            const treeState = globalThis.treeStateManager?.toJSON();
             if (!treeState) return [];
             const windowState = treeState.windows.find(w => w.windowId === args.windowId);
             if (!windowState) return [];

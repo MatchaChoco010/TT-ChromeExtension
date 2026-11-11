@@ -24,7 +24,7 @@ export interface MockTabsEvents {
 }
 
 export interface MockTabs {
-  get: Mock<(tabId: number) => Promise<chrome.tabs.Tab | null>>;
+  get: Mock<(tabId: number) => Promise<chrome.tabs.Tab>>;
   query: Mock<(queryInfo: chrome.tabs.QueryInfo) => Promise<chrome.tabs.Tab[]>>;
   update: Mock<(tabId: number, updateProperties: chrome.tabs.UpdateProperties) => Promise<chrome.tabs.Tab | null>>;
   move: Mock<(tabIds: number | number[], moveProperties: chrome.tabs.MoveProperties) => Promise<chrome.tabs.Tab | chrome.tabs.Tab[]>>;
@@ -102,25 +102,4 @@ export type MessageListener = (
 
 export function getMockChrome(): MockChrome {
   return globalThis.chrome as unknown as MockChrome;
-}
-
-export function getMockedFn<T extends (...args: unknown[]) => unknown>(fn: T): Mock<T> {
-  return fn as unknown as Mock<T>;
-}
-
-export interface MockSnapshotManager {
-  getSnapshots: Mock<() => Promise<import('@/types').Snapshot[]>>;
-  createSnapshot: Mock<(name: string, isAutoSave?: boolean) => Promise<import('@/types').Snapshot>>;
-  restoreSnapshot: Mock<(snapshotId: string) => Promise<void>>;
-  deleteSnapshot: Mock<(snapshotId: string) => Promise<void>>;
-  exportSnapshot: Mock<(snapshotId: string) => Promise<string>>;
-  importSnapshot: Mock<(jsonData: string) => Promise<import('@/types').Snapshot>>;
-}
-
-export interface MockIndexedDBService {
-  deleteOldSnapshots: Mock<(keepCount: number) => Promise<void>>;
-  saveSnapshot?: Mock<(snapshot: import('@/types').Snapshot) => Promise<void>>;
-  getSnapshot?: Mock<(id: string) => Promise<import('@/types').Snapshot | null>>;
-  getAllSnapshots?: Mock<() => Promise<import('@/types').Snapshot[]>>;
-  deleteSnapshot?: Mock<(id: string) => Promise<void>>;
 }

@@ -3,28 +3,21 @@ import {
   registerWindowEventListeners,
   registerMessageListener,
   registerWebNavigationListeners,
-  trackHandler,
 } from './event-handlers';
 
 import { testTreeStateManager, testUnreadTracker, testSnapshotManager } from './event-handlers';
 
 import { storageService, STORAGE_KEYS } from '@/storage';
 import type { UserSettings } from '@/types';
+import { sendMessageToExtensionPages } from '@/utils/chrome-errors';
 
 const snapshotManager = testSnapshotManager;
 
 async function initializeAutoSnapshot(): Promise<void> {
-  try {
-    const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
-    if (settings) {
-      const interval = settings.autoSnapshotInterval ?? 0;
-
-      if (interval > 0) {
-        snapshotManager.startAutoSnapshot(interval);
-      }
-    }
-  } catch {
-    // 初期化失敗時は自動スナップショット機能が動作しないだけで致命的ではない
+  const settings = await storageService.get(STORAGE_KEYS.USER_SETTINGS);
+  const interval = settings?.autoSnapshotInterval ?? 0;
+  if (interval > 0) {
+    snapshotManager.startAutoSnapshot(interval);
   }
 }
 
@@ -49,8 +42,8 @@ function startPeriodicPersist(): void {
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === PERIODIC_PERSIST_ALARM_NAME) {
-      testTreeStateManager.refreshTreeStructure().catch(() => {
-        // 定期永続化失敗は次回のアラームで再試行されるため無視
+      testTreeStateManager.refreshTreeStructure().catch((error: unknown) => {
+        console.error('[service-worker] Periodic persist failed:', error);
       });
     }
   });
@@ -71,10 +64,6 @@ async function markInitializedInCurrentBrowserSession(): Promise<void> {
   await chrome.storage.session.set({ [BROWSER_SESSION_MARKER_KEY]: true });
 }
 
-// 全ての初期化処理はSW IIFEで行う（競合状態を防ぐため）
-chrome.runtime.onInstalled.addListener((_details) => {
-});
-
 (async () => {
   try {
     const hasExistingState = await testTreeStateManager.hasPersistedState();
@@ -89,7 +78,7 @@ chrome.runtime.onInstalled.addListener((_details) => {
       testTreeStateManager.notifyStateChanged();
       await initializeAutoSnapshot();
       startPeriodicPersist();
-      chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+      await sendMessageToExtensionPages({ type: 'STATE_UPDATED' });
       return;
     }
 
@@ -114,7 +103,7 @@ chrome.runtime.onInstalled.addListener((_details) => {
 
     testUnreadTracker.setInitialLoadComplete();
 
-    chrome.runtime.sendMessage({ type: 'STATE_UPDATED' }).catch(() => {});
+    await sendMessageToExtensionPages({ type: 'STATE_UPDATED' });
   } catch (error) {
     console.error('[service-worker] Initialization failed:', error);
   }
@@ -126,15 +115,3 @@ registerWebNavigationListeners();
 registerMessageListener();
 
 registerSettingsChangeListener();
-
-chrome.action.onClicked.addListener(() => {
-  trackHandler(async () => {
-    try {
-      const settingsUrl = chrome.runtime.getURL('settings.html');
-      await chrome.tabs.create({ url: settingsUrl });
-    } catch {
-      // タブ作成失敗時はユーザーに設定画面が開かないだけで致命的ではない
-    }
-  });
-});
-

@@ -581,7 +581,7 @@ describe('複数タブのグループ化機能', () => {
       if (tabId === 1) return createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example1.com' });
       if (tabId === 2) return createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
       if (tabId === 3) return createMockTab({ id: 3, index: 2, windowId: 1, url: 'https://example3.com' });
-      return null;
+      return createMockTab({ id: tabId });
     });
     (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue(createMockTab({
       id: groupTabId,
@@ -658,7 +658,7 @@ describe('複数タブのグループ化機能', () => {
     (chromeMock.tabs.get as ReturnType<typeof vi.fn>).mockImplementation(async (tabId: number) => {
       if (tabId === 1) return createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example1.com' });
       if (tabId === 2) return createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
-      return null;
+      return createMockTab({ id: tabId });
     });
     (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue(createMockTab({
       id: groupTabId,
@@ -731,6 +731,7 @@ describe('空ウィンドウの自動クローズ', () => {
   beforeEach(() => {
     chromeMock.clearAllListeners();
     vi.clearAllMocks();
+    testTreeStateManager.resetForTesting();
   });
 
   afterEach(() => {

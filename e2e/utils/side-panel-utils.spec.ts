@@ -10,8 +10,8 @@ import { assertTabStructure } from './assertion-utils';
 import { setupWindow } from './setup-utils';
 
 test.describe('SidePanelUtils', () => {
-  test('openSidePanelはSide Panelを開く', async ({ extensionContext, extensionId }) => {
-    const page = await openSidePanel(extensionContext, extensionId);
+  test('openSidePanelはSide Panelを開く', async ({ extensionContext, serviceWorker, extensionId }) => {
+    const page = await openSidePanel(extensionContext, serviceWorker, extensionId);
 
     expect(page).toBeDefined();
     expect(page.url()).toContain('sidepanel.html');

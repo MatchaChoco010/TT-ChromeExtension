@@ -10,6 +10,7 @@ const mockStorageService = {
 
 const mockChrome = {
   tabs: {
+    get: vi.fn((tabId: number) => Promise.resolve(createMockTab({ id: tabId }))),
     query: vi.fn(),
     onCreated: { addListener: vi.fn() },
     onRemoved: { addListener: vi.fn() },
