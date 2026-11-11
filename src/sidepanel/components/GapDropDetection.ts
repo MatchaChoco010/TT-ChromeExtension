@@ -304,34 +304,6 @@ export function calculateDropTarget(
 }
 
 /**
- * タブの高さからドロップインジケーターのY座標を計算する
- *
- * @param gapIndex - 隙間のインデックス
- * @param tabPositions - タブノードの位置情報配列
- * @returns ドロップインジケーターのY座標
- */
-export function calculateIndicatorY(
-  gapIndex: number,
-  tabPositions: TabPosition[]
-): number {
-  if (tabPositions.length === 0) {
-    return 0;
-  }
-
-  if (gapIndex === 0) {
-    return tabPositions[0].top;
-  }
-
-  if (gapIndex >= tabPositions.length) {
-    return tabPositions[tabPositions.length - 1].bottom;
-  }
-
-  const aboveTab = tabPositions[gapIndex - 1];
-  const belowTab = tabPositions[gapIndex];
-  return (aboveTab.bottom + belowTab.top) / 2;
-}
-
-/**
  * ノードIDを使ってドロップインジケーターのY座標を計算する
  * ドラッグ中のノードを含む元のtabPositionsを使用することで、
  * プレースホルダーが正しい視覚的位置に表示される

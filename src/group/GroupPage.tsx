@@ -7,11 +7,10 @@ type PageState =
   | { status: 'error'; message: string }
   | { status: 'loaded'; groupInfo: GroupDetails };
 
-const POLLING_INTERVAL_MS = 2000;
-
 export const GroupPage: React.FC = () => {
   const [state, setState] = useState<PageState>({ status: 'loading' });
   const [tabId, setTabId] = useState<number | null>(null);
+  const [reloadRequestCount, setReloadRequestCount] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -26,36 +25,41 @@ export const GroupPage: React.FC = () => {
     });
   }, []);
 
-  const loadGroupInfo = useCallback(async () => {
-    if (!tabId) {
+  useEffect(() => {
+    if (tabId === null) {
       return;
     }
 
-    try {
-      const groupInfo = await sendServiceWorkerRequest('GET_GROUP_INFO', { tabId });
-      setState({ status: 'loaded', groupInfo });
-    } catch {
-      setState({
-        status: 'error',
-        message: 'グループ情報の取得に失敗しました',
-      });
-    }
-  }, [tabId]);
+    let isLatestRequest = true;
+    const loadGroupInfo = (): void => {
+      sendServiceWorkerRequest('GET_GROUP_INFO', { tabId })
+        .then((groupInfo) => {
+          if (isLatestRequest) {
+            setState({ status: 'loaded', groupInfo });
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to load group info:', error);
+          if (isLatestRequest) {
+            setState({ status: 'error', message: 'グループ情報の取得に失敗しました' });
+          }
+        });
+    };
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // グループ名や子タブのタイトルが変わるとService WorkerがSTATE_UPDATEDを送るので、その都度読み直す
+    const handleMessage = (message: { type?: string }): void => {
+      if (message.type === 'STATE_UPDATED') {
+        loadGroupInfo();
+      }
+    };
+
     loadGroupInfo();
-  }, [loadGroupInfo]);
-
-  useEffect(() => {
-    if (state.status !== 'loaded') return;
-
-    const intervalId = setInterval(() => {
-      loadGroupInfo();
-    }, POLLING_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
-  }, [state.status, loadGroupInfo]);
+    chrome.runtime.onMessage.addListener(handleMessage);
+    return () => {
+      isLatestRequest = false;
+      chrome.runtime.onMessage.removeListener(handleMessage);
+    };
+  }, [tabId, reloadRequestCount]);
 
   const handleStartEdit = useCallback(() => {
     if (state.status === 'loaded') {
@@ -72,12 +76,11 @@ export const GroupPage: React.FC = () => {
 
     try {
       await sendServiceWorkerRequest('UPDATE_GROUP_NAME', { tabId, name: editedTitle.trim() });
-      await loadGroupInfo();
     } catch (error) {
       console.error('Failed to save group name:', error);
     }
     setIsEditing(false);
-  }, [state, editedTitle, loadGroupInfo, tabId]);
+  }, [state, editedTitle, tabId]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -107,7 +110,7 @@ export const GroupPage: React.FC = () => {
       <div className="group-page min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-4">
         <div className="text-red-400">{state.message}</div>
         <button
-          onClick={loadGroupInfo}
+          onClick={() => setReloadRequestCount((count) => count + 1)}
           className="px-4 py-2 bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
         >
           再試行

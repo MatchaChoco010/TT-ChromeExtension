@@ -11,6 +11,7 @@ import type {
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import { ignoreMissingTabOrWindow, sendMessageToExtensionPages } from '@/utils/chrome-errors';
 import { isSidePanelUrl } from '@/utils/extension-urls';
+import { collectTabIds, flattenTabNodes } from '@/utils/tab-tree';
 import { ChromeTabSynchronizer } from './ChromeTabSynchronizer';
 
 /**
@@ -219,15 +220,6 @@ export class TreeStateManager {
     const viewState = windowState.views[vi];
     if (!viewState) return [];
 
-    const collectTabIds = (nodes: TabNode[]): number[] => {
-      const result: number[] = [];
-      for (const node of nodes) {
-        result.push(node.tabId);
-        result.push(...collectTabIds(node.children));
-      }
-      return result;
-    };
-
     return [...viewState.pinnedTabIds, ...collectTabIds(viewState.rootNodes)];
   }
 
@@ -410,10 +402,7 @@ export class TreeStateManager {
       const siblings = parent ? parent.children : viewState.rootNodes;
       siblings.splice(nodeIndex, 1, ...node.children);
     } else if (childTabBehavior === 'close_all') {
-      const collectTabIds = (n: TabNode): number[] => {
-        return [n.tabId, ...n.children.flatMap(collectTabIds)];
-      };
-      closedTabIds.push(...node.children.flatMap(collectTabIds));
+      closedTabIds.push(...collectTabIds(node.children));
       const siblings = parent ? parent.children : viewState.rootNodes;
       siblings.splice(nodeIndex, 1);
     }
@@ -971,16 +960,12 @@ export class TreeStateManager {
     const newWindow = await chrome.windows.create({ tabId: nodesToMove[0].tabId });
     if (!newWindow || newWindow.id === undefined) return undefined;
 
-    const collectTabIds = (node: TabNode): number[] => {
-      return [node.tabId, ...node.children.flatMap(collectTabIds)];
-    };
-
     for (let i = 0; i < nodesToMove.length; i++) {
       // 最初のノードは子のみ移動（自身はwindows.createで移動済み）、残りは自身と子を全て移動
       const tabIdsToMove =
         i === 0
-          ? nodesToMove[0].children.flatMap(collectTabIds)
-          : collectTabIds(nodesToMove[i]);
+          ? collectTabIds(nodesToMove[0].children)
+          : collectTabIds([nodesToMove[i]]);
       for (const tid of tabIdsToMove) {
         await ignoreMissingTabOrWindow(chrome.tabs.move(tid, { windowId: newWindow.id, index: -1 }));
       }
@@ -1800,16 +1785,7 @@ export class TreeStateManager {
         .filter((t) => t.id !== undefined && !t.pinned)
         .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 
-      const flattenNodes: TabNode[] = [];
-      const flattenInNodes = (nodes: TabNode[]): void => {
-        for (const node of nodes) {
-          flattenNodes.push(node);
-          flattenInNodes(node.children);
-        }
-      };
-      for (const viewState of windowState.views) {
-        flattenInNodes(viewState.rootNodes);
-      }
+      const flattenNodes = windowState.views.flatMap((viewState) => flattenTabNodes(viewState.rootNodes));
 
       let chromeIndex = 0;
       for (let treeIndex = 0; treeIndex < flattenNodes.length; treeIndex++) {
@@ -1850,12 +1826,7 @@ export class TreeStateManager {
    * ブラウザ再起動後はtabIdが変わるため、インデックスベースでマッチングを行う
    */
   private async rebuildTabIds(): Promise<void> {
-    const sidePanelUrlPrefix = `chrome-extension://${chrome.runtime.id}/sidepanel.html`;
-
-    const isSidePanelTab = (tab: chrome.tabs.Tab): boolean => {
-      const url = tab.url || tab.pendingUrl || '';
-      return url === sidePanelUrlPrefix || url.startsWith(`${sidePanelUrlPrefix}?`);
-    };
+    const isSidePanelTab = (tab: chrome.tabs.Tab): boolean => isSidePanelUrl(tab.url || tab.pendingUrl);
 
     for (const windowState of this.windows) {
       const windowTabs = await chrome.tabs.query({ windowId: windowState.windowId });
@@ -1886,16 +1857,7 @@ export class TreeStateManager {
         .filter((t) => t.id !== undefined && !t.pinned)
         .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 
-      const flattenNodes: TabNode[] = [];
-      const flattenInNodes = (nodes: TabNode[]): void => {
-        for (const node of nodes) {
-          flattenNodes.push(node);
-          flattenInNodes(node.children);
-        }
-      };
-      for (const viewState of windowState.views) {
-        flattenInNodes(viewState.rootNodes);
-      }
+      const flattenNodes = windowState.views.flatMap((viewState) => flattenTabNodes(viewState.rootNodes));
 
       // sidepanelタブに対応するノードを特定してTreeStateから削除
       const sidepanelNodeTabIds: number[] = [];
@@ -1910,16 +1872,7 @@ export class TreeStateManager {
         this.removeTabFromTree(tabId, 'close_all');
       }
 
-      const cleanFlattenNodes: TabNode[] = [];
-      const flattenClean = (nodes: TabNode[]): void => {
-        for (const node of nodes) {
-          cleanFlattenNodes.push(node);
-          flattenClean(node.children);
-        }
-      };
-      for (const viewState of windowState.views) {
-        flattenClean(viewState.rootNodes);
-      }
+      const cleanFlattenNodes = windowState.views.flatMap((viewState) => flattenTabNodes(viewState.rootNodes));
 
       const chromeNonPinnedTabs = chromeAllNonPinned.filter((t) => !isSidePanelTab(t));
 

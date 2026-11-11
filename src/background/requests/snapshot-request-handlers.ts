@@ -8,9 +8,7 @@ import { trackHandler } from '../handler-tracking';
 import { isSidePanelUrl } from '@/utils/extension-urls';
 
 export async function handleCreateSnapshot(): Promise<void> {
-  const timestamp = new Date().toLocaleString();
-  const name = `Manual Snapshot - ${timestamp}`;
-  await snapshotManager.createSnapshot(name, false);
+  await snapshotManager.createManualSnapshot();
 }
 
 /**

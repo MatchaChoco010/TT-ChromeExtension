@@ -15,6 +15,10 @@ import { STORAGE_KEYS } from '@/storage/StorageService';
  * セッションスナップショットの保存を担当するサービス
  * スナップショットはchrome.downloads APIでJSONファイルとしてダウンロードフォルダに保存
  */
+function formatSnapshotTimestamp(date: Date): string {
+  return `${date.toISOString().split('T')[0]} ${date.toLocaleTimeString()}`;
+}
+
 export class SnapshotManager {
   private static readonly SNAPSHOT_ID_PREFIX = 'snapshot-';
   private static readonly AUTO_SNAPSHOT_ALARM_NAME = 'auto-snapshot';
@@ -229,9 +233,11 @@ export class SnapshotManager {
   }
 
   async createAutoSnapshot(): Promise<Snapshot> {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const name = `Auto Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
-    return this.createSnapshot(name, true);
+    return this.createSnapshot(`Auto Snapshot - ${formatSnapshotTimestamp(new Date())}`, true);
+  }
+
+  async createManualSnapshot(): Promise<Snapshot> {
+    return this.createSnapshot(`Manual Snapshot - ${formatSnapshotTimestamp(new Date())}`, false);
   }
 
 }

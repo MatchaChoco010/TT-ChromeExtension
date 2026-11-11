@@ -33,11 +33,11 @@ Vivaldi-TTは、Vivaldiブラウザ向けのツリー型タブマネージャー
 
 # Technology Stack
 
-- **Language**: TypeScript 5.5+ (strict mode)
-- **Framework**: React 18
+- **Language**: TypeScript 6.0 (strict mode)
+- **Framework**: React 19
 - **Runtime**: Chrome Extensions API (Manifest V3)
-- **Build**: Vite 5 + @crxjs/vite-plugin
-- **Styling**: Tailwind CSS 3
+- **Build**: Vite 8 + @crxjs/vite-plugin
+- **Styling**: Tailwind CSS 4
 - **Test**: Vitest + React Testing Library、Playwright（E2E）
 
 ---
@@ -185,7 +185,8 @@ TreeStateManager
 **タブイベント処理**:
 - リンククリック検出: `chrome.webNavigation.onCreatedNavigationTarget`で「リンクから開いたタブ」と「手動で開いたタブ」を区別
 - タブ休止時のtabId変更: `chrome.tabs.onReplaced`で検知し、TreeStateManagerで置換
-- Chrome再起動時: `isRestoringState`フラグでセッション復元中のタブイベントを抑制
+- Service Worker起動時: `chrome.storage.session`の印でブラウザ再起動かService Workerの再起動かを判定する。tabIdを付け直すのはブラウザ再起動時のみで、その復元中に作成されたタブのイベントは抑制する
+- イベント・メッセージハンドラーは`handler-tracking.ts`経由で実行し、初期化完了まで待ってから状態に触れる
 
 **ストレージ**:
 - `chrome.storage.local`使用（`unlimitedStorage`権限）
@@ -193,7 +194,7 @@ TreeStateManager
 - 想定最大タブ数: 2500
 
 **サイドパネルタブ除外**:
-- `isOwnExtensionUrl()` + `isSidePanelUrl()`で判定
+- `src/utils/extension-urls.ts`の`isSidePanelUrl()`で判定
 - TreeStateに追加しない（E2Eテストでの擬似サイドパネル対応のため）
 
 ## E2Eテスト実行時の結果確認（必須）

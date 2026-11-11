@@ -1,8 +1,5 @@
 import React, { useState, useRef } from 'react';
 import type { UserSettings } from '@/types';
-import { SnapshotManager } from '@/services/SnapshotManager';
-import { downloadService } from '@/storage/DownloadService';
-import { storageService } from '@/storage/StorageService';
 import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
 interface SettingsPanelProps {
@@ -20,15 +17,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const snapshotManager = new SnapshotManager(downloadService, storageService);
-
   const handleCreateSnapshot = async () => {
     try {
       setIsProcessing(true);
       setStatusMessage(null);
-      const timestamp = new Date().toLocaleString();
-      const name = `Manual Snapshot - ${timestamp}`;
-      await snapshotManager.createSnapshot(name, false);
+      await sendServiceWorkerRequest('CREATE_SNAPSHOT');
       setStatusMessage('スナップショットを保存しました');
       setTimeout(() => setStatusMessage(null), 3000);
     } catch (error) {

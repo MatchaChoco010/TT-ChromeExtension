@@ -43,38 +43,34 @@ export interface GroupNameModalProps {
   onClose: () => void;
 }
 
-export const GroupNameModal: React.FC<GroupNameModalProps> = ({
-  isOpen,
+export const GroupNameModal: React.FC<GroupNameModalProps> = ({ isOpen, ...dialogProps }) =>
+  isOpen ? <GroupNameDialog {...dialogProps} /> : null;
+
+/**
+ * 開いている間だけマウントされ、開くたびに既定のグループ名から入力を始める
+ */
+const GroupNameDialog: React.FC<Omit<GroupNameModalProps, 'isOpen'>> = ({
   tabTitles,
   onSave,
   onClose,
 }) => {
-  const defaultName = getDefaultGroupTitle(tabTitles);
-  const [name, setName] = useState(defaultName);
+  const [name, setName] = useState(() => getDefaultGroupTitle(tabTitles));
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      const newDefaultName = getDefaultGroupTitle(tabTitles);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setName(newDefaultName);
-      setTimeout(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      }, 0);
-    }
-  }, [isOpen, tabTitles]);
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!isOpen) return;
       if (event.key === 'Escape') {
         onClose();
       } else if (event.key === 'Enter') {
         onSave(name.trim() || 'グループ');
       }
     },
-    [isOpen, onClose, onSave, name]
+    [onClose, onSave, name]
   );
 
   useEffect(() => {
@@ -93,10 +89,6 @@ export const GroupNameModal: React.FC<GroupNameModalProps> = ({
       onClose();
     }
   };
-
-  if (!isOpen) {
-    return null;
-  }
 
   return (
     <div

@@ -5,6 +5,7 @@ import { getVivaldiInternalPageTitle } from '@/utils/vivaldi-internal-pages';
 import { useLatestRequestGuard } from '../hooks/useLatestRequestGuard';
 import { sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 import { isMissingTabOrWindowError } from '@/utils/chrome-errors';
+import { collectTabIds } from '@/utils/tab-tree';
 
 interface TreeStateContextType {
   treeState: TreeState | null;
@@ -326,19 +327,9 @@ export const TreeStateProvider: React.FC<TreeStateProviderProps> = ({
     const targetViewState = windowState.views[viewIndex];
     if (!targetViewState) return;
 
-    const collectTabIds = (nodes: TabNode[]): number[] => {
-      const result: number[] = [];
-      for (const node of nodes) {
-        const tabInfo = tabInfoMap[node.tabId];
-        if (tabInfo && tabInfo.windowId === currentWindowId) {
-          result.push(node.tabId);
-        }
-        result.push(...collectTabIds(node.children));
-      }
-      return result;
-    };
-
-    const viewTabs = collectTabIds(targetViewState.rootNodes);
+    const viewTabs = collectTabIds(targetViewState.rootNodes).filter(
+      (tabId) => tabInfoMap[tabId]?.windowId === currentWindowId,
+    );
 
     if (viewTabs.length > 0) {
       await sendServiceWorkerRequest('ACTIVATE_TAB', { tabId: viewTabs[0] });

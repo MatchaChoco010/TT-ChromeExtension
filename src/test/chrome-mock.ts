@@ -3,8 +3,7 @@ import { vi } from 'vitest';
 /**
  * Generic callback function type for Chrome API events.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type GenericCallback = (...args: any[]) => unknown;
+type GenericCallback = (...args: never[]) => unknown;
 
 interface MockListener<T extends GenericCallback> {
   callback: T;

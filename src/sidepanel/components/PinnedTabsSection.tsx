@@ -156,11 +156,6 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
   items,
   containerRef,
 }) => {
-  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
-    // eslint-disable-next-line react-hooks/immutability -- propsで渡されたrefへの設定は意図的
-    (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-  }, [containerRef]);
-
   const handleDragEnd = useCallback(async (itemId: string, dropTarget: { type: string; insertIndex?: number } | null): Promise<void> => {
     if (!dropTarget || dropTarget.type !== DropTargetType.HorizontalGap || !onPinnedTabReorder) {
       return;
@@ -242,7 +237,7 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
   return (
     <>
       <div
-        ref={setContainerRef}
+        ref={containerRef}
         data-testid="pinned-tabs-section"
         className="relative flex flex-wrap gap-1 p-2"
       >

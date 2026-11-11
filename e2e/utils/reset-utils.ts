@@ -2,31 +2,19 @@ import type { BrowserContext, Worker } from '@playwright/test';
 import { waitForWindowClosed } from './polling-utils';
 
 /**
- * Service Worker evaluateをタイムアウト付きで実行する
- *
- * 任意の引数を渡せる必要があるため、anyを使用する
+ * リセット処理の各ステップをタイムアウト付きで待つ
+ * @throws 時間内に完了しない場合
  */
-async function evaluateWithTimeout<T>(
-  serviceWorker: Worker,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fn: (() => Promise<T>) | ((arg: any) => Promise<T>),
-  timeoutMs: number,
-  stepName: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  arg?: any
-): Promise<T> {
-  const evaluatePromise = arg !== undefined
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? serviceWorker.evaluate(fn as (arg: any) => Promise<T>, arg)
-    : serviceWorker.evaluate(fn as () => Promise<T>);
-
-  const result = await Promise.race([
-    evaluatePromise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Step "${stepName}" timed out after ${timeoutMs}ms`)), timeoutMs)
-    ),
-  ]);
-  return result as T;
+async function withTimeout<T>(step: Promise<T>, timeoutMs: number, stepName: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Step "${stepName}" timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([step, timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -42,25 +30,23 @@ export async function resetExtensionState(
   _extensionContext: BrowserContext
 ): Promise<void> {
   // Step 1: 前のテストからのリセット準備（ハンドラー待機）
-  await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
+  await withTimeout(
+    serviceWorker.evaluate(async () => {
       await globalThis.prepareForReset();
-    },
+    }),
     10000,
     'prepareForReset'
   );
 
   // Step 2: ストレージをクリア
-  await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
+  await withTimeout(
+    serviceWorker.evaluate(async () => {
       await chrome.storage.local.clear();
 
       if (chrome.storage.session) {
         await chrome.storage.session.clear();
       }
-    },
+    }),
     10000,
     'clearStorage'
   );
@@ -68,15 +54,14 @@ export async function resetExtensionState(
   // Step 3: メモリ上の状態をクリアし、initialized = trueにする
   // resetForTesting()を使用することで、通常のイベントハンドリングが有効になり、
   // 後続のウィンドウ/タブ作成時にhandleTabCreatedでTreeStateにタブが追加される
-  await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
+  await withTimeout(
+    serviceWorker.evaluate(async () => {
       globalThis.treeStateManager.resetForTesting();
 
       globalThis.pendingTabParents.clear();
       globalThis.pendingDuplicateSources.clear();
       globalThis.pendingLinkClicks.clear();
-    },
+    }),
     10000,
     'clearMemoryState'
   );
@@ -84,23 +69,21 @@ export async function resetExtensionState(
   // Step 4: 新しいクリーンなウィンドウを作成
   // initialized = trueなので、handleWindowCreatedとhandleTabCreatedが通常通り動作し、
   // TreeStateにウィンドウとタブが追加される
-  const newWindowId = await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
+  const newWindowId = await withTimeout(
+    serviceWorker.evaluate(async () => {
       const newWindow = await chrome.windows.create({ focused: true });
       if (newWindow?.id === undefined) {
         throw new Error('Failed to create window');
       }
       return newWindow.id;
-    },
+    }),
     10000,
     'createCleanWindow'
   );
 
   // Step 5: 新しいウィンドウ以外のすべてのウィンドウを閉じる
-  const windowsToClose = await evaluateWithTimeout(
-    serviceWorker,
-    async (keepWindowId: number) => {
+  const windowsToClose = await withTimeout(
+    serviceWorker.evaluate(async (keepWindowId: number) => {
       const windows = await chrome.windows.getAll();
       const closeIds: number[] = [];
       for (const window of windows) {
@@ -115,10 +98,9 @@ export async function resetExtensionState(
         }
       }
       return closeIds;
-    },
+    }, newWindowId),
     10000,
-    'closeOtherWindows',
-    newWindowId
+    'closeOtherWindows'
   );
 
   for (const windowId of windowsToClose) {
@@ -126,19 +108,17 @@ export async function resetExtensionState(
   }
 
   // Step 6: タブ・ウィンドウ削除のハンドラー完了を待機
-  await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
+  await withTimeout(
+    serviceWorker.evaluate(async () => {
       await globalThis.prepareForReset();
-    },
+    }),
     10000,
     'prepareForReset2'
   );
 
   // Step 7: デフォルト設定を書き込む
-  await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
+  await withTimeout(
+    serviceWorker.evaluate(async () => {
       await chrome.storage.local.set({
         user_settings: {
           fontSize: 14,
@@ -154,21 +134,20 @@ export async function resetExtensionState(
           childTabBehavior: 'promote',
         },
       });
-    },
+    }),
     10000,
     'setDefaultSettings'
   );
 
   // Step 8: initializedがtrueであることを検証
-  const initStatus = await evaluateWithTimeout(
-    serviceWorker,
-    async () => {
+  const initStatus = await withTimeout(
+    serviceWorker.evaluate(async () => {
       const treeStateManager = globalThis.treeStateManager;
       return {
         initialized: treeStateManager?.isInitialized() ?? false,
         initializationInProgress: treeStateManager?.isInitializationInProgress() ?? false,
       };
-    },
+    }),
     5000,
     'verifyInitialized'
   );

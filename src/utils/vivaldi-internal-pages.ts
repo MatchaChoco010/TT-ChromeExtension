@@ -34,9 +34,3 @@ function capitalizeFirst(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-export function isVivaldiInternalPage(url: string): boolean {
-  return (
-    url.includes('mpognobbkildjkofajifpdfhcoklimli') ||
-    url.includes('vivaldi-webui')
-  );
-}

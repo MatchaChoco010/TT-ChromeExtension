@@ -2,8 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import type { View } from '@/types';
 import { useViewportClampedPlacement } from '../hooks/useViewportClampedPlacement';
 
-export type ViewMenuAction = 'edit' | 'delete';
-
 export interface ViewContextMenuProps {
   view: View;
   position: { x: number; y: number };

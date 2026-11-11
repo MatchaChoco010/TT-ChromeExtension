@@ -440,29 +440,6 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     };
   }, []);
 
-  // クロスウィンドウドラッグ終了時に元ウィンドウのドラッグ状態をクリーンアップ
-  useEffect(() => {
-    const handleMessage = (message: { type: string }) => {
-      if (message.type === 'DRAG_SESSION_ENDED') {
-        const currentState = dragStateRef.current;
-        if (currentState.isDragging || currentState.isPotentialDrag) {
-          document.removeEventListener('mousemove', handlersRef.current.handleMouseMove);
-          document.removeEventListener('mouseup', handlersRef.current.handleMouseUp);
-          document.removeEventListener('dragstart', handleDragStartRef.current);
-          resetDragState();
-        }
-      }
-    };
-
-    // テスト環境ではchrome.runtime.onMessageが存在しない場合がある
-    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-      chrome.runtime.onMessage.addListener(handleMessage);
-      return () => {
-        chrome.runtime.onMessage.removeListener(handleMessage);
-      };
-    }
-  }, [resetDragState]);
-
   return {
     dragState,
     getItemProps,

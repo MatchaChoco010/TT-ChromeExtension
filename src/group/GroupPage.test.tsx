@@ -4,12 +4,17 @@ import { GroupPage } from './GroupPage';
 
 const mockSendMessage = vi.fn();
 const mockGetCurrent = vi.fn();
+const messageListeners = new Set<(message: { type: string }) => void>();
 vi.mock('@/types', () => ({}));
 
 beforeEach(() => {
   globalThis.chrome = {
     runtime: {
       sendMessage: mockSendMessage,
+      onMessage: {
+        addListener: (listener: (message: { type: string }) => void) => messageListeners.add(listener),
+        removeListener: (listener: (message: { type: string }) => void) => messageListeners.delete(listener),
+      },
     },
     tabs: {
       getCurrent: mockGetCurrent,
@@ -21,6 +26,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  messageListeners.clear();
 });
 
 describe('GroupPage', () => {
@@ -128,10 +134,8 @@ describe('GroupPage', () => {
     });
   });
 
-  describe('ポーリングによる更新', () => {
-    it('ポーリングによりツリー状態の更新を監視すること', async () => {
-      vi.useFakeTimers();
-
+  describe('状態変更の通知による更新', () => {
+    it('STATE_UPDATEDの通知を受けるとグループ情報を取得し直すこと', async () => {
       const initialGroupInfo = {
         name: 'テストグループ',
         children: [
@@ -153,19 +157,17 @@ describe('GroupPage', () => {
 
       render(<GroupPage />);
 
-      await act(async () => {
-        await vi.runAllTimersAsync();
+      await waitFor(() => {
+        expect(screen.getAllByRole('listitem')).toHaveLength(1);
       });
 
-      expect(screen.getAllByRole('listitem')).toHaveLength(1);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(2000);
+      act(() => {
+        messageListeners.forEach((listener) => listener({ type: 'STATE_UPDATED' }));
       });
 
-      expect(screen.getAllByRole('listitem')).toHaveLength(2);
-
-      vi.useRealTimers();
+      await waitFor(() => {
+        expect(screen.getAllByRole('listitem')).toHaveLength(2);
+      });
     });
   });
 

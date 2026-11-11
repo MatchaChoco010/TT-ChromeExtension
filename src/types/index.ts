@@ -100,20 +100,6 @@ export type StorageChanges = {
 };
 
 /**
- * ツリー構造エントリ
- * タブの順序とURLを使って、ブラウザ再起動後の親子関係復元に使用
- */
-export interface TreeStructureEntry {
-  url: string;
-  parentIndex: number | null;
-  index: number;
-  viewId: string;
-  isExpanded: boolean;
-  groupInfo?: GroupInfo;
-  windowId?: number;
-}
-
-/**
  * ツリー状態
  * Window → View → Tab の階層構造を直接反映
  */
@@ -349,13 +335,6 @@ export interface DragEndEvent {
   over: {
     id: string;
   } | null;
-}
-
-export interface DragEndResult {
-  activeId: string;
-  overId: string | null;
-  newParentId: string | null;
-  newIndex: number;
 }
 
 /**

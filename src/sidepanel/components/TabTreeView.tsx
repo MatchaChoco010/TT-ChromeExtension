@@ -48,6 +48,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
   const [globalIsDragging, setGlobalIsDragging] = useState(false);
   const [activeTabIdForDrag, setActiveTabIdForDrag] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [dropIndicatorTopY, setDropIndicatorTopY] = useState<number | null>(null);
   const [overrideDepth, setOverrideDepth] = useState<number | null>(null);
   const overrideDepthRef = useRef<number | null>(null);
   const tabPositionsRef = useRef<TabPosition[]>([]);
@@ -63,14 +64,31 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
 
   const isDraggable = !!onDragEnd;
 
-  const handleDropTargetChange = useCallback((target: DropTarget | null, newTabPositions?: TabPosition[]) => {
+  /**
+   * ドロップ先と、隙間へのドロップ時のインジケーター位置を更新する
+   * 位置はドラッグ中ノードを含むタブ位置から計算する。除外して計算するとドラッグ中タブの中央に表示されてしまう
+   */
+  const updateDropTarget = useCallback((target: DropTarget | null) => {
     setDropTarget(target);
-    setOverrideDepth(null);
-    overrideDepthRef.current = null;
+    setDropIndicatorTopY(
+      target?.type === DropTargetType.Gap
+        ? calculateIndicatorYByNodeIds(
+          target.adjacentNodeIds?.aboveNodeId,
+          target.adjacentNodeIds?.belowNodeId,
+          tabPositionsRef.current,
+        )
+        : null,
+    );
+  }, []);
+
+  const handleDropTargetChange = useCallback((target: DropTarget | null, newTabPositions?: TabPosition[]) => {
     if (newTabPositions) {
       tabPositionsRef.current = newTabPositions;
     }
-  }, []);
+    updateDropTarget(target);
+    setOverrideDepth(null);
+    overrideDepthRef.current = null;
+  }, [updateDropTarget]);
 
   useEffect(() => {
     return () => {
@@ -180,7 +198,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
           currentDepthForMouseRef.current = clampedDepth;
         }
 
-        setDropTarget(newDropTarget);
+        updateDropTarget(newDropTarget);
       } else {
         // currentGapIndexRefとgapDepthOffsetRefは維持（同じ隙間に戻る可能性があるため）
         handleDropTargetChange(newDropTarget, tabPositionsRef.current);
@@ -241,7 +259,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
         }
         lastHoverTabIdRef.current = null;
       }
-    }, [nodes, onToggleExpand, handleDropTargetChange, onOutsideTreeChange, sidePanelRef]),
+    }, [nodes, onToggleExpand, handleDropTargetChange, updateDropTarget, onOutsideTreeChange, sidePanelRef]),
     onDragEnd: useCallback(async (itemId: string, finalDropTarget: DropTarget | null): Promise<void> => {
       // 非同期処理の完了前に状態をリセットしない（waitForDragEndがis-draggingクラスで待機するため）
       setActiveTabIdForDrag(null);
@@ -396,18 +414,12 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
     return dragState.isDragging && dragState.draggedItemId === tabId.toString();
   }, [dragState.isDragging, dragState.draggedItemId]);
 
-  // adjacentNodeIdsを使って元のtabPositions（ドラッグ中ノード含む）での位置を計算
-  // これにより、プレースホルダーがドラッグ中タブの中央に表示される問題を回避
   const dropIndicatorPosition = useMemo(() => {
-    if (!dropTarget || dropTarget.type !== DropTargetType.Gap) {
+    if (!dropTarget || dropTarget.type !== DropTargetType.Gap || dropIndicatorTopY === null) {
       return null;
     }
     const gapIndex = dropTarget.gapIndex ?? 0;
-
-    const aboveNodeId = dropTarget.adjacentNodeIds?.aboveNodeId;
-    const belowNodeId = dropTarget.adjacentNodeIds?.belowNodeId;
-    // eslint-disable-next-line react-hooks/refs -- ドロップターゲット変更時の位置計算に現在値が必要
-    const topY = calculateIndicatorYByNodeIds(aboveNodeId, belowNodeId, tabPositionsRef.current);
+    const topY = dropIndicatorTopY;
 
     const defaultDepth = dropTarget.adjacentDepths?.below ?? dropTarget.adjacentDepths?.above ?? 0;
     const depth = overrideDepth ?? defaultDepth;
@@ -417,7 +429,7 @@ const TabTreeView: React.FC<TabTreeViewProps> = ({
       depth,
       topY,
     };
-  }, [dropTarget, overrideDepth]);
+  }, [dropTarget, dropIndicatorTopY, overrideDepth]);
 
   const containerClassName = useMemo(() => {
     const baseClass = 'relative';

@@ -9,9 +9,6 @@ import NewTabButton from './NewTabButton';
 import { ContextMenu } from './ContextMenu';
 import { GroupNameModal } from './GroupNameModal';
 import { useMenuActions } from '../hooks/useMenuActions';
-import { downloadService } from '@/storage/DownloadService';
-import { storageService } from '@/storage/StorageService';
-import { SnapshotManager } from '@/services/SnapshotManager';
 import type { UITabNode, TabNode, MenuAction, WindowInfo } from '@/types';
 import { dispatchServiceWorkerRequest, sendServiceWorkerRequest } from '@/messaging/service-worker-client';
 
@@ -108,10 +105,7 @@ const TreeViewContent: React.FC = () => {
 
   const handleSnapshot = useCallback(async () => {
     try {
-      const snapshotManager = new SnapshotManager(downloadService, storageService);
-      const timestamp = new Date().toISOString().split('T')[0];
-      const name = `Manual Snapshot - ${timestamp} ${new Date().toLocaleTimeString()}`;
-      await snapshotManager.createSnapshot(name, false);
+      await sendServiceWorkerRequest('CREATE_SNAPSHOT');
     } catch (error) {
       console.error('Failed to create snapshot:', error);
     }
