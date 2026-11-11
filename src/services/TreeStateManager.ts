@@ -11,6 +11,7 @@ import type {
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import { ignoreMissingTabOrWindow, sendMessageToExtensionPages } from '@/utils/chrome-errors';
 import { isSidePanelUrl } from '@/utils/extension-urls';
+import { ChromeTabSynchronizer } from './ChromeTabSynchronizer';
 
 /**
  * ノード検索結果
@@ -35,7 +36,7 @@ export class TreeStateManager {
   private initializationInProgress: boolean = false;
   private initialized: boolean = false;
   private initializationResolvers: (() => void)[] = [];
-  private isSyncingToChrome: boolean = false;
+  private readonly chromeTabSynchronizer = new ChromeTabSynchronizer((windowId) => this.getWindowState(windowId));
   private restoredFromPreviousBrowserSession: boolean = false;
   private tabRegistrationWaiters = new Map<number, (() => void)[]>();
 
@@ -1194,7 +1195,7 @@ export class TreeStateManager {
     isPinned: boolean
   ): void {
     // 同期中は無視（syncTreeStateToChromeTabs → onUpdated → ここ → ... の無限ループを防ぐ）
-    if (this.isSyncingToChrome) {
+    if (this.chromeTabSynchronizer.isSyncing()) {
       return;
     }
 
@@ -1653,84 +1654,11 @@ export class TreeStateManager {
   // ========================================
 
   /**
-   * 配列からLongest Increasing Subsequence (LIS)を計算
-   * O(n log n)のpatience sortingアルゴリズムを使用
-   * @returns LISに含まれる要素のインデックス集合
+   * TreeStateManagerの状態をChromeのタブに反映する
+   * @param windowId - 対象のウィンドウ。省略時はすべてのウィンドウ
    */
-  private findLIS(arr: number[]): Set<number> {
-    if (arr.length === 0) return new Set();
-
-    const tails: number[] = [];
-    const prev: number[] = new Array(arr.length).fill(-1);
-    const tailIndices: number[] = [];
-
-    for (let i = 0; i < arr.length; i++) {
-      const val = arr[i];
-      let lo = 0;
-      let hi = tails.length;
-      while (lo < hi) {
-        const mid = Math.floor((lo + hi) / 2);
-        if (arr[tailIndices[mid]] < val) {
-          lo = mid + 1;
-        } else {
-          hi = mid;
-        }
-      }
-      if (lo > 0) {
-        prev[i] = tailIndices[lo - 1];
-      }
-      if (lo === tails.length) {
-        tails.push(val);
-        tailIndices.push(i);
-      } else {
-        tails[lo] = val;
-        tailIndices[lo] = i;
-      }
-    }
-
-    const lisIndices = new Set<number>();
-    let idx = tailIndices[tailIndices.length - 1];
-    while (idx !== -1) {
-      lisIndices.add(idx);
-      idx = prev[idx];
-    }
-    return lisIndices;
-  }
-
-  /**
-   * 現在の順序から目標順序への最小移動タブセットを計算
-   * LISを使用して移動不要なタブを特定
-   */
-  private calculateTabsToMove(
-    currentOrder: number[],
-    targetOrder: number[]
-  ): Set<number> {
-    if (targetOrder.length === 0) return new Set();
-
-    const currentPositionMap = new Map<number, number>();
-    for (let i = 0; i < currentOrder.length; i++) {
-      currentPositionMap.set(currentOrder[i], i);
-    }
-
-    const positionsInCurrent: number[] = [];
-    const validTargetOrder: number[] = [];
-    for (const tabId of targetOrder) {
-      const pos = currentPositionMap.get(tabId);
-      if (pos !== undefined) {
-        positionsInCurrent.push(pos);
-        validTargetOrder.push(tabId);
-      }
-    }
-
-    const lisIndices = this.findLIS(positionsInCurrent);
-
-    const tabsToMove = new Set<number>();
-    for (let i = 0; i < validTargetOrder.length; i++) {
-      if (!lisIndices.has(i)) {
-        tabsToMove.add(validTargetOrder[i]);
-      }
-    }
-    return tabsToMove;
+  async syncTreeStateToChromeTabs(windowId?: number): Promise<void> {
+    await this.chromeTabSynchronizer.sync(windowId);
   }
 
   /**
@@ -2000,233 +1928,6 @@ export class TreeStateManager {
         cleanFlattenNodes[i].tabId = newTabId;
       }
     }
-  }
-
-  /**
-   * TreeStateの状態をChromeタブに同期
-   */
-  async syncTreeStateToChromeTabs(windowId?: number): Promise<void> {
-    // 既に同期中の場合は再入を防止
-    if (this.isSyncingToChrome) {
-      return;
-    }
-    this.isSyncingToChrome = true;
-    try {
-      const queryOptions = windowId !== undefined ? { windowId } : {};
-      const currentTabs = await chrome.tabs.query(queryOptions);
-
-      const windowIds =
-        windowId !== undefined
-          ? [windowId]
-          : [
-              ...new Set(
-                currentTabs
-                  .map((t) => t.windowId)
-                  .filter((id): id is number => id !== undefined)
-              ),
-            ];
-
-      for (const wid of windowIds) {
-        await this.syncPinnedStateForWindow(wid, currentTabs);
-      }
-
-      const refreshedTabs = await chrome.tabs.query(queryOptions);
-      const pinnedSet = new Set<number>();
-      for (const tab of refreshedTabs) {
-        if (tab.id !== undefined && tab.pinned) {
-          pinnedSet.add(tab.id);
-        }
-      }
-
-      for (const wid of windowIds) {
-        await this.syncTabOrderForWindow(wid, pinnedSet);
-      }
-
-      await this.closeEmptyWindows();
-    } finally {
-      this.isSyncingToChrome = false;
-    }
-  }
-
-  /**
-   * ピン留め状態を同期
-   * すべてのビューのピン留めタブをChromeに同期
-   */
-  private async syncPinnedStateForWindow(
-    windowId: number,
-    currentTabs: chrome.tabs.Tab[]
-  ): Promise<void> {
-    const windowState = this.getWindowState(windowId);
-    if (!windowState) return;
-
-    const expectedPinnedIds = new Set<number>();
-    const orderedPinnedIds: number[] = [];
-
-    for (const viewState of windowState.views) {
-      for (const tabId of viewState.pinnedTabIds) {
-        orderedPinnedIds.push(tabId);
-        expectedPinnedIds.add(tabId);
-      }
-    }
-
-    const windowTabs = currentTabs.filter((t) => t.windowId === windowId);
-
-    const actuallyPinnedIds = new Set<number>();
-    for (const tab of windowTabs) {
-      if (tab.id !== undefined && tab.pinned) {
-        actuallyPinnedIds.add(tab.id);
-      }
-    }
-
-    for (const tabId of expectedPinnedIds) {
-      if (!actuallyPinnedIds.has(tabId)) {
-        await ignoreMissingTabOrWindow(chrome.tabs.update(tabId, { pinned: true }));
-      }
-    }
-
-    for (const tabId of actuallyPinnedIds) {
-      if (!expectedPinnedIds.has(tabId)) {
-        await ignoreMissingTabOrWindow(chrome.tabs.update(tabId, { pinned: false }));
-      }
-    }
-
-    const currentIndexMap = new Map<number, number>();
-    for (const tab of windowTabs) {
-      if (tab.id !== undefined) {
-        currentIndexMap.set(tab.id, tab.index);
-      }
-    }
-
-    for (let i = 0; i < orderedPinnedIds.length; i++) {
-      const tabId = orderedPinnedIds[i];
-      const currentIndex = currentIndexMap.get(tabId);
-      if (currentIndex !== undefined && currentIndex !== i) {
-        await ignoreMissingTabOrWindow(chrome.tabs.move(tabId, { index: i }));
-        const updatedTabs = await chrome.tabs.query({ windowId });
-        currentIndexMap.clear();
-        for (const tab of updatedTabs) {
-          if (tab.id !== undefined) {
-            currentIndexMap.set(tab.id, tab.index);
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * タブの順序を同期
-   */
-  private async syncTabOrderForWindow(
-    windowId: number,
-    pinnedSet: Set<number>
-  ): Promise<void> {
-    const currentTabs = await chrome.tabs.query({ windowId });
-    const currentWindowTabIds = new Set<number>();
-    for (const tab of currentTabs) {
-      if (tab.id !== undefined) {
-        currentWindowTabIds.add(tab.id);
-      }
-    }
-
-    const windowState = this.getWindowState(windowId);
-    if (!windowState) return;
-
-    const orderedTabIds: number[] = [];
-    const traverse = (node: TabNode): void => {
-      if (!pinnedSet.has(node.tabId) && currentWindowTabIds.has(node.tabId)) {
-        orderedTabIds.push(node.tabId);
-      }
-      for (const child of node.children) {
-        traverse(child);
-      }
-    };
-
-    for (const viewState of windowState.views) {
-      for (const rootNode of viewState.rootNodes) {
-        traverse(rootNode);
-      }
-    }
-
-    // 現在のChrome順序を取得（非ピンタブのみ）
-    const nonPinnedTabs = currentTabs
-      .filter((t) => t.id !== undefined && !t.pinned)
-      .sort((a, b) => a.index - b.index);
-    const currentNonPinnedOrder = nonPinnedTabs.map((t) => t.id!);
-
-    // LISベースで移動が必要なタブを計算
-    const tabsToMove = this.calculateTabsToMove(currentNonPinnedOrder, orderedTabIds);
-
-    const pinnedCount = currentTabs.filter((t) => t.pinned).length;
-
-    const currentIndexMap = new Map<number, number>();
-    for (const tab of currentTabs) {
-      if (tab.id !== undefined) {
-        currentIndexMap.set(tab.id, tab.index);
-      }
-    }
-
-    // 移動が必要なタブがない場合でも、位置確認のループは実行する
-    for (let i = 0; i < orderedTabIds.length; i++) {
-      const tabId = orderedTabIds[i];
-      const expectedIndex = pinnedCount + i;
-      const currentIndex = currentIndexMap.get(tabId);
-
-      // LIS最適化: 移動不要なタブはスキップ
-      // ただし、tabsToMoveが空の場合は従来通り位置チェックを行う
-      if (tabsToMove.size > 0 && !tabsToMove.has(tabId)) {
-        continue;
-      }
-
-      if (currentIndex !== undefined && currentIndex !== expectedIndex) {
-        await ignoreMissingTabOrWindow(chrome.tabs.move(tabId, { index: expectedIndex }));
-        const updatedTabs = await chrome.tabs.query({ windowId });
-        currentIndexMap.clear();
-        for (const tab of updatedTabs) {
-          if (tab.id !== undefined) {
-            currentIndexMap.set(tab.id, tab.index);
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * 空ウィンドウを閉じる
-   * 最初に1回だけwindows.getAll()を呼び出し、各ウィンドウのタブ数をチェック
-   */
-  private async closeEmptyWindows(): Promise<void> {
-    const allWindows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-    if (allWindows.length <= 1) return;
-
-    const emptyWindowIds: number[] = [];
-    for (const window of allWindows) {
-      if (window.id === undefined) continue;
-      const tabs = await chrome.tabs.query({ windowId: window.id });
-      if (tabs.length === 0) {
-        emptyWindowIds.push(window.id);
-      }
-    }
-
-    // 最後の1ウィンドウは空でも閉じない（閉じるとブラウザが終了する）
-    let remainingCount = allWindows.length;
-    for (const windowId of emptyWindowIds) {
-      if (remainingCount <= 1) break;
-      await ignoreMissingTabOrWindow(chrome.windows.remove(windowId));
-      remainingCount--;
-    }
-  }
-
-
-  async refreshTreeStructure(): Promise<void> {
-    await this.persistState();
-  }
-
-  /**
-   * アクティブビューのインデックスを取得
-   */
-  getActiveViewIndex(windowId: number): number {
-    const windowState = this.getWindowState(windowId);
-    return windowState?.activeViewIndex ?? 0;
   }
 
   /**
