@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/extension';
 import { createTab, closeTab, getTestServerUrl, getCurrentWindowId } from './utils/tab-utils';
 import { createWindow, openSidePanelForWindow, closeWindow } from './utils/window-utils';
@@ -5,6 +6,51 @@ import { assertTabStructure, assertWindowCount, assertWindowExists, assertWindow
 import { waitForSidePanelReady } from './utils/polling-utils';
 import { setupWindow } from './utils/setup-utils';
 import { moveTabToParent } from './utils/drag-drop-utils';
+
+interface MenuGeometry {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  scrollHeight: number;
+  clientHeight: number;
+}
+
+/**
+ * 表示中のタブコンテキストメニューの位置とサイズを取得する
+ */
+async function getTabContextMenuGeometry(page: Page): Promise<MenuGeometry> {
+  return page.evaluate(() => {
+    const menu = document.querySelector('[data-testid="tab-context-menu"]');
+    if (!menu) {
+      throw new Error('Tab context menu is not displayed');
+    }
+    const rect = menu.getBoundingClientRect();
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      scrollHeight: menu.scrollHeight,
+      clientHeight: menu.clientHeight,
+    };
+  });
+}
+
+/**
+ * タブノードを右クリックしてコンテキストメニューを開く
+ */
+async function openTabContextMenu(page: Page, tabId: number): Promise<void> {
+  await page.bringToFront();
+  const tabNode = page.locator(`[data-testid="tree-node-${tabId}"]`);
+  await tabNode.scrollIntoViewIfNeeded();
+  await tabNode.click({ button: 'right', noWaitAfter: true });
+  await expect(page.locator('[data-testid="tab-context-menu"]')).toBeVisible({ timeout: 5000 });
+}
 
 test.describe('コンテキストメニュー操作', () => {
   test('タブノードを右クリックした場合、コンテキストメニューが表示される', async ({
@@ -599,5 +645,86 @@ test.describe('コンテキストメニュー操作', () => {
     await sidePanelPage2.close();
     await closeWindow(extensionContext, newWindowId!);
     await assertWindowClosed(extensionContext, newWindowId!);
+  });
+
+  test('ビューポートより高いコンテキストメニューは画面内に収まり、スクロールで全項目に届く', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+    await sidePanelPage.setViewportSize({ width: 320, height: 300 });
+
+    const tabId = await createTab(serviceWorker, getTestServerUrl('/page'));
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+      { tabId, depth: 0 },
+    ], 0);
+
+    await openTabContextMenu(sidePanelPage, tabId);
+
+    const geometry = await getTabContextMenuGeometry(sidePanelPage);
+    expect(geometry.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+    expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight);
+
+    const lastMenuItem = sidePanelPage.locator('[data-testid="tab-context-menu"] > [role="menuitem"]').last();
+    await lastMenuItem.scrollIntoViewIfNeeded();
+    await expect(lastMenuItem).toBeInViewport();
+
+    await sidePanelPage.keyboard.press('Escape');
+    await expect(sidePanelPage.locator('[data-testid="tab-context-menu"]')).toBeHidden();
+
+    await closeTab(serviceWorker, tabId);
+    await assertTabStructure(sidePanelPage, windowId, [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ], 0);
+  });
+
+  test('画面下部のタブを右クリックした場合、コンテキストメニューが画面からはみ出さずに表示される', async ({
+    extensionContext,
+    serviceWorker,
+  }) => {
+    const windowId = await getCurrentWindowId(serviceWorker);
+    const { initialBrowserTabId, sidePanelPage } =
+      await setupWindow(extensionContext, serviceWorker, windowId);
+    await sidePanelPage.setViewportSize({ width: 320, height: 720 });
+
+    const expectedStructure: { tabId: number; depth: number }[] = [
+      { tabId: initialBrowserTabId, depth: 0 },
+    ];
+    const createdTabIds: number[] = [];
+    for (let i = 0; i < 14; i++) {
+      const tabId = await createTab(serviceWorker, getTestServerUrl(`/page?bottom-${i}`), { active: false });
+      createdTabIds.push(tabId);
+      expectedStructure.push({ tabId, depth: 0 });
+      await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);
+    }
+
+    const bottomTabId = createdTabIds[createdTabIds.length - 1];
+    const bottomTabTop = await sidePanelPage
+      .locator(`[data-testid="tree-node-${bottomTabId}"]`)
+      .evaluate((node) => node.getBoundingClientRect().top);
+    expect(bottomTabTop).toBeGreaterThan(720 / 2);
+
+    await openTabContextMenu(sidePanelPage, bottomTabId);
+
+    const geometry = await getTabContextMenuGeometry(sidePanelPage);
+    expect(geometry.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+
+    await sidePanelPage.keyboard.press('Escape');
+    await expect(sidePanelPage.locator('[data-testid="tab-context-menu"]')).toBeHidden();
+
+    for (const tabId of createdTabIds) {
+      await closeTab(serviceWorker, tabId);
+      expectedStructure.splice(expectedStructure.findIndex((e) => e.tabId === tabId), 1);
+      await assertTabStructure(sidePanelPage, windowId, expectedStructure, 0);
+    }
   });
 });

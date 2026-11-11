@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { View } from '@/types';
+import { useViewportClampedPlacement } from '../hooks/useViewportClampedPlacement';
 
 export type ViewMenuAction = 'edit' | 'delete';
 
@@ -23,25 +24,7 @@ export const ViewContextMenu: React.FC<ViewContextMenuProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const adjustedPosition = useMemo(() => {
-    const menuWidth = 160;
-    const menuHeight = 80;
-
-    let { x, y } = position;
-
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 10;
-    }
-
-    if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 10;
-    }
-
-    x = Math.max(10, x);
-    y = Math.max(10, y);
-
-    return { x, y };
-  }, [position]);
+  const placement = useViewportClampedPlacement(menuRef, position);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -87,10 +70,11 @@ export const ViewContextMenu: React.FC<ViewContextMenuProps> = ({
     <div
       ref={menuRef}
       role="menu"
-      className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[160px]"
+      className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[160px] overflow-y-auto"
       style={{
-        left: `${adjustedPosition.x}px`,
-        top: `${adjustedPosition.y}px`,
+        left: `${placement.x}px`,
+        top: `${placement.y}px`,
+        maxHeight: `${placement.maxHeight}px`,
       }}
       data-testid="view-context-menu"
     >

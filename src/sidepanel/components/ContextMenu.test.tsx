@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContextMenu } from './ContextMenu';
+import { mockLayout } from '@/test/layout-utils';
 
 describe('ContextMenu', () => {
   describe('右クリック時のメニュー表示と位置計算', () => {
@@ -436,54 +437,47 @@ describe('ContextMenu', () => {
   });
 
   describe('画面端での位置調整', () => {
-    it('メニューが画面右端を超える場合は左側に表示する', () => {
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 800,
-      });
+    let restoreLayout: () => void = () => {};
 
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-      const position = { x: 750, y: 200 }; // 右端に近い位置
-
-      render(
-        <ContextMenu
-          targetTabIds={[1]}
-          position={position}
-          onAction={onAction}
-          onClose={onClose}
-        />
-      );
-
-      const menu = screen.getByRole('menu');
-
-      expect(menu).toBeInTheDocument();
+    afterEach(() => {
+      restoreLayout();
     });
 
-    it('メニューが画面下端を超える場合は上側に表示する', () => {
-      Object.defineProperty(window, 'innerHeight', {
-        writable: true,
-        configurable: true,
-        value: 600,
-      });
-
-      const onAction = vi.fn();
-      const onClose = vi.fn();
-      const position = { x: 100, y: 550 }; // 下端に近い位置
-
+    const renderAt = (position: { x: number; y: number }): HTMLElement => {
       render(
         <ContextMenu
           targetTabIds={[1]}
           position={position}
-          onAction={onAction}
-          onClose={onClose}
+          onAction={vi.fn()}
+          onClose={vi.fn()}
         />
       );
+      return screen.getByRole('menu');
+    };
 
-      const menu = screen.getByRole('menu');
+    it('メニューの実際の高さで下端からはみ出す場合は、下端が画面内に収まるよう上に寄せる', () => {
+      restoreLayout = mockLayout({ viewport: { width: 800, height: 600 }, elementSize: { width: 200, height: 400 } });
 
-      expect(menu).toBeInTheDocument();
+      const menu = renderAt({ x: 100, y: 550 });
+
+      expect(menu).toHaveStyle({ left: '100px', top: `${600 - 10 - 400}px` });
+    });
+
+    it('メニューの実際の幅で右端からはみ出す場合は、右端が画面内に収まるよう左に寄せる', () => {
+      restoreLayout = mockLayout({ viewport: { width: 800, height: 600 }, elementSize: { width: 200, height: 400 } });
+
+      const menu = renderAt({ x: 750, y: 100 });
+
+      expect(menu).toHaveStyle({ left: `${800 - 10 - 200}px`, top: '100px' });
+    });
+
+    it('メニューが画面より高い場合は上端に置き、画面内の高さでスクロールさせる', () => {
+      restoreLayout = mockLayout({ viewport: { width: 800, height: 300 }, elementSize: { width: 200, height: 500 } });
+
+      const menu = renderAt({ x: 100, y: 200 });
+
+      expect(menu).toHaveStyle({ top: '10px', maxHeight: `${300 - 20}px` });
+      expect(menu).toHaveClass('overflow-y-auto');
     });
   });
 

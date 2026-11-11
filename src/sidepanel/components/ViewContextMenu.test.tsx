@@ -1,7 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { View } from '@/types';
 import { ViewContextMenu } from './ViewContextMenu';
+import { mockLayout } from '@/test/layout-utils';
 
 describe('ViewContextMenu', () => {
   const mockView: View = {
@@ -231,42 +232,39 @@ describe('ViewContextMenu', () => {
   });
 
   describe('画面端での位置調整', () => {
-    it('右端を超える場合は左に調整される', () => {
-      Object.defineProperty(window, 'innerWidth', { value: 300, writable: true });
+    let restoreLayout: () => void = () => {};
 
-      render(
-        <ViewContextMenu
-          view={mockView}
-          position={{ x: 250, y: 100 }}
-          onEdit={mockOnEdit}
-          onDelete={mockOnDelete}
-          onClose={mockOnClose}
-        />
-      );
-
-      const menu = screen.getByRole('menu');
-      const style = menu.style;
-      const leftValue = parseInt(style.left, 10);
-      expect(leftValue).toBeLessThanOrEqual(250);
+    afterEach(() => {
+      restoreLayout();
     });
 
-    it('下端を超える場合は上に調整される', () => {
-      Object.defineProperty(window, 'innerHeight', { value: 200, writable: true });
-
+    const renderAt = (position: { x: number; y: number }): HTMLElement => {
       render(
         <ViewContextMenu
           view={mockView}
-          position={{ x: 100, y: 180 }}
+          position={position}
           onEdit={mockOnEdit}
           onDelete={mockOnDelete}
           onClose={mockOnClose}
         />
       );
+      return screen.getByRole('menu');
+    };
 
-      const menu = screen.getByRole('menu');
-      const style = menu.style;
-      const topValue = parseInt(style.top, 10);
-      expect(topValue).toBeLessThanOrEqual(180);
+    it('メニューの実際の幅で右端からはみ出す場合は、右端が画面内に収まるよう左に寄せる', () => {
+      restoreLayout = mockLayout({ viewport: { width: 300, height: 600 }, elementSize: { width: 160, height: 90 } });
+
+      const menu = renderAt({ x: 250, y: 100 });
+
+      expect(menu).toHaveStyle({ left: `${300 - 10 - 160}px`, top: '100px' });
+    });
+
+    it('メニューの実際の高さで下端からはみ出す場合は、下端が画面内に収まるよう上に寄せる', () => {
+      restoreLayout = mockLayout({ viewport: { width: 800, height: 200 }, elementSize: { width: 160, height: 90 } });
+
+      const menu = renderAt({ x: 100, y: 180 });
+
+      expect(menu).toHaveStyle({ left: '100px', top: `${200 - 10 - 90}px` });
     });
   });
 

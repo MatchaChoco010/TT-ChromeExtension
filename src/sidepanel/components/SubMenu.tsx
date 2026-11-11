@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import type { SubMenuItem, SubMenuProps } from '@/types';
+import { useViewportClampedPlacement } from '../hooks/useViewportClampedPlacement';
 
 export type { SubMenuItem, SubMenuProps };
 
@@ -14,34 +15,11 @@ export const SubMenu: React.FC<SubMenuProps> = ({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const SUBMENU_WIDTH = 160;
-  const SUBMENU_ITEM_HEIGHT = 36;
-  const SUBMENU_PADDING = 8;
-
-  const adjustedPosition = useMemo(() => {
-    const submenuHeight = items.length * SUBMENU_ITEM_HEIGHT + SUBMENU_PADDING * 2;
-
-    let x = parentRect.right;
-    let y = parentRect.top;
-
-    if (x + SUBMENU_WIDTH > window.innerWidth) {
-      x = parentRect.left - SUBMENU_WIDTH;
-    }
-
-    if (x < 10) {
-      x = 10;
-    }
-
-    if (y + submenuHeight > window.innerHeight) {
-      y = window.innerHeight - submenuHeight - 10;
-    }
-
-    if (y < 10) {
-      y = 10;
-    }
-
-    return { x, y };
-  }, [parentRect, items.length]);
+  const placement = useViewportClampedPlacement(
+    menuRef,
+    { x: parentRect.right, y: parentRect.top },
+    parentRect.left,
+  );
 
   const enabledIndices = useMemo(() => {
     return items
@@ -125,11 +103,11 @@ export const SubMenu: React.FC<SubMenuProps> = ({
       ref={menuRef}
       role="menu"
       aria-label={label}
-      className="fixed z-[60] bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-1 select-none"
+      className="fixed z-[60] bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-1 select-none min-w-[160px] overflow-y-auto"
       style={{
-        left: `${adjustedPosition.x}px`,
-        top: `${adjustedPosition.y}px`,
-        minWidth: `${SUBMENU_WIDTH}px`,
+        left: `${placement.x}px`,
+        top: `${placement.y}px`,
+        maxHeight: `${placement.maxHeight}px`,
       }}
       onMouseLeave={handleMouseLeave}
       data-testid="submenu"

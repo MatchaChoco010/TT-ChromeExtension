@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SubMenu } from './SubMenu';
+import { mockLayout } from '@/test/layout-utils';
 
 describe('SubMenu', () => {
   const defaultItems = [
@@ -124,115 +125,47 @@ describe('SubMenu', () => {
   });
 
   describe('画面端での位置自動調整', () => {
-    it('デフォルトでは親メニューの右側に表示される', () => {
-      const onSelect = vi.fn();
-      const onClose = vi.fn();
+    let restoreLayout: () => void = () => {};
 
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 1000,
-      });
-      Object.defineProperty(window, 'innerHeight', {
-        writable: true,
-        configurable: true,
-        value: 800,
-      });
-
-      render(
-        <SubMenu
-          label="Test SubMenu"
-          items={defaultItems}
-          onSelect={onSelect}
-          onClose={onClose}
-          parentRect={defaultParentRect}
-        />
-      );
-
-      const submenu = screen.getByRole('menu');
-      expect(submenu.style.left).toBeDefined();
+    afterEach(() => {
+      restoreLayout();
     });
 
-    it('右端に近い場合は親メニューの左側に表示される', () => {
-      const onSelect = vi.fn();
-      const onClose = vi.fn();
-
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 400,
-      });
-      Object.defineProperty(window, 'innerHeight', {
-        writable: true,
-        configurable: true,
-        value: 800,
-      });
-
-      const rightEdgeRect: DOMRect = {
-        x: 300,
-        y: 200,
-        width: 200,
-        height: 40,
-        top: 200,
-        right: 500,
-        bottom: 240,
-        left: 300,
-        toJSON: () => ({}),
-      };
-
+    const renderWithParentRect = (parentRect: DOMRect): HTMLElement => {
       render(
         <SubMenu
           label="Test SubMenu"
           items={defaultItems}
-          onSelect={onSelect}
-          onClose={onClose}
-          parentRect={rightEdgeRect}
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+          parentRect={parentRect}
         />
       );
+      return screen.getByRole('menu');
+    };
 
-      const submenu = screen.getByRole('menu');
-      expect(submenu).toBeInTheDocument();
+    it('画面内に収まる場合は親メニュー項目の右側に、上端を揃えて表示される', () => {
+      restoreLayout = mockLayout({ viewport: { width: 1000, height: 800 }, elementSize: { width: 160, height: 120 } });
+
+      const submenu = renderWithParentRect(defaultParentRect);
+
+      expect(submenu).toHaveStyle({ left: '300px', top: '200px' });
     });
 
-    it('下端に近い場合は上方向に調整される', () => {
-      const onSelect = vi.fn();
-      const onClose = vi.fn();
+    it('右側では右端からはみ出す場合は、親メニュー項目の左側に表示される', () => {
+      restoreLayout = mockLayout({ viewport: { width: 400, height: 800 }, elementSize: { width: 160, height: 120 } });
 
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 1000,
-      });
-      Object.defineProperty(window, 'innerHeight', {
-        writable: true,
-        configurable: true,
-        value: 300,
-      });
+      const submenu = renderWithParentRect(new DOMRect(300, 200, 200, 40));
 
-      const bottomEdgeRect: DOMRect = {
-        x: 100,
-        y: 250,
-        width: 200,
-        height: 40,
-        top: 250,
-        right: 300,
-        bottom: 290,
-        left: 100,
-        toJSON: () => ({}),
-      };
+      expect(submenu).toHaveStyle({ left: `${300 - 160}px`, top: '200px' });
+    });
 
-      render(
-        <SubMenu
-          label="Test SubMenu"
-          items={defaultItems}
-          onSelect={onSelect}
-          onClose={onClose}
-          parentRect={bottomEdgeRect}
-        />
-      );
+    it('下端からはみ出す場合は、サブメニューの実際の高さ分だけ上に寄せる', () => {
+      restoreLayout = mockLayout({ viewport: { width: 1000, height: 300 }, elementSize: { width: 160, height: 120 } });
 
-      const submenu = screen.getByRole('menu');
-      expect(submenu).toBeInTheDocument();
+      const submenu = renderWithParentRect(new DOMRect(100, 250, 200, 40));
+
+      expect(submenu).toHaveStyle({ left: '300px', top: `${300 - 10 - 120}px` });
     });
   });
 

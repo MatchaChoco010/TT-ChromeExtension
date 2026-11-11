@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { MenuAction, ContextMenuProps, SubMenuItem } from '@/types';
 import { SubMenu } from './SubMenu';
+import { useViewportClampedPlacement } from '../hooks/useViewportClampedPlacement';
 
 export type { MenuAction };
 
@@ -22,8 +23,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onMoveToWindow,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
-  const moveToViewButtonRef = useRef<HTMLDivElement>(null);
-  const moveToWindowButtonRef = useRef<HTMLDivElement>(null);
   const viewSubMenuCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const windowSubMenuCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMultipleSelection = targetTabIds.length > 1;
@@ -33,25 +32,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const [isWindowSubMenuOpen, setIsWindowSubMenuOpen] = useState(false);
   const [windowSubMenuParentRect, setWindowSubMenuParentRect] = useState<DOMRect | null>(null);
 
-  const adjustedPosition = React.useMemo(() => {
-    const menuWidth = 200;
-    const menuHeight = 300;
-
-    let { x, y } = position;
-
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 10;
-    }
-
-    if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 10;
-    }
-
-    x = Math.max(10, x);
-    y = Math.max(10, y);
-
-    return { x, y };
-  }, [position]);
+  const placement = useViewportClampedPlacement(menuRef, position);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -121,19 +102,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }
   }, [onMoveToView, targetTabIds, onClose]);
 
-  const handleMoveToViewMouseEnter = useCallback(() => {
+  const handleMoveToViewMouseEnter = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (viewSubMenuCloseTimeoutRef.current) {
       clearTimeout(viewSubMenuCloseTimeoutRef.current);
       viewSubMenuCloseTimeoutRef.current = null;
     }
     setIsWindowSubMenuOpen(false);
-    if (moveToViewButtonRef.current) {
-      setSubMenuParentRect(moveToViewButtonRef.current.getBoundingClientRect());
-    } else {
-      setSubMenuParentRect(new DOMRect(adjustedPosition.x, adjustedPosition.y, 200, 36));
-    }
+    setSubMenuParentRect(event.currentTarget.getBoundingClientRect());
     setIsSubMenuOpen(true);
-  }, [adjustedPosition]);
+  }, []);
 
   const handleMoveToViewMouseLeave = useCallback(() => {
     if (viewSubMenuCloseTimeoutRef.current) {
@@ -165,19 +142,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     return items;
   }, [otherWindows]);
 
-  const handleMoveToWindowMouseEnter = useCallback(() => {
+  const handleMoveToWindowMouseEnter = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (windowSubMenuCloseTimeoutRef.current) {
       clearTimeout(windowSubMenuCloseTimeoutRef.current);
       windowSubMenuCloseTimeoutRef.current = null;
     }
     setIsSubMenuOpen(false);
-    if (moveToWindowButtonRef.current) {
-      setWindowSubMenuParentRect(moveToWindowButtonRef.current.getBoundingClientRect());
-    } else {
-      setWindowSubMenuParentRect(new DOMRect(adjustedPosition.x, adjustedPosition.y, 200, 36));
-    }
+    setWindowSubMenuParentRect(event.currentTarget.getBoundingClientRect());
     setIsWindowSubMenuOpen(true);
-  }, [adjustedPosition]);
+  }, []);
 
   const handleMoveToWindowMouseLeave = useCallback(() => {
     if (windowSubMenuCloseTimeoutRef.current) {
@@ -214,10 +187,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ref={menuRef}
       role="menu"
       data-testid="tab-context-menu"
-      className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[200px] select-none"
+      className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[200px] select-none overflow-y-auto"
       style={{
-        left: `${adjustedPosition.x}px`,
-        top: `${adjustedPosition.y}px`,
+        left: `${placement.x}px`,
+        top: `${placement.y}px`,
+        maxHeight: `${placement.maxHeight}px`,
       }}
     >
       <button
@@ -297,7 +271,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       <div className="border-t border-gray-700 my-1" />
 
       <div
-        ref={moveToWindowButtonRef}
         className="relative w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100 flex items-center justify-between cursor-default"
         onMouseEnter={handleMoveToWindowMouseEnter}
         onMouseLeave={handleMoveToWindowMouseLeave}
@@ -363,7 +336,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         <>
           <div className="border-t border-gray-700 my-1" />
           <div
-            ref={moveToViewButtonRef}
             className="relative w-full px-4 py-2 text-left text-sm hover:bg-gray-700 text-gray-100 flex items-center justify-between cursor-default"
             onMouseEnter={handleMoveToViewMouseEnter}
             onMouseLeave={handleMoveToViewMouseLeave}
