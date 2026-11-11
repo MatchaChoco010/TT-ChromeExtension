@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { chromeMock } from '@/test/chrome-mock';
+import { chromeMock, createMockTab } from '@/test/chrome-mock';
 import type { MessageType, TabNode, TreeState } from '@/types';
 import {
   registerTabEventListeners,
@@ -53,7 +53,7 @@ describe('Service Worker - Tab Events', () => {
   it('chrome.tabs.onCreated リスナーが登録されている', () => {
     registerTabEventListeners();
 
-    const mockTab = { id: 1, index: 0, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab;
+    const mockTab = createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example.com' });
     chromeMock.tabs.onCreated.trigger(mockTab);
 
     expect(chromeMock.tabs.onCreated.hasListener).toBeDefined();
@@ -62,13 +62,13 @@ describe('Service Worker - Tab Events', () => {
   it('openerTabIdがないタブが作成されたときルートノードとして追加される', async () => {
     registerTabEventListeners();
 
-    const mockTab = {
+    const mockTab = createMockTab({
       id: 100,
       index: 0,
       windowId: 1,
       openerTabId: undefined,
       url: 'https://example.com',
-    } as chrome.tabs.Tab;
+    });
 
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
@@ -90,13 +90,13 @@ describe('Service Worker - Tab Events', () => {
     const sendMessageSpy = vi.fn(() => Promise.resolve());
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
-    const parentTab = {
+    const parentTab = createMockTab({
       id: 200,
       index: 0,
       windowId: 1,
       openerTabId: undefined,
       url: 'https://example.com',
-    } as chrome.tabs.Tab;
+    });
 
     chromeMock.tabs.onCreated.trigger(parentTab);
 
@@ -104,13 +104,13 @@ describe('Service Worker - Tab Events', () => {
 
     sendMessageSpy.mockClear();
 
-    const childTab = {
+    const childTab = createMockTab({
       id: 201,
       index: 1,
       windowId: 1,
       openerTabId: 200,
       url: 'https://example.com/child',
-    } as chrome.tabs.Tab;
+    });
 
     chromeMock.tabs.onCreated.trigger(childTab);
 
@@ -145,7 +145,7 @@ describe('Service Worker - Tab Events', () => {
     registerTabEventListeners();
 
     const changeInfo: chrome.tabs.OnUpdatedInfo = { status: 'complete' };
-    const mockTab = { id: 1, index: 0, windowId: 1 } as chrome.tabs.Tab;
+    const mockTab = createMockTab({ id: 1, index: 0, windowId: 1 });
     chromeMock.tabs.onUpdated.trigger(1, changeInfo, mockTab);
 
     expect(chromeMock.tabs.onUpdated.hasListener).toBeDefined();
@@ -244,13 +244,13 @@ describe('ビュー切り替え動作の修正', () => {
       },
     );
 
-    const mockTab = {
+    const mockTab = createMockTab({
       id: 500,
       index: 0,
       windowId: 1,
       openerTabId: undefined,
       url: 'https://example.com',
-    } as chrome.tabs.Tab;
+    });
 
     chromeMock.tabs.onCreated.trigger(mockTab);
 
@@ -360,7 +360,7 @@ describe('Service Worker - Messaging', () => {
 
     const tabId = 789;
     const targetWindowId = 10;
-    const tab = { id: tabId, index: 0, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab;
+    const tab = createMockTab({ id: tabId, index: 0, windowId: 1, url: 'https://example.com' });
     await testTreeStateManager.addTab(tab, null, 1);
 
     (chromeMock.tabs.move as ReturnType<typeof vi.fn>).mockResolvedValue({});
@@ -385,7 +385,7 @@ describe('Service Worker - Messaging', () => {
     registerMessageListener();
 
     const tabId = 999;
-    const tab = { id: tabId, index: 0, windowId: 1, url: 'https://example.com' } as chrome.tabs.Tab;
+    const tab = createMockTab({ id: tabId, index: 0, windowId: 1, url: 'https://example.com' });
     await testTreeStateManager.addTab(tab, null, 1);
 
     (chromeMock.windows.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 100 });
@@ -478,7 +478,7 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(
       setMessage,
-      { tab: { windowId: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 } as chrome.tabs.Tab },
+      { tab: createMockTab({ windowId: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 }) },
       setResponse,
     );
 
@@ -489,7 +489,7 @@ describe('Service Worker - Messaging', () => {
 
     chromeMock.runtime.onMessage.trigger(
       getMessage,
-      { tab: { windowId: 2, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 } as chrome.tabs.Tab },
+      { tab: createMockTab({ windowId: 2, index: 0, pinned: false, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1 }) },
       getResponse,
     );
 
@@ -571,28 +571,28 @@ describe('複数タブのグループ化機能', () => {
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
     const groupTabId = 100;
-    (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue(createMockTab({
       id: groupTabId,
       index: 3,
       windowId: 1,
       url: `chrome-extension://test-id/group.html`,
-    } as chrome.tabs.Tab);
+    }));
     (chromeMock.tabs.get as ReturnType<typeof vi.fn>).mockImplementation(async (tabId: number) => {
-      if (tabId === 1) return { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
-      if (tabId === 2) return { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
-      if (tabId === 3) return { id: 3, index: 2, windowId: 1, url: 'https://example3.com' } as chrome.tabs.Tab;
+      if (tabId === 1) return createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example1.com' });
+      if (tabId === 2) return createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
+      if (tabId === 3) return createMockTab({ id: 3, index: 2, windowId: 1, url: 'https://example3.com' });
       return null;
     });
-    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue(createMockTab({
       id: groupTabId,
       index: 3,
       windowId: 1,
       url: `chrome-extension://test-id/group.html`,
-    } as chrome.tabs.Tab);
+    }));
 
-    const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
-    const tab2 = { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
-    const tab3 = { id: 3, index: 2, windowId: 1, url: 'https://example3.com' } as chrome.tabs.Tab;
+    const tab1 = createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example1.com' });
+    const tab2 = createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
+    const tab3 = createMockTab({ id: 3, index: 2, windowId: 1, url: 'https://example3.com' });
 
     await testTreeStateManager.addTab(tab1, null, 1);
     await testTreeStateManager.addTab(tab2, null, 1);
@@ -649,26 +649,26 @@ describe('複数タブのグループ化機能', () => {
     chromeMock.runtime.sendMessage = sendMessageSpy;
 
     const groupTabId = 100;
-    (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (chromeMock.tabs.create as ReturnType<typeof vi.fn>).mockResolvedValue(createMockTab({
       id: groupTabId,
       index: 2,
       windowId: 1,
       url: `chrome-extension://test-id/group.html`,
-    } as chrome.tabs.Tab);
+    }));
     (chromeMock.tabs.get as ReturnType<typeof vi.fn>).mockImplementation(async (tabId: number) => {
-      if (tabId === 1) return { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
-      if (tabId === 2) return { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
+      if (tabId === 1) return createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example1.com' });
+      if (tabId === 2) return createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
       return null;
     });
-    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (chromeMock.tabs.update as ReturnType<typeof vi.fn>).mockResolvedValue(createMockTab({
       id: groupTabId,
       index: 2,
       windowId: 1,
       url: `chrome-extension://test-id/group.html`,
-    } as chrome.tabs.Tab);
+    }));
 
-    const tab1 = { id: 1, index: 0, windowId: 1, url: 'https://example1.com' } as chrome.tabs.Tab;
-    const tab2 = { id: 2, index: 1, windowId: 1, url: 'https://example2.com' } as chrome.tabs.Tab;
+    const tab1 = createMockTab({ id: 1, index: 0, windowId: 1, url: 'https://example1.com' });
+    const tab2 = createMockTab({ id: 2, index: 1, windowId: 1, url: 'https://example2.com' });
 
     await testTreeStateManager.addTab(tab1, null, 1);
     await testTreeStateManager.addTab(tab2, null, 1);
@@ -781,12 +781,12 @@ describe('空ウィンドウの自動クローズ', () => {
       }
     );
 
-    const tab = {
+    const tab = createMockTab({
       id: tabId,
       index: 0,
       windowId: sourceWindowId,
       url: 'https://example.com',
-    } as chrome.tabs.Tab;
+    });
 
     chromeMock.tabs.onCreated.trigger(tab);
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -853,19 +853,19 @@ describe('空ウィンドウの自動クローズ', () => {
       }
     );
 
-    const tab1 = {
+    const tab1 = createMockTab({
       id: tabId,
       index: 0,
       windowId: sourceWindowId,
       url: 'https://example1.com',
-    } as chrome.tabs.Tab;
+    });
 
-    const tab2 = {
+    const tab2 = createMockTab({
       id: remainingTabId,
       index: 1,
       windowId: sourceWindowId,
       url: 'https://example2.com',
-    } as chrome.tabs.Tab;
+    });
 
     chromeMock.tabs.onCreated.trigger(tab1);
     chromeMock.tabs.onCreated.trigger(tab2);
@@ -967,12 +967,12 @@ describe('Service Worker起動直後の初期化待ち', () => {
   it('Service Worker再起動の初期化完了前に作成されたタブはツリーに追加される', async () => {
     registerTabEventListeners();
 
-    chromeMock.tabs.onCreated.trigger({
+    chromeMock.tabs.onCreated.trigger(createMockTab({
       id: 40,
       index: 3,
       windowId: 1,
       url: 'https://example.com/40',
-    } as chrome.tabs.Tab);
+    }));
 
     await testTreeStateManager.resumeAfterServiceWorkerRestart();
 
@@ -1009,7 +1009,7 @@ describe('タブを閉じた後のアクティブタブ補正', () => {
   const mockActiveTab = (activeTabId: number): void => {
     chromeMock.tabs.query.mockImplementation((queryInfo: chrome.tabs.QueryInfo) => {
       if (queryInfo.active) {
-        return Promise.resolve([{ id: activeTabId, windowId: 1, index: 0 } as chrome.tabs.Tab]);
+        return Promise.resolve([createMockTab({ id: activeTabId, windowId: 1, index: 0 })]);
       }
       return Promise.resolve([]);
     });

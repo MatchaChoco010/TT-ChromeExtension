@@ -9,6 +9,7 @@ import { StorageService } from '@/storage/StorageService';
 import { ThemeProvider } from '@/sidepanel/providers/ThemeProvider';
 import type { UserSettings, StorageChanges } from '@/types';
 import type { MockChrome } from '@/test/test-types';
+import { createMockTab } from '@/test/chrome-mock';
 
 describe('エラーハンドリングとエッジケース', () => {
   describe('タブAPI失敗時の挙動', () => {
@@ -39,20 +40,7 @@ describe('エラーハンドリングとエッジケース', () => {
       const mockChrome = global.chrome as unknown as MockChrome;
       vi.mocked(mockChrome.tabs.move).mockRejectedValue(new Error('Move failed'));
 
-      const tab: chrome.tabs.Tab = {
-        id: 1,
-        index: 0,
-        pinned: false,
-        highlighted: false,
-        windowId: 1,
-        active: false,
-        incognito: false,
-        selected: false,
-        discarded: false,
-        autoDiscardable: true,
-        groupId: -1,
-        frozen: false,
-      };
+      const tab = createMockTab({ id: 1 });
 
       await treeStateManager.addTab(tab, null, 1, 0);
 
@@ -139,50 +127,11 @@ describe('エラーハンドリングとエッジケース', () => {
     });
 
     it('親ノードを自分の子として移動しようとした場合、操作をキャンセル', async () => {
-      const tabA: chrome.tabs.Tab = {
-        id: 1,
-        index: 0,
-        pinned: false,
-        highlighted: false,
-        windowId: 1,
-        active: false,
-        incognito: false,
-        selected: false,
-        discarded: false,
-        autoDiscardable: true,
-        groupId: -1,
-        frozen: false,
-      };
+      const tabA = createMockTab({ id: 1 });
 
-      const tabB: chrome.tabs.Tab = {
-        id: 2,
-        index: 1,
-        pinned: false,
-        highlighted: false,
-        windowId: 1,
-        active: false,
-        incognito: false,
-        selected: false,
-        discarded: false,
-        autoDiscardable: true,
-        groupId: -1,
-        frozen: false,
-      };
+      const tabB = createMockTab({ id: 2, index: 1 });
 
-      const tabC: chrome.tabs.Tab = {
-        id: 3,
-        index: 2,
-        pinned: false,
-        highlighted: false,
-        windowId: 1,
-        active: false,
-        incognito: false,
-        selected: false,
-        discarded: false,
-        autoDiscardable: true,
-        groupId: -1,
-        frozen: false,
-      };
+      const tabC = createMockTab({ id: 3, index: 2 });
 
       await treeStateManager.addTab(tabA, null, 1, 0);
       await treeStateManager.addTab(tabB, 1, 1, 0);
@@ -204,20 +153,7 @@ describe('エラーハンドリングとエッジケース', () => {
     });
 
     it('ノードを自分自身の親にしようとした場合、操作をキャンセル', async () => {
-      const tab: chrome.tabs.Tab = {
-        id: 1,
-        index: 0,
-        pinned: false,
-        highlighted: false,
-        windowId: 1,
-        active: false,
-        incognito: false,
-        selected: false,
-        discarded: false,
-        autoDiscardable: true,
-        groupId: -1,
-        frozen: false,
-      };
+      const tab = createMockTab({ id: 1 });
 
       await treeStateManager.addTab(tab, null, 1, 0);
 
@@ -467,7 +403,7 @@ describe('エラーハンドリングとエッジケース', () => {
       const storageService = new StorageService();
       const treeStateManager = new TreeStateManager(storageService);
 
-      const invalidTab = { id: undefined, frozen: false } as chrome.tabs.Tab;
+      const invalidTab = createMockTab({ id: undefined, frozen: false });
 
       await expect(
         treeStateManager.addTab(invalidTab, null, 1, 0)

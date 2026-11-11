@@ -78,7 +78,7 @@ export class ChromeMock {
     query: vi.fn<(queryInfo: chrome.tabs.QueryInfo) => Promise<chrome.tabs.Tab[]>>(() => Promise.resolve([])),
     duplicate: vi.fn<(tabId: number) => Promise<chrome.tabs.Tab | undefined>>(() => Promise.resolve(undefined)),
     reload: vi.fn<(tabId?: number) => Promise<void>>(() => Promise.resolve()),
-    create: vi.fn<(createProperties: chrome.tabs.CreateProperties) => Promise<chrome.tabs.Tab>>(() => Promise.resolve({} as chrome.tabs.Tab)),
+    create: vi.fn<(createProperties: chrome.tabs.CreateProperties) => Promise<chrome.tabs.Tab>>(() => Promise.resolve(createMockTab())),
   };
 
   windows = {
@@ -228,3 +228,26 @@ export class ChromeMock {
 export const chromeMock = new ChromeMock();
 
 vi.stubGlobal('chrome', chromeMock);
+
+/**
+ * テスト用のchrome.tabs.Tabを生成する
+ * 指定しなかったプロパティは、通常のアクティブでない未ピン留めタブの値になる
+ * @param overrides - 既定値から変更するプロパティ
+ */
+export function createMockTab(overrides: Partial<chrome.tabs.Tab> = {}): chrome.tabs.Tab {
+  return {
+    index: 0,
+    windowId: 1,
+    pinned: false,
+    highlighted: false,
+    active: false,
+    incognito: false,
+    selected: false,
+    discarded: false,
+    autoDiscardable: true,
+    groupId: -1,
+    frozen: false,
+    lastAccessed: 0,
+    ...overrides,
+  };
+}

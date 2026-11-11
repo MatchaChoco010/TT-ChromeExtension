@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { chromeMock } from '@/test/chrome-mock';
+import { chromeMock, createMockTab } from '@/test/chrome-mock';
 import {
   registerTabEventListeners,
   registerWebNavigationListeners,
@@ -59,12 +59,12 @@ describe('タブ開き方別の位置ルール', () => {
       registerTabEventListeners();
       registerWebNavigationListeners();
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: 1,
         url: 'https://example.com',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
         return Promise.resolve(null);
@@ -81,13 +81,13 @@ describe('タブ開き方別の位置ルール', () => {
         timeStamp: Date.now(),
       });
 
-      const childTab = {
+      const childTab = createMockTab({
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
         url: 'https://example.com/page',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -118,12 +118,12 @@ describe('タブ開き方別の位置ルール', () => {
       registerTabEventListeners();
       registerWebNavigationListeners();
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: 1,
         url: 'https://example.com',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
         return Promise.resolve(null);
@@ -140,13 +140,13 @@ describe('タブ開き方別の位置ルール', () => {
         timeStamp: Date.now(),
       });
 
-      const childTab = {
+      const childTab = createMockTab({
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
         url: 'https://example.com/page',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -176,12 +176,12 @@ describe('タブ開き方別の位置ルール', () => {
 
       registerTabEventListeners();
 
-      const manualTab = {
+      const manualTab = createMockTab({
         id: 1,
         index: 0,
         windowId: 1,
         url: 'https://example.com',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.onCreated.trigger(manualTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -210,12 +210,12 @@ describe('タブ開き方別の位置ルール', () => {
       registerTabEventListeners();
       registerWebNavigationListeners();
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: 1,
         url: 'https://example.com',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
         return Promise.resolve(null);
@@ -232,13 +232,13 @@ describe('タブ開き方別の位置ルール', () => {
         timeStamp: Date.now(),
       });
 
-      const childTab = {
+      const childTab = createMockTab({
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
         url: 'https://example.com/page',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -281,12 +281,12 @@ describe('システムページ判定と新規タブ位置設定', () => {
       registerTabEventListeners();
       registerWebNavigationListeners();
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: 1,
         url: 'https://example.com',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
         return Promise.resolve(null);
@@ -303,13 +303,13 @@ describe('システムページ判定と新規タブ位置設定', () => {
         timeStamp: Date.now(),
       });
 
-      const childTab = {
+      const childTab = createMockTab({
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
         url: 'https://example.com/page',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -327,12 +327,12 @@ describe('システムページ判定と新規タブ位置設定', () => {
       registerTabEventListeners();
       registerWebNavigationListeners();
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: 1,
         url: 'https://example.com',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.get.mockImplementation((tabId: number) => {
         if (tabId === 1) return Promise.resolve(parentTab);
         return Promise.resolve(null);
@@ -349,13 +349,13 @@ describe('システムページ判定と新規タブ位置設定', () => {
         timeStamp: Date.now(),
       });
 
-      const childTab = {
+      const childTab = createMockTab({
         id: 2,
         index: 1,
         windowId: 1,
         openerTabId: 1,
         url: 'https://example.com/page',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.onCreated.trigger(childTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -368,12 +368,12 @@ describe('システムページ判定と新規タブ位置設定', () => {
 
       registerTabEventListeners();
 
-      const manualTab = {
+      const manualTab = createMockTab({
         id: 1,
         index: 0,
         windowId: 1,
         url: 'https://example.com',
-      } as chrome.tabs.Tab;
+      });
       chromeMock.tabs.onCreated.trigger(manualTab);
       await new Promise((resolve) => setTimeout(resolve, 10));
 

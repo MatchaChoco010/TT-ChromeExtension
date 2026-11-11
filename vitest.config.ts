@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 
 // サンドボックス環境対応: 一時ディレクトリをリポジトリ内に設定
-const tmpDir = path.resolve(__dirname, '.vitest-tmp');
+const tmpDir = path.resolve(import.meta.dirname, '.vitest-tmp');
 if (!fs.existsSync(tmpDir)) {
   fs.mkdirSync(tmpDir, { recursive: true });
 }
@@ -15,7 +15,7 @@ process.env.TEMP = tmpDir;
 
 export default defineConfig({
   // キャッシュディレクトリをリポジトリ内に設定（Vite's cacheDir）
-  cacheDir: path.resolve(__dirname, '.vitest-tmp/cache'),
+  cacheDir: path.resolve(import.meta.dirname, '.vitest-tmp/cache'),
   test: {
     globals: true,
     environment: 'jsdom',
@@ -24,7 +24,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
 });

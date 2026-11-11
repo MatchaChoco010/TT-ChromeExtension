@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createMockTab } from '@/test/chrome-mock';
 
 const mockStorageService = {
   get: vi.fn(),
@@ -48,9 +49,9 @@ describe('ツリー同期とリアルタイム更新', () => {
   describe('chrome.tabs API との同期', () => {
     it('restoreStateAfterRestart: 保存された状態をロードしてtabIdを再構築できる', async () => {
       const tabs: chrome.tabs.Tab[] = [
-        { id: 101, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
-        { id: 102, url: 'https://example.com/2', title: 'Tab 2', index: 1, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
-        { id: 103, url: 'https://example.com/3', title: 'Tab 3', index: 2, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        createMockTab({ id: 101, url: 'https://example.com/1', title: 'Tab 1' }),
+        createMockTab({ id: 102, url: 'https://example.com/2', title: 'Tab 2', index: 1 }),
+        createMockTab({ id: 103, url: 'https://example.com/3', title: 'Tab 3', index: 2 }),
       ];
 
       const savedState = {
@@ -95,7 +96,7 @@ describe('ツリー同期とリアルタイム更新', () => {
 
     it('restoreStateAfterRestart: 2回呼び出しても2回目は何もしない', async () => {
       const tabs: chrome.tabs.Tab[] = [
-        { id: 101, url: 'https://example.com/1', title: 'Tab 1', index: 0, pinned: false, highlighted: false, windowId: 1, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+        createMockTab({ id: 101, url: 'https://example.com/1', title: 'Tab 1' }),
       ];
 
       const savedState = {
@@ -164,22 +165,7 @@ describe('ツリー同期とリアルタイム更新', () => {
         title: 'New Title',
         url: 'https://new-url.com',
       };
-      const tab: chrome.tabs.Tab = {
-        id: 1,
-        url: 'https://new-url.com',
-        title: 'New Title',
-        index: 0,
-        pinned: false,
-        highlighted: false,
-        windowId: 1,
-        active: false,
-        incognito: false,
-        selected: false,
-        discarded: false,
-        autoDiscardable: true,
-        groupId: -1,
-        frozen: false,
-      };
+      const tab = createMockTab({ id: 1, url: 'https://new-url.com', title: 'New Title' });
 
       await handleTabUpdated(tabId, changeInfo, tab);
 
@@ -200,22 +186,7 @@ describe('ツリー同期とリアルタイム更新', () => {
       const { TreeStateManager } = await import('@/services/TreeStateManager');
       const manager = new TreeStateManager(mockStorageService);
 
-      const tab: chrome.tabs.Tab = {
-        id: 1,
-        url: 'https://example.com',
-        title: 'Test',
-        index: 0,
-        pinned: false,
-        highlighted: false,
-        windowId: 1,
-        active: false,
-        incognito: false,
-        selected: false,
-        discarded: false,
-        autoDiscardable: true,
-        groupId: -1,
-        frozen: false,
-      };
+      const tab = createMockTab({ id: 1, url: 'https://example.com', title: 'Test' });
       await manager.addTab(tab, null, 1);
 
       await manager.removeTab(1);

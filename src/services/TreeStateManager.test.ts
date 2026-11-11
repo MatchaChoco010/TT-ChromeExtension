@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TreeStateManager } from './TreeStateManager';
 import type { IStorageService } from '@/types';
+import { createMockTab } from '@/test/chrome-mock';
 
 describe('TreeStateManager', () => {
   let manager: TreeStateManager;
@@ -34,7 +35,7 @@ describe('TreeStateManager', () => {
   describe('getTree', () => {
     it('指定されたwindowIdのタブツリーを取得できる', async () => {
       await manager.addTab(
-        { id: 1, url: 'https://example.com', title: 'Example', windowId: defaultWindowId } as chrome.tabs.Tab,
+        createMockTab({ id: 1, url: 'https://example.com', title: 'Example', windowId: defaultWindowId }),
         null,
         defaultWindowId,
       );
@@ -57,7 +58,7 @@ describe('TreeStateManager', () => {
       const tabId = 1;
 
       await manager.addTab(
-        { id: tabId, url: 'https://example.com', title: 'Example', windowId: defaultWindowId } as chrome.tabs.Tab,
+        createMockTab({ id: tabId, url: 'https://example.com', title: 'Example', windowId: defaultWindowId }),
         null,
         defaultWindowId,
       );
@@ -76,12 +77,12 @@ describe('TreeStateManager', () => {
 
   describe('addTab', () => {
     it('新しいタブをルートノードとして追加できる', async () => {
-      const tab = {
+      const tab = createMockTab({
         id: 1,
         url: 'https://example.com',
         title: 'Example',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
+      });
 
       await manager.addTab(tab, null, defaultWindowId);
 
@@ -95,18 +96,18 @@ describe('TreeStateManager', () => {
     });
 
     it('親ノードを指定して子タブとして追加できる', async () => {
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         url: 'https://example.com',
         title: 'Parent',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
-      const childTab = {
+      });
+      const childTab = createMockTab({
         id: 2,
         url: 'https://example.com/child',
         title: 'Child',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
+      });
 
       await manager.addTab(parentTab, null, defaultWindowId);
       const parentResult = manager.getNodeByTabId(parentTab.id!);
@@ -120,12 +121,12 @@ describe('TreeStateManager', () => {
     });
 
     it('タブ追加後にストレージに永続化される', async () => {
-      const tab = {
+      const tab = createMockTab({
         id: 1,
         url: 'https://example.com',
         title: 'Example',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
+      });
 
       await manager.addTab(tab, null, defaultWindowId);
 
@@ -140,12 +141,12 @@ describe('TreeStateManager', () => {
 
   describe('removeTab', () => {
     it('タブを削除できる', async () => {
-      const tab = {
+      const tab = createMockTab({
         id: 1,
         url: 'https://example.com',
         title: 'Example',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
+      });
 
       await manager.addTab(tab, null, defaultWindowId);
       expect(manager.getNodeByTabId(tab.id!)).toBeDefined();
@@ -155,12 +156,12 @@ describe('TreeStateManager', () => {
     });
 
     it('削除後にストレージに永続化される', async () => {
-      const tab = {
+      const tab = createMockTab({
         id: 1,
         url: 'https://example.com',
         title: 'Example',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
+      });
 
       await manager.addTab(tab, null, defaultWindowId);
       await manager.removeTab(tab.id!);
@@ -171,8 +172,8 @@ describe('TreeStateManager', () => {
 
   describe('moveNode', () => {
     it('ノードを別の親ノードの子として移動できる', async () => {
-      const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const tab1 = createMockTab({ id: 1, url: 'https://example.com/1', title: 'Tab1', windowId: defaultWindowId });
+      const tab2 = createMockTab({ id: 2, url: 'https://example.com/2', title: 'Tab2', windowId: defaultWindowId });
 
       await manager.addTab(tab1, null, defaultWindowId);
       await manager.addTab(tab2, null, defaultWindowId);
@@ -184,8 +185,8 @@ describe('TreeStateManager', () => {
     });
 
     it('移動後にストレージに永続化される', async () => {
-      const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const tab1 = createMockTab({ id: 1, url: 'https://example.com/1', title: 'Tab1', windowId: defaultWindowId });
+      const tab2 = createMockTab({ id: 2, url: 'https://example.com/2', title: 'Tab2', windowId: defaultWindowId });
 
       await manager.addTab(tab1, null, defaultWindowId);
       await manager.addTab(tab2, null, defaultWindowId);
@@ -196,10 +197,10 @@ describe('TreeStateManager', () => {
     });
 
     it('子孫を持つノードを移動できる', async () => {
-      const tab1 = { id: 1, url: 'https://example.com/1', title: 'Root1', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const tab2 = { id: 2, url: 'https://example.com/2', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const tab3 = { id: 3, url: 'https://example.com/3', title: 'Grandchild', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const tab4 = { id: 4, url: 'https://example.com/4', title: 'Root2', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const tab1 = createMockTab({ id: 1, url: 'https://example.com/1', title: 'Root1', windowId: defaultWindowId });
+      const tab2 = createMockTab({ id: 2, url: 'https://example.com/2', title: 'Child', windowId: defaultWindowId });
+      const tab3 = createMockTab({ id: 3, url: 'https://example.com/3', title: 'Grandchild', windowId: defaultWindowId });
+      const tab4 = createMockTab({ id: 4, url: 'https://example.com/4', title: 'Root2', windowId: defaultWindowId });
 
       await manager.addTab(tab1, null, defaultWindowId);
       await manager.addTab(tab2, tab1.id!, defaultWindowId);
@@ -218,12 +219,12 @@ describe('TreeStateManager', () => {
 
   describe('toggleExpand', () => {
     it('ノードの展開状態を切り替えられる', async () => {
-      const tab = {
+      const tab = createMockTab({
         id: 1,
         url: 'https://example.com',
         title: 'Example',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
+      });
 
       await manager.addTab(tab, null, defaultWindowId);
       const result = manager.getNodeByTabId(tab.id!);
@@ -236,12 +237,12 @@ describe('TreeStateManager', () => {
     });
 
     it('展開状態切り替え後にストレージに永続化される', async () => {
-      const tab = {
+      const tab = createMockTab({
         id: 1,
         url: 'https://example.com',
         title: 'Example',
         windowId: defaultWindowId,
-      } as chrome.tabs.Tab;
+      });
 
       await manager.addTab(tab, null, defaultWindowId);
 
@@ -332,9 +333,9 @@ describe('TreeStateManager', () => {
   describe('子タブ処理', () => {
     describe('childTabBehavior: promote', () => {
       it('親タブを閉じると、子タブが親のレベルに昇格する', async () => {
-        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const child1Tab = { id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const child2Tab = { id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
+        const child1Tab = createMockTab({ id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId });
+        const child2Tab = createMockTab({ id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId });
 
         await manager.addTab(parentTab, null, defaultWindowId);
         await manager.addTab(child1Tab, parentTab.id!, defaultWindowId);
@@ -359,9 +360,9 @@ describe('TreeStateManager', () => {
       });
 
       it('親タブを閉じると、孫タブは子タブの子として維持される', async () => {
-        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const childTab = { id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const grandchildTab = { id: 3, url: 'https://example.com/grandchild', title: 'Grandchild', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
+        const childTab = createMockTab({ id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId });
+        const grandchildTab = createMockTab({ id: 3, url: 'https://example.com/grandchild', title: 'Grandchild', windowId: defaultWindowId });
 
         await manager.addTab(parentTab, null, defaultWindowId);
         await manager.addTab(childTab, parentTab.id!, defaultWindowId);
@@ -381,10 +382,10 @@ describe('TreeStateManager', () => {
 
     describe('childTabBehavior: close_all', () => {
       it('親タブを閉じると、すべての子タブが再帰的に削除される', async () => {
-        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const child1Tab = { id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const child2Tab = { id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const grandchildTab = { id: 4, url: 'https://example.com/grandchild', title: 'Grandchild', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
+        const child1Tab = createMockTab({ id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId });
+        const child2Tab = createMockTab({ id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId });
+        const grandchildTab = createMockTab({ id: 4, url: 'https://example.com/grandchild', title: 'Grandchild', windowId: defaultWindowId });
 
         await manager.addTab(parentTab, null, defaultWindowId);
         await manager.addTab(child1Tab, parentTab.id!, defaultWindowId);
@@ -413,8 +414,8 @@ describe('TreeStateManager', () => {
 
     describe('後方互換性', () => {
       it('childTabBehaviorを指定しない場合、デフォルトでpromote動作になる', async () => {
-        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const childTab = { id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
+        const childTab = createMockTab({ id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId });
 
         await manager.addTab(parentTab, null, defaultWindowId);
         await manager.addTab(childTab, parentTab.id!, defaultWindowId);
@@ -432,8 +433,8 @@ describe('TreeStateManager', () => {
 
   describe('createGroupWithRealTab', () => {
     it('実際のタブIDでグループノードを作成できる', async () => {
-      const childTab1 = { id: 1, url: 'https://example.com/1', title: 'Child1', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const childTab2 = { id: 2, url: 'https://example.com/2', title: 'Child2', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const childTab1 = createMockTab({ id: 1, url: 'https://example.com/1', title: 'Child1', windowId: defaultWindowId });
+      const childTab2 = createMockTab({ id: 2, url: 'https://example.com/2', title: 'Child2', windowId: defaultWindowId });
 
       await manager.addTab(childTab1, null, defaultWindowId);
       await manager.addTab(childTab2, null, defaultWindowId);
@@ -450,7 +451,7 @@ describe('TreeStateManager', () => {
     });
 
     it('グループノードがルートレベルに作成される', async () => {
-      const childTab = { id: 1, url: 'https://example.com/1', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const childTab = createMockTab({ id: 1, url: 'https://example.com/1', title: 'Child', windowId: defaultWindowId });
       await manager.addTab(childTab, null, defaultWindowId);
 
       const groupTabId = 100;
@@ -461,7 +462,7 @@ describe('TreeStateManager', () => {
     });
 
     it('グループ情報がノードに直接埋め込まれる', async () => {
-      const childTab = { id: 1, url: 'https://example.com/1', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const childTab = createMockTab({ id: 1, url: 'https://example.com/1', title: 'Child', windowId: defaultWindowId });
       await manager.addTab(childTab, null, defaultWindowId);
 
       const groupTabId = 100;
@@ -475,8 +476,8 @@ describe('TreeStateManager', () => {
     });
 
     it('子タブが既に別の親を持つ場合、その親から削除されてグループに移動する', async () => {
-      const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const childTab = { id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
+      const childTab = createMockTab({ id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId });
 
       await manager.addTab(parentTab, null, defaultWindowId);
       await manager.addTab(childTab, parentTab.id!, defaultWindowId);
@@ -514,11 +515,11 @@ describe('TreeStateManager', () => {
 
     describe('グループタブの階層決定', () => {
       it('すべてのタブが同じ親を持つ場合、コンテキストメニューを開いたタブの位置にグループが配置される', async () => {
-        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
         await manager.addTab(parentTab, null, defaultWindowId);
 
-        const childTab1 = { id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const childTab2 = { id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const childTab1 = createMockTab({ id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId });
+        const childTab2 = createMockTab({ id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId });
         await manager.addTab(childTab1, parentTab.id!, defaultWindowId);
         await manager.addTab(childTab2, parentTab.id!, defaultWindowId);
 
@@ -534,13 +535,13 @@ describe('TreeStateManager', () => {
       });
 
       it('タブが異なる親を持つ場合、コンテキストメニューを開いたタブの位置にグループが配置される', async () => {
-        const parent1Tab = { id: 1, url: 'https://example.com/parent1', title: 'Parent1', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const parent2Tab = { id: 2, url: 'https://example.com/parent2', title: 'Parent2', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parent1Tab = createMockTab({ id: 1, url: 'https://example.com/parent1', title: 'Parent1', windowId: defaultWindowId });
+        const parent2Tab = createMockTab({ id: 2, url: 'https://example.com/parent2', title: 'Parent2', windowId: defaultWindowId });
         await manager.addTab(parent1Tab, null, defaultWindowId);
         await manager.addTab(parent2Tab, null, defaultWindowId);
 
-        const child1Tab = { id: 3, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const child2Tab = { id: 4, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const child1Tab = createMockTab({ id: 3, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId });
+        const child2Tab = createMockTab({ id: 4, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId });
         await manager.addTab(child1Tab, parent1Tab.id!, defaultWindowId);
         await manager.addTab(child2Tab, parent2Tab.id!, defaultWindowId);
 
@@ -556,13 +557,13 @@ describe('TreeStateManager', () => {
       });
 
       it('コンテキストメニューを開いたタブがルートレベルの場合、グループもルートレベルに配置される', async () => {
-        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
         await manager.addTab(parentTab, null, defaultWindowId);
 
-        const childTab = { id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const childTab = createMockTab({ id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId });
         await manager.addTab(childTab, parentTab.id!, defaultWindowId);
 
-        const rootTab = { id: 3, url: 'https://example.com/root', title: 'Root', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const rootTab = createMockTab({ id: 3, url: 'https://example.com/root', title: 'Root', windowId: defaultWindowId });
         await manager.addTab(rootTab, null, defaultWindowId);
 
         const groupTabId = 100;
@@ -573,8 +574,8 @@ describe('TreeStateManager', () => {
       });
 
       it('すべてのタブがルートレベルの場合、グループタブもルートレベルに配置される', async () => {
-        const tab1 = { id: 1, url: 'https://example.com/1', title: 'Tab1', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const tab2 = { id: 2, url: 'https://example.com/2', title: 'Tab2', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const tab1 = createMockTab({ id: 1, url: 'https://example.com/1', title: 'Tab1', windowId: defaultWindowId });
+        const tab2 = createMockTab({ id: 2, url: 'https://example.com/2', title: 'Tab2', windowId: defaultWindowId });
         await manager.addTab(tab1, null, defaultWindowId);
         await manager.addTab(tab2, null, defaultWindowId);
 
@@ -586,11 +587,11 @@ describe('TreeStateManager', () => {
       });
 
       it('サブツリーをグループ化した際に親子関係が維持される', async () => {
-        const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
         await manager.addTab(parentTab, null, defaultWindowId);
 
-        const child1Tab = { id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId } as chrome.tabs.Tab;
-        const child2Tab = { id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId } as chrome.tabs.Tab;
+        const child1Tab = createMockTab({ id: 2, url: 'https://example.com/child1', title: 'Child1', windowId: defaultWindowId });
+        const child2Tab = createMockTab({ id: 3, url: 'https://example.com/child2', title: 'Child2', windowId: defaultWindowId });
         await manager.addTab(child1Tab, parentTab.id!, defaultWindowId);
         await manager.addTab(child2Tab, parentTab.id!, defaultWindowId);
 
@@ -615,7 +616,7 @@ describe('TreeStateManager', () => {
     it('タブIDを正しく置き換える', async () => {
       const oldTabId = 100;
       const newTabId = 200;
-      const tab = { id: oldTabId, url: 'https://example.com', title: 'Example', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const tab = createMockTab({ id: oldTabId, url: 'https://example.com', title: 'Example', windowId: defaultWindowId });
 
       await manager.addTab(tab, null, defaultWindowId);
 
@@ -631,8 +632,8 @@ describe('TreeStateManager', () => {
     });
 
     it('親子関係のあるタブのIDを置き換えてもツリー構造が維持される', async () => {
-      const parentTab = { id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId } as chrome.tabs.Tab;
-      const childTab = { id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const parentTab = createMockTab({ id: 1, url: 'https://example.com/parent', title: 'Parent', windowId: defaultWindowId });
+      const childTab = createMockTab({ id: 2, url: 'https://example.com/child', title: 'Child', windowId: defaultWindowId });
 
       await manager.addTab(parentTab, null, defaultWindowId);
       await manager.addTab(childTab, parentTab.id!, defaultWindowId);
@@ -652,7 +653,7 @@ describe('TreeStateManager', () => {
     });
 
     it('存在しないタブIDを置き換えようとしても何も起きない', async () => {
-      const tab = { id: 1, url: 'https://example.com', title: 'Example', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const tab = createMockTab({ id: 1, url: 'https://example.com', title: 'Example', windowId: defaultWindowId });
 
       await manager.addTab(tab, null, defaultWindowId);
 
@@ -664,7 +665,7 @@ describe('TreeStateManager', () => {
     });
 
     it('置き換え後にストレージに永続化される', async () => {
-      const tab = { id: 1, url: 'https://example.com', title: 'Example', windowId: defaultWindowId } as chrome.tabs.Tab;
+      const tab = createMockTab({ id: 1, url: 'https://example.com', title: 'Example', windowId: defaultWindowId });
 
       await manager.addTab(tab, null, defaultWindowId);
       vi.clearAllMocks();

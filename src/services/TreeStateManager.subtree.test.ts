@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TreeStateManager } from './TreeStateManager';
 import { StorageService } from '@/storage/StorageService';
+import { createMockTab } from '@/test/chrome-mock';
 
 describe('TreeStateManager - Subtree Operations', () => {
   let treeStateManager: TreeStateManager;
@@ -20,11 +21,11 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   │   ├── tab4
       //   │   └── tab5
       //   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
-      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
-      const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
+      const tab2 = createMockTab({ id: 2, index: 1, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
+      const tab3 = createMockTab({ id: 3, index: 2, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
+      const tab4 = createMockTab({ id: 4, index: 3, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 2 });
+      const tab5 = createMockTab({ id: 5, index: 4, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 2 });
 
       await treeStateManager.addTab(tab1, null, defaultWindowId);
       await treeStateManager.addTab(tab2, 1, defaultWindowId);
@@ -46,7 +47,7 @@ describe('TreeStateManager - Subtree Operations', () => {
 
     it('should return only the root node if it has no children', async () => {
       // Arrange: Create a single tab with no children
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
       await treeStateManager.addTab(tab1, null, defaultWindowId);
 
       // Act: Get subtree
@@ -70,9 +71,9 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   tab1
       //   ├── tab2
       //   │   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
+      const tab2 = createMockTab({ id: 2, index: 1, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
+      const tab3 = createMockTab({ id: 3, index: 2, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 2 });
 
       await treeStateManager.addTab(tab1, null, defaultWindowId);
       await treeStateManager.addTab(tab2, 1, defaultWindowId);
@@ -105,11 +106,11 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   │   ├── tab4
       //   │   └── tab5
       //   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
-      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
-      const tab5: chrome.tabs.Tab = { id: 5, index: 4, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
+      const tab2 = createMockTab({ id: 2, index: 1, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
+      const tab3 = createMockTab({ id: 3, index: 2, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
+      const tab4 = createMockTab({ id: 4, index: 3, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 2 });
+      const tab5 = createMockTab({ id: 5, index: 4, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 2 });
 
       await treeStateManager.addTab(tab1, null, defaultWindowId);
       await treeStateManager.addTab(tab2, 1, defaultWindowId);
@@ -126,7 +127,7 @@ describe('TreeStateManager - Subtree Operations', () => {
 
     it('should return 1 for a node without children', async () => {
       // Arrange: Create a single tab with no children
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
       await treeStateManager.addTab(tab1, null, defaultWindowId);
 
       // Act & Assert: Should return 1
@@ -144,10 +145,10 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   └── tab2
       //       └── tab3
       //           └── tab4
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 2, frozen: false };
-      const tab4: chrome.tabs.Tab = { id: 4, index: 3, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 3, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
+      const tab2 = createMockTab({ id: 2, index: 1, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
+      const tab3 = createMockTab({ id: 3, index: 2, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 2 });
+      const tab4 = createMockTab({ id: 4, index: 3, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 3 });
 
       await treeStateManager.addTab(tab1, null, defaultWindowId);
       await treeStateManager.addTab(tab2, 1, defaultWindowId);
@@ -168,9 +169,9 @@ describe('TreeStateManager - Subtree Operations', () => {
       //   tab1
       //   ├── tab2
       //   └── tab3
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
-      const tab2: chrome.tabs.Tab = { id: 2, index: 1, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
-      const tab3: chrome.tabs.Tab = { id: 3, index: 2, pinned: false, highlighted: false, active: false, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, openerTabId: 1, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
+      const tab2 = createMockTab({ id: 2, index: 1, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
+      const tab3 = createMockTab({ id: 3, index: 2, windowId: defaultWindowId, autoDiscardable: false, openerTabId: 1 });
 
       await treeStateManager.addTab(tab1, null, defaultWindowId);
       await treeStateManager.addTab(tab2, 1, defaultWindowId);
@@ -198,7 +199,7 @@ describe('TreeStateManager - Subtree Operations', () => {
 
     it('should handle moving a single node without children', async () => {
       // Arrange: Create a single tab
-      const tab1: chrome.tabs.Tab = { id: 1, index: 0, pinned: false, highlighted: false, active: true, incognito: false, windowId: defaultWindowId, selected: false, discarded: false, autoDiscardable: false, groupId: -1, frozen: false };
+      const tab1 = createMockTab({ id: 1, active: true, windowId: defaultWindowId, autoDiscardable: false });
       await treeStateManager.addTab(tab1, null, defaultWindowId);
 
       // Create a second view

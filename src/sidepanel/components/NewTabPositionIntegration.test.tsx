@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { chromeMock } from '@/test/chrome-mock';
+import { chromeMock, createMockTab } from '@/test/chrome-mock';
 import { StorageService, STORAGE_KEYS } from '@/storage/StorageService';
 import { TreeStateManager } from '@/services/TreeStateManager';
 import type { UserSettings, TreeState } from '@/types';
@@ -73,7 +73,7 @@ describe('新規タブ位置の統合テスト', () => {
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: defaultWindowId,
@@ -83,11 +83,11 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(parentTab, null, defaultWindowId);
 
-      const childTab = {
+      const childTab = createMockTab({
         id: 2,
         index: 1,
         windowId: defaultWindowId,
@@ -98,7 +98,7 @@ describe('新規タブ位置の統合テスト', () => {
         highlighted: false,
         incognito: false,
         openerTabId: 1,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(childTab, 1, defaultWindowId);
 
@@ -125,7 +125,7 @@ describe('新規タブ位置の統合テスト', () => {
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: defaultWindowId,
@@ -135,11 +135,11 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(parentTab, null, defaultWindowId);
 
-      const childTab = {
+      const childTab = createMockTab({
         id: 2,
         index: 1,
         windowId: defaultWindowId,
@@ -150,7 +150,7 @@ describe('新規タブ位置の統合テスト', () => {
         highlighted: false,
         incognito: false,
         openerTabId: 1,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(childTab, 1, defaultWindowId);
 
@@ -179,7 +179,7 @@ describe('新規タブ位置の統合テスト', () => {
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
-      const existingTab = {
+      const existingTab = createMockTab({
         id: 1,
         index: 0,
         windowId: defaultWindowId,
@@ -189,11 +189,11 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(existingTab, null, defaultWindowId);
 
-      const manualTab = {
+      const manualTab = createMockTab({
         id: 2,
         index: 1,
         windowId: defaultWindowId,
@@ -203,7 +203,7 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(manualTab, null, defaultWindowId);
 
@@ -230,7 +230,7 @@ describe('新規タブ位置の統合テスト', () => {
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
-      const tab1 = {
+      const tab1 = createMockTab({
         id: 1,
         index: 0,
         windowId: defaultWindowId,
@@ -240,9 +240,9 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
-      const tab2 = {
+      const tab2 = createMockTab({
         id: 2,
         index: 1,
         windowId: defaultWindowId,
@@ -252,9 +252,9 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
-      const tab3 = {
+      const tab3 = createMockTab({
         id: 3,
         index: 2,
         windowId: defaultWindowId,
@@ -264,7 +264,7 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(tab1, null, defaultWindowId);
       await testTreeStateManager.addTab(tab2, null, defaultWindowId);
@@ -301,7 +301,7 @@ describe('新規タブ位置の統合テスト', () => {
       };
       await testStorageService.set(STORAGE_KEYS.USER_SETTINGS, settings);
 
-      const parentTab = {
+      const parentTab = createMockTab({
         id: 1,
         index: 0,
         windowId: defaultWindowId,
@@ -311,11 +311,11 @@ describe('新規タブ位置の統合テスト', () => {
         pinned: false,
         highlighted: false,
         incognito: false,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(parentTab, null, defaultWindowId);
 
-      const siblingTab = {
+      const siblingTab = createMockTab({
         id: 2,
         index: 1,
         windowId: defaultWindowId,
@@ -326,7 +326,7 @@ describe('新規タブ位置の統合テスト', () => {
         highlighted: false,
         incognito: false,
         openerTabId: 1,
-      } as chrome.tabs.Tab;
+      });
 
       await testTreeStateManager.addTab(siblingTab, null, defaultWindowId);
 

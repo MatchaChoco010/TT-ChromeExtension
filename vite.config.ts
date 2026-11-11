@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { crx } from '@crxjs/vite-plugin';
-import manifest from './manifest.json';
-import path from 'path';
+import manifest from './manifest.json' with { type: 'json' };
+import path from 'node:path';
 
 export default defineConfig({
   plugins: [
@@ -11,11 +11,11 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         sidepanel: 'sidepanel.html',
         settings: 'settings.html',

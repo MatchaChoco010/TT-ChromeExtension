@@ -30,7 +30,7 @@ describe('UnreadIndicator 統合テスト', () => {
     depth,
   });
 
-  const createMockTab = (id: number, title: string = 'Test Tab'): TabInfo => ({
+  const createMockTabInfo = (id: number, title: string = 'Test Tab'): TabInfo => ({
     id,
     title,
     url: 'https://example.com',
@@ -41,7 +41,7 @@ describe('UnreadIndicator 統合テスト', () => {
   describe('未読タブに未読インジケータを表示', () => {
     it('新しく開かれた未読タブに未読バッジが表示される', async () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, '未読タブ');
+      const tab = createMockTabInfo(1, '未読タブ');
 
       await unreadTracker.markAsUnread(tab.id);
       const isUnread = unreadTracker.isUnread(tab.id);
@@ -70,7 +70,7 @@ describe('UnreadIndicator 統合テスト', () => {
   describe('タブアクティブ化時に未読インジケータを削除', () => {
     it('タブをアクティブにすると未読バッジが削除される', async () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, 'アクティブ化するタブ');
+      const tab = createMockTabInfo(1, 'アクティブ化するタブ');
 
       await unreadTracker.markAsUnread(tab.id);
       expect(unreadTracker.isUnread(tab.id)).toBe(true);
@@ -113,7 +113,7 @@ describe('UnreadIndicator 統合テスト', () => {
   describe('設定による未読インジケータの表示/非表示切り替え', () => {
     it('showUnreadIndicator=trueの場合、未読バッジが表示される', () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, '未読タブ');
+      const tab = createMockTabInfo(1, '未読タブ');
 
       render(
         <TreeNode
@@ -133,7 +133,7 @@ describe('UnreadIndicator 統合テスト', () => {
 
     it('showUnreadIndicator=falseの場合、未読タブでもバッジが表示されない', () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, '未読タブ（設定でバッジ非表示）');
+      const tab = createMockTabInfo(1, '未読タブ（設定でバッジ非表示）');
 
       render(
         <TreeNode

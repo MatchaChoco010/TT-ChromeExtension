@@ -4,6 +4,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import { TreeStateProvider, useTreeState } from './TreeStateProvider';
 import type { TreeState, StorageChanges, SiblingDropInfo, TabNode } from '@/types';
 import type { MockChrome, MessageListener } from '@/test/test-types';
+import { createMockTab } from '@/test/chrome-mock';
 
 function TestComponent() {
   const { treeState, isLoading, error, currentViewIndex, currentWindowState } = useTreeState();
@@ -2023,23 +2024,7 @@ describe('TreeStateProvider ファビコン永続化', () => {
         listener(
           1,
           { favIconUrl: undefined },
-          {
-            id: 1,
-            title: 'Test Page',
-            url: 'https://example.com',
-            favIconUrl: undefined,
-            status: 'loading',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1, frozen: false,
-          }
+          createMockTab({ id: 1, title: 'Test Page', url: 'https://example.com', favIconUrl: undefined, status: 'loading', active: true })
         );
       });
     });
@@ -2260,23 +2245,7 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
         listener(
           999,
           { status: 'loading' },
-          {
-            id: 999,
-            title: '',
-            url: '',
-            favIconUrl: undefined,
-            status: 'loading',
-            pinned: false,
-            active: false,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1, frozen: false,
-          }
+          createMockTab({ id: 999, title: '', url: '', favIconUrl: undefined, status: 'loading' })
         );
       });
     });
@@ -2304,23 +2273,7 @@ describe('TreeStateProvider 余分なLoadingタブ防止', () => {
         listener(
           1,
           { title: 'Updated Title' },
-          {
-            id: 1,
-            title: 'Updated Title',
-            url: 'https://example.com',
-            favIconUrl: 'https://example.com/favicon.ico',
-            status: 'complete',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1, frozen: false,
-          }
+          createMockTab({ id: 1, title: 'Updated Title', url: 'https://example.com', favIconUrl: 'https://example.com/favicon.ico', status: 'complete', active: true })
         );
       });
     });
@@ -2514,23 +2467,7 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
         listener(
           1,
           { title: undefined },
-          {
-            id: 1,
-            title: undefined,
-            url: 'https://example.com',
-            favIconUrl: 'https://example.com/favicon.ico',
-            status: 'loading',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1, frozen: false,
-          }
+          createMockTab({ id: 1, title: undefined, url: 'https://example.com', favIconUrl: 'https://example.com/favicon.ico', status: 'loading', active: true })
         );
       });
     });
@@ -2564,23 +2501,7 @@ describe('TreeStateProvider タブタイトル永続化更新', () => {
         listener(
           1,
           { title: '' },
-          {
-            id: 1,
-            title: '',
-            url: 'https://example.com',
-            favIconUrl: 'https://example.com/favicon.ico',
-            status: 'loading',
-            pinned: false,
-            active: true,
-            index: 0,
-            windowId: 1,
-            highlighted: false,
-            incognito: false,
-            selected: false,
-            discarded: false,
-            autoDiscardable: true,
-            groupId: -1, frozen: false,
-          }
+          createMockTab({ id: 1, title: '', url: 'https://example.com', favIconUrl: 'https://example.com/favicon.ico', status: 'loading', active: true })
         );
       });
     });
@@ -2787,10 +2708,10 @@ describe('TreeStateProvider viewTabCounts 正確性', () => {
 
   it('すべてのタブが存在する場合は全ノードをカウントする', async () => {
     mockChrome.tabs.query.mockResolvedValue([
-      { id: 1, title: 'Tab 1', url: 'https://example.com/1', pinned: false, windowId: 1, status: 'complete', index: 0, highlighted: false, active: true, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
-      { id: 2, title: 'Tab 2', url: 'https://example.com/2', pinned: false, windowId: 1, status: 'complete', index: 1, highlighted: false, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
-      { id: 3, title: 'Tab 3', url: 'https://example.com/3', pinned: false, windowId: 1, status: 'complete', index: 2, highlighted: false, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
-      { id: 4, title: 'Tab 4', url: 'https://example.com/4', pinned: false, windowId: 1, status: 'complete', index: 3, highlighted: false, active: false, incognito: false, selected: false, discarded: false, autoDiscardable: true, groupId: -1, frozen: false },
+      createMockTab({ id: 1, title: 'Tab 1', url: 'https://example.com/1', status: 'complete', active: true }),
+      createMockTab({ id: 2, title: 'Tab 2', url: 'https://example.com/2', status: 'complete', index: 1 }),
+      createMockTab({ id: 3, title: 'Tab 3', url: 'https://example.com/3', status: 'complete', index: 2 }),
+      createMockTab({ id: 4, title: 'Tab 4', url: 'https://example.com/4', status: 'complete', index: 3 }),
     ]);
 
     await act(async () => {

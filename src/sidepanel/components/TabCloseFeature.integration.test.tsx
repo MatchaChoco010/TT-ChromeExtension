@@ -23,7 +23,7 @@ describe('タブ閉じる機能の統合テスト', () => {
     isExpanded,
   });
 
-  const createMockTab = (id: number, title: string = 'Test Tab'): TabInfo => ({
+  const createMockTabInfo = (id: number, title: string = 'Test Tab'): TabInfo => ({
     id,
     title,
     url: 'https://example.com',
@@ -34,7 +34,7 @@ describe('タブ閉じる機能の統合テスト', () => {
   describe('マウスホバー時に閉じるボタンが表示される', () => {
     it('タブノードにマウスをホバーすると、閉じるボタンが表示される', () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, 'ホバーするタブ');
+      const tab = createMockTabInfo(1, 'ホバーするタブ');
       const onClose = vi.fn();
 
       render(
@@ -60,7 +60,7 @@ describe('タブ閉じる機能の統合テスト', () => {
 
     it('タブノードからマウスを離すと、閉じるボタンが非表示になる', () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, 'ホバー解除するタブ');
+      const tab = createMockTabInfo(1, 'ホバー解除するタブ');
       const onClose = vi.fn();
 
       render(
@@ -87,7 +87,7 @@ describe('タブ閉じる機能の統合テスト', () => {
 
     it('閉じるボタンをクリックすると、onCloseコールバックが呼ばれる', () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, '閉じるタブ');
+      const tab = createMockTabInfo(1, '閉じるタブ');
       const onClose = vi.fn();
 
       render(
@@ -125,7 +125,7 @@ describe('タブ閉じる機能の統合テスト', () => {
         false,
       );
 
-      const tab = createMockTab(1, '親タブ');
+      const tab = createMockTabInfo(1, '親タブ');
       const onClose = vi.fn();
 
       render(
@@ -165,7 +165,7 @@ describe('タブ閉じる機能の統合テスト', () => {
         false,
       );
 
-      const tab = createMockTab(1, '親タブ');
+      const tab = createMockTabInfo(1, '親タブ');
       const onClose = vi.fn();
 
       render(
@@ -207,7 +207,7 @@ describe('タブ閉じる機能の統合テスト', () => {
         false,
       );
 
-      const tab = createMockTab(1, '親タブ');
+      const tab = createMockTabInfo(1, '親タブ');
       const onClose = vi.fn();
 
       render(
@@ -249,7 +249,7 @@ describe('タブ閉じる機能の統合テスト', () => {
         true,
       );
 
-      const tab = createMockTab(1, '親タブ（展開済み）');
+      const tab = createMockTabInfo(1, '親タブ（展開済み）');
       const onClose = vi.fn();
 
       render(
@@ -288,7 +288,7 @@ describe('タブ閉じる機能の統合テスト', () => {
         false,
       );
 
-      const tab = createMockTab(1, '親タブ');
+      const tab = createMockTabInfo(1, '親タブ');
       const onClose = vi.fn();
 
       render(
@@ -329,7 +329,7 @@ describe('タブ閉じる機能の統合テスト', () => {
         false,
       );
 
-      const tab = createMockTab(1, '親タブ（大きなサブツリー）');
+      const tab = createMockTabInfo(1, '親タブ（大きなサブツリー）');
       const onClose = vi.fn();
 
       render(
@@ -368,7 +368,7 @@ describe('タブ閉じる機能の統合テスト', () => {
         false,
       );
 
-      const tab = createMockTab(1, '親タブ');
+      const tab = createMockTabInfo(1, '親タブ');
       const onClose = vi.fn();
 
       render(
@@ -398,7 +398,7 @@ describe('タブ閉じる機能の統合テスト', () => {
   describe('エッジケース', () => {
     it('子タブを持たない単一のタブを閉じる場合、確認ダイアログは表示されない', () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, '単一タブ');
+      const tab = createMockTabInfo(1, '単一タブ');
       const onClose = vi.fn();
 
       render(
@@ -428,7 +428,7 @@ describe('タブ閉じる機能の統合テスト', () => {
 
     it('閉じるボタンのクリックがノードのクリックイベントを伝播しない', () => {
       const node = createMockNode(1);
-      const tab = createMockTab(1, 'クリック伝播テスト');
+      const tab = createMockTabInfo(1, 'クリック伝播テスト');
       const onActivate = vi.fn();
       const onClose = vi.fn();
 

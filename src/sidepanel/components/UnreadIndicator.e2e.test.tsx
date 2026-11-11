@@ -59,7 +59,7 @@ describe('未読インジケータ E2Eテスト', () => {
     depth,
   });
 
-  const createMockTab = (id: number, title: string = 'Test Tab'): TabInfo => ({
+  const createMockTabInfo = (id: number, title: string = 'Test Tab'): TabInfo => ({
     id,
     title,
     url: 'https://example.com',
@@ -71,7 +71,7 @@ describe('未読インジケータ E2Eテスト', () => {
     it('新しいタブが作成されると未読バッジが表示される', async () => {
       const tabId = 101;
       const node = createMockNode(tabId);
-      const tab = createMockTab(tabId, '新しいタブ');
+      const tab = createMockTabInfo(tabId, '新しいタブ');
 
       await unreadTracker.markAsUnread(tabId);
 
@@ -120,7 +120,7 @@ describe('未読インジケータ E2Eテスト', () => {
             <TreeNode
               key={tab.id}
               node={createMockNode(tab.id)}
-              tab={createMockTab(tab.id, tab.title)}
+              tab={createMockTabInfo(tab.id, tab.title)}
               isUnread={unreadTracker.isUnread(tab.id)}
               isActive={false}
               showUnreadIndicator={true}
@@ -144,7 +144,7 @@ describe('未読インジケータ E2Eテスト', () => {
       const user = userEvent.setup();
       const tabId = 301;
       const node = createMockNode(tabId);
-      const tab = createMockTab(tabId, 'アクティブ化するタブ');
+      const tab = createMockTabInfo(tabId, 'アクティブ化するタブ');
 
       await unreadTracker.markAsUnread(tabId);
       expect(unreadTracker.isUnread(tabId)).toBe(true);
@@ -221,7 +221,7 @@ describe('未読インジケータ E2Eテスト', () => {
             <TreeNode
               key={tab.id}
               node={createMockNode(tab.id)}
-              tab={createMockTab(tab.id, tab.title)}
+              tab={createMockTabInfo(tab.id, tab.title)}
               isUnread={unreadTracker.isUnread(tab.id)}
               isActive={false}
               showUnreadIndicator={true}
@@ -249,7 +249,7 @@ describe('未読インジケータ E2Eテスト', () => {
             <TreeNode
               key={tab.id}
               node={createMockNode(tab.id)}
-              tab={createMockTab(tab.id, tab.title)}
+              tab={createMockTabInfo(tab.id, tab.title)}
               isUnread={unreadTracker.isUnread(tab.id)}
               isActive={tab.id === 402}
               showUnreadIndicator={true}
@@ -298,7 +298,7 @@ describe('未読インジケータ E2Eテスト', () => {
         <>
           <TreeNode
             node={createMockNode(501)}
-            tab={createMockTab(501, '復元されたタブ1')}
+            tab={createMockTabInfo(501, '復元されたタブ1')}
             isUnread={newUnreadTracker.isUnread(501)}
             isActive={false}
             showUnreadIndicator={true}
@@ -308,7 +308,7 @@ describe('未読インジケータ E2Eテスト', () => {
           />
           <TreeNode
             node={createMockNode(502)}
-            tab={createMockTab(502, '復元されたタブ2')}
+            tab={createMockTabInfo(502, '復元されたタブ2')}
             isUnread={newUnreadTracker.isUnread(502)}
             isActive={false}
             showUnreadIndicator={true}

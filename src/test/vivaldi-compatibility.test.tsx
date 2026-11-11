@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ThemeProvider } from '@/sidepanel/providers/ThemeProvider';
 import type { UserSettings } from '@/types';
 import type { MockChrome, MockStorageData } from '@/test/test-types';
+import { createMockTab } from '@/test/chrome-mock';
 
 interface VivaldiTabAPI {
   getAll?: (callback: (tabs: chrome.tabs.Tab[]) => void) => void;
@@ -53,20 +54,20 @@ describe('Vivaldi互換性テスト', () => {
     global.chrome.storage.onChanged.removeListener = vi.fn();
 
     vi.mocked(mockChrome.tabs.query).mockResolvedValue([
-      {
+      createMockTab({
         id: 1,
         title: 'Tab 1',
         url: 'https://example.com/1',
         active: true,
         windowId: 1,
-      } as chrome.tabs.Tab,
+      }),
     ]);
 
     vi.mocked(mockChrome.tabs.update).mockImplementation((tabId: number, updateProperties: chrome.tabs.UpdateProperties) =>
-      Promise.resolve({
+      Promise.resolve(createMockTab({
         id: tabId,
         active: updateProperties.active ?? false,
-      } as chrome.tabs.Tab)
+      }))
     );
 
     global.chrome.runtime.sendMessage = vi.fn(() => Promise.resolve());
@@ -104,13 +105,13 @@ describe('Vivaldi互換性テスト', () => {
 
     it('Chrome tabs APIが正常に動作すること', async () => {
       const mockTabs = [
-        {
+        createMockTab({
           id: 1,
           title: 'Test Tab',
           url: 'https://vivaldi.com',
           active: true,
           windowId: 1,
-        } as chrome.tabs.Tab,
+        }),
       ];
 
       const mockChrome = global.chrome as unknown as MockChrome;
@@ -148,13 +149,13 @@ describe('Vivaldi互換性テスト', () => {
       const vivaldiTabs: VivaldiTabAPI = {
         getAll: vi.fn((callback) => {
           callback([
-            {
+            createMockTab({
               id: 1,
               title: 'Vivaldi Tab',
               url: 'https://vivaldi.com',
               active: true,
               windowId: 1,
-            } as chrome.tabs.Tab,
+            }),
           ]);
         }),
       };
@@ -178,13 +179,13 @@ describe('Vivaldi互換性テスト', () => {
 
     it('標準のChrome tabs APIも正常に動作すること', async () => {
       const chromeTabs = [
-        {
+        createMockTab({
           id: 1,
           title: 'Chrome Tab',
           url: 'https://google.com',
           active: true,
           windowId: 1,
-        } as chrome.tabs.Tab,
+        }),
       ];
 
       const mockChrome = global.chrome as unknown as MockChrome;
@@ -312,13 +313,13 @@ describe('Vivaldi互換性テスト', () => {
       window.vivaldi = undefined;
 
       const chromeTabs = [
-        {
+        createMockTab({
           id: 1,
           title: 'Fallback Tab',
           url: 'https://example.com',
           active: true,
           windowId: 1,
-        } as chrome.tabs.Tab,
+        }),
       ];
 
       const mockChrome = global.chrome as unknown as MockChrome;
@@ -367,13 +368,13 @@ describe('Vivaldi互換性テスト', () => {
         tabs: {
           getAll: vi.fn((callback) => {
             callback([
-              {
+              createMockTab({
                 id: 1,
                 title: 'Test Tab',
                 url: 'https://vivaldi.com',
                 active: true,
                 windowId: 1,
-              } as chrome.tabs.Tab,
+              }),
             ]);
           }),
         },

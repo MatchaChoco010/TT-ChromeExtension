@@ -21,13 +21,12 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Path aliases */
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
 
-    /* Chrome and Node types */
-    "types": ["chrome", "node"]
+    /* Chrome, Node and Vite client types */
+    "types": ["chrome", "node", "vite/client"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "playwright-report", "test-results", "e2e"],
