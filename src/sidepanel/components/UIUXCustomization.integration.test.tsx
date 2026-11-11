@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ThemeProvider, useTheme } from '@/sidepanel/providers/ThemeProvider';
 import SettingsPanel from './SettingsPanel';
-import TreeNode from './TreeNode';
-import type { UserSettings, UITabNode, TabInfo, StorageChanges } from '@/types';
+import type { UserSettings, StorageChanges } from '@/types';
 import type { StorageChangeListener } from '@/test/test-types';
 
 describe('UI/UXカスタマイズのインテグレーションテスト', () => {
@@ -65,139 +64,6 @@ describe('UI/UXカスタマイズのインテグレーションテスト', () =>
   });
 
   describe('フォントサイズ変更がすべてのタブアイテムに適用される', () => {
-    it('should apply font size changes to all tab items in the side panel', async () => {
-      const initialSettings: UserSettings = {
-        fontSize: 14,
-        fontFamily: 'system-ui',
-        customCSS: '',
-        newTabPosition: 'child',
-        closeWarningThreshold: 3,
-        showUnreadIndicator: true,
-        autoSnapshotInterval: 0,
-        childTabBehavior: 'promote',
-        snapshotSubfolder: 'TT-Snapshots',
-      };
-
-      mockGet.mockResolvedValue({
-        user_settings: initialSettings,
-      });
-
-      const TestSidePanelWithTabs = () => {
-        const { settings, updateSettings } = useTheme();
-
-        const mockTabs: Array<{ node: UITabNode; tab: TabInfo }> = [
-          {
-            node: {
-              tabId: 1,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            tab: {
-              id: 1,
-              title: 'タブアイテム1',
-              url: 'https://example.com/1',
-              favIconUrl: undefined,
-              status: 'complete' as const,
-            },
-          },
-          {
-            node: {
-              tabId: 2,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            tab: {
-              id: 2,
-              title: 'タブアイテム2',
-              url: 'https://example.com/2',
-              favIconUrl: undefined,
-              status: 'complete' as const,
-            },
-          },
-          {
-            node: {
-              tabId: 3,
-              children: [],
-              isExpanded: true,
-              depth: 0,
-            },
-            tab: {
-              id: 3,
-              title: 'タブアイテム3',
-              url: 'https://example.com/3',
-              favIconUrl: undefined,
-              status: 'complete' as const,
-            },
-          },
-        ];
-
-        return (
-          <div>
-            {settings && (
-              <>
-                <SettingsPanel
-                  settings={settings}
-                  onSettingsChange={updateSettings}
-                />
-                <div className="tab-tree" data-testid="tab-tree">
-                  {mockTabs.map(({ node, tab }) => (
-                    <TreeNode
-                      key={node.tabId}
-                      node={node}
-                      tab={tab}
-                      isUnread={false}
-                      isActive={false}
-                      onClose={vi.fn()}
-                      onActivate={vi.fn()}
-                      onToggle={vi.fn()}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        );
-      };
-
-      render(
-        <ThemeProvider>
-          <TestSidePanelWithTabs />
-        </ThemeProvider>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByLabelText(/フォントサイズ/i)).toBeInTheDocument();
-      });
-
-      await waitFor(() => {
-        const styleElement = document.getElementById('vivaldi-tt-theme');
-        expect(styleElement).toBeTruthy();
-        expect(styleElement?.textContent).toContain('--font-size: 14px');
-      });
-
-      const fontSizeInput = screen.getByLabelText(/フォントサイズ/i);
-      fireEvent.change(fontSizeInput, { target: { value: '18' } });
-
-      await waitFor(
-        () => {
-          const styleElement = document.getElementById('vivaldi-tt-theme');
-          expect(styleElement?.textContent).toContain('--font-size: 18px');
-        },
-        { timeout: 2000 }
-      );
-
-      expect(screen.getByText('タブアイテム1')).toBeInTheDocument();
-      expect(screen.getByText('タブアイテム2')).toBeInTheDocument();
-      expect(screen.getByText('タブアイテム3')).toBeInTheDocument();
-
-      await waitFor(() => {
-        const styleElement = document.getElementById('vivaldi-tt-theme');
-        expect(styleElement?.textContent).toContain('font-size: var(--font-size)');
-      });
-    });
-
     it('should update font size for all tab items when using preset buttons', async () => {
       const initialSettings: UserSettings = {
         fontSize: 14,

@@ -78,7 +78,6 @@ function registerAlarmListener(): void {
   });
 }
 
-exposeE2ETestHooks();
 registerTabEventListeners();
 registerWindowEventListeners();
 registerWebNavigationListeners();
@@ -86,6 +85,7 @@ registerRequestListener();
 registerSettingsChangeListener();
 registerAlarmListener();
 
-initialize().catch((error: unknown) => {
+const initialization = initialize().catch((error: unknown) => {
   console.error('[service-worker] Initialization failed:', error);
 });
+exposeE2ETestHooks(initialization);

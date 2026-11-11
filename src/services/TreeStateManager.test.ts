@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TreeStateManager } from './TreeStateManager';
 import type { IStorageService } from '@/types';
-import { createMockTab } from '@/test/chrome-mock';
+import { chromeMock, createMockTab } from '@/test/chrome-mock';
 
 describe('TreeStateManager', () => {
   let manager: TreeStateManager;
@@ -273,6 +273,33 @@ describe('TreeStateManager', () => {
       } finally {
         chrome.tabs.query = originalQuery;
       }
+    });
+  });
+
+  describe('initializeFromChromeTabs', () => {
+    it('Chromeのタブをツリーに取り込み、擬似サイドパネルのタブは除外する', async () => {
+      chromeMock.windows.getAll.mockResolvedValue([{ id: 1 } as chrome.windows.Window]);
+      chromeMock.tabs.query.mockResolvedValue([
+        createMockTab({ id: 10, index: 0, windowId: 1 }),
+        createMockTab({ id: 11, index: 1, windowId: 1, url: 'chrome-extension://test-extension-id/sidepanel.html' }),
+        createMockTab({ id: 12, index: 2, windowId: 1, pinned: true }),
+      ]);
+
+      await manager.initializeFromChromeTabs();
+
+      expect(manager.getViewTabIds(1)).toEqual([12, 10]);
+      expect(manager.isInitialized()).toBe(true);
+    });
+
+    it('既に初期化済みの場合は何もしない（登録済みのタブを重複させない）', async () => {
+      chromeMock.windows.getAll.mockResolvedValue([{ id: 1 } as chrome.windows.Window]);
+      chromeMock.tabs.query.mockResolvedValue([createMockTab({ id: 10, windowId: 1 })]);
+      manager.resetForTesting();
+      await manager.addTab(createMockTab({ id: 10, windowId: 1 }), null, 1);
+
+      await manager.initializeFromChromeTabs();
+
+      expect(manager.getViewTabIds(1)).toEqual([10]);
     });
   });
 

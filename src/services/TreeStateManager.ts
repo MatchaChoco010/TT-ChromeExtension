@@ -10,6 +10,7 @@ import type {
 } from '@/types';
 import { STORAGE_KEYS } from '@/storage/StorageService';
 import { ignoreMissingTabOrWindow, sendMessageToExtensionPages } from '@/utils/chrome-errors';
+import { isSidePanelUrl } from '@/utils/extension-urls';
 
 /**
  * ノード検索結果
@@ -1738,39 +1739,48 @@ export class TreeStateManager {
    * 新規インストール時のみ許可される唯一の例外
    */
   async initializeFromChromeTabs(): Promise<void> {
-    const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    if (this.initializationInProgress || this.initialized) {
+      return;
+    }
+    this.initializationInProgress = true;
 
-    for (const window of windows) {
-      if (window.id === undefined) continue;
+    try {
+      const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
 
-      const windowState = this.getOrCreateWindowState(window.id);
-      const viewState = windowState.views[0];
+      for (const window of windows) {
+        if (window.id === undefined) continue;
 
-      const tabs = await chrome.tabs.query({ windowId: window.id });
-      const sortedTabs = tabs
-        .filter((t) => t.id !== undefined)
-        .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+        const windowState = this.getOrCreateWindowState(window.id);
+        const viewState = windowState.views[0];
 
-      for (const tab of sortedTabs) {
-        if (tab.id === undefined) continue;
+        const tabs = await chrome.tabs.query({ windowId: window.id });
+        const sortedTabs = tabs
+          .filter((t) => !isSidePanelUrl(t.url || t.pendingUrl))
+          .sort((a, b) => a.index - b.index);
 
-        if (tab.pinned) {
-          viewState.pinnedTabIds.push(tab.id);
-        } else {
-          viewState.rootNodes.push({
-            tabId: tab.id,
-            isExpanded: true,
-            children: [],
-          });
+        for (const tab of sortedTabs) {
+          if (tab.id === undefined) continue;
+
+          if (tab.pinned) {
+            viewState.pinnedTabIds.push(tab.id);
+          } else {
+            viewState.rootNodes.push({
+              tabId: tab.id,
+              isExpanded: true,
+              children: [],
+            });
+          }
         }
       }
+
+      await this.persistState();
+    } finally {
+      this.initialized = true;
+      this.initializationInProgress = false;
+      this.notifyInitializationComplete();
     }
-
-    await this.persistState();
-
-    this.initialized = true;
-    this.notifyInitializationComplete();
   }
+
 
   /**
    * 同一ブラウザセッション内でService Workerが再起動した後の状態復元

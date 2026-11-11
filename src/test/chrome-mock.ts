@@ -101,7 +101,7 @@ export class ChromeMock {
       ) => boolean | void
     >(),
     sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(() => Promise.resolve({ success: true, data: null })),
-    getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path}`),
+    getURL: vi.fn((path: string) => `chrome-extension://test-extension-id/${path.replace(/^\//, "")}`),
     id: 'test-extension-id',
     lastError: undefined as chrome.runtime.LastError | undefined,
   };
@@ -182,7 +182,7 @@ export class ChromeMock {
 
     this.tabs.get.mockImplementation((tabId: number) => Promise.resolve(createMockTab({ id: tabId })));
     this.runtime.sendMessage.mockImplementation(() => Promise.resolve({ success: true, data: null }));
-    this.runtime.getURL.mockImplementation((path: string) => `chrome-extension://test-extension-id/${path}`);
+    this.runtime.getURL.mockImplementation((path: string) => `chrome-extension://test-extension-id/${path.replace(/^\//, "")}`);
     this.runtime.lastError = undefined;
 
     // Re-apply storage mock implementations (may be cleared by vi.clearAllMocks())

@@ -3,27 +3,7 @@ import type { TabInfoMap } from '@/types';
 import { useDragDrop, DropTargetType } from '../hooks/useDragDrop';
 import { DragOverlay } from './DragOverlay';
 import HorizontalDropIndicator from './HorizontalDropIndicator';
-
-const getFaviconUrl = (url: string): string | null => {
-  if (!url) return null;
-
-  const faviconApiUrl = new URL(chrome.runtime.getURL("/_favicon/"));
-  faviconApiUrl.searchParams.set("pageUrl", url);
-  faviconApiUrl.searchParams.set("size", "32");
-  return faviconApiUrl.toString();
-};
-
-const getDisplayFavicon = (tabInfo: { favIconUrl?: string; url?: string }): string | null => {
-  if (tabInfo.favIconUrl) {
-    return tabInfo.favIconUrl;
-  }
-
-  if (tabInfo.url) {
-    return getFaviconUrl(tabInfo.url);
-  }
-
-  return null;
-};
+import { getDisplayFavicon } from '../utils/tab-display';
 
 interface PinnedTabsSectionProps {
   pinnedTabIds: number[];
