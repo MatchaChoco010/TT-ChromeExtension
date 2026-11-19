@@ -837,4 +837,108 @@ describe('useDragDrop', () => {
       document.body.removeChild(horizontalContainer);
     });
   });
+
+  describe('グリッドドラッグモード（複数行折り返し）', () => {
+    it('グリッドモードでは垂直方向の移動距離だけでもドラッグが開始される', () => {
+      const { result } = renderHook(() =>
+        useDragDrop({
+          containerRef,
+          items: [{ id: 'pinned-1', tabId: 1 }],
+          direction: 'grid',
+          activationDistance: 5,
+        })
+      );
+
+      const props = result.current.getItemProps('pinned-1', 1);
+
+      act(() => {
+        props.onMouseDown(createReactMouseEvent(20, 20));
+      });
+
+      act(() => {
+        document.dispatchEvent(createMouseEvent('mousemove', 20, 30));
+      });
+
+      expect(result.current.dragState.isDragging).toBe(true);
+      expect(result.current.dragState.isPotentialDrag).toBe(false);
+    });
+
+    it('グリッドモードで2行目の位置にドラッグしたとき正しいinsertIndexとindicatorPositionが計算される', async () => {
+      const gridContainer = document.createElement('div');
+      document.body.appendChild(gridContainer);
+
+      const rects = [
+        { left: 8, right: 36, top: 8, bottom: 36 },
+        { left: 40, right: 68, top: 8, bottom: 36 },
+        { left: 72, right: 100, top: 8, bottom: 36 },
+        { left: 8, right: 36, top: 40, bottom: 68 },
+        { left: 40, right: 68, top: 40, bottom: 68 },
+      ];
+
+      const tabs = rects.map((r, i) => {
+        const tab = document.createElement('div');
+        tab.setAttribute('data-node-id', `pinned-${i + 1}`);
+        tab.setAttribute('data-pinned-index', String(i));
+        gridContainer.appendChild(tab);
+        vi.spyOn(tab, 'getBoundingClientRect').mockReturnValue({
+          ...r,
+          width: r.right - r.left,
+          height: r.bottom - r.top,
+          x: r.left,
+          y: r.top,
+          toJSON: () => ({}),
+        });
+        return tab;
+      });
+
+      vi.spyOn(gridContainer, 'getBoundingClientRect').mockReturnValue({
+        top: 0, left: 0, right: 108, bottom: 76, width: 108, height: 76, x: 0, y: 0, toJSON: () => ({}),
+      });
+
+      const gridRef = { current: gridContainer };
+      const onDragEnd = vi.fn();
+
+      const { result } = renderHook(() =>
+        useDragDrop({
+          containerRef: gridRef,
+          items: tabs.map((_, i) => ({ id: `pinned-${i + 1}`, tabId: i + 1 })),
+          direction: 'grid',
+          activationDistance: 5,
+          onDragEnd,
+        })
+      );
+
+      const props = result.current.getItemProps('pinned-1', 1);
+
+      act(() => {
+        props.onMouseDown(createReactMouseEvent(22, 22));
+      });
+
+      // 2行目の2番目のタブ（index=4）の右半分へドラッグ
+      act(() => {
+        document.dispatchEvent(createMouseEvent('mousemove', 60, 54));
+      });
+
+      expect(result.current.dragState.isDragging).toBe(true);
+      expect(result.current.dragState.dropTarget).toEqual({
+        type: 'horizontal_gap',
+        insertIndex: 5,
+        indicatorPosition: { left: 70, top: 40, height: 28 },
+      });
+
+      act(() => {
+        document.dispatchEvent(createMouseEvent('mouseup', 60, 54));
+      });
+
+      await waitFor(() => {
+        expect(onDragEnd).toHaveBeenCalledWith('pinned-1', {
+          type: 'horizontal_gap',
+          insertIndex: 5,
+          indicatorPosition: { left: 70, top: 40, height: 28 },
+        });
+      });
+
+      document.body.removeChild(gridContainer);
+    });
+  });
 });

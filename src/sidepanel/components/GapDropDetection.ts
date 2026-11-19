@@ -48,6 +48,18 @@ export interface AdjacentNodeIds {
 }
 
 /**
+ * 水平・グリッドドロップ時のインジケーター表示位置（コンテナ相対）
+ */
+export interface HorizontalIndicatorPosition {
+  /** インジケーターのX座標（px） */
+  left: number;
+  /** インジケーターの上端Y座標（px） */
+  top?: number;
+  /** インジケーターの高さ（px） */
+  height?: number;
+}
+
+/**
  * ドロップターゲット情報
  */
 export interface DropTarget {
@@ -63,6 +75,8 @@ export interface DropTarget {
   adjacentNodeIds?: AdjacentNodeIds;
   /** 水平ドロップの場合の挿入インデックス（ピン留めタブ用） */
   insertIndex?: number;
+  /** 水平・グリッドドロップの場合のインジケーター表示位置 */
+  indicatorPosition?: HorizontalIndicatorPosition;
 }
 
 /**
@@ -354,61 +368,176 @@ export interface HorizontalTabPosition {
   left: number;
   /** タブの右端X座標（コンテナ相対） */
   right: number;
+  /** タブの上端Y座標（コンテナ相対、複数行レイアウト時に使用） */
+  top?: number;
+  /** タブの下端Y座標（コンテナ相対、複数行レイアウト時に使用） */
+  bottom?: number;
   /** タブのインデックス */
   index: number;
 }
 
+interface HorizontalTabRow {
+  top: number;
+  bottom: number;
+  tabs: HorizontalTabPosition[];
+}
+
+function hasVerticalBounds(tabPositions: HorizontalTabPosition[]): boolean {
+  return tabPositions.every(
+    (tab) => tab.top !== undefined && tab.bottom !== undefined && tab.bottom > tab.top
+  );
+}
+
+function groupTabsIntoRows(
+  tabPositions: HorizontalTabPosition[],
+  useVerticalBounds: boolean
+): HorizontalTabRow[] {
+  if (!useVerticalBounds) {
+    return [{ top: 0, bottom: 0, tabs: tabPositions }];
+  }
+
+  const rows: HorizontalTabRow[] = [];
+
+  for (const tab of tabPositions) {
+    const top = tab.top!;
+    const bottom = tab.bottom!;
+    const centerY = (top + bottom) / 2;
+    const lastRow = rows[rows.length - 1];
+
+    if (lastRow && centerY >= lastRow.top && centerY <= lastRow.bottom) {
+      lastRow.tabs.push(tab);
+      lastRow.top = Math.min(lastRow.top, top);
+      lastRow.bottom = Math.max(lastRow.bottom, bottom);
+    } else {
+      rows.push({ top, bottom, tabs: [tab] });
+    }
+  }
+
+  return rows;
+}
+
+function findTargetRow(rows: HorizontalTabRow[], mouseY: number | undefined): HorizontalTabRow {
+  if (rows.length === 1 || mouseY === undefined) {
+    return rows[0];
+  }
+
+  if (mouseY < rows[0].top) {
+    return rows[0];
+  }
+
+  const lastRow = rows[rows.length - 1];
+  if (mouseY >= lastRow.bottom) {
+    return lastRow;
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (mouseY >= row.top && mouseY < row.bottom) {
+      return row;
+    }
+
+    if (i < rows.length - 1) {
+      const nextRow = rows[i + 1];
+      if (mouseY >= row.bottom && mouseY < nextRow.top) {
+        const midY = (row.bottom + nextRow.top) / 2;
+        return mouseY < midY ? row : nextRow;
+      }
+    }
+  }
+
+  let closestRow = rows[0];
+  let minDistance = Infinity;
+  for (const row of rows) {
+    const rowCenterY = (row.top + row.bottom) / 2;
+    const distance = Math.abs(mouseY - rowCenterY);
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestRow = row;
+    }
+  }
+  return closestRow;
+}
+
+function estimateHorizontalGap(targetRow: HorizontalTabRow, rows: HorizontalTabRow[]): number {
+  if (targetRow.tabs.length >= 2) {
+    return Math.max(0, targetRow.tabs[1].left - targetRow.tabs[0].right);
+  }
+
+  for (const row of rows) {
+    if (row.tabs.length >= 2) {
+      return Math.max(0, row.tabs[1].left - row.tabs[0].right);
+    }
+  }
+
+  return 0;
+}
+
 /**
- * 水平方向のドロップターゲットを計算する（ピン留めタブ用）
+ * 水平方向（単一行および複数行折り返し）のドロップターゲットを計算する
  *
  * @param mouseX - マウスのX座標（コンテナ相対）
- * @param tabPositions - タブノードの水平位置情報配列（左から順）
+ * @param tabPositions - タブノードの位置情報配列（DOM順）
+ * @param mouseY - マウスのY座標（コンテナ相対、複数行レイアウト時に指定）
  * @returns ドロップターゲット情報
  */
 export function calculateHorizontalDropTarget(
   mouseX: number,
-  tabPositions: HorizontalTabPosition[]
+  tabPositions: HorizontalTabPosition[],
+  mouseY?: number
 ): DropTarget {
   if (tabPositions.length === 0) {
     return { type: DropTargetType.None };
   }
 
-  const firstTab = tabPositions[0];
-  if (mouseX < firstTab.left) {
+  const useVerticalBounds = hasVerticalBounds(tabPositions);
+  const rows = groupTabsIntoRows(tabPositions, useVerticalBounds);
+  const targetRow = findTargetRow(rows, useVerticalBounds ? mouseY : undefined);
+  const rowTabs = targetRow.tabs;
+  const gap = estimateHorizontalGap(targetRow, rows);
+
+  const verticalIndicator = useVerticalBounds
+    ? { top: targetRow.top, height: targetRow.bottom - targetRow.top }
+    : {};
+
+  const firstTab = rowTabs[0];
+  const firstCenter = (firstTab.left + firstTab.right) / 2;
+  if (mouseX < firstCenter) {
     return {
       type: DropTargetType.HorizontalGap,
-      insertIndex: 0,
+      insertIndex: firstTab.index,
+      indicatorPosition: {
+        left: Math.max(0, firstTab.left - gap / 2),
+        ...verticalIndicator,
+      },
     };
   }
 
-  const lastTab = tabPositions[tabPositions.length - 1];
-  if (mouseX >= lastTab.right) {
-    return {
-      type: DropTargetType.HorizontalGap,
-      insertIndex: tabPositions.length,
-    };
-  }
+  for (let i = 0; i < rowTabs.length - 1; i++) {
+    const currentTab = rowTabs[i];
+    const nextTab = rowTabs[i + 1];
+    const nextCenter = (nextTab.left + nextTab.right) / 2;
 
-  for (let i = 0; i < tabPositions.length; i++) {
-    const tab = tabPositions[i];
-    const tabWidth = tab.right - tab.left;
-    const tabCenter = tab.left + tabWidth / 2;
-
-    if (mouseX >= tab.left && mouseX < tab.right) {
-      if (mouseX < tabCenter) {
-        return {
-          type: DropTargetType.HorizontalGap,
-          insertIndex: i,
-        };
-      }
+    if (mouseX < nextCenter) {
       return {
         type: DropTargetType.HorizontalGap,
-        insertIndex: i + 1,
+        insertIndex: currentTab.index + 1,
+        indicatorPosition: {
+          left: (currentTab.right + nextTab.left) / 2,
+          ...verticalIndicator,
+        },
       };
     }
   }
 
-  return { type: DropTargetType.None };
+  const lastTab = rowTabs[rowTabs.length - 1];
+  return {
+    type: DropTargetType.HorizontalGap,
+    insertIndex: lastTab.index + 1,
+    indicatorPosition: {
+      left: lastTab.right + gap / 2,
+      ...verticalIndicator,
+    },
+  };
 }
 
 /**

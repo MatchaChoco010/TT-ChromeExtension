@@ -32,8 +32,8 @@ export interface DragState {
 export interface UseDragDropOptions {
   /** ドラッグ開始までの移動距離（デフォルト: 8px） */
   activationDistance?: number;
-  /** ドラッグ方向（vertical: 縦方向、horizontal: 横方向） */
-  direction?: 'vertical' | 'horizontal';
+  /** ドラッグ方向（vertical: 縦方向、horizontal: 単一行横方向、grid: 複数行折り返し） */
+  direction?: 'vertical' | 'horizontal' | 'grid';
   containerRef: React.RefObject<HTMLElement | null>;
   items: Array<{ id: string; tabId: number }>;
   onDragStart?: (itemId: string, tabId: number) => void;
@@ -186,14 +186,16 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     return calculateDropTarget(mouseY, tabPositions, options);
   }, [containerRef]);
 
-  const calculateHorizontalDropTargetFromDOM = useCallback((clientX: number, _clientY: number): DropTarget | null => {
+  const calculateHorizontalDropTargetFromDOM = useCallback((clientX: number, clientY: number): DropTarget | null => {
     const container = containerRef.current;
     if (!container) return null;
 
     const rect = container.getBoundingClientRect();
     const scrollLeft = container.scrollLeft || 0;
+    const scrollTop = container.scrollTop || 0;
 
     const mouseX = clientX - rect.left + scrollLeft;
+    const mouseY = clientY - rect.top + scrollTop;
 
     const tabPositions: HorizontalTabPosition[] = [];
     const nodeElements = container.querySelectorAll('[data-node-id]');
@@ -208,17 +210,20 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
           nodeId,
           left: elemRect.left - rect.left + scrollLeft,
           right: elemRect.right - rect.left + scrollLeft,
+          top: elemRect.top - rect.top + scrollTop,
+          bottom: elemRect.bottom - rect.top + scrollTop,
           index: pinnedIndex !== null ? parseInt(pinnedIndex, 10) : idx,
         });
       }
     });
 
-    return calculateHorizontalDropTarget(mouseX, tabPositions);
+    const isGrid = optionsRef.current.direction === 'grid';
+    return calculateHorizontalDropTarget(mouseX, tabPositions, isGrid ? mouseY : undefined);
   }, [containerRef]);
 
   const calculateCurrentDropTarget = useCallback((clientX: number, clientY: number): DropTarget | null => {
     const { direction: dir } = optionsRef.current;
-    if (dir === 'horizontal') {
+    if (dir === 'horizontal' || dir === 'grid') {
       return calculateHorizontalDropTargetFromDOM(clientX, clientY);
     }
     return calculateVerticalDropTarget(clientX, clientY);

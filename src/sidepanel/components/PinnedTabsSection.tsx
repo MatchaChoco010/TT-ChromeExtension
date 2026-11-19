@@ -184,7 +184,7 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
 
   const { dragState, getItemProps } = useDragDrop({
     activationDistance: 5,
-    direction: 'horizontal',
+    direction: 'grid',
     containerRef,
     items,
     onDragEnd: handleDragEnd,
@@ -204,33 +204,25 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
   const draggedTabId = dragState.draggedTabId;
   const draggedTabInfo = draggedTabId ? tabInfoMap[draggedTabId] : null;
 
-  const getIndicatorInfo = useCallback((): { insertIndex: number; leftPosition: number } | null => {
+  const getIndicatorInfo = useCallback((): {
+    insertIndex: number;
+    leftPosition: number;
+    topPosition?: number;
+    height?: number;
+  } | null => {
     if (!dragState.isDragging || !dragState.dropTarget) return null;
     if (dragState.dropTarget.type !== DropTargetType.HorizontalGap) return null;
 
-    const insertIndex = dragState.dropTarget.insertIndex ?? 0;
-    const tabCount = validPinnedTabs.length;
-
-    if (tabCount === 0) return null;
-
-    const TAB_WIDTH = 28;
-    const GAP = 4;
-    const PADDING = 8;
-
-    let leftPosition: number;
-    if (insertIndex === 0) {
-      leftPosition = PADDING;
-    } else if (insertIndex >= tabCount) {
-      leftPosition = PADDING + tabCount * TAB_WIDTH + (tabCount - 1) * GAP + GAP / 2;
-    } else {
-      leftPosition = PADDING + insertIndex * TAB_WIDTH + (insertIndex - 1) * GAP + GAP / 2;
-    }
+    const { insertIndex, indicatorPosition } = dragState.dropTarget;
+    if (insertIndex === undefined || !indicatorPosition) return null;
 
     return {
       insertIndex,
-      leftPosition,
+      leftPosition: indicatorPosition.left,
+      topPosition: indicatorPosition.top,
+      height: indicatorPosition.height,
     };
-  }, [dragState.isDragging, dragState.dropTarget, validPinnedTabs.length]);
+  }, [dragState.isDragging, dragState.dropTarget]);
 
   const indicatorInfo = getIndicatorInfo();
 
@@ -269,6 +261,8 @@ const PinnedTabsSectionContent: React.FC<PinnedTabsSectionContentProps> = ({
             insertIndex={indicatorInfo.insertIndex}
             isVisible={true}
             leftPosition={indicatorInfo.leftPosition}
+            topPosition={indicatorInfo.topPosition}
+            height={indicatorInfo.height}
           />
         )}
       </div>

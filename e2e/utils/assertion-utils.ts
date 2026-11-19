@@ -468,7 +468,7 @@ export async function assertPinnedTabStructure(
         );
       }
 
-      const actualStructure: { tabId: number; x: number }[] = [];
+      const actualStructure: { tabId: number; x: number; y: number }[] = [];
 
       for (const expected of expectedStructure) {
         const element = page.locator(`[data-testid="pinned-tab-${expected.tabId}"]`).first();
@@ -485,11 +485,12 @@ export async function assertPinnedTabStructure(
 
         actualStructure.push({
           tabId: expected.tabId,
-          x: box.x
+          x: box.x,
+          y: box.y,
         });
       }
 
-      actualStructure.sort((a, b) => a.x - b.x);
+      actualStructure.sort((a, b) => (Math.abs(a.y - b.y) > 4 ? a.y - b.y : a.x - b.x));
 
       const actualOrder = actualStructure.map(s => s.tabId);
       const expectedOrder = expectedStructure.map(s => s.tabId);

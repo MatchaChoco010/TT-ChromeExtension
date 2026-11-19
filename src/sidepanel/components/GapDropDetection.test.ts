@@ -90,6 +90,101 @@ describe('calculateHorizontalDropTarget', () => {
       expect(result.insertIndex).toBe(1);
     });
   });
+
+  describe('タブ間の隙間にある場合', () => {
+    it('左タブと右タブの間として挿入インデックスを返す', () => {
+      const tabs: HorizontalTabPosition[] = [
+        { nodeId: 'tab-1', left: 8, right: 36, top: 8, bottom: 36, index: 0 },
+        { nodeId: 'tab-2', left: 40, right: 68, top: 8, bottom: 36, index: 1 },
+      ];
+
+      const result = calculateHorizontalDropTarget(38, tabs, 20);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(1);
+      expect(result.indicatorPosition).toEqual({ left: 38, top: 8, height: 28 });
+    });
+  });
+
+  describe('複数行レイアウト（2行以上に折り返された場合）', () => {
+    // 1行目: tab-0..tab-3 (top: 8, bottom: 36)
+    // 2行目: tab-4..tab-5 (top: 40, bottom: 68)
+    const multiRowTabs: HorizontalTabPosition[] = [
+      { nodeId: 'pinned-0', left: 8, right: 36, top: 8, bottom: 36, index: 0 },
+      { nodeId: 'pinned-1', left: 40, right: 68, top: 8, bottom: 36, index: 1 },
+      { nodeId: 'pinned-2', left: 72, right: 100, top: 8, bottom: 36, index: 2 },
+      { nodeId: 'pinned-3', left: 104, right: 132, top: 8, bottom: 36, index: 3 },
+      { nodeId: 'pinned-4', left: 8, right: 36, top: 40, bottom: 68, index: 4 },
+      { nodeId: 'pinned-5', left: 40, right: 68, top: 40, bottom: 68, index: 5 },
+    ];
+
+    it('2行目のタブの左半分では2行目の該当インデックスと2行目のインジケーター位置を返す', () => {
+      const result = calculateHorizontalDropTarget(15, multiRowTabs, 54);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(4);
+      expect(result.indicatorPosition).toEqual({ left: 6, top: 40, height: 28 });
+    });
+
+    it('2行目のタブ間では2行目のタブ間インデックスと2行目のインジケーター位置を返す', () => {
+      const result = calculateHorizontalDropTarget(48, multiRowTabs, 54);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(5);
+      expect(result.indicatorPosition).toEqual({ left: 38, top: 40, height: 28 });
+    });
+
+    it('2行目の末尾より右側の余白では全体末尾のインデックスと2行目末尾のインジケーター位置を返す', () => {
+      const result = calculateHorizontalDropTarget(120, multiRowTabs, 54);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(6);
+      expect(result.indicatorPosition).toEqual({ left: 70, top: 40, height: 28 });
+    });
+
+    it('2行目が短い状態でも1行目の後半タブ上では1行目の位置として正しく計算される', () => {
+      const result = calculateHorizontalDropTarget(80, multiRowTabs, 20);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(2);
+      expect(result.indicatorPosition).toEqual({ left: 70, top: 8, height: 28 });
+    });
+
+    it('1行目の末尾右側ではinsertIndex=4かつ1行目末尾にインジケーターを表示する', () => {
+      const result = calculateHorizontalDropTarget(125, multiRowTabs, 20);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(4);
+      expect(result.indicatorPosition).toEqual({ left: 134, top: 8, height: 28 });
+    });
+
+    it('行間の隙間では上半分が上の行、下半分が下の行として判定される', () => {
+      const upperHalf = calculateHorizontalDropTarget(50, multiRowTabs, 37);
+      expect(upperHalf.insertIndex).toBe(1);
+      expect(upperHalf.indicatorPosition?.top).toBe(8);
+
+      const lowerHalf = calculateHorizontalDropTarget(50, multiRowTabs, 39);
+      expect(lowerHalf.insertIndex).toBe(5);
+      expect(lowerHalf.indicatorPosition?.top).toBe(40);
+    });
+
+    it('2行目にタブが1つだけの場合でも1行目のギャップ幅を用いてインジケーター位置を計算する', () => {
+      const singleItemSecondRow = multiRowTabs.slice(0, 5);
+      const result = calculateHorizontalDropTarget(60, singleItemSecondRow, 54);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(5);
+      expect(result.indicatorPosition).toEqual({ left: 38, top: 40, height: 28 });
+    });
+
+    it('3行レイアウトの3行目でも正しくドロップターゲットを計算する', () => {
+      const threeRowTabs: HorizontalTabPosition[] = [
+        ...multiRowTabs,
+        { nodeId: 'pinned-6', left: 72, right: 100, top: 40, bottom: 68, index: 6 },
+        { nodeId: 'pinned-7', left: 104, right: 132, top: 40, bottom: 68, index: 7 },
+        { nodeId: 'pinned-8', left: 8, right: 36, top: 72, bottom: 100, index: 8 },
+        { nodeId: 'pinned-9', left: 40, right: 68, top: 72, bottom: 100, index: 9 },
+      ];
+
+      const result = calculateHorizontalDropTarget(48, threeRowTabs, 86);
+      expect(result.type).toBe(DropTargetType.HorizontalGap);
+      expect(result.insertIndex).toBe(9);
+      expect(result.indicatorPosition).toEqual({ left: 38, top: 72, height: 28 });
+    });
+  });
 });
 
 describe('calculateHorizontalIndicatorX', () => {

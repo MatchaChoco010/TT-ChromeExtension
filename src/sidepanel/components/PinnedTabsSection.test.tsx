@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PinnedTabsSection from './PinnedTabsSection';
 import type { TabInfoMap, ExtendedTabInfo } from '@/types';
@@ -482,6 +482,190 @@ describe('PinnedTabsSection', () => {
 
       const pinnedTab1 = screen.getByTestId('pinned-tab-1');
       expect(pinnedTab1).toHaveAttribute('data-pinned-id', 'pinned-1');
+    });
+
+    it('2行以上に折り返されたピン留めタブで1行目から2行目へドラッグ＆ドロップでき、インジケーターが2行目に表示されること', () => {
+      const pinnedTabIds = [1, 2, 3, 4, 5, 6];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+        3: createMockTabInfo(3, 'Tab 3', true),
+        4: createMockTabInfo(4, 'Tab 4', true),
+        5: createMockTabInfo(5, 'Tab 5', true),
+        6: createMockTabInfo(6, 'Tab 6', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          onPinnedTabReorder={mockOnPinnedTabReorder}
+        />
+      );
+
+      const section = screen.getByTestId('pinned-tabs-section');
+      vi.spyOn(section, 'getBoundingClientRect').mockReturnValue({
+        top: 0, left: 0, right: 140, bottom: 76, width: 140, height: 76, x: 0, y: 0, toJSON: () => ({}),
+      });
+
+      const rects = [
+        { left: 8, right: 36, top: 8, bottom: 36 },
+        { left: 40, right: 68, top: 8, bottom: 36 },
+        { left: 72, right: 100, top: 8, bottom: 36 },
+        { left: 104, right: 132, top: 8, bottom: 36 },
+        { left: 8, right: 36, top: 40, bottom: 68 },
+        { left: 40, right: 68, top: 40, bottom: 68 },
+      ];
+
+      pinnedTabIds.forEach((id, i) => {
+        const el = screen.getByTestId(`pinned-tab-${id}`);
+        const r = rects[i];
+        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+          ...r,
+          width: r.right - r.left,
+          height: r.bottom - r.top,
+          x: r.left,
+          y: r.top,
+          toJSON: () => ({}),
+        });
+      });
+
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      fireEvent.mouseDown(pinnedTab1, { button: 0, clientX: 22, clientY: 22 });
+      fireEvent.mouseMove(document, { clientX: 46, clientY: 54 });
+
+      const indicator = screen.getByTestId('horizontal-drop-indicator');
+      expect(indicator).toHaveAttribute('data-insert-index', '5');
+      expect(indicator).toHaveStyle({ left: '38px', top: '40px', height: '28px' });
+
+      fireEvent.mouseUp(document, { clientX: 46, clientY: 54 });
+
+      expect(mockOnPinnedTabReorder).toHaveBeenCalledTimes(1);
+      expect(mockOnPinnedTabReorder).toHaveBeenCalledWith(1, 4);
+    });
+
+    it('2行目が短い状態でも1行目のタブを1行目の末尾へドラッグ＆ドロップできること', () => {
+      const pinnedTabIds = [1, 2, 3, 4, 5, 6];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+        3: createMockTabInfo(3, 'Tab 3', true),
+        4: createMockTabInfo(4, 'Tab 4', true),
+        5: createMockTabInfo(5, 'Tab 5', true),
+        6: createMockTabInfo(6, 'Tab 6', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          onPinnedTabReorder={mockOnPinnedTabReorder}
+        />
+      );
+
+      const section = screen.getByTestId('pinned-tabs-section');
+      vi.spyOn(section, 'getBoundingClientRect').mockReturnValue({
+        top: 0, left: 0, right: 140, bottom: 76, width: 140, height: 76, x: 0, y: 0, toJSON: () => ({}),
+      });
+
+      const rects = [
+        { left: 8, right: 36, top: 8, bottom: 36 },
+        { left: 40, right: 68, top: 8, bottom: 36 },
+        { left: 72, right: 100, top: 8, bottom: 36 },
+        { left: 104, right: 132, top: 8, bottom: 36 },
+        { left: 8, right: 36, top: 40, bottom: 68 },
+        { left: 40, right: 68, top: 40, bottom: 68 },
+      ];
+
+      pinnedTabIds.forEach((id, i) => {
+        const el = screen.getByTestId(`pinned-tab-${id}`);
+        const r = rects[i];
+        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+          ...r,
+          width: r.right - r.left,
+          height: r.bottom - r.top,
+          x: r.left,
+          y: r.top,
+          toJSON: () => ({}),
+        });
+      });
+
+      const pinnedTab1 = screen.getByTestId('pinned-tab-1');
+      fireEvent.mouseDown(pinnedTab1, { button: 0, clientX: 22, clientY: 22 });
+      fireEvent.mouseMove(document, { clientX: 125, clientY: 22 });
+
+      const indicator = screen.getByTestId('horizontal-drop-indicator');
+      expect(indicator).toHaveAttribute('data-insert-index', '4');
+      expect(indicator).toHaveStyle({ left: '134px', top: '8px', height: '28px' });
+
+      fireEvent.mouseUp(document, { clientX: 125, clientY: 22 });
+
+      expect(mockOnPinnedTabReorder).toHaveBeenCalledTimes(1);
+      expect(mockOnPinnedTabReorder).toHaveBeenCalledWith(1, 3);
+    });
+
+    it('2行目のタブを真上の1行目へ垂直ドラッグで移動できること', () => {
+      const pinnedTabIds = [1, 2, 3, 4, 5, 6];
+      const tabInfoMap: TabInfoMap = {
+        1: createMockTabInfo(1, 'Tab 1', true),
+        2: createMockTabInfo(2, 'Tab 2', true),
+        3: createMockTabInfo(3, 'Tab 3', true),
+        4: createMockTabInfo(4, 'Tab 4', true),
+        5: createMockTabInfo(5, 'Tab 5', true),
+        6: createMockTabInfo(6, 'Tab 6', true),
+      };
+
+      render(
+        <PinnedTabsSection
+          pinnedTabIds={pinnedTabIds}
+          tabInfoMap={tabInfoMap}
+          onTabClick={mockOnTabClick}
+          onPinnedTabReorder={mockOnPinnedTabReorder}
+        />
+      );
+
+      const section = screen.getByTestId('pinned-tabs-section');
+      vi.spyOn(section, 'getBoundingClientRect').mockReturnValue({
+        top: 0, left: 0, right: 140, bottom: 76, width: 140, height: 76, x: 0, y: 0, toJSON: () => ({}),
+      });
+
+      const rects = [
+        { left: 8, right: 36, top: 8, bottom: 36 },
+        { left: 40, right: 68, top: 8, bottom: 36 },
+        { left: 72, right: 100, top: 8, bottom: 36 },
+        { left: 104, right: 132, top: 8, bottom: 36 },
+        { left: 8, right: 36, top: 40, bottom: 68 },
+        { left: 40, right: 68, top: 40, bottom: 68 },
+      ];
+
+      pinnedTabIds.forEach((id, i) => {
+        const el = screen.getByTestId(`pinned-tab-${id}`);
+        const r = rects[i];
+        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+          ...r,
+          width: r.right - r.left,
+          height: r.bottom - r.top,
+          x: r.left,
+          y: r.top,
+          toJSON: () => ({}),
+        });
+      });
+
+      // 2行目先頭(tab5, centerX=22)から真上(clientX=16, deltaX=-6ではなく垂直移動 clientX=20, deltaX=-2)へドラッグ
+      const pinnedTab5 = screen.getByTestId('pinned-tab-5');
+      fireEvent.mouseDown(pinnedTab5, { button: 0, clientX: 20, clientY: 54 });
+      fireEvent.mouseMove(document, { clientX: 20, clientY: 22 });
+
+      const indicator = screen.getByTestId('horizontal-drop-indicator');
+      expect(indicator).toHaveAttribute('data-insert-index', '0');
+      expect(indicator).toHaveStyle({ left: '6px', top: '8px', height: '28px' });
+
+      fireEvent.mouseUp(document, { clientX: 20, clientY: 22 });
+
+      expect(mockOnPinnedTabReorder).toHaveBeenCalledTimes(1);
+      expect(mockOnPinnedTabReorder).toHaveBeenCalledWith(5, 0);
     });
   });
 });
